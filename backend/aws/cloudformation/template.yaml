@@ -1,0 +1,247 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: "AWS::Serverless-2016-10-31"
+Description: spica deployment cloudformation script
+    
+# More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
+Globals:
+  Function:
+      Timeout: 30  # in seconds
+Parameters:
+  Project:
+    Type: String
+  TargetEnvr:
+    Type: String
+    Description: The target environment for API Gateway deployment.
+  SubDomain:
+    Type: String
+  Domain:
+    Type: String
+Conditions: 
+  IsProd: !Equals [ !Ref TargetEnvr, prod ]
+Resources:
+  ##########################################
+  ##### AWS IAM Role to execute lambda #####
+  ##########################################
+  ExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      RoleName: !Sub ${Project}-${TargetEnvr}-lambda-execution-role
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/AWSLambda_FullAccess
+        - arn:aws:iam::aws:policy/AmazonAPIGatewayInvokeFullAccess
+        - arn:aws:iam::aws:policy/AmazonSQSFullAccess
+  ##############################################
+  ##### API Gateway and associated Lambdas #####
+  ##############################################
+  ServerlessApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: !Sub ${TargetEnvr}
+      EndpointConfiguration: REGIONAL
+      DefinitionBody: {
+          "openapi": "3.0.1",
+          "info": {
+            "version": "2020-01-06T07:45:41Z",
+            "title": !Sub "${Project}-${TargetEnvr}-api"
+          },
+          "paths": {
+            "/api/question": {
+              "get": {
+                "responses": {
+                  "200": {
+                    "description": "200 response",
+                    "headers": {
+                      "Access-Control-Allow-Origin": {
+                        "schema": {"type": "string"}
+                      }
+                    },
+                    "content": {
+                      "application/json": {
+                        "schema": {
+                          "$ref": "#/components/schemas/Empty"
+                        }
+                      }
+                    }
+                  }
+                },
+                "x-amazon-apigateway-request-validator" : "Validate query string parameters and headers",
+                "x-amazon-apigateway-integration": {
+                  "type": "aws_proxy",
+                  "httpMethod": "POST",
+                  "uri": !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${Project}-${TargetEnvr}-api/invocations",
+                  "responses": {
+                    "default": {
+                      "statusCode": "200",
+                      "responseParameters": {
+                        "method.response.header.Access-Control-Allow-Origin": "'*'"
+                      }
+                    }
+                  },
+                  "passthroughBehavior": "when_no_match",
+                  "contentHandling": "CONVERT_TO_TEXT"
+                }
+              }
+            }
+          },
+          "definitions": {
+            "Empty": {
+              "type": "object",
+              "title": "Empty Schema"
+            }
+          },
+          "x-amazon-apigateway-request-validators" : {
+            "Validate body, query string parameters, and headers" : {
+              "validateRequestParameters" : true,
+              "validateRequestBody" : true
+            },
+            "Validate query string parameters and headers" : {
+              "validateRequestParameters" : true,
+              "validateRequestBody" : false
+            }
+          }
+        }
+  LambdaApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Architectures: [arm64]
+      Handler: index.api
+      Runtime: nodejs20.x
+      FunctionName: !Sub ${Project}-${TargetEnvr}-api
+      Role: !GetAtt ExecutionRole.Arn
+      CodeUri: ../../lib/src
+      MemorySize: 200
+      Layers: [!Ref LambdaLayer]
+      Environment:
+        Variables:
+          PROJECT: !Sub ${Project}
+          DB_CLUSTER: !Sub '{{resolve:ssm:${TargetEnvr}-db-cluster:1}}'
+          DB_HOST: !Sub '{{resolve:ssm:${TargetEnvr}-db-host:1}}'
+          DB_PWD: !Sub '{{resolve:ssm:${TargetEnvr}-db-pwd:1}}'
+          DB_USER: !Sub '{{resolve:ssm:${TargetEnvr}-db-user:1}}'
+          LOGGER_QUEUE_URL: !Sub https://sqs.ap-east-2.amazonaws.com/${AWS::AccountId}/polaris-${TargetEnvr}-logger-queue
+  InvokePermissionLambdaApi:
+    Type: AWS::Lambda::Permission
+    DependsOn: [ServerlessApi, LambdaApiFunction]
+    Properties:
+      FunctionName: !Sub ${Project}-${TargetEnvr}-api
+      Action: 'lambda:InvokeFunction'
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ServerlessApi}/*
+  LambdaLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: !Sub ${Project}-${TargetEnvr}-layer
+      CompatibleArchitectures: [arm64]
+      CompatibleRuntimes: [nodejs20.x]
+      ContentUri: ../../dist
+      RetentionPolicy: Delete
+  #########################################
+  ##### Cloudfront and Route53 config #####
+  #########################################
+  Route53RecordSet:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneName: !Sub '${Domain}.'
+      Name: !If [IsProd, !Sub '${SubDomain}.${Domain}.', !Sub '${SubDomain}-${TargetEnvr}.${Domain}.']
+      Type: A
+      AliasTarget:
+        HostedZoneId: Z2FDTNDATAQYW2
+        DNSName: !GetAtt
+        - CloudFrontDistribution
+        - DomainName
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    DependsOn: [ServerlessApi, S3Bucket]
+    Properties:
+      DistributionConfig:
+        Aliases: [!If [IsProd, !Sub '${SubDomain}.${Domain}', !Sub '${SubDomain}-${TargetEnvr}.${Domain}']]
+        Origins:
+        - DomainName: !Select [1, !Split ["//", !GetAtt S3Bucket.WebsiteURL]]
+          Id: S3-hosted-website-ID
+          CustomOriginConfig:
+            OriginProtocolPolicy: http-only
+        - DomainName: !Sub '${ServerlessApi}.execute-api.${AWS::Region}.amazonaws.com'
+          Id: !Sub ${Project}-${TargetEnvr}-ApiEndpoint-ID
+          OriginPath: !Sub /${TargetEnvr}
+          CustomOriginConfig:
+            HTTPPort: 80
+            HTTPSPort: 443
+            OriginKeepaliveTimeout: 5
+            OriginProtocolPolicy: https-only
+        Enabled: 'true'
+        HttpVersion: http2
+        DefaultRootObject: index.html
+        DefaultCacheBehavior:
+          AllowedMethods: [ "GET", "HEAD", "OPTIONS", "PUT", "PATCH", "POST", "DELETE"]
+          TargetOriginId: S3-hosted-website-ID
+          ForwardedValues:
+            QueryString: 'false'
+            Cookies:
+              Forward: none
+          ViewerProtocolPolicy: redirect-to-https
+          DefaultTTL: 0
+          MinTTL: 0
+          MaxTTL: 0
+        CacheBehaviors:
+        - PathPattern: /api/*
+          AllowedMethods: [ "GET", "HEAD", "OPTIONS", "PUT", "PATCH", "POST", "DELETE"]
+          ForwardedValues:
+            Headers: [ "Authorization", "Accept" ]
+            QueryString: true
+          TargetOriginId: !Sub ${Project}-${TargetEnvr}-ApiEndpoint-ID
+          ViewerProtocolPolicy: redirect-to-https
+          DefaultTTL: 0
+          MinTTL: 0
+          MaxTTL: 0
+        PriceClass: PriceClass_200
+        ViewerCertificate:
+          AcmCertificateArn: arn:aws:acm:us-east-1:278497686406:certificate/8914c993-68c7-4e06-b741-def8fc0270ba
+          MinimumProtocolVersion: TLSv1
+          SslSupportMethod: sni-only
+  ####################################
+  ##### S3 Bucket and its policy #####
+  ####################################
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub ${Project}-${TargetEnvr}-y
+      WebsiteConfiguration:
+        ErrorDocument: index.html
+        IndexDocument: index.html
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+  S3BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    DependsOn: [S3Bucket]
+    Properties:
+      Bucket: !Ref S3Bucket
+      PolicyDocument: !Join
+      - ''
+      - - '{
+            "Version": "2012-10-17",
+            "Id": "PolicyForCloudFrontPrivateContent",
+            "Statement": [
+                {
+                    "Sid": "Allow-OAI-Access-To-Bucket",
+                    "Effect": "Allow",
+                    "Principal": "*",
+                    "Action": "s3:GetObject",
+                    "Resource": "'
+        - !GetAtt S3Bucket.Arn
+        - '/*"
+                }
+            ]
+          }'
