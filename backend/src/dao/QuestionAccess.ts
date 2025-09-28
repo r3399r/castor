@@ -1,5 +1,5 @@
 import { inject, injectable } from 'inversify';
-import { FindOneOptions } from 'typeorm';
+import { FindManyOptions } from 'typeorm';
 import { Question, QuestionEntity } from 'src/model/entity/QuestionEntity';
 import { Database } from 'src/utils/Database';
 
@@ -19,10 +19,13 @@ export class QuestionAccess {
     return await qr.manager.save(entity);
   }
 
-  public async findOne(options?: FindOneOptions<Question>) {
+  public async findAndCount(options?: FindManyOptions<Question>) {
     const qr = await this.database.getQueryRunner();
 
-    return await qr.manager.findOne<Question>(QuestionEntity.name, {
+    return await qr.manager.findAndCount<Question>(QuestionEntity.name, {
+      relations: {
+        minor: true,
+      },
       ...options,
     });
   }

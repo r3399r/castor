@@ -3,8 +3,11 @@ import {
   BeforeUpdate,
   Column,
   Entity,
+  JoinColumn,
+  ManyToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
+import { Question, QuestionEntity } from './QuestionEntity';
 
 export type QuestionMinor = {
   id: number;
@@ -24,6 +27,10 @@ export class QuestionMinorEntity implements QuestionMinor {
 
   @Column({ type: 'int', unsigned: true, name: 'question_id' })
   questionId!: number;
+
+  @ManyToOne(() => QuestionEntity)
+  @JoinColumn({ name: 'question_id' })
+  question!: Question;
 
   @Column({ type: 'varchar', length: 255 })
   type!: string;

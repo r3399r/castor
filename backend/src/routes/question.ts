@@ -1,6 +1,7 @@
 import { bindings } from 'src/bindings';
 import { QuestionService } from 'src/logic/QuestionService';
 import {
+  GetQuestionParams,
   PostQuestionReplyRequest,
   PostQuestionRequest,
 } from 'src/model/api/Question';
@@ -26,6 +27,10 @@ export default async (lambdaEvent: LambdaEvent) => {
 
 const questionDefault = async () => {
   switch (event.httpMethod) {
+    case 'GET':
+      return await service.getQuestionList(
+        event.queryStringParameters as GetQuestionParams | null
+      );
     case 'POST':
       if (event.body === null)
         throw new BadRequestError('body should not be empty');

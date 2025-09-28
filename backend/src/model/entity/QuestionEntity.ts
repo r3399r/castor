@@ -3,14 +3,17 @@ import {
   BeforeUpdate,
   Column,
   Entity,
+  OneToMany,
   PrimaryGeneratedColumn,
 } from 'typeorm';
+import { QuestionMinor, QuestionMinorEntity } from './QuestionMinorEntity';
 
 export type Question = {
   id: number;
   content: string;
   isFreeResponse: boolean;
   discussionUrl: string;
+  minor: QuestionMinor[];
   createdAt: string | null;
   updatedAt: string | null;
 };
@@ -28,6 +31,12 @@ export class QuestionEntity implements Question {
 
   @Column({ type: 'varchar', length: 255, name: 'discussion_url' })
   discussionUrl!: string;
+
+  @OneToMany(
+    () => QuestionMinorEntity,
+    (questionMinor) => questionMinor.question
+  )
+  minor!: QuestionMinor[];
 
   @Column({ type: 'datetime', name: 'created_at', default: null })
   createdAt!: string;

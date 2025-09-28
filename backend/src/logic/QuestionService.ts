@@ -1,8 +1,11 @@
 import { inject, injectable } from 'inversify';
+import { LIMIT, OFFSET } from 'src/constant/Pagination';
 import { QuestionAccess } from 'src/dao/QuestionAccess';
 import { QuestionMinorAccess } from 'src/dao/QuestionMinorAccess';
 import { ReplyAccess } from 'src/dao/ReplyAccess';
 import {
+  GetQuestionParams,
+  GetQuestionResponse,
   PostQuestionReplyRequest,
   PostQuestionRequest,
 } from 'src/model/api/Question';
@@ -10,6 +13,7 @@ import { QuestionEntity } from 'src/model/entity/QuestionEntity';
 import { QuestionMinorEntity } from 'src/model/entity/QuestionMinorEntity';
 import { ReplyEntity } from 'src/model/entity/ReplyEntity';
 import { BadRequestError } from 'src/model/error';
+import { genPagination } from 'src/utils/paginator';
 import { UserService } from './UserService';
 
 /**
@@ -25,6 +29,19 @@ export class QuestionService {
   private readonly userService!: UserService;
   @inject(ReplyAccess)
   private readonly replyAccess!: ReplyAccess;
+
+  public async getQuestionList(
+    params: GetQuestionParams | null
+  ): Promise<GetQuestionResponse> {
+    const limit = params?.limit ? Number(params.limit) : LIMIT;
+    const offset = params?.offset ? Number(params.offset) : OFFSET;
+    const [question, total] = await this.questionAccess.findAndCount({
+      take: limit,
+      skip: offset,
+    });
+
+    return { data: question, paginate: genPagination(total, limit, offset) };
+  }
 
   public async createQuestion(data: PostQuestionRequest) {
     const questionEntity = new QuestionEntity();

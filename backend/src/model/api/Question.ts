@@ -1,3 +1,6 @@
+import { Question } from 'src/model/entity/QuestionEntity';
+import { Paginate, PaginationParams } from 'src/model/Pagination';
+
 export type PostQuestionRequest = {
   content: string;
   isFreeResponse: boolean;
@@ -18,3 +21,7 @@ export type PostQuestionReplyRequest = {
   elapsedTimeMs: number;
   repliedAnswer: string;
 };
+
+export type GetQuestionParams = PaginationParams;
+
+export type GetQuestionResponse = Paginate<Question>;
