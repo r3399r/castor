@@ -113,7 +113,20 @@ Resources:
               "properties": {
                 "content":{"type": "string"},
                 "isFreeResponse":{"type": "boolean"},
-                "discussionUrl":{"type": "string"}
+                "discussionUrl":{"type": "string"},
+                "minor": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "type": {"type": "string", enum: ["SINGLE","MULTIPLE"]},
+                      "orderIndex": {"type": "integer", "minimum": 0},
+                      "options": {"type": "string"},
+                      "answer": {"type": "string"}
+                    },
+                    "required": ["type","orderIndex","options","answer"]
+                  }
+                }
               },
               "required": ["content","isFreeResponse","discussionUrl"]
             }

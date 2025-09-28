@@ -2,6 +2,7 @@ import { SQS } from 'aws-sdk';
 import { Container } from 'inversify';
 import { DbAccess } from './dao/DbAccess';
 import { QuestionAccess } from './dao/QuestionAccess';
+import { QuestionMinorAccess } from './dao/QuestionMinorAccess';
 import { QuestionService } from './logic/QuestionService';
 import { QuestionEntity } from './model/entity/QuestionEntity';
 import { QuestionMinorEntity } from './model/entity/QuestionMinorEntity';
@@ -24,6 +25,7 @@ container.bind<Function>(dbEntitiesBindingId).toConstantValue(ReplyEntity);
 // db access
 container.bind(DbAccess).toSelf();
 container.bind(QuestionAccess).toSelf();
+container.bind(QuestionMinorAccess).toSelf();
 
 // service
 container.bind(QuestionService).toSelf();

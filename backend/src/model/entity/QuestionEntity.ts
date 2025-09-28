@@ -8,7 +8,6 @@ import {
 
 export type Question = {
   id: number;
-  uid: string;
   content: string;
   isFreeResponse: boolean;
   discussionUrl: string;
@@ -20,9 +19,6 @@ export type Question = {
 export class QuestionEntity implements Question {
   @PrimaryGeneratedColumn({ type: 'int', unsigned: true })
   id!: number;
-
-  @Column({ type: 'varchar', length: 255 })
-  uid!: string;
 
   @Column({ type: 'text' })
   content!: string;

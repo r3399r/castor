@@ -8,7 +8,7 @@ import {
 
 export type QuestionMinor = {
   id: number;
-  questionId: string;
+  questionId: number;
   type: string;
   orderIndex: number;
   options: string | null;
@@ -23,7 +23,7 @@ export class QuestionMinorEntity implements QuestionMinor {
   id!: number;
 
   @Column({ type: 'int', unsigned: true, name: 'question_id' })
-  questionId!: string;
+  questionId!: number;
 
   @Column({ type: 'varchar', length: 255 })
   type!: string;
