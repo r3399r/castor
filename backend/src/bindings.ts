@@ -3,7 +3,10 @@ import { Container } from 'inversify';
 import { DbAccess } from './dao/DbAccess';
 import { QuestionAccess } from './dao/QuestionAccess';
 import { QuestionMinorAccess } from './dao/QuestionMinorAccess';
+import { ReplyAccess } from './dao/ReplyAccess';
+import { UserAccess } from './dao/UserAccess';
 import { QuestionService } from './logic/QuestionService';
+import { UserService } from './logic/UserService';
 import { QuestionEntity } from './model/entity/QuestionEntity';
 import { QuestionMinorEntity } from './model/entity/QuestionMinorEntity';
 import { ReplyEntity } from './model/entity/ReplyEntity';
@@ -26,9 +29,12 @@ container.bind<Function>(dbEntitiesBindingId).toConstantValue(ReplyEntity);
 container.bind(DbAccess).toSelf();
 container.bind(QuestionAccess).toSelf();
 container.bind(QuestionMinorAccess).toSelf();
+container.bind(ReplyAccess).toSelf();
+container.bind(UserAccess).toSelf();
 
 // service
 container.bind(QuestionService).toSelf();
+container.bind(UserService).toSelf();
 
 // AWS
 container.bind(SQS).toDynamicValue(() => new SQS());

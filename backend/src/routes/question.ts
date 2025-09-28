@@ -1,6 +1,9 @@
 import { bindings } from 'src/bindings';
 import { QuestionService } from 'src/logic/QuestionService';
-import { PostQuestionRequest } from 'src/model/api/Question';
+import {
+  PostQuestionReplyRequest,
+  PostQuestionRequest,
+} from 'src/model/api/Question';
 import { BadRequestError } from 'src/model/error';
 import { LambdaEvent } from 'src/model/Lambda';
 
@@ -13,13 +16,15 @@ export default async (lambdaEvent: LambdaEvent) => {
 
   switch (event.resource) {
     case '/api/question':
-      return await authDefault();
+      return await questionDefault();
+    case '/api/question/reply':
+      return await questionReply();
   }
 
   throw new BadRequestError('unexpected resource');
 };
 
-const authDefault = async () => {
+const questionDefault = async () => {
   switch (event.httpMethod) {
     case 'POST':
       if (event.body === null)
@@ -27,6 +32,20 @@ const authDefault = async () => {
 
       return await service.createQuestion(
         JSON.parse(event.body) as PostQuestionRequest
+      );
+  }
+
+  throw new Error('unexpected httpMethod');
+};
+
+const questionReply = async () => {
+  switch (event.httpMethod) {
+    case 'POST':
+      if (event.body === null)
+        throw new BadRequestError('body should not be empty');
+
+      return await service.replyQuestion(
+        JSON.parse(event.body) as PostQuestionReplyRequest
       );
   }
 

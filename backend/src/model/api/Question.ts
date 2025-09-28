@@ -9,3 +9,12 @@ export type PostQuestionRequest = {
     answer: string;
   }[];
 };
+
+export type PostQuestionReplyRequest = {
+  questionId: number;
+  userId?: number;
+  deviceId?: string;
+  score: number;
+  elapsedTimeMs: number;
+  repliedAnswer: string;
+};

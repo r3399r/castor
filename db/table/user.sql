@@ -5,5 +5,6 @@ CREATE TABLE IF NOT EXISTS caster.user (
     created_at DATETIME(3) NULL,
     updated_at DATETIME(3) NULL,
     PRIMARY KEY (id),
-    UNIQUE (email)
+    UNIQUE (email),
+    UNIQUE (device_id)
 );
