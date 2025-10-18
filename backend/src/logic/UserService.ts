@@ -14,7 +14,7 @@ export class UserService {
   @inject(deviceIdSymbol)
   private readonly deviceId!: string;
   @inject(userIdSymbol)
-  private readonly headerUserId!: string;
+  private readonly userId!: string;
 
   public async getUserByDeviceId(deviceId: string) {
     const user = await this.userAccess.findOne({ where: { deviceId } });
@@ -27,12 +27,8 @@ export class UserService {
   }
 
   public async getUser() {
-    let userId = -1;
-    if (this.headerUserId && !isNaN(Number(this.headerUserId)))
-      userId = Number(this.headerUserId);
-
     let user = await this.userAccess.findOne({
-      where: { id: userId },
+      where: { id: Number(this.userId) },
     });
     if (user !== null) return user;
 

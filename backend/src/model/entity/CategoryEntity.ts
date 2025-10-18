@@ -3,12 +3,15 @@ import {
   BeforeUpdate,
   Column,
   Entity,
+  OneToMany,
   PrimaryGeneratedColumn,
 } from 'typeorm';
+import { Question, QuestionEntity } from './QuestionEntity';
 
 export type Category = {
   id: number;
   name: string;
+  question: Question[];
   createdAt: string | null;
   updatedAt: string | null;
 };
@@ -20,6 +23,9 @@ export class CategoryEntity implements Category {
 
   @Column({ type: 'varchar', length: 255 })
   name!: string;
+
+  @OneToMany(() => QuestionEntity, (question) => question.category)
+  question!: Question[];
 
   @Column({ type: 'datetime', name: 'created_at', default: null })
   createdAt!: string;

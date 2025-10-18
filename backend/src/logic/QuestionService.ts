@@ -17,6 +17,8 @@ import { QuestionMinorEntity } from 'src/model/entity/QuestionMinorEntity';
 import { ReplyEntity } from 'src/model/entity/ReplyEntity';
 import { BadRequestError } from 'src/model/error';
 import { bn } from 'src/utils/bignumber';
+import { compare } from 'src/utils/compare';
+import { userIdSymbol } from 'src/utils/LambdaHelper';
 import { genPagination } from 'src/utils/paginator';
 import { randomBase36 } from 'src/utils/random';
 import { UserService } from './UserService';
@@ -36,6 +38,8 @@ export class QuestionService {
   private readonly replyAccess!: ReplyAccess;
   @inject(CategoryAccess)
   private readonly categoryAccess!: CategoryAccess;
+  @inject(userIdSymbol)
+  private readonly userId!: string;
 
   public async getQuestionByUid(uid: string): Promise<GetQuestionIdResponse> {
     const id = parseInt(uid.substring(3), 36);
@@ -47,7 +51,7 @@ export class QuestionService {
     return {
       ...question,
       minor: question.minor.map((m) => {
-        const { answer, ...rest } = m;
+        const { answer: _answer, ...rest } = m;
 
         return rest;
       }),
@@ -57,17 +61,31 @@ export class QuestionService {
   public async getQuestionList(
     params: GetQuestionParams | null
   ): Promise<GetQuestionResponse> {
+    if (!params?.categoryId)
+      throw new BadRequestError('categoryId is required');
+
     const limit = params?.limit ? Number(params.limit) : LIMIT;
     const offset = params?.offset ? Number(params.offset) : OFFSET;
-    const [question, total] = await this.questionAccess.findAndCount({
+
+    const [question, total] = await this.questionAccess.findAndCount1({
+      categoryId: params.categoryId,
+      userId: Number(this.userId),
       take: limit,
       skip: offset,
     });
 
     return {
       data: question.map((v) => ({
-        ...v,
         uid: v.rid + v.id.toString(36),
+        categoryId: v.categoryId,
+        count: v.count,
+        scoringRate: v.scoringRate,
+        avgElapsedTimeMs: v.avgElapsedTimeMs,
+        hasReplied: v.reply.length > 0,
+        lastRepliedAt:
+          v.reply.length > 0
+            ? v.reply.sort(compare('createdAt', 'desc'))[0].createdAt
+            : null,
       })),
       paginate: genPagination(total, limit, offset),
     };

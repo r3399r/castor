@@ -3,19 +3,25 @@ import {
   BeforeUpdate,
   Column,
   Entity,
+  JoinColumn,
+  ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
 } from 'typeorm';
+import { Category, CategoryEntity } from './CategoryEntity';
 import { QuestionMinor, QuestionMinorEntity } from './QuestionMinorEntity';
+import { Reply, ReplyEntity } from './ReplyEntity';
 
 export type Question = {
   id: number;
   rid: string;
   categoryId: number;
+  category: Category;
   content: string;
   discussionUrl: string | null;
   source: string | null;
   minor: QuestionMinor[];
+  reply: Reply[];
   count: number;
   scoringRate: number | null;
   avgElapsedTimeMs: number | null;
@@ -33,6 +39,10 @@ export class QuestionEntity implements Question {
 
   @Column({ type: 'int', unsigned: true, name: 'category_id' })
   categoryId!: number;
+
+  @ManyToOne(() => CategoryEntity)
+  @JoinColumn({ name: 'category_id' })
+  category!: Category;
 
   @Column({ type: 'text' })
   content!: string;
@@ -62,6 +72,9 @@ export class QuestionEntity implements Question {
     (questionMinor) => questionMinor.question
   )
   minor!: QuestionMinor[];
+
+  @OneToMany(() => ReplyEntity, (reply) => reply.question)
+  reply!: Reply[];
 
   @Column({ type: 'datetime', name: 'created_at', default: null })
   createdAt!: string;

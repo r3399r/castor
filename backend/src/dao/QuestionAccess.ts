@@ -40,4 +40,34 @@ export class QuestionAccess {
       ...options,
     });
   }
+
+  private async createQueryBuilder() {
+    const qr = await this.database.getQueryRunner();
+
+    return qr.manager.createQueryBuilder(QuestionEntity.name, 'question');
+  }
+
+  public async findAndCount1(data: {
+    categoryId: number;
+    userId: number;
+    take: number;
+    skip: number;
+  }) {
+    const qb = await this.createQueryBuilder();
+    const findPromise = qb
+      .leftJoinAndSelect(
+        'question.category',
+        'category',
+        'category.id = :categoryId',
+        { categoryId: data.categoryId }
+      )
+      .leftJoinAndSelect('question.reply', 'reply', 'reply.user_id = :userId', {
+        userId: data.userId,
+      });
+
+    return (await Promise.all([
+      findPromise.take(data.take).skip(data.skip).getMany(),
+      findPromise.getCount(),
+    ])) as [Question[], number];
+  }
 }

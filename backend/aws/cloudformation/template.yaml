@@ -105,6 +105,21 @@ Resources:
             },
             "/api/question": {
               "get": {
+                "parameters": [{
+                  "name": "x-device-id",
+                  "in": "header",
+                  "required": true,
+                  "schema": {"type": "string"}
+                }, {
+                  "name": "x-user-id",
+                  "in": "header",
+                  "required": true,
+                  "schema": {"type": "string"}
+                }, {
+                    "name": "categoryId",
+                    "in": "query",
+                    "required": true
+                }],
                 "responses": {
                   "200": {
                     "description": "200 response",
