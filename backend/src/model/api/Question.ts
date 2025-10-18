@@ -29,9 +29,7 @@ export type PostQuestionReplyResponse = Reply;
 
 export type GetQuestionParams = PaginationParams & { categoryId: number };
 
-export type ModifiedQuestion = Question & { uid: string };
-
-export type GetQuestionResponse = Paginate<{
+export type ModifiedQuestion = {
   uid: string;
   categoryId: number;
   tag: Tag[];
@@ -40,7 +38,9 @@ export type GetQuestionResponse = Paginate<{
   avgElapsedTimeMs: number | null;
   hasReplied: boolean;
   lastRepliedAt: string | null;
-}>;
+};
+
+export type GetQuestionResponse = Paginate<ModifiedQuestion>;
 
 export type GetQuestionIdResponse = Omit<Question, 'minor'> & {
   minor: Omit<QuestionMinor, 'answer'>[];
