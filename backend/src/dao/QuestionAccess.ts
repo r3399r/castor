@@ -1,5 +1,5 @@
 import { inject, injectable } from 'inversify';
-import { FindManyOptions, FindOneOptions } from 'typeorm';
+import { FindOneOptions } from 'typeorm';
 import { Question, QuestionEntity } from 'src/model/entity/QuestionEntity';
 import { Database } from 'src/utils/Database';
 
@@ -19,17 +19,6 @@ export class QuestionAccess {
     return await qr.manager.save(entity);
   }
 
-  public async findAndCount(options?: FindManyOptions<Question>) {
-    const qr = await this.database.getQueryRunner();
-
-    return await qr.manager.findAndCount<Question>(QuestionEntity.name, {
-      relations: {
-        minor: true,
-      },
-      ...options,
-    });
-  }
-
   public async findOneOrFail(options?: FindOneOptions<Question>) {
     const qr = await this.database.getQueryRunner();
 
@@ -47,7 +36,7 @@ export class QuestionAccess {
     return qr.manager.createQueryBuilder(QuestionEntity.name, 'question');
   }
 
-  public async findAndCount1(data: {
+  public async findAndCount(data: {
     categoryId: number;
     userId: number;
     take: number;
@@ -63,7 +52,8 @@ export class QuestionAccess {
       )
       .leftJoinAndSelect('question.reply', 'reply', 'reply.user_id = :userId', {
         userId: data.userId,
-      });
+      })
+      .leftJoinAndSelect('question.tag', 'tag');
 
     return (await Promise.all([
       findPromise.take(data.take).skip(data.skip).getMany(),

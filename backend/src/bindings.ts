@@ -12,6 +12,7 @@ import { CategoryEntity } from './model/entity/CategoryEntity';
 import { QuestionEntity } from './model/entity/QuestionEntity';
 import { QuestionMinorEntity } from './model/entity/QuestionMinorEntity';
 import { ReplyEntity } from './model/entity/ReplyEntity';
+import { TagEntity } from './model/entity/TagEntity';
 import { UserEntity } from './model/entity/UserEntity';
 import { Database, dbEntitiesBindingId } from './utils/Database';
 
@@ -27,6 +28,7 @@ container
 container.bind<Function>(dbEntitiesBindingId).toConstantValue(UserEntity);
 container.bind<Function>(dbEntitiesBindingId).toConstantValue(ReplyEntity);
 container.bind<Function>(dbEntitiesBindingId).toConstantValue(CategoryEntity);
+container.bind<Function>(dbEntitiesBindingId).toConstantValue(TagEntity);
 
 // db access
 container.bind(DbAccess).toSelf();

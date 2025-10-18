@@ -67,7 +67,7 @@ export class QuestionService {
     const limit = params?.limit ? Number(params.limit) : LIMIT;
     const offset = params?.offset ? Number(params.offset) : OFFSET;
 
-    const [question, total] = await this.questionAccess.findAndCount1({
+    const [question, total] = await this.questionAccess.findAndCount({
       categoryId: params.categoryId,
       userId: Number(this.userId),
       take: limit,
@@ -78,6 +78,7 @@ export class QuestionService {
       data: question.map((v) => ({
         uid: v.rid + v.id.toString(36),
         categoryId: v.categoryId,
+        tag: v.tag,
         count: v.count,
         scoringRate: v.scoringRate,
         avgElapsedTimeMs: v.avgElapsedTimeMs,

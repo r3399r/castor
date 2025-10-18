@@ -4,6 +4,8 @@ import {
   Column,
   Entity,
   JoinColumn,
+  JoinTable,
+  ManyToMany,
   ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
@@ -11,6 +13,7 @@ import {
 import { Category, CategoryEntity } from './CategoryEntity';
 import { QuestionMinor, QuestionMinorEntity } from './QuestionMinorEntity';
 import { Reply, ReplyEntity } from './ReplyEntity';
+import { Tag, TagEntity } from './TagEntity';
 
 export type Question = {
   id: number;
@@ -22,6 +25,7 @@ export type Question = {
   source: string | null;
   minor: QuestionMinor[];
   reply: Reply[];
+  tag: Tag[];
   count: number;
   scoringRate: number | null;
   avgElapsedTimeMs: number | null;
@@ -75,6 +79,14 @@ export class QuestionEntity implements Question {
 
   @OneToMany(() => ReplyEntity, (reply) => reply.question)
   reply!: Reply[];
+
+  @ManyToMany(() => TagEntity)
+  @JoinTable({
+    name: 'question_tag',
+    joinColumn: { name: 'question_id', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'tag_id', referencedColumnName: 'id' },
+  })
+  tag!: Tag[];
 
   @Column({ type: 'datetime', name: 'created_at', default: null })
   createdAt!: string;
