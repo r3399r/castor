@@ -45,16 +45,32 @@ export class QuestionService {
     const id = parseInt(uid.substring(3), 36);
     const rid = uid.substring(0, 3).toUpperCase();
 
-    const question = await this.questionAccess.findOneOrFail({ where: { id } });
+    const question = await this.questionAccess.findDetail({
+      id,
+      userId: isNaN(Number(this.userId)) ? 0 : Number(this.userId),
+    });
     if (question.rid !== rid) throw new BadRequestError('rid is not matched');
 
     return {
-      ...question,
+      uid: question.rid + question.id.toString(36),
+      categoryId: question.categoryId,
+      content: question.content,
+      discussionUrl: question.discussionUrl,
+      source: question.source,
       minor: question.minor.map((m) => {
         const { answer, ...rest } = m;
 
         return rest;
       }),
+      tag: question.tag,
+      count: question.count,
+      scoringRate: question.scoringRate,
+      avgElapsedTimeMs: question.avgElapsedTimeMs,
+      hasReplied: question.reply.length > 0,
+      lastRepliedAt:
+        question.reply.length > 0
+          ? question.reply.sort(compare('createdAt', 'desc'))[0].createdAt
+          : null,
     };
   }
 
@@ -69,7 +85,7 @@ export class QuestionService {
 
     const [question, total] = await this.questionAccess.findAndCount({
       categoryId: params.categoryId,
-      userId: Number(this.userId),
+      userId: isNaN(Number(this.userId)) ? 0 : Number(this.userId),
       take: limit,
       skip: offset,
     });
@@ -78,6 +94,7 @@ export class QuestionService {
       data: question.map((v) => ({
         uid: v.rid + v.id.toString(36),
         categoryId: v.categoryId,
+        source: v.source,
         tag: v.tag,
         count: v.count,
         scoringRate: v.scoringRate,

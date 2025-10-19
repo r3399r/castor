@@ -143,11 +143,6 @@ Resources:
             "/api/question": {
               "get": {
                 "parameters": [{
-                  "name": "x-device-id",
-                  "in": "header",
-                  "required": true,
-                  "schema": {"type": "string"}
-                }, {
                   "name": "x-user-id",
                   "in": "header",
                   "required": true,
@@ -239,6 +234,12 @@ Resources:
             },
             "/api/question/{uid}": {
               "get": {
+                "parameters": [{
+                  "name": "x-user-id",
+                  "in": "header",
+                  "required": true,
+                  "schema": {"type": "string"}
+                }],
                 "responses": {
                   "200": {
                     "description": "200 response",

@@ -36,6 +36,19 @@ export class QuestionAccess {
     return qr.manager.createQueryBuilder(QuestionEntity.name, 'question');
   }
 
+  public async findDetail(data: { id: number; userId: number }) {
+    const qb = await this.createQueryBuilder();
+
+    return (await qb
+      .leftJoinAndSelect('question.minor', 'minor')
+      .leftJoinAndSelect('question.reply', 'reply', 'reply.user_id = :userId', {
+        userId: data.userId,
+      })
+      .leftJoinAndSelect('question.tag', 'tag')
+      .where('question.id = :id', { id: data.id })
+      .getOneOrFail()) as Question;
+  }
+
   public async findAndCount(data: {
     categoryId: number;
     userId: number;

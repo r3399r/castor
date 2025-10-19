@@ -1,4 +1,3 @@
-import { Question } from 'src/model/entity/QuestionEntity';
 import { QuestionMinor } from 'src/model/entity/QuestionMinorEntity';
 import { Reply } from 'src/model/entity/ReplyEntity';
 import { Tag } from 'src/model/entity/TagEntity';
@@ -32,6 +31,7 @@ export type GetQuestionParams = PaginationParams & { categoryId: number };
 export type ModifiedQuestion = {
   uid: string;
   categoryId: number;
+  source: string | null;
   tag: Tag[];
   count: number;
   scoringRate: number | null;
@@ -42,6 +42,17 @@ export type ModifiedQuestion = {
 
 export type GetQuestionResponse = Paginate<ModifiedQuestion>;
 
-export type GetQuestionIdResponse = Omit<Question, 'minor'> & {
+export type GetQuestionIdResponse = {
+  uid: string;
+  categoryId: number;
+  content: string;
+  discussionUrl: string | null;
+  source: string | null;
   minor: Omit<QuestionMinor, 'answer'>[];
+  tag: Tag[];
+  count: number;
+  scoringRate: number | null;
+  avgElapsedTimeMs: number | null;
+  hasReplied: boolean;
+  lastRepliedAt: string | null;
 };

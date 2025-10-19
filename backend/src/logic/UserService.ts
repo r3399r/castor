@@ -28,7 +28,7 @@ export class UserService {
 
   public async getUser() {
     let user = await this.userAccess.findOne({
-      where: { id: Number(this.userId) },
+      where: { id: isNaN(Number(this.userId)) ? 0 : Number(this.userId) },
     });
     if (user !== null) return user;
 
