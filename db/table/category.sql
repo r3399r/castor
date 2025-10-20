@@ -3,5 +3,6 @@ CREATE TABLE IF NOT EXISTS caster.category (
     name VARCHAR(255) NOT NULL,
     created_at DATETIME(3) NULL,
     updated_at DATETIME(3) NULL,
-    PRIMARY KEY (id)
+    PRIMARY KEY (id),
+    UNIQUE (name)
 );

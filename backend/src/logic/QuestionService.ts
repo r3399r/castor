@@ -19,7 +19,7 @@ import { User } from 'src/model/entity/UserEntity';
 import { BadRequestError } from 'src/model/error';
 import { bn } from 'src/utils/bignumber';
 import { compare } from 'src/utils/compare';
-import { deviceIdSymbol, userIdSymbol } from 'src/utils/LambdaHelper';
+import { userIdSymbol } from 'src/utils/LambdaHelper';
 import { genPagination } from 'src/utils/paginator';
 import { randomBase36 } from 'src/utils/random';
 import { UserService } from './UserService';
@@ -41,8 +41,6 @@ export class QuestionService {
   private readonly categoryAccess!: CategoryAccess;
   @inject(userIdSymbol)
   private readonly userId!: string;
-  @inject(deviceIdSymbol)
-  private readonly deviceId!: string;
 
   public async getQuestionByUid(uid: string): Promise<GetQuestionIdResponse> {
     const id = parseInt(uid.substring(3), 36);
@@ -174,12 +172,9 @@ export class QuestionService {
   public async replyQuestion(
     data: PostQuestionReplyRequest
   ): Promise<PostQuestionReplyResponse> {
-    let user: User;
-    try {
-      user = await this.userService.getUser();
-    } catch {
-      user = await this.userService.createUserWithDeviceId(this.deviceId);
-    }
+    let user: User | null;
+    user = await this.userService.getUser();
+    if (user === null) user = await this.userService.createUserWithDeviceId();
 
     const question = await this.questionAccess.findOneOrFail({
       where: { id: data.id },

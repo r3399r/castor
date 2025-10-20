@@ -3,9 +3,13 @@ import { LIMIT, OFFSET } from 'src/constant/Pagination';
 import { ReplyAccess } from 'src/dao/ReplyAccess';
 import { UserAccess } from 'src/dao/UserAccess';
 import { UserStatsAccess } from 'src/dao/UserStatsAccess';
-import { GetUserDetailParams, GetUserDetailResponse } from 'src/model/api/User';
+import {
+  GetUserDetailParams,
+  GetUserDetailResponse,
+  GetUserResponse,
+} from 'src/model/api/User';
 import { UserEntity } from 'src/model/entity/UserEntity';
-import { BadRequestError, NotFoundError } from 'src/model/error';
+import { BadRequestError } from 'src/model/error';
 import { deviceIdSymbol, userIdSymbol } from 'src/utils/LambdaHelper';
 import { genPagination } from 'src/utils/paginator';
 
@@ -25,25 +29,22 @@ export class UserService {
   @inject(userIdSymbol)
   private readonly userId!: string;
 
-  public async createUserWithDeviceId(deviceId: string) {
+  public async createUserWithDeviceId() {
     const userEntity = new UserEntity();
-    userEntity.deviceId = deviceId;
+    userEntity.deviceId = this.deviceId;
 
     return await this.userAccess.save(userEntity);
   }
 
-  public async getUser() {
-    let user = await this.userAccess.findOne({
+  public async getUser(): Promise<GetUserResponse> {
+    const user = await this.userAccess.findOne({
       where: { id: isNaN(Number(this.userId)) ? 0 : Number(this.userId) },
     });
     if (user !== null) return user;
 
-    user = await this.userAccess.findOne({
+    return await this.userAccess.findOne({
       where: { deviceId: this.deviceId },
     });
-
-    if (user !== null) return user;
-    throw new NotFoundError('User not found');
   }
 
   public async getUserDetail(
@@ -81,7 +82,7 @@ export class UserService {
       reply: {
         data: reply.map((v) => ({
           id: v.id,
-          questionId: v.questionId,
+          questionUid: v.question.rid + v.question.id.toString(36),
           tag: v.question.tag,
           score: v.score,
           elapsedTimeMs: v.elapsedTimeMs,

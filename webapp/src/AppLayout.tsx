@@ -13,7 +13,8 @@ const AppLayout = () => {
 
   useEffect(() => {
     userEndpoint.getUser().then((res) => {
-      if (res === null) {
+      if (!res) return;
+      if (res.data === null) {
         if (localStorage.getItem('deviceId') === null) localStorage.setItem('deviceId', uuidv4());
       } else {
         localStorage.setItem('userId', res.data.id.toString());
