@@ -56,11 +56,7 @@ const QuestionList = () => {
             {list?.map((row) => (
               <TableRow key={row.uid}>
                 <TableCell component="th" scope="row">
-                  <a
-                    href={`/q/${row.uid}`}
-                    target="_blank"
-                    className="text-blue-600 underline"
-                  >
+                  <a href={`/q/${row.uid}`} target="_blank" className="text-blue-600 underline">
                     {row.uid}
                   </a>
                 </TableCell>

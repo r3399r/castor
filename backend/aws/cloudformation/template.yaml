@@ -391,6 +391,7 @@ Resources:
               "properties": {
                 "categoryName":{"type": "string"},
                 "content":{"type": "string"},
+                "imageUrl":{"type": "string"},
                 "source":{"type": "string"},
                 "minor": {
                   "type": "array",
@@ -407,7 +408,7 @@ Resources:
                   }
                 }
               },
-              "required": ["categoryName","content","discussionUrl"]
+              "required": ["categoryName","content","source"]
             },
             "postQuestionReply": {
               "type": "object",
@@ -612,7 +613,7 @@ Resources:
     DependsOn: [LambdaStatsLoader]
     Properties:
       Name: !Sub ${Project}-${TargetEnvr}-stats-loader
-      ScheduleExpression: cron(5 0 * * ? *)
+      ScheduleExpression: cron(5 * * * ? *)
       State: ENABLED
       Targets:
         - Arn: !GetAtt LambdaStatsLoader.Arn

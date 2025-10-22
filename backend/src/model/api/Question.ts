@@ -6,6 +6,7 @@ import { Paginate, PaginationParams } from 'src/model/Pagination';
 export type PostQuestionRequest = {
   categoryName: string;
   content: string;
+  imageUrl?:string
   source: string;
   minor: {
     type: 'SINGLE' | 'MULTIPLE';
