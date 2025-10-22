@@ -487,14 +487,15 @@ Resources:
           DB_HOST:
             Fn::ImportValue: !Sub celestial-studio-${TargetEnvr}-db-endpoint
           DB_PWD: !Sub '{{resolve:ssm:mysql-${TargetEnvr}-${Project}-pwd}}'
-  # InvokePermissionStatsLoader:
-  #   Type: AWS::Lambda::Permission
-  #   DependsOn: [LambdaStatsLoader]
-  #   Properties:
-  #     FunctionName: !Sub ${Project}-${TargetEnvr}-stats-loader
-  #     Action: 'lambda:InvokeFunction'
-  #     Principal: events.amazonaws.com
-  #     SourceArn: !GetAtt EventBridgeGiftLoader.Arn
+          INTERVAL_EXPRESSION: '1445 minute'
+  InvokePermissionStatsLoader:
+    Type: AWS::Lambda::Permission
+    DependsOn: [LambdaStatsLoader]
+    Properties:
+      FunctionName: !Sub ${Project}-${TargetEnvr}-stats-loader
+      Action: 'lambda:InvokeFunction'
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt EventBridgeStatsLoader.Arn
   LambdaLayer:
     Type: AWS::Serverless::LayerVersion
     Properties:
@@ -603,3 +604,16 @@ Resources:
                 }
             ]
           }'
+  #######################
+  ##### EventBridge #####
+  #######################
+  EventBridgeStatsLoader:
+    Type: AWS::Events::Rule
+    DependsOn: [LambdaStatsLoader]
+    Properties:
+      Name: !Sub ${Project}-${TargetEnvr}-stats-loader
+      ScheduleExpression: cron(5 0 * * ? *)
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt LambdaStatsLoader.Arn
+          Id: !Sub ${Project}-${TargetEnvr}-stats-loader

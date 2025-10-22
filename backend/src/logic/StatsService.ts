@@ -1,4 +1,5 @@
 import { inject, injectable } from 'inversify';
+import { Raw } from 'typeorm';
 import { QuestionAccess } from 'src/dao/QuestionAccess';
 import { ReplyAccess } from 'src/dao/ReplyAccess';
 import { UserStatsAccess } from 'src/dao/UserStatsAccess';
@@ -17,11 +18,20 @@ export class StatsService {
   private readonly userStatsAccess!: UserStatsAccess;
 
   public async processStats() {
-    const replies = await this.replyAccess.find();
+    const intervalExpression = process.env.INTERVAL_EXPRESSION ?? '1 day';
+    const replies = await this.replyAccess.find({
+      where: {
+        createdAt: Raw(
+          (alias) => `${alias} > NOW() - INTERVAL ${intervalExpression}`
+        ),
+      },
+    });
+    console.log(`Processing ${replies.length} new replies for stats.`);
+    if (replies.length === 0) return;
 
-    const questionStats = await this.replyAccess.groupByQuestionId(
-      replies.map((r) => r.questionId)
-    );
+    const questionStats = await this.replyAccess.groupByQuestionId([
+      ...new Set(replies.map((r) => r.questionId)),
+    ]);
     console.log(`Processing stats for ${questionStats.length} questions.`);
     for (const stats of questionStats) {
       console.log(JSON.stringify(stats));
@@ -36,9 +46,9 @@ export class StatsService {
       });
     }
 
-    const userStats = await this.replyAccess.groupByUserId(
-      replies.map((r) => r.userId)
-    );
+    const userStats = await this.replyAccess.groupByUserId([
+      ...new Set(replies.map((r) => r.userId)),
+    ]);
     console.log(`Processing stats for ${userStats.length} users.`);
     for (const stats of userStats) {
       console.log(JSON.stringify(stats));

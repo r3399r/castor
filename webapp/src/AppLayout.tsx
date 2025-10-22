@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import { Outlet, useNavigate } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import Bar from './components/Bar';
 import { useEffect, useState } from 'react';
 import userEndpoint from './api/userEndpoint';
@@ -10,6 +10,7 @@ const AppLayout = () => {
   const [ready, setReady] = useState<boolean>(false);
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const location = useLocation();
 
   useEffect(() => {
     userEndpoint.getUser().then((res) => {
@@ -23,12 +24,15 @@ const AppLayout = () => {
       setReady(true);
     });
 
-    if (
-      localStorage.getItem('categoryId') === null ||
-      isNaN(Number(localStorage.getItem('categoryId')))
-    )
-      navigate('/category');
-    else dispatch(setCategoryId(Number(localStorage.getItem('categoryId'))));
+    const pathname = location.pathname;
+    if (!pathname.startsWith('/q/')) {
+      if (
+        localStorage.getItem('categoryId') === null ||
+        isNaN(Number(localStorage.getItem('categoryId')))
+      )
+        navigate('/category');
+      else dispatch(setCategoryId(Number(localStorage.getItem('categoryId'))));
+    }
   }, []);
 
   if (!ready) return <div>loading...</div>;

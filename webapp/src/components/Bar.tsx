@@ -10,7 +10,7 @@ const Bar = () => {
   return (
     <div
       className="flex items-center gap-5 px-5 py-3"
-      style={{ background: randomcolor({ luminosity: 'light', seed: categoryId ?? 'default' }) }}
+      style={{ background: categoryId ? randomcolor({ luminosity: 'light', seed: categoryId }) : '#00000000' }}
     >
       <div className="font-bold text-blue-900">Practice Makes Perfect</div>
       <div className="cursor-pointer" onClick={() => navigate('/')}>

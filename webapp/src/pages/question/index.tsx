@@ -8,7 +8,7 @@ import { Button } from '@mui/material';
 import Modal from 'src/components/Modal';
 import type { GetQuestionIdResponse } from 'src/model/backend/api/Question';
 import { useDispatch } from 'react-redux';
-import { finishWaiting, startWaiting } from 'src/redux/uiSlice';
+import { finishWaiting, setCategoryId, startWaiting } from 'src/redux/uiSlice';
 
 const Question = () => {
   const dispatch = useDispatch();
@@ -24,6 +24,10 @@ const Question = () => {
     questionEndpoint.getQuestionId(id ?? '').then((res) => {
       setQuestion(res?.data);
       setRepliedAnswer(res?.data.minor.map((v) => ({ id: v.id, answer: '' })));
+
+      const categoryId = res?.data.categoryId ?? -1;
+      localStorage.setItem('categoryId', categoryId.toString());
+      dispatch(setCategoryId(categoryId));
     });
   }, [id]);
 

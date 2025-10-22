@@ -63,7 +63,7 @@ const User = () => {
                   </TableCell>
                   <TableCell>
                     <a
-                      href={`/question/${row.questionUid}`}
+                      href={`/q/${row.questionUid}`}
                       target="_blank"
                       className="text-blue-600 underline"
                     >
