@@ -8,7 +8,6 @@ import {
   TableHead,
   TableRow,
 } from '@mui/material';
-import { format } from 'date-fns';
 import { useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
 import questionEndpoint from 'src/api/questionEndpoint';
@@ -46,10 +45,11 @@ const QuestionList = () => {
             <TableRow>
               <TableCell>題目ID</TableCell>
               <TableCell>標題</TableCell>
+              <TableCell>出處</TableCell>
               <TableCell>Tag</TableCell>
               <TableCell>得分率</TableCell>
               <TableCell>平均耗時(秒)</TableCell>
-              <TableCell>答題於</TableCell>
+              <TableCell>是否作答</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -61,6 +61,7 @@ const QuestionList = () => {
                   </a>
                 </TableCell>
                 <TableCell>{row.title}</TableCell>
+                <TableCell>{row.source ?? '-'}</TableCell>
                 <TableCell>
                   <div className="flex gap-1">
                     {row.tag.map((t) => (
@@ -72,11 +73,7 @@ const QuestionList = () => {
                   {row.scoringRate ? bn(row.scoringRate).times(100).dp(2).toFormat() + '%' : '-'}
                 </TableCell>
                 <TableCell>{bn(row.avgElapsedTimeMs).div(1000).dp(1).toFormat()}</TableCell>
-                <TableCell>
-                  {row.lastRepliedAt
-                    ? format(new Date(row.lastRepliedAt ?? ''), 'yyyy/MM/dd HH:mm:ss')
-                    : '尚未答題'}
-                </TableCell>
+                <TableCell>{row.lastReply ? '✔️' : '❌'}</TableCell>
               </TableRow>
             ))}
           </TableBody>

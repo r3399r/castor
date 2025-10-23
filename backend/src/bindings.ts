@@ -5,6 +5,7 @@ import { DbAccess } from './dao/DbAccess';
 import { QuestionAccess } from './dao/QuestionAccess';
 import { QuestionMinorAccess } from './dao/QuestionMinorAccess';
 import { ReplyAccess } from './dao/ReplyAccess';
+import { TagAccess } from './dao/TagAccess';
 import { UserAccess } from './dao/UserAccess';
 import { UserStatsAccess } from './dao/UserStatsAccess';
 import { CategoryService } from './logic/CategoryService';
@@ -43,6 +44,7 @@ container.bind(ReplyAccess).toSelf();
 container.bind(UserAccess).toSelf();
 container.bind(CategoryAccess).toSelf();
 container.bind(UserStatsAccess).toSelf();
+container.bind(TagAccess).toSelf();
 
 // service
 container.bind(QuestionService).toSelf();

@@ -1,9 +1,11 @@
+import axios from 'axios';
 import { inject, injectable } from 'inversify';
 import { LIMIT, OFFSET } from 'src/constant/Pagination';
 import { CategoryAccess } from 'src/dao/CategoryAccess';
 import { QuestionAccess } from 'src/dao/QuestionAccess';
 import { QuestionMinorAccess } from 'src/dao/QuestionMinorAccess';
 import { ReplyAccess } from 'src/dao/ReplyAccess';
+import { TagAccess } from 'src/dao/TagAccess';
 import {
   GetQuestionIdResponse,
   GetQuestionParams,
@@ -15,6 +17,7 @@ import {
 import { QuestionEntity } from 'src/model/entity/QuestionEntity';
 import { QuestionMinorEntity } from 'src/model/entity/QuestionMinorEntity';
 import { ReplyEntity } from 'src/model/entity/ReplyEntity';
+import { Tag, TagEntity } from 'src/model/entity/TagEntity';
 import { User } from 'src/model/entity/UserEntity';
 import { BadRequestError } from 'src/model/error';
 import { bn } from 'src/utils/bignumber';
@@ -39,6 +42,8 @@ export class QuestionService {
   private readonly replyAccess!: ReplyAccess;
   @inject(CategoryAccess)
   private readonly categoryAccess!: CategoryAccess;
+  @inject(TagAccess)
+  private readonly tagAccess!: TagAccess;
   @inject(userIdSymbol)
   private readonly userId!: string;
 
@@ -102,29 +107,73 @@ export class QuestionService {
         count: v.count,
         scoringRate: v.scoringRate,
         avgElapsedTimeMs: v.avgElapsedTimeMs,
-        hasReplied: v.reply.length > 0,
-        lastRepliedAt:
+        lastReply:
           v.reply.length > 0
-            ? v.reply.sort(compare('createdAt', 'desc'))[0].createdAt
+            ? v.reply.sort(compare('createdAt', 'desc'))[0]
             : null,
       })),
       paginate: genPagination(total, limit, offset),
     };
   }
 
+  private async postFb(imageUrl: string, caption: string) {
+    const fbPageId = process.env.FB_PAGE_ID;
+    const fbAccessToken = process.env.FB_ACCESS_TOKEN;
+    const res = await axios.post(
+      `https://graph.facebook.com/${fbPageId}/photos`,
+      {
+        url: imageUrl,
+        access_token: fbAccessToken,
+        caption,
+      }
+    );
+
+    return res.data;
+  }
+
+  private async commentFbPost(postId: string, questionUid: string) {
+    const fbAccessToken = process.env.FB_ACCESS_TOKEN;
+    await axios.post(`https://graph.facebook.com/${postId}/comments`, {
+      message: `https://pmp${process.env.EVNR === 'prod' ? '' : '-test'}.celestialstudio.net/q/${questionUid}`,
+      access_token: fbAccessToken,
+    });
+  }
+
   public async createQuestion(data: PostQuestionRequest) {
     const category = await this.categoryAccess.findOneOrFail({
-      where: { name: data.categoryName },
+      where: { name: data.category },
     });
+    const tagEntities: Tag[] = [];
+    for (const t of data.tag) {
+      let tagEntity = await this.tagAccess.findOne({ where: { name: t } });
+      if (tagEntity === null) {
+        tagEntity = new TagEntity();
+        tagEntity.name = t;
+        tagEntity = await this.tagAccess.save(tagEntity);
+      }
+      tagEntities.push(tagEntity);
+    }
+
+    const fbPost = await this.postFb(
+      data.imageUrl,
+      `#${data.category} ` + data.tag.map((t) => `#${t}`).join(' ')
+    );
 
     const questionEntity = new QuestionEntity();
     questionEntity.rid = randomBase36(3);
     questionEntity.categoryId = category.id;
+    questionEntity.title = data.title;
     questionEntity.content = data.content;
     questionEntity.source = data.source;
-    questionEntity.discussionUrl = 'a';
+    questionEntity.discussionUrl = `https://facebook.com/${fbPost.post_id}`;
+    questionEntity.tag = tagEntities;
 
     const newQuestionEntity = await this.questionAccess.save(questionEntity);
+
+    await this.commentFbPost(
+      fbPost.post_id,
+      newQuestionEntity.rid + newQuestionEntity.id.toString(36)
+    );
 
     const minor: QuestionMinorEntity[] = [];
     for (const m of data.minor) {

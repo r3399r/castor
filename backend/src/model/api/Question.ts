@@ -4,10 +4,12 @@ import { Tag } from 'src/model/entity/TagEntity';
 import { Paginate, PaginationParams } from 'src/model/Pagination';
 
 export type PostQuestionRequest = {
-  categoryName: string;
+  category: string;
+  title: string;
   content: string;
-  imageUrl?: string;
+  imageUrl: string;
   source: string;
+  tag: string[];
   minor: {
     type: 'SINGLE' | 'MULTIPLE';
     orderIndex: number;
@@ -36,8 +38,7 @@ export type ModifiedQuestion = {
   count: number;
   scoringRate: number | null;
   avgElapsedTimeMs: number | null;
-  hasReplied: boolean;
-  lastRepliedAt: string | null;
+  lastReply: Reply | null;
 };
 
 export type GetQuestionResponse = Paginate<ModifiedQuestion>;

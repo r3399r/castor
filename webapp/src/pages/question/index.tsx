@@ -62,7 +62,6 @@ const Question = () => {
   };
 
   const onSubmit = () => {
-    console.log(id, repliedAnswer, startTimestamp);
     if (!id || !repliedAnswer || !startTimestamp) return;
 
     dispatch(startWaiting());
@@ -73,7 +72,7 @@ const Question = () => {
         replied: repliedAnswer,
       })
       .then((res) => {
-        if (localStorage.getItem('userId') === '' && !!res)
+        if (localStorage.getItem('userId') === null && !!res)
           localStorage.setItem('userId', res.data.userId.toString() || '');
         setOpen(false);
       })
@@ -100,7 +99,7 @@ const Question = () => {
 
   return (
     <div>
-      <div className="mb-2 text-xl font-bold">⏱ {formatTime(seconds)}</div>
+      <div className="mb-2 text-xl font-bold">⏱️ {formatTime(seconds)}</div>
       <Button
         onClick={() => {
           setRunning((r) => !r);

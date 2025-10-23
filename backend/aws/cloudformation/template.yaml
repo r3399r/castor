@@ -389,10 +389,15 @@ Resources:
             "postQuestion": {
               "type": "object",
               "properties": {
-                "categoryName":{"type": "string"},
+                "category":{"type": "string"},
+                "title":{"type": "string"},
                 "content":{"type": "string"},
                 "imageUrl":{"type": "string"},
                 "source":{"type": "string"},
+                "tag": {
+                  "type": "array",
+                  "items": {"type": "string"}
+                },
                 "minor": {
                   "type": "array",
                   "items": {
@@ -408,7 +413,7 @@ Resources:
                   }
                 }
               },
-              "required": ["categoryName","content","source"]
+              "required": ["category","content","imageUrl","source","tag"]
             },
             "postQuestionReply": {
               "type": "object",
@@ -456,11 +461,14 @@ Resources:
       Layers: [!Ref LambdaLayer]
       Environment:
         Variables:
+          ENVR: !Sub ${TargetEnvr}
           PROJECT: !Sub ${Project}
           DB_HOST:
             Fn::ImportValue: !Sub celestial-studio-${TargetEnvr}-db-endpoint
           DB_PWD: !Sub '{{resolve:ssm:mysql-${TargetEnvr}-${Project}-pwd}}'
           LOGGER_QUEUE_URL: !Sub https://sqs.ap-east-2.amazonaws.com/${AWS::AccountId}/polaris-${TargetEnvr}-logger-queue
+          FB_PAGE_ID: '352343371286540'
+          FB_ACCESS_TOKEN: !Sub '{{resolve:ssm:${Project}-fb-access-token}}'
   InvokePermissionLambdaApi:
     Type: AWS::Lambda::Permission
     DependsOn: [ServerlessApi, LambdaApiFunction]
