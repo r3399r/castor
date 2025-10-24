@@ -496,7 +496,7 @@ Resources:
           DB_HOST:
             Fn::ImportValue: !Sub celestial-studio-${TargetEnvr}-db-endpoint
           DB_PWD: !Sub '{{resolve:ssm:mysql-${TargetEnvr}-${Project}-pwd}}'
-          INTERVAL_EXPRESSION: '1445 minute'
+          INTERVAL_EXPRESSION: '65 minute'
   InvokePermissionStatsLoader:
     Type: AWS::Lambda::Permission
     DependsOn: [LambdaStatsLoader]

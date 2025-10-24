@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import userEndpoint from './api/userEndpoint';
 import { useDispatch } from 'react-redux';
 import { setCategoryId } from './redux/uiSlice';
+import { encrypt } from './util/crypto';
 
 const AppLayout = () => {
   const [ready, setReady] = useState<boolean>(false);
@@ -18,8 +19,10 @@ const AppLayout = () => {
       if (res.data === null) {
         if (localStorage.getItem('deviceId') === null) localStorage.setItem('deviceId', uuidv4());
       } else {
-        localStorage.setItem('userId', res.data.id.toString());
-        localStorage.setItem('deviceId', res.data.deviceId);
+        if (localStorage.getItem('userId') === null)
+          localStorage.setItem('userId', encrypt(res.data.id.toString(), res.data.deviceId));
+        if (localStorage.getItem('deviceId') === null)
+          localStorage.setItem('deviceId', res.data.deviceId);
       }
       setReady(true);
     });

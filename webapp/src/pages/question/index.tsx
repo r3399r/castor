@@ -10,6 +10,7 @@ import type { GetQuestionIdResponse, ModifiedReply } from 'src/model/backend/api
 import { useDispatch } from 'react-redux';
 import { finishWaiting, setCategoryId, startWaiting } from 'src/redux/uiSlice';
 import { bn } from 'src/util/bignumber';
+import { encrypt } from 'src/util/crypto';
 
 const Question = () => {
   const dispatch = useDispatch();
@@ -84,7 +85,10 @@ const Question = () => {
       })
       .then((res) => {
         if (localStorage.getItem('userId') === null && !!res)
-          localStorage.setItem('userId', res.data.userId.toString() || '');
+          localStorage.setItem(
+            'userId',
+            encrypt(res.data.userId.toString(), localStorage.getItem('deviceId') ?? 'x'),
+          );
         setOpen(false);
         setReplyResult(res?.data);
         setRunning(false);

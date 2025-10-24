@@ -1,5 +1,6 @@
 import axios, { type AxiosRequestConfig, type RawAxiosRequestHeaders } from 'axios';
 import packageJson from '../../package.json';
+import { decrypt } from 'src/util/crypto';
 
 // eslint-disable-next-line
 type Options<D = any, P = any> = {
@@ -24,17 +25,24 @@ const publicRequestConfig = <D = unknown, P = any>(
   method: string,
   url: string,
   options?: Options<D, P>,
-) => ({
-  ...defaultConfig,
-  headers: {
-    ...defaultHeader,
-    ...options?.headers,
-  },
-  data: options?.data,
-  params: options?.params,
-  url,
-  method,
-});
+) => {
+  const userId = localStorage.getItem('userId');
+  const deviceId = localStorage.getItem('deviceId');
+  const headerUser = userId && deviceId ? decrypt(userId, deviceId) : 'no-user-id';
+
+  return {
+    ...defaultConfig,
+    headers: {
+      'x-user-id': headerUser,
+      ...defaultHeader,
+      ...options?.headers,
+    },
+    data: options?.data,
+    params: options?.params,
+    url,
+    method,
+  };
+};
 
 // eslint-disable-next-line
 const get = async <T, P = any>(url: string, options?: Options<any, P>) =>

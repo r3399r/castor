@@ -11,9 +11,6 @@ const getQuestion = async (params?: GetQuestionParams) => {
   try {
     return await http.get<GetQuestionResponse>('question', {
       params,
-      headers: {
-        'x-user-id': localStorage.getItem('userId') || 'no-user-id',
-      },
     });
   } catch {
     alert('發生無預期錯誤，請重新再試，若反覆出現此問題，請聯絡客服人員。');
@@ -22,11 +19,7 @@ const getQuestion = async (params?: GetQuestionParams) => {
 
 const getQuestionId = async (id: string) => {
   try {
-    return await http.get<GetQuestionIdResponse>(`question/${id}`, {
-      headers: {
-        'x-user-id': localStorage.getItem('userId') || 'no-user-id',
-      },
-    });
+    return await http.get<GetQuestionIdResponse>(`question/${id}`);
   } catch {
     alert('發生無預期錯誤，請重新再試，若反覆出現此問題，請聯絡客服人員。');
   }
@@ -37,7 +30,6 @@ const postQuestionReply = async (data: PostQuestionReplyRequest) => {
     return await http.post<PostQuestionReplyResponse, PostQuestionReplyRequest>(`question/reply`, {
       data,
       headers: {
-        'x-user-id': localStorage.getItem('userId') || 'no-user-id',
         'x-device-id': localStorage.getItem('deviceId') || '',
       },
     });
