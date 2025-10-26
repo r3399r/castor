@@ -36,6 +36,25 @@ export class QuestionAccess {
     return qr.manager.createQueryBuilder(QuestionEntity.name, 'question');
   }
 
+  public async findTag(categoryId: number) {
+    const qb = await this.createQueryBuilder();
+    const raws = await qb
+      .select('tag.id', 'id')
+      .addSelect('tag.name', 'name')
+      .innerJoin('question.category', 'category', 'category.id = :categoryId', {
+        categoryId,
+      })
+      .innerJoin('question_tag', 'qt', 'qt.question_id = question.id')
+      .innerJoin('tag', 'tag', 'tag.id = qt.tag_id')
+      .where('tag.id IS NOT NULL')
+      .groupBy('tag.id')
+      .addGroupBy('tag.name')
+      .orderBy('tag.name', 'ASC')
+      .getRawMany();
+
+    return raws.map((r: any) => ({ id: Number(r.id), name: String(r.name) }));
+  }
+
   public async findDetail(data: { id: number; userId: number }) {
     const qb = await this.createQueryBuilder();
 
@@ -61,7 +80,7 @@ export class QuestionAccess {
     tags?: number[];
   }) {
     const qb = await this.createQueryBuilder();
-    const findPromise = qb
+    const base = qb
       .innerJoinAndSelect(
         'question.category',
         'category',
@@ -74,15 +93,15 @@ export class QuestionAccess {
       .leftJoinAndSelect('question.tag', 'tag');
 
     if (data.title)
-      findPromise.andWhere('question.title like :title', {
+      base.andWhere('question.title like :title', {
         title: `%${data.title}%`,
       });
-    if (data.hasReply === true) findPromise.andWhere('reply.id IS NOT NULL');
+    if (data.hasReply === true) base.andWhere('reply.id IS NOT NULL');
 
-    if (data.hasReply === false) findPromise.andWhere('reply.id IS NULL');
+    if (data.hasReply === false) base.andWhere('reply.id IS NULL');
 
     if (data.tags !== undefined && data.tags.length > 0)
-      findPromise.innerJoin(
+      base.innerJoin(
         'question.tag',
         'tagFilter',
         'tagFilter.id IN (:...tagIds)',
@@ -90,12 +109,13 @@ export class QuestionAccess {
       );
 
     return (await Promise.all([
-      findPromise
+      base
+        .clone()
         .orderBy(`question.${data.orderBy}`, data.orderDirection)
         .skip(data.skip)
         .take(data.take)
         .getMany(),
-      findPromise.getCount(),
+      base.getCount(),
     ])) as [Question[], number];
   }
 }

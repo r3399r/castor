@@ -10,6 +10,8 @@ import {
   GetQuestionIdResponse,
   GetQuestionParams,
   GetQuestionResponse,
+  GetQuestionTagParams,
+  GetQuestionTagResponse,
   PostQuestionReplyRequest,
   PostQuestionReplyResponse,
   PostQuestionRequest,
@@ -81,6 +83,15 @@ export class QuestionService {
             }
           : null,
     };
+  }
+
+  public async getAllTags(
+    params: GetQuestionTagParams | null
+  ): Promise<GetQuestionTagResponse> {
+    if (!params?.categoryId)
+      throw new BadRequestError('categoryId is required');
+
+    return await this.questionAccess.findTag(params.categoryId);
   }
 
   public async getQuestionList(

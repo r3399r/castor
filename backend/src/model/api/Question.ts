@@ -41,6 +41,10 @@ export type GetQuestionParams = PaginationParams & {
   tags?: string;
 };
 
+export type GetQuestionTagParams = { categoryId: number };
+
+export type GetQuestionTagResponse = { id: number; name: string }[];
+
 export type ModifiedQuestion = {
   uid: string;
   title: string;

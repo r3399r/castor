@@ -18,9 +18,10 @@ import { useEffect, useState } from 'react';
 import { useDispatch } from 'react-redux';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import questionEndpoint from 'src/api/questionEndpoint';
-import type { ModifiedQuestion } from 'src/model/backend/api/Question';
+import type { GetQuestionTagResponse, ModifiedQuestion } from 'src/model/backend/api/Question';
 import { setCategoryId as reduxSetCategoryId } from 'src/redux/uiSlice';
 import { bn } from 'src/util/bignumber';
+import randomcolor from 'randomcolor';
 
 const LIMIT = 100;
 
@@ -38,6 +39,8 @@ const QuestionList = () => {
   const [sortValue, setSortValue] = useState<number>(1);
   const [showReply, setShowReply] = useState<'true' | 'false'>();
   const [showReplyValue, setShowReplyValue] = useState<number>(1);
+  const [tagsFilter, setTagsFilter] = useState<string[]>([]);
+  const [allTags, setAllTags] = useState<GetQuestionTagResponse>();
 
   useEffect(() => {
     const tmpCategoryId = searchParams.get('categoryId');
@@ -61,7 +64,18 @@ const QuestionList = () => {
     const tmpShowReply = searchParams.get('showReply');
     if (tmpShowReply !== null && (tmpShowReply === 'true' || tmpShowReply === 'false'))
       setShowReply(tmpShowReply);
+
+    const tmpTagsFilter = searchParams.get('tagsFilter');
+    if (tmpTagsFilter !== null) setTagsFilter(tmpTagsFilter.split(','));
   }, [searchParams, dispatch, navigate]);
+
+  useEffect(() => {
+    if (!categoryId) return;
+
+    questionEndpoint.getQuestionTag({ categoryId }).then((res) => {
+      setAllTags(res?.data);
+    });
+  }, [categoryId]);
 
   useEffect(() => {
     if (!categoryId) return;
@@ -75,7 +89,7 @@ const QuestionList = () => {
         orderDirection: sortDirection,
         title: titleQuery,
         hasReply: showReply,
-        // tags:'1,2'
+        tags: tagsFilter.join(),
       })
       .then((res) => {
         setList(res?.data.data);
@@ -90,6 +104,7 @@ const QuestionList = () => {
     if (sorting) sp.set('sorting', sorting);
     if (sortDirection === 'DESC') sp.set('sortDirection', 'DESC');
     if (showReply) sp.set('showReply', showReply);
+    if (tagsFilter) sp.set('tagsFilter', tagsFilter.join());
     setSearchParams(sp, { replace: !!opts?.replace });
   };
 
@@ -136,7 +151,25 @@ const QuestionList = () => {
             </Select>
           </FormControl>
         </div>
-        <div>tag</div>
+        <div className="w-50">
+          <FormControl fullWidth>
+            <InputLabel>Tag</InputLabel>
+            <Select
+              size="small"
+              value={tagsFilter}
+              label="Tag"
+              multiple
+              onChange={(e) => {
+                const value = e.target.value;
+                setTagsFilter(typeof value === 'string' ? value.split(',') : value);
+              }}
+            >
+              {allTags?.map((t) => (
+                <MenuItem value={t.id.toString()}>{t.name}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </div>
         <div className="w-50">
           <FormControl fullWidth>
             <InputLabel>作答與否</InputLabel>
@@ -191,7 +224,15 @@ const QuestionList = () => {
                 <TableCell>
                   <div className="flex flex-wrap gap-1">
                     {row.tag.map((t) => (
-                      <div key={t.id}>#{t.name}</div>
+                      <div
+                        key={t.id}
+                        className="rounded px-1"
+                        style={{
+                          background: randomcolor({ luminosity: 'light', seed: t.id }),
+                        }}
+                      >
+                        {t.name}
+                      </div>
                     ))}
                   </div>
                 </TableCell>

@@ -5,6 +5,8 @@ import type {
   GetQuestionIdResponse,
   PostQuestionReplyRequest,
   PostQuestionReplyResponse,
+  GetQuestionTagParams,
+  GetQuestionTagResponse,
 } from 'src/model/backend/api/Question';
 
 const getQuestion = async (params?: GetQuestionParams) => {
@@ -25,6 +27,14 @@ const getQuestionId = async (id: string) => {
   }
 };
 
+const getQuestionTag = async (params: GetQuestionTagParams) => {
+  try {
+    return await http.get<GetQuestionTagResponse>('question/tag', { params });
+  } catch {
+    alert('發生無預期錯誤，請重新再試，若反覆出現此問題，請聯絡客服人員。');
+  }
+};
+
 const postQuestionReply = async (data: PostQuestionReplyRequest) => {
   try {
     return await http.post<PostQuestionReplyResponse, PostQuestionReplyRequest>(`question/reply`, {
@@ -40,6 +50,7 @@ const postQuestionReply = async (data: PostQuestionReplyRequest) => {
 
 export default {
   getQuestion,
+  getQuestionTag,
   getQuestionId,
   postQuestionReply,
 };

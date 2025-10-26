@@ -2,6 +2,7 @@ import { bindings } from 'src/bindings';
 import { QuestionService } from 'src/logic/QuestionService';
 import {
   GetQuestionParams,
+  GetQuestionTagParams,
   PostQuestionReplyRequest,
   PostQuestionRequest,
 } from 'src/model/api/Question';
@@ -22,6 +23,8 @@ export default async (lambdaEvent: LambdaEvent) => {
       return await questionUid();
     case '/api/question/reply':
       return await questionReply();
+    case '/api/question/tag':
+      return await questionTag();
   }
 
   throw new BadRequestError('unexpected resource');
@@ -64,6 +67,17 @@ const questionReply = async () => {
 
       return await service.replyQuestion(
         JSON.parse(event.body) as PostQuestionReplyRequest
+      );
+  }
+
+  throw new Error('unexpected httpMethod');
+};
+
+const questionTag = async () => {
+  switch (event.httpMethod) {
+    case 'GET':
+      return await service.getAllTags(
+        event.queryStringParameters as GetQuestionTagParams | null
       );
   }
 
