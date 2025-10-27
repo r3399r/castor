@@ -100,13 +100,21 @@ export class QuestionAccess {
 
     if (data.hasReply === false) base.andWhere('reply.id IS NULL');
 
-    if (data.tags !== undefined && data.tags.length > 0)
-      base.innerJoin(
-        'question.tag',
-        'tagFilter',
-        'tagFilter.id IN (:...tagIds)',
-        { tagIds: data.tags }
-      );
+    if (data.tags !== undefined && data.tags.length > 0) {
+      const tagIds = data.tags;
+      const tagCount = tagIds.length;
+
+      const subQuery = qb
+        .subQuery()
+        .select('qtFilter.question_id')
+        .from('question_tag', 'qtFilter')
+        .where('qtFilter.tag_id IN (:...tagIds)', { tagIds })
+        .groupBy('qtFilter.question_id')
+        .having('COUNT(DISTINCT qtFilter.tag_id) = :tagCount')
+        .getQuery();
+
+      base.andWhere(`question.id IN ${subQuery}`, { tagIds, tagCount });
+    }
 
     return (await Promise.all([
       base

@@ -11,6 +11,7 @@ import { useDispatch } from 'react-redux';
 import { finishWaiting, setCategoryId, startWaiting } from 'src/redux/uiSlice';
 import { bn } from 'src/util/bignumber';
 import { encrypt } from 'src/util/crypto';
+import randomcolor from 'randomcolor';
 
 const Question = () => {
   const dispatch = useDispatch();
@@ -108,6 +109,14 @@ const Question = () => {
     return [hrs, mins, secs].map((v) => String(v).padStart(2, '0')).join(':');
   };
 
+  const msToMinSec = (ms: number): string => {
+    if (Number.isNaN(ms)) return '00分00秒';
+    const totalSeconds = Math.floor(ms / 1000);
+    const m = Math.floor(totalSeconds / 60);
+    const s = totalSeconds % 60;
+    return `${m}分${String(s).padStart(2, '0')}秒`;
+  };
+
   if (!question)
     return (
       <div className="flex items-center justify-center">
@@ -130,9 +139,18 @@ const Question = () => {
           <p>
             Tag:{' '}
             {question.tag.map((t) => (
-              <span className="mr-1 rounded border px-1">{t.name}</span>
+              <span
+                key={t.id}
+                className="mr-1 rounded px-1"
+                style={{
+                  background: randomcolor({ luminosity: 'light', seed: t.id }),
+                }}
+              >
+                {t.name}
+              </span>
             ))}
           </p>
+          {question.avgElapsedTimeMs && <p>平均耗時: {msToMinSec(question.avgElapsedTimeMs)}</p>}
           <p className="my-4">
             提醒您，在按下「開始」之後便會開始計時，請確保您有充足且完整的時間作答，以獲得客觀的統計結果。
           </p>
@@ -224,7 +242,7 @@ const Question = () => {
               <div className="mt-2">
                 如果你有什麼想提問的，歡迎到{' '}
                 <a
-                  className="text-blue-600"
+                  className="text-blue-600 underline"
                   href={replyResult.discussionUrl}
                   target="_blank"
                   rel="noreferrer"

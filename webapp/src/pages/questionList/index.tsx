@@ -39,7 +39,7 @@ const QuestionList = () => {
   const [sortValue, setSortValue] = useState<number>(1);
   const [showReply, setShowReply] = useState<'true' | 'false'>();
   const [showReplyValue, setShowReplyValue] = useState<number>(1);
-  const [tagsFilter, setTagsFilter] = useState<string[]>([]);
+  const [tagsFilter, setTagsFilter] = useState<string[]>();
   const [allTags, setAllTags] = useState<GetQuestionTagResponse>();
 
   useEffect(() => {
@@ -89,7 +89,7 @@ const QuestionList = () => {
         orderDirection: sortDirection,
         title: titleQuery,
         hasReply: showReply,
-        tags: tagsFilter.join(),
+        tags: tagsFilter ? tagsFilter.join() : undefined,
       })
       .then((res) => {
         setList(res?.data.data);
@@ -104,8 +104,16 @@ const QuestionList = () => {
     if (sorting) sp.set('sorting', sorting);
     if (sortDirection === 'DESC') sp.set('sortDirection', 'DESC');
     if (showReply) sp.set('showReply', showReply);
-    if (tagsFilter) sp.set('tagsFilter', tagsFilter.join());
+    if (tagsFilter && tagsFilter.length > 0) sp.set('tagsFilter', tagsFilter.join());
     setSearchParams(sp, { replace: !!opts?.replace });
+  };
+
+  const msToMinSec = (ms: number): string => {
+    if (Number.isNaN(ms)) return '00分00秒';
+    const totalSeconds = Math.floor(ms / 1000);
+    const m = Math.floor(totalSeconds / 60);
+    const s = totalSeconds % 60;
+    return `${m}分${String(s).padStart(2, '0')}秒`;
   };
 
   return (
@@ -156,7 +164,7 @@ const QuestionList = () => {
             <InputLabel>Tag</InputLabel>
             <Select
               size="small"
-              value={tagsFilter}
+              value={tagsFilter ?? []}
               label="Tag"
               multiple
               onChange={(e) => {
@@ -207,7 +215,7 @@ const QuestionList = () => {
               <TableCell>標題</TableCell>
               <TableCell>Tag</TableCell>
               <TableCell>得分率</TableCell>
-              <TableCell>平均耗時(秒)</TableCell>
+              <TableCell>平均耗時</TableCell>
               <TableCell>是否作答</TableCell>
               <TableCell>來源</TableCell>
             </TableRow>
@@ -239,7 +247,9 @@ const QuestionList = () => {
                 <TableCell>
                   {row.scoringRate ? bn(row.scoringRate).times(100).dp(2).toFormat() + '%' : '-'}
                 </TableCell>
-                <TableCell>{bn(row.avgElapsedTimeMs).div(1000).dp(1).toFormat()}</TableCell>
+                <TableCell>
+                  {row.avgElapsedTimeMs ? msToMinSec(row.avgElapsedTimeMs) : '-'}
+                </TableCell>
                 <TableCell>{row.lastReply ? '已作答' : '尚未作答'}</TableCell>
                 <TableCell>{row.source ?? '-'}</TableCell>
               </TableRow>
