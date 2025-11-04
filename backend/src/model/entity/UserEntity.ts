@@ -8,12 +8,11 @@ import {
 
 export type User = {
   id: number;
-  deviceId: string;
+  firebaseUid: string;
   email: string | null;
-  code: string | null;
-  codeGeneratedAt: string | null;
-  isVerified: boolean;
-  verifiedAt: string | null;
+  name: string | null;
+  avatar: string | null;
+  lastLoginAt: string | null;
   createdAt: string | null;
   updatedAt: string | null;
 };
@@ -23,26 +22,23 @@ export class UserEntity implements User {
   @PrimaryGeneratedColumn({ type: 'int', unsigned: true })
   id!: number;
 
-  @Column({ type: 'varchar', length: 255, name: 'device_id' })
-  deviceId!: string;
+  @Column({ type: 'varchar', length: 128, name: 'firebase_uid' })
+  firebaseUid!: string;
 
   @Column({ type: 'varchar', length: 255, nullable: true })
   email: string | null = null;
 
-  @Column({ type: 'varchar', length: 15, nullable: true })
-  code: string | null = null;
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  name: string | null = null;
 
-  @Column({ type: 'datetime', name: 'code_generated_at', default: null })
-  codeGeneratedAt: string | null = null;
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  avatar: string | null = null;
 
-  @Column({ type: 'boolean', name: 'is_verified' })
-  isVerified: boolean = false;
-
-  @Column({ type: 'datetime', name: 'verified_at', default: null })
-  verifiedAt: string | null = null;
+  @Column({ type: 'datetime', name: 'last_login_at', default: null })
+  lastLoginAt: string | null = null;
 
   @Column({ type: 'datetime', name: 'created_at', default: null })
-  createdAt!: string;
+  createdAt: string | null = null;
 
   @Column({ type: 'datetime', name: 'updated_at', default: null })
   updatedAt: string | null = null;

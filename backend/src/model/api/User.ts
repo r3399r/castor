@@ -23,15 +23,4 @@ export type GetUserDetailResponse = {
   }>;
 };
 
-export type PostUserBindRequest = {
-  email: string;
-};
-
-export type PatchUserBindRequest = {
-  email: string;
-  code: string;
-};
-
-export type PatchUserBindResponse = User;
-
-export type PostUserUnbindResponse = User;
+export type PostUserSyncResponse = User;

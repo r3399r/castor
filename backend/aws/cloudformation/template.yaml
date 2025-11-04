@@ -95,12 +95,7 @@ Resources:
             "/api/user": {
               "get": {
                 "parameters": [{
-                  "name": "x-device-id",
-                  "in": "header",
-                  "required": true,
-                  "schema": {"type": "string"}
-                }, {
-                  "name": "x-user-id",
+                  "name": "Authorization",
                   "in": "header",
                   "required": true,
                   "schema": {"type": "string"}
@@ -143,7 +138,7 @@ Resources:
             "/api/user/detail": {
               "get": {
                 "parameters": [{
-                  "name": "x-user-id",
+                  "name": "Authorization",
                   "in": "header",
                   "required": true,
                   "schema": {"type": "string"}
@@ -187,129 +182,10 @@ Resources:
                 }
               }
             },
-            "/api/user/bind": {
+            "/api/user/sync": {
               "post": {
                 "parameters": [{
-                  "name": "x-device-id",
-                  "in": "header",
-                  "required": true,
-                  "schema": {"type": "string"}
-                }, {
-                  "name": "x-user-id",
-                  "in": "header",
-                  "required": true,
-                  "schema": {"type": "string"}
-                }],
-                "requestBody": {
-                  "content": {
-                    "application/json": {
-                      "schema": {
-                        "$ref": "#/components/schemas/postUserBind"
-                      }
-                    }
-                  },
-                  "required": true
-                },
-                "responses": {
-                  "200": {
-                    "description": "200 response",
-                    "headers": {
-                      "Access-Control-Allow-Origin": {
-                        "schema": {"type": "string"}
-                      }
-                    },
-                    "content": {
-                      "application/json": {
-                        "schema": {
-                          "$ref": "#/components/schemas/Empty"
-                        }
-                      }
-                    }
-                  }
-                },
-                "x-amazon-apigateway-request-validator": "Validate body, query string parameters, and headers",
-                "x-amazon-apigateway-integration": {
-                  "type": "aws_proxy",
-                  "httpMethod": "POST",
-                  "uri": !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${Project}-${TargetEnvr}-api/invocations",
-                  "responses": {
-                    "default": {
-                      "statusCode": "200",
-                      "responseParameters": {
-                        "method.response.header.Access-Control-Allow-Origin": "'*'"
-                      }
-                    }
-                  },
-                  "passthroughBehavior": "when_no_match",
-                  "contentHandling": "CONVERT_TO_TEXT"
-                }
-              },
-              "patch": {
-                "parameters": [{
-                  "name": "x-device-id",
-                  "in": "header",
-                  "required": true,
-                  "schema": {"type": "string"}
-                }, {
-                  "name": "x-user-id",
-                  "in": "header",
-                  "required": true,
-                  "schema": {"type": "string"}
-                }],
-                "requestBody": {
-                  "content": {
-                    "application/json": {
-                      "schema": {
-                        "$ref": "#/components/schemas/patchUserBind"
-                      }
-                    }
-                  },
-                  "required": true
-                },
-                "responses": {
-                  "200": {
-                    "description": "200 response",
-                    "headers": {
-                      "Access-Control-Allow-Origin": {
-                        "schema": {"type": "string"}
-                      }
-                    },
-                    "content": {
-                      "application/json": {
-                        "schema": {
-                          "$ref": "#/components/schemas/Empty"
-                        }
-                      }
-                    }
-                  }
-                },
-                "x-amazon-apigateway-request-validator": "Validate body, query string parameters, and headers",
-                "x-amazon-apigateway-integration": {
-                  "type": "aws_proxy",
-                  "httpMethod": "POST",
-                  "uri": !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${Project}-${TargetEnvr}-api/invocations",
-                  "responses": {
-                    "default": {
-                      "statusCode": "200",
-                      "responseParameters": {
-                        "method.response.header.Access-Control-Allow-Origin": "'*'"
-                      }
-                    }
-                  },
-                  "passthroughBehavior": "when_no_match",
-                  "contentHandling": "CONVERT_TO_TEXT"
-                }
-              }
-            },
-            "/api/user/unbind": {
-              "post": {
-                "parameters": [{
-                  "name": "x-device-id",
-                  "in": "header",
-                  "required": true,
-                  "schema": {"type": "string"}
-                }, {
-                  "name": "x-user-id",
+                  "name": "Authorization",
                   "in": "header",
                   "required": true,
                   "schema": {"type": "string"}
@@ -352,9 +228,9 @@ Resources:
             "/api/question": {
               "get": {
                 "parameters": [{
-                  "name": "x-user-id",
+                  "name": "Authorization",
                   "in": "header",
-                  "required": true,
+                  "required": false,
                   "schema": {"type": "string"}
                 }, {
                     "name": "categoryId",
@@ -444,7 +320,7 @@ Resources:
             "/api/question/{uid}": {
               "get": {
                 "parameters": [{
-                  "name": "x-user-id",
+                  "name": "Authorization",
                   "in": "header",
                   "required": true,
                   "schema": {"type": "string"}
@@ -487,12 +363,7 @@ Resources:
             "/api/question/reply": {
               "post": {
                 "parameters": [{
-                  "name": "x-device-id",
-                  "in": "header",
-                  "required": true,
-                  "schema": {"type": "string"}
-                }, {
-                  "name": "x-user-id",
+                  "name": "Authorization",
                   "in": "header",
                   "required": true,
                   "schema": {"type": "string"}
@@ -590,21 +461,6 @@ Resources:
               "type": "object",
               "title": "Empty Schema"
             },
-            "postUserBind": {
-              "type": "object",
-              "properties": {
-                "email":{"type": "string"}
-              },
-              "required": ["email"]
-            },
-            "patchUserBind": {
-              "type": "object",
-              "properties": {
-                "code":{"type": "string"},
-                "email":{"type": "string"}
-              },
-              "required": ["code","email"]
-            },
             "postQuestion": {
               "type": "object",
               "properties": {
@@ -688,6 +544,7 @@ Resources:
           LOGGER_QUEUE_URL: !Sub https://sqs.ap-east-2.amazonaws.com/${AWS::AccountId}/polaris-${TargetEnvr}-logger-queue
           FB_PAGE_ID: '352343371286540'
           FB_ACCESS_TOKEN: !Sub '{{resolve:ssm:${Project}-fb-access-token}}'
+          FIREBAE_ADMIN_KEY: !Sub '{{resolve:ssm:${Project}-${TargetEnvr}-firebase-admin-key}}'
   InvokePermissionLambdaApi:
     Type: AWS::Lambda::Permission
     DependsOn: [ServerlessApi, LambdaApiFunction]

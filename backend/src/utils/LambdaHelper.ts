@@ -2,8 +2,7 @@ import { bindings } from 'src/bindings';
 import { HttpError } from 'src/model/error/HttpError';
 import { LambdaEvent, LambdaOutput } from 'src/model/Lambda';
 
-export const deviceIdSymbol = Symbol('deviceId');
-export const userIdSymbol = Symbol('userId');
+export const authorizationSymbol = Symbol('Authorization');
 
 export const successOutput = <T>(res: T): LambdaOutput => ({
   statusCode: 200,
@@ -31,8 +30,10 @@ export const errorOutput = (e: unknown): LambdaOutput => {
 };
 
 export const initLambda = (event?: LambdaEvent): void => {
-  bind<string>(deviceIdSymbol, event?.headers?.['x-device-id'] ?? 'xx');
-  bind<string>(userIdSymbol, event?.headers?.['x-user-id'] ?? 'xx');
+  bind<string>(
+    authorizationSymbol,
+    event?.headers?.['Authorization'] ?? 'NO_AUTH'
+  );
 };
 
 const bind = <T>(bindingId: symbol, values: T): void => {

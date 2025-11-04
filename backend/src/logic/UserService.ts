@@ -1,5 +1,5 @@
+import admin from 'firebase-admin';
 import { inject, injectable } from 'inversify';
-import { v4 as uuidv4 } from 'uuid';
 import { LIMIT, OFFSET } from 'src/constant/Pagination';
 import { ReplyAccess } from 'src/dao/ReplyAccess';
 import { UserAccess } from 'src/dao/UserAccess';
@@ -8,16 +8,22 @@ import {
   GetUserDetailParams,
   GetUserDetailResponse,
   GetUserResponse,
-  PatchUserBindRequest,
-  PatchUserBindResponse,
-  PostUserBindRequest,
-  PostUserUnbindResponse,
+  PostUserSyncResponse,
 } from 'src/model/api/User';
 import { UserEntity } from 'src/model/entity/UserEntity';
-import { BadRequestError, ConflictError, NotFoundError } from 'src/model/error';
-import { deviceIdSymbol, userIdSymbol } from 'src/utils/LambdaHelper';
+import {
+  BadRequestError,
+  NotFoundError,
+  UnauthorizedError,
+} from 'src/model/error';
+import { authorizationSymbol } from 'src/utils/LambdaHelper';
 import { genPagination } from 'src/utils/paginator';
-import { randomBase10 } from 'src/utils/random';
+
+admin.initializeApp({
+  credential: admin.credential.cert(
+    JSON.parse(process.env.FIREBAE_ADMIN_KEY ?? '{}')
+  ),
+});
 
 /**
  * Service class for User
@@ -30,26 +36,44 @@ export class UserService {
   private readonly userStatsAccess!: UserStatsAccess;
   @inject(ReplyAccess)
   private readonly replyAccess!: ReplyAccess;
-  @inject(deviceIdSymbol)
-  private readonly deviceId!: string;
-  @inject(userIdSymbol)
-  private readonly userId!: string;
+  @inject(authorizationSymbol)
+  private readonly token!: string;
 
-  public async createUserWithDeviceId() {
+  private async verifyFirebaseToken() {
+    try {
+      return await admin.auth().verifyIdToken(this.token);
+    } catch (error) {
+      console.error('Invalid Firebase token', error);
+
+      return null;
+    }
+  }
+
+  public async syncFirebaseUser(): Promise<PostUserSyncResponse> {
+    const decoded = await this.verifyFirebaseToken();
+    if (!decoded) throw new UnauthorizedError('Unauthorized');
+
+    const user = await this.userAccess.findOne({
+      where: { firebaseUid: decoded.uid },
+    });
+    if (user !== null) return user;
+
     const userEntity = new UserEntity();
-    userEntity.deviceId = this.deviceId;
+    userEntity.firebaseUid = decoded.uid;
+    userEntity.email = decoded.email ?? null;
+    userEntity.name = decoded.name ?? null;
+    userEntity.avatar = decoded.picture ?? null;
+    userEntity.lastLoginAt = new Date().toISOString();
 
     return await this.userAccess.save(userEntity);
   }
 
   public async getUser(): Promise<GetUserResponse> {
-    const user = await this.userAccess.findOne({
-      where: { id: isNaN(Number(this.userId)) ? 0 : Number(this.userId) },
-    });
-    if (user !== null) return user;
+    const decoded = await this.verifyFirebaseToken();
+    if (!decoded) throw new UnauthorizedError('Unauthorized');
 
     return await this.userAccess.findOne({
-      where: { deviceId: this.deviceId },
+      where: { firebaseUid: decoded.uid },
     });
   }
 
@@ -59,9 +83,12 @@ export class UserService {
     if (!params?.categoryId)
       throw new BadRequestError('categoryId is required');
 
+    const user = await this.getUser();
+    if (user === null) throw new NotFoundError('User not found');
+
     const userStats = await this.userStatsAccess.findOne({
       where: {
-        userId: isNaN(Number(this.userId)) ? 0 : Number(this.userId),
+        userId: user.id,
         categoryId: params.categoryId,
       },
       relations: { user: true },
@@ -71,7 +98,7 @@ export class UserService {
     const offset = params?.offset ? Number(params.offset) : OFFSET;
     const [reply, total] = await this.replyAccess.findAndCount({
       where: {
-        userId: isNaN(Number(this.userId)) ? 0 : Number(this.userId),
+        userId: user.id,
         question: {
           categoryId: params.categoryId,
         },
@@ -103,99 +130,5 @@ export class UserService {
         paginate: genPagination(total, limit, offset),
       },
     };
-  }
-
-  public async bindUser(data: PostUserBindRequest) {
-    const user = await this.getUser();
-    const userByEmail = await this.userAccess.findOne({
-      where: { email: data.email, isVerified: true },
-    });
-    if (user === null) {
-      if (userByEmail === null) {
-        const userEntity = new UserEntity();
-        userEntity.deviceId = this.deviceId;
-        userEntity.email = data.email;
-        userEntity.code = randomBase10(6);
-        userEntity.codeGeneratedAt = new Date().toISOString();
-        await this.userAccess.save(userEntity);
-
-        return;
-      }
-
-      userByEmail.code = randomBase10(6);
-      userByEmail.codeGeneratedAt = new Date().toISOString();
-      await this.userAccess.save(userByEmail);
-
-      return;
-    }
-
-    if (user.isVerified) throw new ConflictError('you are already verified.');
-    if (userByEmail === null) {
-      // clean user with same email to avoid db conflict
-      const unverifiedUserByEmail = await this.userAccess.findOne({
-        where: { email: data.email, isVerified: false },
-      });
-      if (
-        unverifiedUserByEmail !== null &&
-        unverifiedUserByEmail.id !== user.id
-      ) {
-        unverifiedUserByEmail.email = null;
-        await this.userAccess.save(unverifiedUserByEmail);
-      }
-
-      user.email = data.email;
-      user.code = randomBase10(6);
-      user.codeGeneratedAt = new Date().toISOString();
-      await this.userAccess.save(user);
-
-      return;
-    }
-
-    userByEmail.code = randomBase10(6);
-    userByEmail.codeGeneratedAt = new Date().toISOString();
-    await this.userAccess.save(userByEmail);
-
-    return;
-  }
-
-  public async verifyUser(
-    data: PatchUserBindRequest
-  ): Promise<PatchUserBindResponse> {
-    const user = await this.userAccess.findOne({
-      where: { email: data.email, code: data.code },
-    });
-    const thisUser = await this.getUser();
-    if (user === null) throw new NotFoundError('data not found');
-
-    if (thisUser !== null) {
-      if (thisUser.isVerified)
-        throw new ConflictError('you are already verified.');
-      if (user.id !== thisUser.id) {
-        const replies = await this.replyAccess.find({
-          where: { userId: thisUser.id },
-        });
-        await this.replyAccess.saveMany(
-          replies.map((r) => ({ ...r, userId: user.id }))
-        );
-        // may need to delete thisUser in time, or housekeep by loader
-      }
-    }
-
-    user.isVerified = true;
-    user.verifiedAt = new Date().toISOString();
-
-    return await this.userAccess.save(user);
-  }
-
-  public async unbindUser(): Promise<PostUserUnbindResponse> {
-    const user = await this.getUser();
-    if (user === null) throw new NotFoundError('user not found');
-    if (user.isVerified === false)
-      throw new BadRequestError('you are not verified.');
-
-    const userEntity = new UserEntity();
-    userEntity.deviceId = uuidv4();
-
-    return await this.userAccess.save(userEntity);
   }
 }

@@ -20,11 +20,9 @@ import { QuestionEntity } from 'src/model/entity/QuestionEntity';
 import { QuestionMinorEntity } from 'src/model/entity/QuestionMinorEntity';
 import { ReplyEntity } from 'src/model/entity/ReplyEntity';
 import { Tag, TagEntity } from 'src/model/entity/TagEntity';
-import { User } from 'src/model/entity/UserEntity';
-import { BadRequestError } from 'src/model/error';
+import { BadRequestError, NotFoundError } from 'src/model/error';
 import { bn } from 'src/utils/bignumber';
 import { compare } from 'src/utils/compare';
-import { userIdSymbol } from 'src/utils/LambdaHelper';
 import { genPagination } from 'src/utils/paginator';
 import { randomBase36 } from 'src/utils/random';
 import { UserService } from './UserService';
@@ -46,16 +44,17 @@ export class QuestionService {
   private readonly categoryAccess!: CategoryAccess;
   @inject(TagAccess)
   private readonly tagAccess!: TagAccess;
-  @inject(userIdSymbol)
-  private readonly userId!: string;
 
   public async getQuestionByUid(uid: string): Promise<GetQuestionIdResponse> {
     const id = parseInt(uid.substring(3), 36);
     const rid = uid.substring(0, 3).toUpperCase();
 
+    const user = await this.userService.getUser();
+    if (user === null) throw new NotFoundError('User not found');
+
     const question = await this.questionAccess.findDetail({
       id,
-      userId: isNaN(Number(this.userId)) ? 0 : Number(this.userId),
+      userId: user.id,
     });
     if (question.rid !== rid) throw new BadRequestError('rid is not matched');
 
@@ -100,6 +99,8 @@ export class QuestionService {
     if (!params?.categoryId)
       throw new BadRequestError('categoryId is required');
 
+    const user = await this.userService.getUser();
+
     const limit = params?.limit ? Number(params.limit) : LIMIT;
     const offset = params?.offset ? Number(params.offset) : OFFSET;
 
@@ -114,7 +115,7 @@ export class QuestionService {
 
     const [question, total] = await this.questionAccess.findAndCount({
       categoryId: params.categoryId,
-      userId: isNaN(Number(this.userId)) ? 0 : Number(this.userId),
+      userId: user?.id ?? 0,
       take: limit,
       skip: offset,
       orderBy: params.orderBy ?? 'id',
@@ -253,9 +254,8 @@ export class QuestionService {
   public async replyQuestion(
     data: PostQuestionReplyRequest
   ): Promise<PostQuestionReplyResponse> {
-    let user: User | null;
-    user = await this.userService.getUser();
-    if (user === null) user = await this.userService.createUserWithDeviceId();
+    const user = await this.userService.getUser();
+    if (user === null) throw new NotFoundError('User not found');
 
     const question = await this.questionAccess.findOneOrFail({
       where: { id: data.id },
