@@ -56,7 +56,10 @@ export class UserService {
     const user = await this.userAccess.findOne({
       where: { firebaseUid: decoded.uid },
     });
-    if (user !== null) return user;
+    if (user !== null) {
+      user.lastLoginAt = new Date().toISOString();
+      return await this.userAccess.save(user)
+    };
 
     const userEntity = new UserEntity();
     userEntity.firebaseUid = decoded.uid;

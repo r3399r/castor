@@ -22,13 +22,13 @@
     "bignumber.js": "^9.3.1",
     "crypto-js": "^4.2.0",
     "date-fns": "^4.1.0",
+    "firebase": "^12.5.0",
     "randomcolor": "^0.6.2",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-redux": "^9.2.0",
     "react-router-dom": "^7.9.3",
-    "tailwindcss": "^4.1.14",
-    "uuid": "^13.0.0"
+    "tailwindcss": "^4.1.14"
   },
   "devDependencies": {
     "@eslint/js": "^9.36.0",

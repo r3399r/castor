@@ -39,9 +39,6 @@ const postQuestionReply = async (data: PostQuestionReplyRequest) => {
   try {
     return await http.post<PostQuestionReplyResponse, PostQuestionReplyRequest>(`question/reply`, {
       data,
-      headers: {
-        'x-device-id': localStorage.getItem('deviceId') || '',
-      },
     });
   } catch {
     alert('發生無預期錯誤，請重新再試，若反覆出現此問題，請聯絡客服人員。');

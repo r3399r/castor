@@ -9,7 +9,7 @@ import {
   TableRow,
 } from '@mui/material';
 import { useEffect, useState } from 'react';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import userEndpoint from 'src/api/userEndpoint';
 import type { GetUserDetailResponse } from 'src/model/backend/api/User';
 import { format } from 'date-fns';
@@ -17,6 +17,7 @@ import { bn } from 'src/util/bignumber';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { setCategoryId as reduxSetCategoryId } from 'src/redux/uiSlice';
 import randomcolor from 'randomcolor';
+import type { RootState } from 'src/redux/store';
 
 const LIMIT = 100;
 
@@ -28,6 +29,7 @@ const User = () => {
   const [count, setCount] = useState<number>();
   const [searchParams] = useSearchParams();
   const [categoryId, setCategoryId] = useState<number>();
+  const { isLogin } = useSelector((rootState: RootState) => rootState.ui);
 
   useEffect(() => {
     const tmpCategoryId = searchParams.get('categoryId');
@@ -35,9 +37,12 @@ const User = () => {
       navigate('/category');
       return;
     }
+    if (!isLogin) {
+      navigate(`/list?categoryId=${tmpCategoryId}`);
+    }
     setCategoryId(Number(tmpCategoryId));
     dispatch(reduxSetCategoryId(Number(tmpCategoryId)));
-  }, [searchParams, dispatch, navigate]);
+  }, [searchParams, isLogin]);
 
   useEffect(() => {
     if (!categoryId) return;

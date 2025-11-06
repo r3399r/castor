@@ -6,6 +6,7 @@ import { store } from './redux/store.ts';
 import Loader from './components/Loader.tsx';
 import { Suspense } from 'react';
 import './style/index.css';
+import './firebase/config';
 
 createRoot(document.getElementById('root')!).render(
   <Provider store={store}>

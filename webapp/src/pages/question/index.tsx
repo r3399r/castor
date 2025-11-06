@@ -1,5 +1,5 @@
 import { useEffect, useState, type ChangeEvent } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import questionEndpoint from 'src/api/questionEndpoint';
 import type { Question } from 'src/model/backend/entity/QuestionEntity';
 import IcLoader from 'src/assets/ic-loader.svg';
@@ -7,15 +7,14 @@ import { MathJax } from 'better-react-mathjax';
 import { Button } from '@mui/material';
 import Modal from 'src/components/Modal';
 import type { GetQuestionIdResponse, ModifiedReply } from 'src/model/backend/api/Question';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { finishWaiting, setCategoryId, startWaiting } from 'src/redux/uiSlice';
 import { bn } from 'src/util/bignumber';
-import { encrypt } from 'src/util/crypto';
 import randomcolor from 'randomcolor';
+import type { RootState } from 'src/redux/store';
 
 const Question = () => {
   const dispatch = useDispatch();
-  const navigate = useNavigate();
   const { id } = useParams();
   const [open, setOpen] = useState<boolean>(false);
   const [question, setQuestion] = useState<GetQuestionIdResponse>();
@@ -25,11 +24,13 @@ const Question = () => {
   const [startTimestamp, setStartTimestamp] = useState<number>();
   const [showNotification, setShowNotification] = useState<boolean>(true);
   const [replyResult, setReplyResult] = useState<ModifiedReply>();
+  const { isLogin } = useSelector((rootState: RootState) => rootState.ui);
 
   useEffect(() => {
+    if (!id || !isLogin) return;
+
     questionEndpoint.getQuestionId(id ?? '').then((res) => {
       if (res === undefined) {
-        navigate('/category');
         return;
       }
       setQuestion(res.data);
@@ -45,7 +46,7 @@ const Question = () => {
         setSeconds(bn(res.data.lastReply.elapsedTimeMs).div(1000).dp(0).toNumber());
       }
     });
-  }, [id, dispatch, navigate]);
+  }, [id, isLogin]);
 
   useEffect(() => {
     let interval: number | undefined;
@@ -88,11 +89,6 @@ const Question = () => {
         replied: repliedAnswer,
       })
       .then((res) => {
-        if (localStorage.getItem('userId') === null && !!res)
-          localStorage.setItem(
-            'userId',
-            encrypt(res.data.userId.toString(), localStorage.getItem('deviceId') ?? 'x'),
-          );
         setOpen(false);
         setReplyResult(res?.data);
         setRunning(false);
@@ -116,6 +112,8 @@ const Question = () => {
     const s = totalSeconds % 60;
     return `${m}分${String(s).padStart(2, '0')}秒`;
   };
+
+  if (!isLogin) return <div>請登入以繼續</div>;
 
   if (!question)
     return (
