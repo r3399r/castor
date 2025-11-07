@@ -7,6 +7,7 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
+import { Category, CategoryEntity } from './CategoryEntity';
 import { User, UserEntity } from './UserEntity';
 
 export type UserStats = {
@@ -14,6 +15,7 @@ export type UserStats = {
   userId: number;
   user: User;
   categoryId: number;
+  category: Category;
   count: number;
   scoringRate: number | null;
   createdAt: string | null;
@@ -34,6 +36,10 @@ export class UserStatsEntity implements UserStats {
 
   @Column({ type: 'int', unsigned: true, name: 'category_id' })
   categoryId!: number;
+
+  @ManyToOne(() => CategoryEntity)
+  @JoinColumn({ name: 'category_id' })
+  category!: Category;
 
   @Column({ type: 'int', unsigned: true })
   count: number = 0;

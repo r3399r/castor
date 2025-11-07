@@ -58,8 +58,9 @@ export class UserService {
     });
     if (user !== null) {
       user.lastLoginAt = new Date().toISOString();
-      return await this.userAccess.save(user)
-    };
+
+      return await this.userAccess.save(user);
+    }
 
     const userEntity = new UserEntity();
     userEntity.firebaseUid = decoded.uid;
@@ -94,7 +95,7 @@ export class UserService {
         userId: user.id,
         categoryId: params.categoryId,
       },
-      relations: { user: true },
+      relations: { user: true, category: true },
     });
 
     const limit = params?.limit ? Number(params.limit) : LIMIT;
@@ -117,6 +118,7 @@ export class UserService {
     return {
       user: userStats?.user ?? null,
       categoryId: params.categoryId,
+      category: userStats?.category ?? null,
       count: userStats?.count ?? null,
       scoringRate: userStats?.scoringRate ?? null,
       reply: {

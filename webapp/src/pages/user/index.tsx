@@ -1,6 +1,10 @@
 import {
+  FormControl,
+  InputLabel,
+  MenuItem,
   Pagination,
   Paper,
+  Select,
   Table,
   TableBody,
   TableCell,
@@ -18,6 +22,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { setCategoryId as reduxSetCategoryId } from 'src/redux/uiSlice';
 import randomcolor from 'randomcolor';
 import type { RootState } from 'src/redux/store';
+import categoryEndpoint from 'src/api/categoryEndpoint';
+import type { Category } from 'src/model/backend/entity/CategoryEntity';
 
 const LIMIT = 100;
 
@@ -27,9 +33,10 @@ const User = () => {
   const [result, setResult] = useState<GetUserDetailResponse>();
   const [page, setPage] = useState<number>(1);
   const [count, setCount] = useState<number>();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [categoryId, setCategoryId] = useState<number>();
-  const { isLogin } = useSelector((rootState: RootState) => rootState.ui);
+  const [category, setCategory] = useState<Category[]>();
+  const { isLogin, user } = useSelector((rootState: RootState) => rootState.ui);
 
   useEffect(() => {
     const tmpCategoryId = searchParams.get('categoryId');
@@ -59,67 +66,103 @@ const User = () => {
       });
   }, [page, categoryId]);
 
+  useEffect(() => {
+    categoryEndpoint.getCategoryUser().then((res) => {
+      if (res) setCategory(res.data);
+    });
+  }, []);
+
   return (
     <div>
-      <div className="mb-2 text-2xl font-bold">答題記錄</div>
+      <div className="mb-2 flex items-center justify-between">
+        {user && (
+          <div>
+            Hello! <span className="font-bold">{user.name}</span>，以下是你在{' '}
+            <span className="font-bold">{result?.category?.name}</span> 的答題記錄
+          </div>
+        )}
+        {category && category.length > 1 && (
+          <div className="w-50">
+            <FormControl fullWidth>
+              <InputLabel>類別</InputLabel>
+              <Select
+                size="small"
+                value={categoryId}
+                label="排序方式"
+                onChange={(e) => {
+                  const sp = new URLSearchParams();
+                  sp.set('categoryId', String(e.target.value));
+                  setSearchParams(sp, { replace: true });
+                }}
+              >
+                {category.map((v) => (
+                  <MenuItem value={v.id}>{v.name}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </div>
+        )}
+      </div>
       <div>總答題數: {result?.count ?? '-'}</div>
       <div>
         平均得分:{' '}
         {result && result.scoringRate !== null ? bn(result.scoringRate).dp(2).toFormat() : '-'}
       </div>
-      <div className="mt-2">
-        <TableContainer component={Paper}>
-          <Table sx={{ minWidth: 650 }} aria-label="simple table">
-            <TableHead>
-              <TableRow>
-                <TableCell>答題時間</TableCell>
-                <TableCell>題目ID</TableCell>
-                <TableCell>標題</TableCell>
-                <TableCell>Tag</TableCell>
-                <TableCell>分數(滿分1)</TableCell>
-                <TableCell>耗時(秒)</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {result?.reply.data.map((row) => (
-                <TableRow key={row.id}>
-                  <TableCell component="th" scope="row">
-                    {format(new Date(row.createdAt ?? ''), 'yyyy/MM/dd HH:mm:ss')}
-                  </TableCell>
-                  <TableCell>
-                    <a
-                      href={`/q/${row.questionUid}`}
-                      target="_blank"
-                      className="text-blue-600 underline"
-                    >
-                      {row.questionUid}
-                    </a>
-                  </TableCell>
-                  <TableCell>{row.questionTitle}</TableCell>
-                  <TableCell>
-                    <div className="flex gap-1">
-                      {row.tag.map((t) => (
-                        <div
-                          key={t.id}
-                          className="rounded px-1"
-                          style={{
-                            background: randomcolor({ luminosity: 'light', seed: t.id }),
-                          }}
-                        >
-                          {t.name}
-                        </div>
-                      ))}
-                    </div>
-                  </TableCell>
-                  <TableCell>{row.score}</TableCell>
-                  <TableCell>{bn(row.elapsedTimeMs).div(1000).dp(1).toFormat()}</TableCell>
+      {result && result.reply.data.length > 0 && (
+        <div className="mt-2">
+          <TableContainer component={Paper}>
+            <Table sx={{ minWidth: 650 }} aria-label="simple table">
+              <TableHead>
+                <TableRow>
+                  <TableCell>答題時間</TableCell>
+                  <TableCell>題目ID</TableCell>
+                  <TableCell>標題</TableCell>
+                  <TableCell>Tag</TableCell>
+                  <TableCell>分數(滿分1)</TableCell>
+                  <TableCell>耗時(秒)</TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-        <Pagination count={count} page={page} onChange={(_e, v) => setPage(v)} />
-      </div>
+              </TableHead>
+              <TableBody>
+                {result?.reply.data.map((row) => (
+                  <TableRow key={row.id}>
+                    <TableCell component="th" scope="row">
+                      {format(new Date(row.createdAt ?? ''), 'yyyy/MM/dd HH:mm:ss')}
+                    </TableCell>
+                    <TableCell>
+                      <a
+                        href={`/q/${row.questionUid}`}
+                        target="_blank"
+                        className="text-blue-600 underline"
+                      >
+                        {row.questionUid}
+                      </a>
+                    </TableCell>
+                    <TableCell>{row.questionTitle}</TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        {row.tag.map((t) => (
+                          <div
+                            key={t.id}
+                            className="rounded px-1"
+                            style={{
+                              background: randomcolor({ luminosity: 'light', seed: t.id }),
+                            }}
+                          >
+                            {t.name}
+                          </div>
+                        ))}
+                      </div>
+                    </TableCell>
+                    <TableCell>{row.score}</TableCell>
+                    <TableCell>{bn(row.elapsedTimeMs).div(1000).dp(1).toFormat()}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+          <Pagination count={count} page={page} onChange={(_e, v) => setPage(v)} />
+        </div>
+      )}
     </div>
   );
 };

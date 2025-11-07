@@ -1,15 +1,18 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
+import type { User } from 'src/model/backend/entity/UserEntity';
 
 export type UiState = {
   workload: number;
   categoryId: number | null;
   isLogin: boolean;
+  user: User | null;
 };
 
 const initialState: UiState = {
   workload: 0,
   categoryId: null,
   isLogin: false,
+  user: null,
 };
 
 export const uiSlice = createSlice({
@@ -28,9 +31,12 @@ export const uiSlice = createSlice({
     setIsLogin: (state: UiState, action: PayloadAction<boolean>) => {
       state.isLogin = action.payload;
     },
+    setUser: (state: UiState, action: PayloadAction<User>) => {
+      state.user = action.payload;
+    },
   },
 });
 
-export const { startWaiting, finishWaiting, setCategoryId, setIsLogin } = uiSlice.actions;
+export const { startWaiting, finishWaiting, setCategoryId, setIsLogin, setUser } = uiSlice.actions;
 
 export default uiSlice.reducer;

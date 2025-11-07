@@ -118,7 +118,9 @@ const QuestionList = () => {
 
   return (
     <div>
-      <div className="text-2xl font-bold">題目清單</div>
+      <div className="text-2xl font-bold">
+        題目清單 ({list !== undefined && list.length > 0 ? list[0].category.name : '無此類別'})
+      </div>
       <div className="my-3 flex flex-wrap items-center gap-2">
         <div className="w-50">
           <TextField
@@ -224,7 +226,15 @@ const QuestionList = () => {
             {list?.map((row) => (
               <TableRow key={row.uid}>
                 <TableCell component="th" scope="row">
-                  <a href={`/q/${row.uid}`} target="_blank" className="text-blue-600 underline">
+                  <a
+                    onClick={(e) => {
+                      e.preventDefault();
+                      navigate(`/q/${row.uid}`);
+                    }}
+                    href={`/q/${row.uid}`}
+                    target="_self"
+                    className="text-blue-600 underline"
+                  >
                     {row.uid}
                   </a>
                 </TableCell>

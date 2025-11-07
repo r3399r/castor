@@ -132,6 +132,7 @@ export class QuestionService {
         uid: v.rid + v.id.toString(36),
         title: v.title,
         categoryId: v.categoryId,
+        category: v.category,
         source: v.source,
         tag: v.tag,
         count: v.count,

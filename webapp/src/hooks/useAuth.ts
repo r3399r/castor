@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { getAuth, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
 import userEndpoint from 'src/api/userEndpoint';
 import { useDispatch } from 'react-redux';
-import { setIsLogin } from 'src/redux/uiSlice';
+import { setIsLogin, setUser } from 'src/redux/uiSlice';
 
 export const useAuth = () => {
   const dispatch = useDispatch();
@@ -18,7 +18,9 @@ export const useAuth = () => {
         dispatch(setIsLogin(true));
         sessionStorage.setItem('idToken', token);
 
-        userEndpoint.postUserSync();
+        userEndpoint.postUserSync().then((res) => {
+          if (res) dispatch(setUser(res.data));
+        });
       } else {
         setIsAuthenticated(false);
         dispatch(setIsLogin(false));

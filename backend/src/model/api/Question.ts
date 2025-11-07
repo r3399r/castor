@@ -1,3 +1,4 @@
+import { Category } from 'src/model/entity/CategoryEntity';
 import { QuestionMinor } from 'src/model/entity/QuestionMinorEntity';
 import { Reply } from 'src/model/entity/ReplyEntity';
 import { Tag } from 'src/model/entity/TagEntity';
@@ -49,6 +50,7 @@ export type ModifiedQuestion = {
   uid: string;
   title: string;
   categoryId: number;
+  category: Category;
   source: string | null;
   tag: Tag[];
   count: number;

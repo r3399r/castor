@@ -92,6 +92,49 @@ Resources:
                 }
               }
             },
+            "/api/category/user": {
+              "get": {
+                "parameters": [{
+                  "name": "Authorization",
+                  "in": "header",
+                  "required": true,
+                  "schema": {"type": "string"}
+                }],
+                "responses": {
+                  "200": {
+                    "description": "200 response",
+                    "headers": {
+                      "Access-Control-Allow-Origin": {
+                        "schema": {"type": "string"}
+                      }
+                    },
+                    "content": {
+                      "application/json": {
+                        "schema": {
+                          "$ref": "#/components/schemas/Empty"
+                        }
+                      }
+                    }
+                  }
+                },
+                "x-amazon-apigateway-request-validator": "Validate query string parameters and headers",
+                "x-amazon-apigateway-integration": {
+                  "type": "aws_proxy",
+                  "httpMethod": "POST",
+                  "uri": !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${Project}-${TargetEnvr}-api/invocations",
+                  "responses": {
+                    "default": {
+                      "statusCode": "200",
+                      "responseParameters": {
+                        "method.response.header.Access-Control-Allow-Origin": "'*'"
+                      }
+                    }
+                  },
+                  "passthroughBehavior": "when_no_match",
+                  "contentHandling": "CONVERT_TO_TEXT"
+                }
+              }
+            },
             "/api/user": {
               "get": {
                 "parameters": [{
@@ -544,7 +587,7 @@ Resources:
           LOGGER_QUEUE_URL: !Sub https://sqs.ap-east-2.amazonaws.com/${AWS::AccountId}/polaris-${TargetEnvr}-logger-queue
           FB_PAGE_ID: '352343371286540'
           FB_ACCESS_TOKEN: !Sub '{{resolve:ssm:${Project}-fb-access-token}}'
-          FIREBAE_ADMIN_KEY: !Sub '{{resolve:ssm:${Project}-${TargetEnvr}-firebase-admin-key}}'
+          FIREBAE_ADMIN_KEY: !Sub '{{resolve:ssm:${Project}-firebase-admin-key}}'
   InvokePermissionLambdaApi:
     Type: AWS::Lambda::Permission
     DependsOn: [ServerlessApi, LambdaApiFunction]
@@ -573,7 +616,7 @@ Resources:
             Fn::ImportValue: !Sub celestial-studio-${TargetEnvr}-db-endpoint
           DB_PWD: !Sub '{{resolve:ssm:mysql-${TargetEnvr}-${Project}-pwd}}'
           INTERVAL_EXPRESSION: '65 minute'
-          FIREBAE_ADMIN_KEY: !Sub '{{resolve:ssm:${Project}-${TargetEnvr}-firebase-admin-key}}'
+          FIREBAE_ADMIN_KEY: !Sub '{{resolve:ssm:${Project}-firebase-admin-key}}'
   InvokePermissionStatsLoader:
     Type: AWS::Lambda::Permission
     DependsOn: [LambdaStatsLoader]
