@@ -1,0 +1,23 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC&family=Noto+Serif+TC&display=swap');
+@import 'tailwindcss';
+@import './color.css';
+@import './theme.css';
+
+@layer base {
+  body {
+    font-family: 'Noto Sans TC', serif;
+    font-size: 16px;
+  }
+}
+
+@theme {
+  --breakpoint-sm: 768px;
+  --breakpoint-md: 1024px;
+  --breakpoint-lg: 1400px;
+  --breakpoint-xl: 1400px;
+  --breakpoint-2xl: 1400px;
+}
+
+@theme {
+  --font-serif: 'Noto Serif TC', sans-serif;
+}

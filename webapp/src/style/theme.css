@@ -1,0 +1,7 @@
+@theme {
+  --color-text-body: var(--color-text-body);
+}
+
+[data-theme='primary'] {
+  --color-text-body: theme(color-white);
+}
