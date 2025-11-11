@@ -174,7 +174,7 @@ export class QuestionService {
   private async commentFbPost(postId: string, questionUid: string) {
     const fbAccessToken = process.env.FB_ACCESS_TOKEN;
     await axios.post(`https://graph.facebook.com/${postId}/comments`, {
-      message: `https://pmp${process.env.EVNR === 'prod' ? '' : '-test'}.celestialstudio.net/q/${questionUid}`,
+      message: `https://pmp${process.env.ENVR === 'prod' ? '' : '-test'}.celestialstudio.net/q/${questionUid}`,
       access_token: fbAccessToken,
     });
   }
