@@ -12,8 +12,6 @@ export default async (lambdaEvent: LambdaEvent) => {
   service = bindings.get(UserService);
 
   switch (event.resource) {
-    case '/api/user':
-      return await userDefault();
     case '/api/user/detail':
       return await userDetail();
     case '/api/user/sync':
@@ -21,15 +19,6 @@ export default async (lambdaEvent: LambdaEvent) => {
   }
 
   throw new BadRequestError('unexpected resource');
-};
-
-const userDefault = async () => {
-  switch (event.httpMethod) {
-    case 'GET':
-      return await service.getUser();
-  }
-
-  throw new Error('unexpected httpMethod');
 };
 
 const userDetail = async () => {

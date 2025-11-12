@@ -13,8 +13,6 @@ export default async (lambdaEvent: LambdaEvent) => {
   switch (event.resource) {
     case '/api/category':
       return await categoryDefault();
-    case '/api/category/user':
-      return await categoryUser();
   }
 
   throw new BadRequestError('unexpected resource');
@@ -29,11 +27,3 @@ const categoryDefault = async () => {
   throw new Error('unexpected httpMethod');
 };
 
-const categoryUser = async () => {
-  switch (event.httpMethod) {
-    case 'GET':
-      return await service.getCategoryOfUser();
-  }
-
-  throw new Error('unexpected httpMethod');
-};
