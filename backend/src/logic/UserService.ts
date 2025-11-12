@@ -90,10 +90,9 @@ export class UserService {
     const user = await this.getUser();
     if (user === null) throw new NotFoundError('User not found');
 
-    const userStats = await this.userStatsAccess.findOne({
+    const userStats = await this.userStatsAccess.find({
       where: {
         userId: user.id,
-        categoryId: params.categoryId,
       },
       relations: { user: true, category: true },
     });
@@ -115,12 +114,20 @@ export class UserService {
       skip: offset,
     });
 
+    const currentUs = userStats.find(
+      (v) => v.category.id === Number(params.categoryId)
+    );
+
     return {
-      user: userStats?.user ?? null,
-      categoryId: params.categoryId,
-      category: userStats?.category ?? null,
-      count: userStats?.count ?? null,
-      scoringRate: userStats?.scoringRate ?? null,
+      user,
+      category:
+        userStats?.map((v) => ({
+          id: v.category.id,
+          name: v.category.name,
+          isCurrent: v.category.id === Number(params.categoryId),
+        })) ?? [],
+      count: currentUs?.count ?? null,
+      scoringRate: currentUs?.scoringRate ?? null,
       reply: {
         data: reply.map((v) => ({
           id: v.id,

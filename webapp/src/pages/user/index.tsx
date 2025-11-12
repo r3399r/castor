@@ -19,11 +19,13 @@ import type { GetUserDetailResponse } from 'src/model/backend/api/User';
 import { format } from 'date-fns';
 import { bn } from 'src/util/bignumber';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { setCategoryId as reduxSetCategoryId } from 'src/redux/uiSlice';
+import {
+  finishWaiting,
+  setCategoryId as reduxSetCategoryId,
+  startWaiting,
+} from 'src/redux/uiSlice';
 import randomcolor from 'randomcolor';
 import type { RootState } from 'src/redux/store';
-import categoryEndpoint from 'src/api/categoryEndpoint';
-import type { Category } from 'src/model/backend/entity/CategoryEntity';
 
 const LIMIT = 100;
 
@@ -35,8 +37,9 @@ const User = () => {
   const [count, setCount] = useState<number>();
   const [searchParams, setSearchParams] = useSearchParams();
   const [categoryId, setCategoryId] = useState<number>();
-  const [category, setCategory] = useState<Category[]>();
-  const { isLogin, user } = useSelector((rootState: RootState) => rootState.ui);
+  const [category, setCategory] = useState<{ id: number; name: string }[]>();
+  const [currentCategory, setCurrentCategory] = useState<{ id: number; name: string }>();
+  const { isLogin } = useSelector((rootState: RootState) => rootState.ui);
 
   useEffect(() => {
     const tmpCategoryId = searchParams.get('categoryId');
@@ -54,6 +57,7 @@ const User = () => {
   useEffect(() => {
     if (!categoryId) return;
 
+    dispatch(startWaiting());
     userEndpoint
       .getUserDetail({
         limit: LIMIT.toString(),
@@ -63,45 +67,49 @@ const User = () => {
       .then((res) => {
         setResult(res?.data);
         setCount(res?.data.reply.paginate.totalPages);
+        setCategory(res?.data.category.map((v) => ({ id: v.id, name: v.name })));
+        setCurrentCategory(res?.data.category.find((v) => v.isCurrent));
+        if (res?.data.category.find((v) => v.isCurrent) === undefined) {
+          navigate('/category');
+          return;
+        }
+      })
+      .finally(() => {
+        dispatch(finishWaiting());
       });
   }, [page, categoryId]);
 
-  useEffect(() => {
-    categoryEndpoint.getCategoryUser().then((res) => {
-      if (res) setCategory(res.data);
-    });
-  }, []);
+  if (result?.reply.data.length === 0)
+    return (
+      <div>
+        Hello! <span className="font-bold">{result.user?.name}</span>，資料庫尚無您的答題記錄。
+      </div>
+    );
 
   return (
     <div>
-      <div className="mb-2 flex items-center justify-between">
-        {user && (
-          <div>
-            Hello! <span className="font-bold">{user.name}</span>，以下是你在{' '}
-            <span className="font-bold">{result?.category?.name}</span> 的答題記錄
-          </div>
-        )}
-        {category && category.length > 1 && (
-          <div className="w-50">
-            <FormControl fullWidth>
-              <InputLabel>類別</InputLabel>
-              <Select
-                size="small"
-                value={categoryId}
-                label="排序方式"
-                onChange={(e) => {
-                  const sp = new URLSearchParams();
-                  sp.set('categoryId', String(e.target.value));
-                  setSearchParams(sp, { replace: true });
-                }}
-              >
-                {category.map((v) => (
-                  <MenuItem value={v.id}>{v.name}</MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </div>
-        )}
+      {category && category.length > 1 && (
+        <FormControl variant="standard">
+          <InputLabel>選擇類別</InputLabel>
+          <Select
+            size="small"
+            value={categoryId}
+            label="排序方式"
+            onChange={(e) => {
+              const sp = new URLSearchParams();
+              sp.set('categoryId', String(e.target.value));
+              setSearchParams(sp, { replace: true });
+            }}
+          >
+            {category.map((v) => (
+              <MenuItem value={v.id}>{v.name}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      )}
+      <div className="my-2">
+        Hello! <span className="font-bold">{result?.user?.name}</span>，以下是你在{' '}
+        <span className="font-bold">{currentCategory?.name}</span> 的答題記錄
       </div>
       <div>總答題數: {result?.count ?? '-'}</div>
       <div>

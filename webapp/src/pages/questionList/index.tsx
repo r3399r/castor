@@ -15,13 +15,19 @@ import {
   TextField,
 } from '@mui/material';
 import { useEffect, useState } from 'react';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import questionEndpoint from 'src/api/questionEndpoint';
 import type { GetQuestionTagResponse, ModifiedQuestion } from 'src/model/backend/api/Question';
-import { setCategoryId as reduxSetCategoryId } from 'src/redux/uiSlice';
+import {
+  finishWaiting,
+  setCategoryId as reduxSetCategoryId,
+  setTag,
+  startWaiting,
+} from 'src/redux/uiSlice';
 import { bn } from 'src/util/bignumber';
 import randomcolor from 'randomcolor';
+import type { RootState } from 'src/redux/store';
 
 const LIMIT = 100;
 
@@ -41,6 +47,7 @@ const QuestionList = () => {
   const [showReplyValue, setShowReplyValue] = useState<number>(1);
   const [tagsFilter, setTagsFilter] = useState<string[]>();
   const [allTags, setAllTags] = useState<GetQuestionTagResponse>();
+  const { tag } = useSelector((rootState: RootState) => rootState.ui);
 
   useEffect(() => {
     const tmpCategoryId = searchParams.get('categoryId');
@@ -70,16 +77,25 @@ const QuestionList = () => {
   }, [searchParams, dispatch, navigate]);
 
   useEffect(() => {
-    if (!categoryId) return;
+    if (!categoryId || (tag !== null && tag[categoryId] !== undefined)) return;
 
-    questionEndpoint.getQuestionTag({ categoryId }).then((res) => {
-      setAllTags(res?.data);
-    });
+    dispatch(startWaiting());
+    questionEndpoint
+      .getQuestionTag({ categoryId })
+      .then((res) => {
+        if (!res) return;
+        setAllTags(res.data);
+        dispatch(setTag({ [categoryId]: res.data }));
+      })
+      .finally(() => {
+        dispatch(finishWaiting());
+      });
   }, [categoryId]);
 
   useEffect(() => {
     if (!categoryId) return;
 
+    dispatch(startWaiting());
     questionEndpoint
       .getQuestion({
         limit: LIMIT.toString(),
@@ -94,6 +110,9 @@ const QuestionList = () => {
       .then((res) => {
         setList(res?.data.data);
         setCount(res?.data.paginate.totalPages);
+      })
+      .finally(() => {
+        dispatch(finishWaiting());
       });
   }, [page, categoryId, searchParams]);
 
@@ -121,18 +140,19 @@ const QuestionList = () => {
       <div className="text-2xl font-bold">
         題目清單 ({list !== undefined && list.length > 0 ? list[0].category.name : '無此類別'})
       </div>
-      <div className="my-3 flex flex-wrap items-center gap-2">
-        <div className="w-50">
+      <div className="my-3 flex flex-col flex-wrap gap-3 xs:flex-row xs:items-center">
+        <div className="xs:w-50">
           <TextField
             label="搜尋標題"
-            variant="outlined"
+            fullWidth
+            variant="standard"
             size="small"
             value={titleQuery}
             onChange={(e) => setTitleQuery(e.target.value)}
           />
         </div>
-        <div className="w-50">
-          <FormControl fullWidth>
+        <div className="xs:w-50">
+          <FormControl fullWidth variant="standard">
             <InputLabel>排序方式</InputLabel>
             <Select
               size="small"
@@ -161,8 +181,8 @@ const QuestionList = () => {
             </Select>
           </FormControl>
         </div>
-        <div className="w-50">
-          <FormControl fullWidth>
+        <div className="xs:w-50">
+          <FormControl fullWidth variant="standard">
             <InputLabel>Tag</InputLabel>
             <Select
               size="small"
@@ -180,8 +200,8 @@ const QuestionList = () => {
             </Select>
           </FormControl>
         </div>
-        <div className="w-50">
-          <FormControl fullWidth>
+        <div className="xs:w-50">
+          <FormControl fullWidth variant="standard">
             <InputLabel>作答與否</InputLabel>
             <Select
               size="small"

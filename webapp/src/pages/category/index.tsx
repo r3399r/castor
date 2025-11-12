@@ -3,15 +3,24 @@ import { useNavigate } from 'react-router-dom';
 import categoryEndpoint from 'src/api/categoryEndpoint';
 import type { Category as TypeCategory } from 'src/model/backend/entity/CategoryEntity';
 import randomcolor from 'randomcolor';
+import { finishWaiting, startWaiting } from 'src/redux/uiSlice';
+import { useDispatch } from 'react-redux';
 
 const Category = () => {
   const [category, setCategory] = useState<TypeCategory[]>();
   const navigate = useNavigate();
+  const dispatch = useDispatch();
 
   useEffect(() => {
-    categoryEndpoint.getCategory().then((res) => {
-      setCategory(res?.data);
-    });
+    dispatch(startWaiting());
+    categoryEndpoint
+      .getCategory()
+      .then((res) => {
+        setCategory(res?.data);
+      })
+      .finally(() => {
+        dispatch(finishWaiting());
+      });
   }, []);
 
   return (

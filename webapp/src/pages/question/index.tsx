@@ -30,27 +30,33 @@ const Question = () => {
   useEffect(() => {
     if (!id || !isLogin) return;
 
-    questionEndpoint.getQuestionId(id ?? '').then((res) => {
-      if (res === undefined) {
-        return;
-      }
-      setQuestion(res.data);
-      setRepliedAnswer(res.data.minor.map((v) => ({ id: v.id, answer: '' })));
+    dispatch(startWaiting());
+    questionEndpoint
+      .getQuestionId(id ?? '')
+      .then((res) => {
+        if (res === undefined) {
+          return;
+        }
+        setQuestion(res.data);
+        setRepliedAnswer(res.data.minor.map((v) => ({ id: v.id, answer: '' })));
 
-      const categoryId = res.data.categoryId;
-      dispatch(setCategoryId(categoryId));
+        const categoryId = res.data.categoryId;
+        dispatch(setCategoryId(categoryId));
 
-      if (res.data.lastReply === null) setShowNotification(true);
-      else if (res.data.lastReply.complete === false) {
-        setShowNotification(true);
-        setReplyId(res.data.lastReply.id);
-      } else {
-        setShowNotification(false);
-        setReplyId(res.data.lastReply.id);
-        setReplyResult(res.data.lastReply);
-        setSeconds(bn(res.data.lastReply.elapsedTimeMs).div(1000).dp(0).toNumber());
-      }
-    });
+        if (res.data.lastReply === null) setShowNotification(true);
+        else if (res.data.lastReply.complete === false) {
+          setShowNotification(true);
+          setReplyId(res.data.lastReply.id);
+        } else {
+          setShowNotification(false);
+          setReplyId(res.data.lastReply.id);
+          setReplyResult(res.data.lastReply);
+          setSeconds(bn(res.data.lastReply.elapsedTimeMs).div(1000).dp(0).toNumber());
+        }
+      })
+      .finally(() => {
+        dispatch(finishWaiting());
+      });
   }, [id, isLogin]);
 
   useEffect(() => {

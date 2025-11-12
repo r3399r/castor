@@ -40,19 +40,11 @@ const Bar = () => {
       )}
       <div className="ml-auto">
         {!isAuthenticated ? (
-          <Button
-            variant="outlined"
-            onClick={login}
-            className="flex items-center gap-2 rounded-lg border bg-white px-4 py-2 text-sm text-gray-600 hover:bg-gray-50"
-          >
+          <Button variant="contained" onClick={login}>
             Google 登入
           </Button>
         ) : (
-          <Button
-            variant="outlined"
-            onClick={logout}
-            className="rounded-lg border bg-white px-4 py-2 text-sm text-gray-600 hover:bg-gray-50"
-          >
+          <Button variant="contained" onClick={logout}>
             登出
           </Button>
         )}
