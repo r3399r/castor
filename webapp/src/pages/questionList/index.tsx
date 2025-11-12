@@ -77,7 +77,11 @@ const QuestionList = () => {
   }, [searchParams, dispatch, navigate]);
 
   useEffect(() => {
-    if (!categoryId || (tag !== null && tag[categoryId] !== undefined)) return;
+    if (!categoryId) return;
+    if (tag !== null && tag[categoryId] !== undefined) {
+      setAllTags(tag[categoryId]);
+      return;
+    }
 
     dispatch(startWaiting());
     questionEndpoint
