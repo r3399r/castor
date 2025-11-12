@@ -1,5 +1,5 @@
 import { useEffect, useState, type ChangeEvent } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import questionEndpoint from 'src/api/questionEndpoint';
 import type { Question } from 'src/model/backend/entity/QuestionEntity';
 import IcLoader from 'src/assets/ic-loader.svg';
@@ -15,6 +15,7 @@ import type { RootState } from 'src/redux/store';
 
 const Question = () => {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const { id } = useParams();
   const [open, setOpen] = useState<boolean>(false);
   const [question, setQuestion] = useState<GetQuestionIdResponse>();
@@ -245,27 +246,37 @@ const Question = () => {
         </div>
       )}
       {replyResult && (
-        <div className="mt-4 border p-4">
-          <div>
-            <div>你的分數: {replyResult.score} (滿分1)</div>
-            <div>你的答案: {replyResult.repliedAnswer}</div>
-            <div>正確答案: {replyResult.actualAnswer}</div>
-            {replyResult.fbPostId && (
-              <div className="mt-2">
-                如果你有什麼想提問的，歡迎到{' '}
-                <a
-                  className="text-blue-600 underline"
-                  href={`https://facebook.com/${replyResult.fbPostId}`}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  討論區
-                </a>{' '}
-                跟大家一起討論題目唷!
-              </div>
-            )}
+        <>
+          <div className="mt-4 border p-4">
+            <div>
+              <div>你的分數: {replyResult.score} (滿分1)</div>
+              <div>你的答案: {replyResult.repliedAnswer}</div>
+              <div>正確答案: {replyResult.actualAnswer}</div>
+              {replyResult.fbPostId && (
+                <div className="mt-2">
+                  如果你有什麼想提問的，歡迎到{' '}
+                  <a
+                    className="text-blue-600 underline"
+                    href={`https://facebook.com/${replyResult.fbPostId}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    討論區
+                  </a>{' '}
+                  跟大家一起討論題目唷!
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+          <div className="mt-4">
+            <Button
+              variant="outlined"
+              onClick={() => navigate(`/list?categoryId=${question.categoryId}`)}
+            >
+              回到題目清單
+            </Button>
+          </div>
+        </>
       )}
       <Modal open={open} onClose={() => setOpen(false)}>
         <>
