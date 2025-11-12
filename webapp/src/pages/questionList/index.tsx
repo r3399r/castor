@@ -138,7 +138,7 @@ const QuestionList = () => {
   return (
     <div>
       <div className="text-2xl font-bold">
-        題目清單 ({list !== undefined && list.length > 0 ? list[0].category.name : '無此類別'})
+        題目清單 {list !== undefined && list.length > 0 ? `(${list[0].category.name})` : ''}
       </div>
       <div className="my-3 flex flex-col flex-wrap gap-3 xs:flex-row xs:items-center">
         <div className="xs:w-50">

@@ -69,10 +69,6 @@ const User = () => {
         setCount(res?.data.reply.paginate.totalPages);
         setCategory(res?.data.category.map((v) => ({ id: v.id, name: v.name })));
         setCurrentCategory(res?.data.category.find((v) => v.isCurrent));
-        if (res?.data.category.find((v) => v.isCurrent) === undefined) {
-          navigate('/category');
-          return;
-        }
       })
       .finally(() => {
         dispatch(finishWaiting());
