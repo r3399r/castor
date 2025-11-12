@@ -257,7 +257,7 @@ const Question = () => {
                   如果你有什麼想提問的，歡迎到{' '}
                   <a
                     className="text-blue-600 underline"
-                    href={`https://facebook.com/${replyResult.fbPostId}`}
+                    href={`https://m.facebook.com/story.php?story_fbid=${replyResult.fbPostId.split('_')[1]}&id=${replyResult.fbPostId.split('_')[0]}`}
                     target="_blank"
                     rel="noreferrer"
                   >

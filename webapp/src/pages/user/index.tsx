@@ -38,7 +38,6 @@ const User = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [categoryId, setCategoryId] = useState<number>();
   const [category, setCategory] = useState<{ id: number; name: string }[]>();
-  const [currentCategory, setCurrentCategory] = useState<{ id: number; name: string }>();
   const { isLogin } = useSelector((rootState: RootState) => rootState.ui);
 
   useEffect(() => {
@@ -68,7 +67,6 @@ const User = () => {
         setResult(res?.data);
         setCount(res?.data.reply.paginate.totalPages);
         setCategory(res?.data.category.map((v) => ({ id: v.id, name: v.name })));
-        setCurrentCategory(res?.data.category.find((v) => v.isCurrent));
       })
       .finally(() => {
         dispatch(finishWaiting());
@@ -104,8 +102,9 @@ const User = () => {
         </FormControl>
       )}
       <div className="my-2">
-        Hello! <span className="font-bold">{result?.user?.name}</span>，以下是你在{' '}
-        <span className="font-bold">{currentCategory?.name}</span> 的答題記錄
+        <span className="font-bold">{result?.user?.name}</span>，您好！此頁面為您在{' '}
+        <span className="font-bold">{category?.find((v) => v.id === categoryId)?.name}</span>{' '}
+        的答題記錄。
       </div>
       <div>總答題數: {result?.count ?? '-'}</div>
       <div>
@@ -134,8 +133,12 @@ const User = () => {
                     </TableCell>
                     <TableCell>
                       <a
+                        onClick={(e) => {
+                          e.preventDefault();
+                          navigate(`/q/${row.questionUid}`);
+                        }}
                         href={`/q/${row.questionUid}`}
-                        target="_blank"
+                        target="_self"
                         className="text-blue-600 underline"
                       >
                         {row.questionUid}
