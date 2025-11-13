@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS caster.category (
+CREATE TABLE IF NOT EXISTS castor.category (
     id INT UNSIGNED AUTO_INCREMENT,
     name VARCHAR(255) NOT NULL,
     created_at DATETIME(3) NULL,

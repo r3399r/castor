@@ -2,7 +2,7 @@
 set -e
 
 env=$1
-project=caster
+project=castor
 subDomain=pmp
 domain=celestialstudio.net
 

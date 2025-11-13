@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS caster.user_stats (
+CREATE TABLE IF NOT EXISTS castor.user_stats (
     id INT UNSIGNED AUTO_INCREMENT,
     user_id INT UNSIGNED NOT NULL,
     category_id INT UNSIGNED NOT NULL,

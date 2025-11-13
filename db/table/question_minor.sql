@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS caster.question_minor (
+CREATE TABLE IF NOT EXISTS castor.question_minor (
     id INT UNSIGNED AUTO_INCREMENT,
     question_id INT UNSIGNED NOT NULL,
     type VARCHAR(255) NOT NULL,

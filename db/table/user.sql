@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS caster.user (
+CREATE TABLE IF NOT EXISTS castor.user (
     id INT UNSIGNED AUTO_INCREMENT,
     firebase_uid VARCHAR(128) NOT NULL,
     email VARCHAR(255) NULL,

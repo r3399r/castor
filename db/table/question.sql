@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS caster.question (
+CREATE TABLE IF NOT EXISTS castor.question (
     id INT UNSIGNED AUTO_INCREMENT,
     rid VARCHAR(16) NOT NULL,
     title VARCHAR(255) NOT NULL,

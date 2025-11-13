@@ -1,14 +1,14 @@
-# caster
+# castor
 tarot
 
 ## work with docker
 go to the folder you want to work in docker container and run
 ```
-docker run -dit -v .:/usr/src/app --name caster sleavely/node-awscli:20.x
+docker run -dit -v .:/usr/src/app --name castor sleavely/node-awscli:20.x
 ```
 a docker container would be generated.
 
 if you want to attach it, run
 ```
-docker exec -it caster bash
+docker exec -it castor bash
 ```

@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS caster.question_tag (
+CREATE TABLE IF NOT EXISTS castor.question_tag (
     question_id INT UNSIGNED NOT NULL,
     tag_id INT UNSIGNED NOT NULL,
     PRIMARY KEY (question_id, tag_id),
