@@ -1,0 +1,16 @@
+User-agent: *
+Allow: /
+Disallow: /preview
+Disallow: /admin
+
+Sitemap: https://pmp.celestialstudio.net/sitemap.xml
+
+# Specific bot rules
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+# Crawl delay for respectful crawling
+Crawl-delay: 1
