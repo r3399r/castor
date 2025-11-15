@@ -66,7 +66,7 @@ export class QuestionService {
         : null;
 
     return {
-      uid: question.rid + question.id.toString(36),
+      uid: question.rid + question.id.toString(36).toUpperCase(),
       title: question.title,
       categoryId: question.categoryId,
       content: question.content,
@@ -138,7 +138,7 @@ export class QuestionService {
 
     return {
       data: question.map((v) => ({
-        uid: v.rid + v.id.toString(36),
+        uid: v.rid + v.id.toString(36).toUpperCase(),
         title: v.title,
         categoryId: v.categoryId,
         category: v.category,
