@@ -212,7 +212,7 @@ export class QuestionService {
 
     await this.commentFbPost(
       fbPost.post_id,
-      newQuestionEntity.rid + newQuestionEntity.id.toString(36)
+      newQuestionEntity.rid + newQuestionEntity.id.toString(36).toUpperCase()
     );
 
     const minor: QuestionMinorEntity[] = [];
