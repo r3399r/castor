@@ -14,7 +14,7 @@ const Preview = () => {
         placeholder="Enter content to preview"
       />
       <h2 className="mb-2 text-xl font-bold">Output: (replace \n)</h2>
-      <div className="w-full border p-4">{content.replace('\n', '')}</div>
+      <div className="w-full border p-4">{content.replace('\n', '').replace(/\\/g, '\\\\')}</div>
       <div className="mt-4 w-full">
         <h2 className="mb-2 text-xl font-bold">Preview:</h2>
         <div className="border p-4">

@@ -16,7 +16,7 @@ const Bar = () => {
   if (matches)
     return (
       <div
-        className="flex items-center gap-5 px-5 py-3"
+        className="flex items-center gap-3 px-5 py-3"
         style={{
           background: categoryId
             ? randomcolor({ luminosity: 'light', seed: categoryId })
@@ -24,6 +24,9 @@ const Bar = () => {
         }}
       >
         <div className="font-bold text-blue-900">Practice Makes Perfect</div>
+        <Button variant="contained" onClick={() => navigate(`/category`)}>
+          類別清單
+        </Button>
         {!!categoryId && (
           <>
             <Button variant="contained" onClick={() => navigate(`/list?categoryId=${categoryId}`)}>
@@ -70,6 +73,15 @@ const Bar = () => {
       </div>
       <Drawer open={open} onClose={() => setOpen(false)} anchor="right">
         <div className="flex w-50 flex-col gap-2 p-5">
+          <Button
+            variant="contained"
+            onClick={() => {
+              setOpen(false);
+              navigate(`/category`);
+            }}
+          >
+            類別清單
+          </Button>
           {!!categoryId && (
             <>
               <Button
@@ -95,7 +107,9 @@ const Bar = () => {
             </>
           )}
           {!isAuthenticated ? (
-            <Button onClick={login}>Google 登入</Button>
+            <Button variant="contained" onClick={login}>
+              Google 登入
+            </Button>
           ) : (
             <Button variant="contained" onClick={logout}>
               登出

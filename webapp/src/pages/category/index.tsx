@@ -24,7 +24,7 @@ const Category = () => {
   }, []);
 
   return (
-    <div className="flex flex-wrap items-center justify-center gap-2">
+    <div className="flex flex-wrap items-center justify-center gap-5">
       {category?.map((v) => (
         <div
           key={v.id}
