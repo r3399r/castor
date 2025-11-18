@@ -488,7 +488,7 @@ Resources:
                   "items": {
                     "type": "object",
                     "properties": {
-                      "type": {"type": "string", enum: ["SINGLE","MULTIPLE"]},
+                      "type": {"type": "string", enum: ["SINGLE","MULTIPLE","FILL"]},
                       "orderIndex": {"type": "integer", "minimum": 0},
                       "content": {"type":"string"},
                       "options": {"type": "string"},

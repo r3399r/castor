@@ -100,6 +100,16 @@ const Question = () => {
     setRepliedAnswer(thisAnswer);
   };
 
+  const onClickFill = (id: number, index: number) => (e: ChangeEvent<HTMLInputElement>) => {
+    const thisAnswer = repliedAnswer?.map((r) => {
+      if (r.id !== id) return r;
+      const answers = r.answer === '' ? Array<string>() : r.answer.split(',');
+      answers[index] = e.target.value;
+      return { ...r, answer: answers.join(',') };
+    });
+    setRepliedAnswer(thisAnswer);
+  };
+
   const onSubmit = () => {
     if (!id || !repliedAnswer || !startTimestamp || !replyId) return;
 
@@ -197,54 +207,81 @@ const Question = () => {
       <div className="mb-2 text-xl font-bold">⏱️ {formatTime(seconds)}</div>
       <MathJax>
         <div dangerouslySetInnerHTML={{ __html: question.content }}></div>
-        <div className="mt-4 flex flex-col gap-2">
-          {question.minor.map((v) => {
-            if (v.type === 'SINGLE')
-              return (
-                <div key={v.id}>
-                  {v.content && <div>{v.content}</div>}
-                  <div className="flex flex-wrap gap-2">
-                    {v.options?.split(',').map((o) => (
-                      <div className="flex items-center" key={v.id + ':' + o}>
-                        <input
-                          type="radio"
-                          id={v.id + ':' + o}
-                          name={v.id.toString()}
-                          value={o}
-                          onChange={onClickSingle(v.id)}
-                        />
-                        <label className="px-2" htmlFor={v.id + ':' + o}>
-                          {o}
-                        </label>
-                      </div>
-                    ))}
+        {!replyResult && (
+          <div className="mt-4 flex flex-col gap-2">
+            {question.minor.map((v) => {
+              if (v.type === 'SINGLE')
+                return (
+                  <div key={v.id}>
+                    {v.content && <div>{v.content}</div>}
+                    <div className="flex flex-wrap gap-2">
+                      {v.options?.split(',').map((o) => (
+                        <div className="flex items-center" key={v.id + ':' + o}>
+                          <input
+                            type="radio"
+                            id={v.id + ':' + o}
+                            name={v.id.toString()}
+                            value={o}
+                            onChange={onClickSingle(v.id)}
+                          />
+                          <label className="px-2" htmlFor={v.id + ':' + o}>
+                            {o}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              );
-            else if (v.type === 'MULTIPLE')
-              return (
-                <div key={v.id}>
-                  {v.content && <div>{v.content}</div>}
-                  <div className="flex flex-wrap gap-2">
-                    {v.options?.split(',').map((o) => (
-                      <div className="flex items-center" key={v.id + ':' + o}>
-                        <input
-                          type="checkbox"
-                          id={v.id + ':' + o}
-                          name={v.id.toString()}
-                          value={o}
-                          onChange={onClickMultiple(v.id)}
-                        />
-                        <label className="px-2" htmlFor={v.id + ':' + o}>
-                          {o}
-                        </label>
-                      </div>
-                    ))}
+                );
+              else if (v.type === 'MULTIPLE')
+                return (
+                  <div key={v.id}>
+                    {v.content && <div>{v.content}</div>}
+                    <div className="flex flex-wrap gap-2">
+                      {v.options?.split(',').map((o) => (
+                        <div className="flex items-center" key={v.id + ':' + o}>
+                          <input
+                            type="checkbox"
+                            id={v.id + ':' + o}
+                            name={v.id.toString()}
+                            value={o}
+                            onChange={onClickMultiple(v.id)}
+                          />
+                          <label className="px-2" htmlFor={v.id + ':' + o}>
+                            {o}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              );
-          })}
-        </div>
+                );
+              else if (v.type === 'FILL')
+                return (
+                  <div key={v.id}>
+                    {v.content && <div>{v.content}</div>}
+                    {v.length &&
+                      Array.from({ length: v.length }, (_, i) => i).map((n) => (
+                        <div key={n} className="flex flex-wrap gap-2">
+                          {v.options?.split(',').map((o) => (
+                            <div className="flex items-center" key={v.id + ':' + n + ':' + o}>
+                              <input
+                                type="radio"
+                                id={v.id + ':' + n + ':' + o}
+                                name={v.id + ':' + n}
+                                value={o}
+                                onChange={onClickFill(v.id, n)}
+                              />
+                              <label className="px-2" htmlFor={v.id + ':' + n + ':' + o}>
+                                {o}
+                              </label>
+                            </div>
+                          ))}
+                        </div>
+                      ))}
+                  </div>
+                );
+            })}
+          </div>
+        )}
       </MathJax>
       {!replyResult && (
         <div className="mt-4 text-right">
