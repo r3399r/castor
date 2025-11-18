@@ -22,9 +22,6 @@ export class StatsService {
     const replies = await this.replyAccess.find({
       where: [
         {
-          createdAt: Raw(
-            (alias) => `${alias} > NOW() - INTERVAL ${intervalExpression}`
-          ),
           updatedAt: Raw(
             (alias) => `${alias} > NOW() - INTERVAL ${intervalExpression}`
           ),

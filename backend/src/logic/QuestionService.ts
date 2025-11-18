@@ -71,11 +71,12 @@ export class QuestionService {
       category: question.category,
       content: question.content,
       source: question.source,
-      minor: question.minor.map((m) => {
-        const { answer, ...rest } = m;
-
-        return rest;
-      }),
+      minor: question.minor.sort(compare('orderIndex', 'asc')).map((m) => ({
+        ...m,
+        answer: lastReply?.complete === true ? m.answer : null,
+        length:
+          m.answer && m.type === 'FILL' ? m.answer.split(',').length : null,
+      })),
       tag: question.tag,
       count: question.count,
       scoringRate: question.scoringRate,
@@ -261,6 +262,14 @@ export class QuestionService {
           .toNumber();
   }
 
+  private calculateFillScore(correct: string[], replied: string[]) {
+    if (correct.length !== replied.length) return 0;
+    for (let i = 0; i < correct.length; i++)
+      if (correct[i] !== replied[i]) return 0;
+
+    return 1;
+  }
+
   public async startQuestion(
     data: PostQuestionStartRequest
   ): Promise<PostQuestionStartResponse> {
@@ -316,8 +325,13 @@ export class QuestionService {
             data.replied.find((r) => r.id === v.id)?.answer ?? '',
             v.options
           );
+        else if (v.type === 'FILL')
+          return this.calculateFillScore(
+            v.answer?.split(',') ?? [],
+            data.replied.find((r) => r.id === v.id)?.answer.split(',') ?? []
+          );
 
-        return 1;
+        return 0;
       })
       .reduce((prev, cur) => prev.plus(cur), bn(0));
     const score = totalScore.div(question.minor.length).dp(4, 7).toNumber();

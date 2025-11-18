@@ -84,7 +84,7 @@ const User = () => {
     <div>
       {category && category.length > 1 && (
         <FormControl variant="standard">
-          <InputLabel>選擇類別</InputLabel>
+          <InputLabel>切換類別</InputLabel>
           <Select
             size="small"
             value={categoryId}
@@ -118,9 +118,8 @@ const User = () => {
               <TableHead>
                 <TableRow>
                   <TableCell>時間</TableCell>
-                  <TableCell>題目ID</TableCell>
-                  <TableCell>標題</TableCell>
-                  <TableCell>Tag</TableCell>
+                  <TableCell>題目名稱</TableCell>
+                  <TableCell>標籤</TableCell>
                   <TableCell>分數(滿分1)</TableCell>
                   <TableCell>耗時(秒)</TableCell>
                 </TableRow>
@@ -141,10 +140,9 @@ const User = () => {
                         target="_self"
                         className="text-blue-600 underline"
                       >
-                        {row.questionUid}
+                        {row.questionTitle}-{row.questionUid}
                       </a>
                     </TableCell>
-                    <TableCell>{row.questionTitle}</TableCell>
                     <TableCell>
                       <div className="flex gap-1">
                         {row.tag.map((t) => (
@@ -171,7 +169,9 @@ const User = () => {
               </TableBody>
             </Table>
           </TableContainer>
-          <Pagination count={count} page={page} onChange={(_e, v) => setPage(v)} />
+          <div className="mt-3 flex justify-center">
+            <Pagination count={count} page={page} onChange={(_e, v) => setPage(v)} />
+          </div>
         </div>
       )}
     </div>

@@ -12,7 +12,7 @@ export type PostQuestionRequest = {
   source: string;
   tag: string[];
   minor: {
-    type: 'SINGLE' | 'MULTIPLE';
+    type: 'SINGLE' | 'MULTIPLE' | 'FILL';
     orderIndex: number;
     content?: string;
     options: string;
@@ -77,7 +77,7 @@ export type GetQuestionIdResponse = {
   category: Category;
   content: string;
   source: string | null;
-  minor: Omit<QuestionMinor, 'answer'>[];
+  minor: (QuestionMinor & { length: number | null })[];
   tag: Tag[];
   count: number;
   scoringRate: number | null;

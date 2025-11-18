@@ -100,6 +100,16 @@ const Question = () => {
     setRepliedAnswer(thisAnswer);
   };
 
+  const onClickFill = (id: number, index: number) => (e: ChangeEvent<HTMLInputElement>) => {
+    const thisAnswer = repliedAnswer?.map((r) => {
+      if (r.id !== id) return r;
+      const answers = r.answer === '' ? Array<string>() : r.answer.split(',');
+      answers[index] = e.target.value;
+      return { ...r, answer: answers.join(',') };
+    });
+    setRepliedAnswer(thisAnswer);
+  };
+
   const onSubmit = () => {
     if (!id || !repliedAnswer || !startTimestamp || !replyId) return;
 
@@ -129,11 +139,11 @@ const Question = () => {
   };
 
   const msToMinSec = (ms: number): string => {
-    if (Number.isNaN(ms)) return '00分00秒';
     const totalSeconds = Math.floor(ms / 1000);
     const m = Math.floor(totalSeconds / 60);
     const s = totalSeconds % 60;
-    return `${m}分${String(s).padStart(2, '0')}秒`;
+    if (m === 0) return `${s} 秒`;
+    return `${m} 分 ${String(s).padStart(2, '0')} 秒`;
   };
 
   if (!isLogin) return <div>請登入以繼續</div>;
@@ -163,13 +173,10 @@ const Question = () => {
             </span>
           </p>
           <p>
-            題目ID: <span className="font-bold text-blue-600">{question.uid}</span>
+            題目名稱: <span className="font-bold">{question.title}</span>
           </p>
           <p>
-            標題: <span className="font-bold">{question.title}</span>
-          </p>
-          <p>
-            Tag:{' '}
+            標籤:{' '}
             {question.tag.map((t) => (
               <span
                 key={t.id}
@@ -200,54 +207,81 @@ const Question = () => {
       <div className="mb-2 text-xl font-bold">⏱️ {formatTime(seconds)}</div>
       <MathJax>
         <div dangerouslySetInnerHTML={{ __html: question.content }}></div>
-        <div className="mt-4 flex flex-col gap-2">
-          {question.minor.map((v) => {
-            if (v.type === 'SINGLE')
-              return (
-                <div key={v.id}>
-                  {v.content && <div>{v.content}</div>}
-                  <div className="flex flex-wrap gap-2">
-                    {v.options?.split(',').map((o) => (
-                      <div className="flex items-center" key={v.id + ':' + o}>
-                        <input
-                          type="radio"
-                          id={v.id + ':' + o}
-                          name={v.id.toString()}
-                          value={o}
-                          onChange={onClickSingle(v.id)}
-                        />
-                        <label className="px-2" htmlFor={v.id + ':' + o}>
-                          {o}
-                        </label>
-                      </div>
-                    ))}
+        {!replyResult && (
+          <div className="mt-4 flex flex-col gap-2">
+            {question.minor.map((v) => {
+              if (v.type === 'SINGLE')
+                return (
+                  <div key={v.id}>
+                    {v.content && <div>{v.content}</div>}
+                    <div className="flex flex-wrap gap-2">
+                      {v.options?.split(',').map((o) => (
+                        <div className="flex items-center" key={v.id + ':' + o}>
+                          <input
+                            type="radio"
+                            id={v.id + ':' + o}
+                            name={v.id.toString()}
+                            value={o}
+                            onChange={onClickSingle(v.id)}
+                          />
+                          <label className="px-2" htmlFor={v.id + ':' + o}>
+                            {o}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              );
-            else if (v.type === 'MULTIPLE')
-              return (
-                <div key={v.id}>
-                  {v.content && <div>{v.content}</div>}
-                  <div className="flex flex-wrap gap-2">
-                    {v.options?.split(',').map((o) => (
-                      <div className="flex items-center" key={v.id + ':' + o}>
-                        <input
-                          type="checkbox"
-                          id={v.id + ':' + o}
-                          name={v.id.toString()}
-                          value={o}
-                          onChange={onClickMultiple(v.id)}
-                        />
-                        <label className="px-2" htmlFor={v.id + ':' + o}>
-                          {o}
-                        </label>
-                      </div>
-                    ))}
+                );
+              else if (v.type === 'MULTIPLE')
+                return (
+                  <div key={v.id}>
+                    {v.content && <div>{v.content}</div>}
+                    <div className="flex flex-wrap gap-2">
+                      {v.options?.split(',').map((o) => (
+                        <div className="flex items-center" key={v.id + ':' + o}>
+                          <input
+                            type="checkbox"
+                            id={v.id + ':' + o}
+                            name={v.id.toString()}
+                            value={o}
+                            onChange={onClickMultiple(v.id)}
+                          />
+                          <label className="px-2" htmlFor={v.id + ':' + o}>
+                            {o}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              );
-          })}
-        </div>
+                );
+              else if (v.type === 'FILL')
+                return (
+                  <div key={v.id}>
+                    {v.content && <div>{v.content}</div>}
+                    {v.length &&
+                      Array.from({ length: v.length }, (_, i) => i).map((n) => (
+                        <div key={n} className="flex flex-wrap gap-2">
+                          {v.options?.split(',').map((o) => (
+                            <div className="flex items-center" key={v.id + ':' + n + ':' + o}>
+                              <input
+                                type="radio"
+                                id={v.id + ':' + n + ':' + o}
+                                name={v.id + ':' + n}
+                                value={o}
+                                onChange={onClickFill(v.id, n)}
+                              />
+                              <label className="px-2" htmlFor={v.id + ':' + n + ':' + o}>
+                                {o}
+                              </label>
+                            </div>
+                          ))}
+                        </div>
+                      ))}
+                  </div>
+                );
+            })}
+          </div>
+        )}
       </MathJax>
       {!replyResult && (
         <div className="mt-4 text-right">
@@ -260,11 +294,39 @@ const Question = () => {
         <>
           <div className="mt-4 border p-4">
             <div>
-              <div>你的分數: {replyResult.score} (滿分1)</div>
-              <div>你的答案: {replyResult.repliedAnswer}</div>
-              <div>正確答案: {replyResult.actualAnswer}</div>
+              <p>
+                類別:{' '}
+                <span
+                  className="rounded px-1"
+                  style={{
+                    background: randomcolor({ luminosity: 'light', seed: question.category.id }),
+                  }}
+                >
+                  {question.category.name}
+                </span>
+              </p>
+              <p>
+                題目名稱: <span className="font-bold">{question.title}</span>
+              </p>
+              <p>
+                標籤:{' '}
+                {question.tag.map((t) => (
+                  <span
+                    key={t.id}
+                    className="mr-1 rounded px-1"
+                    style={{
+                      background: randomcolor({ luminosity: 'light', seed: t.id }),
+                    }}
+                  >
+                    {t.name}
+                  </span>
+                ))}
+              </p>
+              <p className="mt-2">你的分數: {replyResult.score} (滿分1)</p>
+              <p>你的答案: {replyResult.repliedAnswer}</p>
+              <p>正確答案: {replyResult.actualAnswer}</p>
               {replyResult.fbPostId && (
-                <div className="mt-2">
+                <p className="mt-2">
                   如果你有什麼想提問的，歡迎到{' '}
                   <a
                     className="text-blue-600 underline"
@@ -275,7 +337,7 @@ const Question = () => {
                     討論區
                   </a>{' '}
                   跟大家一起討論題目唷!
-                </div>
+                </p>
               )}
             </div>
           </div>

@@ -131,7 +131,8 @@ export class UserService {
       reply: {
         data: reply.map((v) => ({
           id: v.id,
-          questionUid: v.question.rid + v.question.id.toString(36).toUpperCase(),
+          questionUid:
+            v.question.rid + v.question.id.toString(36).toUpperCase(),
           questionTitle: v.question.title,
           tag: v.question.tag,
           score: v.score,

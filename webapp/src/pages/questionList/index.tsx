@@ -179,8 +179,8 @@ const QuestionList = () => {
               }}
             >
               <MenuItem value={1}>預設</MenuItem>
-              <MenuItem value={2}>得分率(遞增)</MenuItem>
-              <MenuItem value={3}>得分率(遞減)</MenuItem>
+              <MenuItem value={2}>答對率(遞增)</MenuItem>
+              <MenuItem value={3}>答對率(遞減)</MenuItem>
               <MenuItem value={4}>平均耗時(遞增)</MenuItem>
               <MenuItem value={5}>平均耗時(遞減)</MenuItem>
             </Select>
@@ -238,10 +238,9 @@ const QuestionList = () => {
         <Table sx={{ minWidth: 650 }} aria-label="simple table">
           <TableHead>
             <TableRow>
-              <TableCell>題目ID</TableCell>
-              <TableCell>標題</TableCell>
-              <TableCell>Tag</TableCell>
-              <TableCell>得分率</TableCell>
+              <TableCell>題目名稱</TableCell>
+              <TableCell>標籤</TableCell>
+              <TableCell>答對率</TableCell>
               <TableCell>平均耗時</TableCell>
               <TableCell>是否作答</TableCell>
               <TableCell>來源</TableCell>
@@ -250,7 +249,7 @@ const QuestionList = () => {
           <TableBody>
             {list?.map((row) => (
               <TableRow key={row.uid}>
-                <TableCell component="th" scope="row">
+                <TableCell>
                   <a
                     onClick={(e) => {
                       e.preventDefault();
@@ -260,10 +259,9 @@ const QuestionList = () => {
                     target="_self"
                     className="text-blue-600 underline"
                   >
-                    {row.uid}
+                    {row.title}-{row.uid}
                   </a>
                 </TableCell>
-                <TableCell>{row.title}</TableCell>
                 <TableCell>
                   <div className="flex flex-wrap gap-1">
                     {row.tag.map((t) => (
@@ -294,7 +292,9 @@ const QuestionList = () => {
           </TableBody>
         </Table>
       </TableContainer>
-      <Pagination count={count} page={page} onChange={(_e, v) => setPage(v)} />
+      <div className="mt-3 flex justify-center">
+        <Pagination count={count} page={page} onChange={(_e, v) => setPage(v)} />
+      </div>
     </div>
   );
 };
