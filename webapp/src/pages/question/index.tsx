@@ -205,7 +205,7 @@ const Question = () => {
   return (
     <div>
       <div className="mb-2 text-xl font-bold">⏱️ {formatTime(seconds)}</div>
-      <MathJax>
+      <MathJax dynamic>
         <div dangerouslySetInnerHTML={{ __html: question.content }}></div>
         {!replyResult && (
           <div className="mt-4 flex flex-col gap-2">
