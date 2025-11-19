@@ -18,7 +18,7 @@ const Preview = () => {
       <div className="mt-4 w-full">
         <h2 className="mb-2 text-xl font-bold">Preview:</h2>
         <div className="border p-4">
-          <MathJax>
+          <MathJax dynamic>
             <div dangerouslySetInnerHTML={{ __html: content.replace('\n', '') }}></div>
           </MathJax>
         </div>
