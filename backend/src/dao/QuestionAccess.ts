@@ -79,6 +79,7 @@ export class QuestionAccess {
     title?: string;
     hasReply?: boolean;
     tags?: number[];
+    source?: string;
   }) {
     const qb = await this.createQueryBuilder();
     const base = qb
@@ -96,6 +97,10 @@ export class QuestionAccess {
     if (data.title)
       base.andWhere('question.title like :title', {
         title: `%${data.title}%`,
+      });
+    if (data.source)
+      base.andWhere('question.source like :source', {
+        source: `%${data.source}%`,
       });
     if (data.hasReply === true) base.andWhere('reply.id IS NOT NULL');
 

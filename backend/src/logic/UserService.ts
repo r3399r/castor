@@ -134,6 +134,7 @@ export class UserService {
           questionUid:
             v.question.rid + v.question.id.toString(36).toUpperCase(),
           questionTitle: v.question.title,
+          questionSource: v.question.source,
           tag: v.question.tag,
           score: v.score,
           elapsedTimeMs: v.elapsedTimeMs,

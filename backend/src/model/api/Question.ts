@@ -50,6 +50,7 @@ export type GetQuestionParams = PaginationParams & {
   title?: string;
   hasReply?: 'true' | 'false';
   tags?: string;
+  source?: string;
 };
 
 export type GetQuestionTagParams = { categoryId: number };

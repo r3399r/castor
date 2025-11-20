@@ -15,6 +15,7 @@ export type GetUserDetailResponse = {
     id: number;
     questionUid: string;
     questionTitle: string;
+    questionSource: string | null;
     tag: Tag[];
     score: number;
     elapsedTimeMs: number | null;

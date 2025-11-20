@@ -40,6 +40,7 @@ const QuestionList = () => {
   const [count, setCount] = useState<number>();
   const [categoryId, setCategoryId] = useState<number>();
   const [titleQuery, setTitleQuery] = useState<string>();
+  const [sourceQuery, setSourceQuery] = useState<string>();
   const [sorting, setSorting] = useState<string>();
   const [sortDirection, setSortDirection] = useState<'ASC' | 'DESC'>('DESC');
   const [sortValue, setSortValue] = useState<number>(1);
@@ -60,6 +61,9 @@ const QuestionList = () => {
 
     const tmpTitleQuery = searchParams.get('title');
     if (tmpTitleQuery !== null) setTitleQuery(tmpTitleQuery);
+
+    const tmpSourceQuery = searchParams.get('source');
+    if (tmpSourceQuery !== null) setSourceQuery(tmpSourceQuery);
 
     const tmpSorting = searchParams.get('sorting');
     if (tmpSorting !== null) setSorting(tmpSorting);
@@ -108,6 +112,7 @@ const QuestionList = () => {
         orderBy: sorting,
         orderDirection: sortDirection,
         title: titleQuery,
+        source: sourceQuery,
         hasReply: showReply,
         tags: tagsFilter ? tagsFilter.join() : undefined,
       })
@@ -124,6 +129,7 @@ const QuestionList = () => {
     const sp = new URLSearchParams();
     if (categoryId) sp.set('categoryId', String(categoryId));
     if (titleQuery) sp.set('title', titleQuery);
+    if (sourceQuery) sp.set('source', sourceQuery);
     if (sorting) sp.set('sorting', sorting);
     if (sortDirection === 'DESC') sp.set('sortDirection', 'DESC');
     else sp.set('sortDirection', 'ASC');
@@ -146,7 +152,7 @@ const QuestionList = () => {
         題目清單 {list !== undefined && list.length > 0 ? `(${list[0].category.name})` : ''}
       </div>
       <div className="my-3 flex flex-col flex-wrap gap-3 xs:flex-row xs:items-center">
-        <div className="xs:w-50">
+        <div className="xs:w-40">
           <TextField
             label="搜尋標題"
             fullWidth
@@ -156,7 +162,36 @@ const QuestionList = () => {
             onChange={(e) => setTitleQuery(e.target.value)}
           />
         </div>
-        <div className="xs:w-50">
+        <div className="xs:w-40">
+          <FormControl fullWidth variant="standard">
+            <InputLabel>Tag</InputLabel>
+            <Select
+              size="small"
+              value={tagsFilter ?? []}
+              label="Tag"
+              multiple
+              onChange={(e) => {
+                const value = e.target.value;
+                setTagsFilter(typeof value === 'string' ? value.split(',') : value);
+              }}
+            >
+              {allTags?.map((t) => (
+                <MenuItem value={t.id.toString()}>{t.name}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </div>
+        <div className="xs:w-40">
+          <TextField
+            label="搜尋來源"
+            fullWidth
+            variant="standard"
+            size="small"
+            value={sourceQuery}
+            onChange={(e) => setSourceQuery(e.target.value)}
+          />
+        </div>
+        <div className="xs:w-40">
           <FormControl fullWidth variant="standard">
             <InputLabel>排序方式</InputLabel>
             <Select
@@ -186,26 +221,7 @@ const QuestionList = () => {
             </Select>
           </FormControl>
         </div>
-        <div className="xs:w-50">
-          <FormControl fullWidth variant="standard">
-            <InputLabel>Tag</InputLabel>
-            <Select
-              size="small"
-              value={tagsFilter ?? []}
-              label="Tag"
-              multiple
-              onChange={(e) => {
-                const value = e.target.value;
-                setTagsFilter(typeof value === 'string' ? value.split(',') : value);
-              }}
-            >
-              {allTags?.map((t) => (
-                <MenuItem value={t.id.toString()}>{t.name}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        </div>
-        <div className="xs:w-50">
+        <div className="xs:w-40">
           <FormControl fullWidth variant="standard">
             <InputLabel>作答與否</InputLabel>
             <Select
@@ -240,10 +256,10 @@ const QuestionList = () => {
             <TableRow>
               <TableCell>題目名稱</TableCell>
               <TableCell>標籤</TableCell>
+              <TableCell>來源</TableCell>
               <TableCell>答對率</TableCell>
               <TableCell>平均耗時</TableCell>
               <TableCell>是否作答</TableCell>
-              <TableCell>來源</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -259,7 +275,7 @@ const QuestionList = () => {
                     target="_self"
                     className="text-blue-600 underline"
                   >
-                    {row.title}-{row.uid}
+                    {row.title}
                   </a>
                 </TableCell>
                 <TableCell>
@@ -277,6 +293,7 @@ const QuestionList = () => {
                     ))}
                   </div>
                 </TableCell>
+                <TableCell>{row.source ?? '-'}</TableCell>
                 <TableCell>
                   {row.scoringRate !== null
                     ? bn(row.scoringRate).times(100).dp(2).toFormat() + '%'
@@ -286,7 +303,6 @@ const QuestionList = () => {
                   {row.avgElapsedTimeMs ? msToMinSec(row.avgElapsedTimeMs) : '-'}
                 </TableCell>
                 <TableCell>{row.lastReply?.complete === true ? '已作答' : '尚未作答'}</TableCell>
-                <TableCell>{row.source ?? '-'}</TableCell>
               </TableRow>
             ))}
           </TableBody>

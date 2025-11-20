@@ -120,6 +120,7 @@ const User = () => {
                   <TableCell>時間</TableCell>
                   <TableCell>題目名稱</TableCell>
                   <TableCell>標籤</TableCell>
+                  <TableCell>來源</TableCell>
                   <TableCell>分數(滿分1)</TableCell>
                   <TableCell>耗時(秒)</TableCell>
                 </TableRow>
@@ -140,7 +141,7 @@ const User = () => {
                         target="_self"
                         className="text-blue-600 underline"
                       >
-                        {row.questionTitle}-{row.questionUid}
+                        {row.questionTitle}
                       </a>
                     </TableCell>
                     <TableCell>
@@ -158,6 +159,7 @@ const User = () => {
                         ))}
                       </div>
                     </TableCell>
+                    <TableCell>{row.questionSource ?? '-'}</TableCell>
                     <TableCell>{row.score}</TableCell>
                     <TableCell>
                       {row.complete === false

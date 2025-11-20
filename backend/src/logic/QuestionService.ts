@@ -131,6 +131,7 @@ export class QuestionService {
       orderBy: params.orderBy ?? 'id',
       orderDirection,
       title: params.title,
+      source: params.source,
       hasReply,
       tags: params.tags
         ? params.tags.split(',').map((v) => Number(v))
