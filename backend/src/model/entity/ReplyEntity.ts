@@ -15,7 +15,6 @@ export type Reply = {
   question: Question;
   userId: number;
   score: number;
-  elapsedTimeMs: number | null;
   repliedAnswer: string | null;
   complete: boolean;
   recordedAt: string | null;
@@ -40,9 +39,6 @@ export class ReplyEntity implements Reply {
 
   @Column({ type: 'double' })
   score!: number;
-
-  @Column({ type: 'int', name: 'elapsed_time_ms', default: null })
-  elapsedTimeMs: number | null = null;
 
   @Column({ type: 'text', name: 'replied_answer', default: null })
   repliedAnswer: string | null = null;

@@ -137,7 +137,6 @@ export class UserService {
           questionSource: v.question.source,
           tag: v.question.tag,
           score: v.score,
-          elapsedTimeMs: v.elapsedTimeMs,
           repliedAnswer: v.repliedAnswer,
           complete: v.complete,
           recordedAt: v.recordedAt,

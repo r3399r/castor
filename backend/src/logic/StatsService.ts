@@ -44,7 +44,6 @@ export class StatsService {
         ...q,
         count: Number(stats.count),
         scoringRate: Number(stats.scoringRate),
-        avgElapsedTimeMs: Number(stats.avgElapsedTimeMs),
       });
     }
 

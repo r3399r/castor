@@ -8,7 +8,6 @@ CREATE TABLE IF NOT EXISTS castor.question (
     source VARCHAR(255) NULL,
     count INT UNSIGNED NOT NULL DEFAULT 0,
     scoring_rate DOUBLE NULL,
-    avg_elapsed_time_ms DOUBLE NULL,
     created_at DATETIME(3) NULL,
     updated_at DATETIME(3) NULL,
     PRIMARY KEY (id),

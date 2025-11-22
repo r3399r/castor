@@ -18,7 +18,6 @@ export type GetUserDetailResponse = {
     questionSource: string | null;
     tag: Tag[];
     score: number;
-    elapsedTimeMs: number | null;
     repliedAnswer: string | null;
     complete: boolean;
     recordedAt: string | null;

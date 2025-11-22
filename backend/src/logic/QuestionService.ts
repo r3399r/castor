@@ -80,7 +80,6 @@ export class QuestionService {
       tag: question.tag,
       count: question.count,
       scoringRate: question.scoringRate,
-      avgElapsedTimeMs: question.avgElapsedTimeMs,
       lastReply: lastReply
         ? {
             ...lastReply,
@@ -148,7 +147,6 @@ export class QuestionService {
         tag: v.tag,
         count: v.count,
         scoringRate: v.scoringRate,
-        avgElapsedTimeMs: v.avgElapsedTimeMs,
         lastReply:
           v.reply.length > 0
             ? v.reply.sort(compare('createdAt', 'desc'))[0]
@@ -338,7 +336,6 @@ export class QuestionService {
     const score = totalScore.div(question.minor.length).dp(4, 7).toNumber();
 
     reply.score = score;
-    reply.elapsedTimeMs = data.elapsedTimeMs;
     reply.repliedAnswer = data.replied.map((r) => r.answer).join('|');
     reply.complete = true;
     reply.recordedAt = new Date().toISOString();

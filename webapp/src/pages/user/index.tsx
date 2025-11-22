@@ -122,7 +122,6 @@ const User = () => {
                   <TableCell>標籤</TableCell>
                   <TableCell>來源</TableCell>
                   <TableCell>分數(滿分1)</TableCell>
-                  <TableCell>耗時(秒)</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -160,12 +159,7 @@ const User = () => {
                       </div>
                     </TableCell>
                     <TableCell>{row.questionSource ?? '-'}</TableCell>
-                    <TableCell>{row.score}</TableCell>
-                    <TableCell>
-                      {row.complete === false
-                        ? '尚未完成作答'
-                        : bn(row.elapsedTimeMs).div(1000).dp(1).toFormat()}
-                    </TableCell>
+                    <TableCell>{row.complete === true ? row.score : '尚未完成'}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
