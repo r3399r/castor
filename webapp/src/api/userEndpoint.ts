@@ -4,22 +4,23 @@ import type {
   GetUserDetailResponse,
   PostUserSyncResponse,
 } from 'src/model/backend/api/User';
+import { alertError } from './errorHandler';
 
 const getUserDetail = async (params: GetUserDetailParams) => {
   try {
     return await http.get<GetUserDetailResponse, GetUserDetailParams>('user/detail', {
       params,
     });
-  } catch {
-    alert('發生無預期錯誤，請重新再試，若反覆出現此問題，請聯絡客服人員。');
+  } catch (e) {
+    alertError(e);
   }
 };
 
 const postUserSync = async () => {
   try {
     return await http.post<PostUserSyncResponse>('user/sync');
-  } catch {
-    alert('發生無預期錯誤，請重新再試，若反覆出現此問題，請聯絡客服人員。');
+  } catch (e) {
+    alertError(e);
   }
 };
 

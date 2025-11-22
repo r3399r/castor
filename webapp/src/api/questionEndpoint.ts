@@ -10,30 +10,31 @@ import type {
   PostQuestionStartRequest,
   PostQuestionStartResponse,
 } from 'src/model/backend/api/Question';
+import { alertError } from './errorHandler';
 
 const getQuestion = async (params?: GetQuestionParams) => {
   try {
     return await http.get<GetQuestionResponse>('question', {
       params,
     });
-  } catch {
-    alert('發生無預期錯誤，請重新再試，若反覆出現此問題，請聯絡客服人員。');
+  } catch (e) {
+    alertError(e);
   }
 };
 
 const getQuestionId = async (id: string) => {
   try {
     return await http.get<GetQuestionIdResponse>(`question/${id}`);
-  } catch {
-    alert('發生無預期錯誤，請重新再試，若反覆出現此問題，請聯絡客服人員。');
+  } catch (e) {
+    alertError(e);
   }
 };
 
 const getQuestionTag = async (params: GetQuestionTagParams) => {
   try {
     return await http.get<GetQuestionTagResponse>('question/tag', { params });
-  } catch {
-    alert('發生無預期錯誤，請重新再試，若反覆出現此問題，請聯絡客服人員。');
+  } catch (e) {
+    alertError(e);
   }
 };
 
@@ -42,8 +43,8 @@ const postQuestionStart = async (data: PostQuestionStartRequest) => {
     return await http.post<PostQuestionStartResponse, PostQuestionStartRequest>(`question/start`, {
       data,
     });
-  } catch {
-    alert('發生無預期錯誤，請重新再試，若反覆出現此問題，請聯絡客服人員。');
+  } catch (e) {
+    alertError(e);
   }
 };
 
@@ -55,8 +56,8 @@ const postQuestionComplete = async (data: PostQuestionCompleteRequest) => {
         data,
       },
     );
-  } catch {
-    alert('發生無預期錯誤，請重新再試，若反覆出現此問題，請聯絡客服人員。');
+  } catch (e) {
+    alertError(e);
   }
 };
 

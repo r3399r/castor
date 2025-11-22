@@ -29,7 +29,6 @@ export type Question = {
   tag: Tag[];
   count: number;
   scoringRate: number | null;
-  avgElapsedTimeMs: number | null;
   createdAt: string | null;
   updatedAt: string | null;
 };
@@ -71,9 +70,6 @@ export class QuestionEntity implements Question {
 
   @Column({ type: 'double', name: 'scoring_rate', default: null })
   scoringRate: number | null = null;
-
-  @Column({ type: 'double', name: 'avg_elapsed_time_ms', default: null })
-  avgElapsedTimeMs: number | null = null;
 
   @OneToMany(
     () => QuestionMinorEntity,

@@ -64,14 +64,12 @@ export class ReplyAccess {
       .select('reply.questionId', 'questionId')
       .addSelect('COUNT(reply.id)', 'count')
       .addSelect('AVG(reply.score)', 'scoringRate')
-      .addSelect('AVG(reply.elapsed_time_ms)', 'avgElapsedTimeMs')
       .where('reply.questionId in (:...questionIds)', { questionIds })
       .groupBy('reply.questionId')
       .getRawMany()) as {
       questionId: number;
       count: string;
       scoringRate: number;
-      avgElapsedTimeMs: number;
     }[];
   }
 

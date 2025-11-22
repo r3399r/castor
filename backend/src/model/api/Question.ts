@@ -32,7 +32,6 @@ export type PostQuestionStartResponse = Pick<
 export type PostQuestionCompleteRequest = {
   id: number;
   replyId: number;
-  elapsedTimeMs: number;
   replied: { id: number; answer: string }[];
 };
 
@@ -66,7 +65,6 @@ export type ModifiedQuestion = {
   tag: Tag[];
   count: number;
   scoringRate: number | null;
-  avgElapsedTimeMs: number | null;
   lastReply: Reply | null;
 };
 
@@ -82,6 +80,5 @@ export type GetQuestionIdResponse = {
   tag: Tag[];
   count: number;
   scoringRate: number | null;
-  avgElapsedTimeMs: number | null;
   lastReply: ModifiedReply | null;
 };

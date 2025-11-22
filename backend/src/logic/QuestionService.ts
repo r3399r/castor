@@ -22,7 +22,7 @@ import { QuestionEntity } from 'src/model/entity/QuestionEntity';
 import { QuestionMinorEntity } from 'src/model/entity/QuestionMinorEntity';
 import { ReplyEntity } from 'src/model/entity/ReplyEntity';
 import { Tag, TagEntity } from 'src/model/entity/TagEntity';
-import { BadRequestError, NotFoundError } from 'src/model/error';
+import { BadRequestError, UnauthorizedError } from 'src/model/error';
 import { bn } from 'src/utils/bignumber';
 import { compare } from 'src/utils/compare';
 import { genPagination } from 'src/utils/paginator';
@@ -52,11 +52,10 @@ export class QuestionService {
     const rid = uid.substring(0, 3).toUpperCase();
 
     const user = await this.userService.getUser();
-    if (user === null) throw new NotFoundError('User not found');
 
     const question = await this.questionAccess.findDetail({
       id,
-      userId: user.id,
+      userId: user?.id ?? -1,
     });
     if (question.rid !== rid) throw new BadRequestError('rid is not matched');
 
@@ -80,7 +79,6 @@ export class QuestionService {
       tag: question.tag,
       count: question.count,
       scoringRate: question.scoringRate,
-      avgElapsedTimeMs: question.avgElapsedTimeMs,
       lastReply: lastReply
         ? {
             ...lastReply,
@@ -148,7 +146,6 @@ export class QuestionService {
         tag: v.tag,
         count: v.count,
         scoringRate: v.scoringRate,
-        avgElapsedTimeMs: v.avgElapsedTimeMs,
         lastReply:
           v.reply.length > 0
             ? v.reply.sort(compare('createdAt', 'desc'))[0]
@@ -275,7 +272,7 @@ export class QuestionService {
     data: PostQuestionStartRequest
   ): Promise<PostQuestionStartResponse> {
     const user = await this.userService.getUser();
-    if (user === null) throw new NotFoundError('User not found');
+    if (user === null) throw new UnauthorizedError('User not found');
 
     const replyEntity = new ReplyEntity();
     replyEntity.userId = user.id;
@@ -297,7 +294,7 @@ export class QuestionService {
     data: PostQuestionCompleteRequest
   ): Promise<PostQuestionCompleteResponse> {
     const user = await this.userService.getUser();
-    if (user === null) throw new NotFoundError('User not found');
+    if (user === null) throw new UnauthorizedError('User not found');
 
     const reply = await this.replyAccess.findOne({
       where: {
@@ -307,7 +304,7 @@ export class QuestionService {
         complete: false,
       },
     });
-    if (reply === null) throw new NotFoundError('Reply not found');
+    if (reply === null) throw new UnauthorizedError('Reply not found');
 
     const question = await this.questionAccess.findOneOrFail({
       where: { id: data.id },
@@ -338,7 +335,6 @@ export class QuestionService {
     const score = totalScore.div(question.minor.length).dp(4, 7).toNumber();
 
     reply.score = score;
-    reply.elapsedTimeMs = data.elapsedTimeMs;
     reply.repliedAnswer = data.replied.map((r) => r.answer).join('|');
     reply.complete = true;
     reply.recordedAt = new Date().toISOString();

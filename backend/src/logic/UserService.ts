@@ -11,11 +11,7 @@ import {
   PostUserSyncResponse,
 } from 'src/model/api/User';
 import { UserEntity } from 'src/model/entity/UserEntity';
-import {
-  BadRequestError,
-  NotFoundError,
-  UnauthorizedError,
-} from 'src/model/error';
+import { BadRequestError, UnauthorizedError } from 'src/model/error';
 import { authorizationSymbol } from 'src/utils/LambdaHelper';
 import { genPagination } from 'src/utils/paginator';
 
@@ -88,7 +84,7 @@ export class UserService {
       throw new BadRequestError('categoryId is required');
 
     const user = await this.getUser();
-    if (user === null) throw new NotFoundError('User not found');
+    if (user === null) throw new UnauthorizedError('User not found');
 
     const userStats = await this.userStatsAccess.find({
       where: {
@@ -137,7 +133,6 @@ export class UserService {
           questionSource: v.question.source,
           tag: v.question.tag,
           score: v.score,
-          elapsedTimeMs: v.elapsedTimeMs,
           repliedAnswer: v.repliedAnswer,
           complete: v.complete,
           recordedAt: v.recordedAt,

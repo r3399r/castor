@@ -512,7 +512,6 @@ Resources:
               "properties": {
                 "id":{"type": "number"},
                 "replyId":{"type": "number"},
-                "elapsedTimeMs":{"type": "number", "minimum": 0},
                 "replied": {
                   "type": "array",
                   "items": {
@@ -525,7 +524,7 @@ Resources:
                   }
                 }
               },
-              "required": ["id","replyId","elapsedTimeMs","replied"]
+              "required": ["id","replyId","replied"]
             }
           },
           "x-amazon-apigateway-request-validators" : {
@@ -544,7 +543,7 @@ Resources:
     Properties:
       Architectures: [arm64]
       Handler: index.api
-      Runtime: nodejs20.x
+      Runtime: nodejs22.x
       FunctionName: !Sub ${Project}-${TargetEnvr}-api
       Role: !GetAtt ExecutionRole.Arn
       CodeUri: ../../lib/src
@@ -574,7 +573,7 @@ Resources:
     Properties:
       Architectures: [arm64]
       Handler: index.statsLoader
-      Runtime: nodejs20.x
+      Runtime: nodejs22.x
       FunctionName: !Sub ${Project}-${TargetEnvr}-stats-loader
       Role: !GetAtt ExecutionRole.Arn
       CodeUri: ../../lib/src
@@ -603,7 +602,7 @@ Resources:
     Properties:
       LayerName: !Sub ${Project}-${TargetEnvr}-layer
       CompatibleArchitectures: [arm64]
-      CompatibleRuntimes: [nodejs20.x]
+      CompatibleRuntimes: [nodejs22.x]
       ContentUri: ../../dist
       RetentionPolicy: Delete
   #########################################

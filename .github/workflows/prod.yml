@@ -21,7 +21,7 @@ jobs:
 
       - uses: actions/setup-node@v3
         with:
-          node-version: '20.18.3'
+          node-version: '22.21.1'
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1

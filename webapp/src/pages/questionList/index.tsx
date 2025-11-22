@@ -138,14 +138,6 @@ const QuestionList = () => {
     setSearchParams(sp, { replace: !!opts?.replace });
   };
 
-  const msToMinSec = (ms: number): string => {
-    if (Number.isNaN(ms)) return '00分00秒';
-    const totalSeconds = Math.floor(ms / 1000);
-    const m = Math.floor(totalSeconds / 60);
-    const s = totalSeconds % 60;
-    return `${m}分${String(s).padStart(2, '0')}秒`;
-  };
-
   return (
     <div>
       <div className="text-2xl font-bold">
@@ -207,17 +199,12 @@ const QuestionList = () => {
                 } else if (value === 2 || value === 3) {
                   setSorting('scoringRate');
                   setSortDirection(value === 2 ? 'ASC' : 'DESC');
-                } else if (value === 4 || value === 5) {
-                  setSorting('avgElapsedTimeMs');
-                  setSortDirection(value === 4 ? 'ASC' : 'DESC');
                 }
               }}
             >
               <MenuItem value={1}>預設</MenuItem>
               <MenuItem value={2}>答對率(遞增)</MenuItem>
               <MenuItem value={3}>答對率(遞減)</MenuItem>
-              <MenuItem value={4}>平均耗時(遞增)</MenuItem>
-              <MenuItem value={5}>平均耗時(遞減)</MenuItem>
             </Select>
           </FormControl>
         </div>
@@ -258,7 +245,6 @@ const QuestionList = () => {
               <TableCell>標籤</TableCell>
               <TableCell>來源</TableCell>
               <TableCell>答對率</TableCell>
-              <TableCell>平均耗時</TableCell>
               <TableCell>是否作答</TableCell>
             </TableRow>
           </TableHead>
@@ -298,9 +284,6 @@ const QuestionList = () => {
                   {row.scoringRate !== null
                     ? bn(row.scoringRate).times(100).dp(2).toFormat() + '%'
                     : '-'}
-                </TableCell>
-                <TableCell>
-                  {row.avgElapsedTimeMs ? msToMinSec(row.avgElapsedTimeMs) : '-'}
                 </TableCell>
                 <TableCell>{row.lastReply?.complete === true ? '已作答' : '尚未作答'}</TableCell>
               </TableRow>

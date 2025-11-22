@@ -3,7 +3,6 @@ CREATE TABLE IF NOT EXISTS castor.reply (
     question_id INT UNSIGNED NOT NULL,
     user_id INT UNSIGNED NOT NULL,
     score DOUBLE NOT NULL DEFAULT 0,
-    elapsed_time_ms INT UNSIGNED NULL,
     replied_answer VARCHAR(255) NULL,
     complete BOOLEAN NOT NULL DEFAULT FALSE,
     recorded_at DATETIME(3) NULL,

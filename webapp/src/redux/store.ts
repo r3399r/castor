@@ -8,3 +8,5 @@ export const store = configureStore({
     ui: uiReducer,
   },
 });
+
+export const dispatch = store.dispatch;
