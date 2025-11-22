@@ -13,7 +13,6 @@ import {
 import { UserEntity } from 'src/model/entity/UserEntity';
 import {
   BadRequestError,
-  NotFoundError,
   UnauthorizedError,
 } from 'src/model/error';
 import { authorizationSymbol } from 'src/utils/LambdaHelper';
@@ -88,7 +87,7 @@ export class UserService {
       throw new BadRequestError('categoryId is required');
 
     const user = await this.getUser();
-    if (user === null) throw new NotFoundError('User not found');
+    if (user === null) throw new UnauthorizedError('User not found');
 
     const userStats = await this.userStatsAccess.find({
       where: {

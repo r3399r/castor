@@ -22,7 +22,7 @@ import { QuestionEntity } from 'src/model/entity/QuestionEntity';
 import { QuestionMinorEntity } from 'src/model/entity/QuestionMinorEntity';
 import { ReplyEntity } from 'src/model/entity/ReplyEntity';
 import { Tag, TagEntity } from 'src/model/entity/TagEntity';
-import { BadRequestError, NotFoundError } from 'src/model/error';
+import { BadRequestError, UnauthorizedError } from 'src/model/error';
 import { bn } from 'src/utils/bignumber';
 import { compare } from 'src/utils/compare';
 import { genPagination } from 'src/utils/paginator';
@@ -52,7 +52,7 @@ export class QuestionService {
     const rid = uid.substring(0, 3).toUpperCase();
 
     const user = await this.userService.getUser();
-    if (user === null) throw new NotFoundError('User not found');
+    if (user === null) throw new UnauthorizedError('User not found');
 
     const question = await this.questionAccess.findDetail({
       id,
@@ -273,7 +273,7 @@ export class QuestionService {
     data: PostQuestionStartRequest
   ): Promise<PostQuestionStartResponse> {
     const user = await this.userService.getUser();
-    if (user === null) throw new NotFoundError('User not found');
+    if (user === null) throw new UnauthorizedError('User not found');
 
     const replyEntity = new ReplyEntity();
     replyEntity.userId = user.id;
@@ -295,7 +295,7 @@ export class QuestionService {
     data: PostQuestionCompleteRequest
   ): Promise<PostQuestionCompleteResponse> {
     const user = await this.userService.getUser();
-    if (user === null) throw new NotFoundError('User not found');
+    if (user === null) throw new UnauthorizedError('User not found');
 
     const reply = await this.replyAccess.findOne({
       where: {
@@ -305,7 +305,7 @@ export class QuestionService {
         complete: false,
       },
     });
-    if (reply === null) throw new NotFoundError('Reply not found');
+    if (reply === null) throw new UnauthorizedError('Reply not found');
 
     const question = await this.questionAccess.findOneOrFail({
       where: { id: data.id },
