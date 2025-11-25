@@ -8,6 +8,18 @@
     font-family: 'Times New Roman', 'Noto Sans TC', serif;
     font-size: 16px;
   }
+
+  ol {
+    list-style: decimal inside;
+    text-indent: -1.5em;
+    padding-left: 1.5em;
+  }
+
+  ul {
+    list-style: disc inside;
+    text-indent: -1.5em;
+    padding-left: 1.5em;
+  }
 }
 
 @theme {
