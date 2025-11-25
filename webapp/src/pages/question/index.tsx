@@ -120,8 +120,9 @@ const Question = () => {
               {question.category.name}
             </span>
           </p>
+          <p>出處: {question.source}</p>
           <p>
-            題目名稱: <span className="font-bold">{question.title}</span>
+            題號: <span className="font-bold">{question.title}</span>
           </p>
           <p>
             標籤:{' '}
@@ -137,7 +138,6 @@ const Question = () => {
               </span>
             ))}
           </p>
-          <p>來源: {question.source}</p>
         </div>
       </div>
       <MathJax dynamic>

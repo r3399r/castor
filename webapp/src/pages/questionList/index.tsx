@@ -39,7 +39,6 @@ const QuestionList = () => {
   const [page, setPage] = useState<number>(1);
   const [count, setCount] = useState<number>();
   const [categoryId, setCategoryId] = useState<number>();
-  const [titleQuery, setTitleQuery] = useState<string>();
   const [sourceQuery, setSourceQuery] = useState<string>();
   const [sorting, setSorting] = useState<string>();
   const [sortDirection, setSortDirection] = useState<'ASC' | 'DESC'>('DESC');
@@ -58,9 +57,6 @@ const QuestionList = () => {
     }
     setCategoryId(Number(tmpCategoryId));
     dispatch(reduxSetCategoryId(Number(tmpCategoryId)));
-
-    const tmpTitleQuery = searchParams.get('title');
-    if (tmpTitleQuery !== null) setTitleQuery(tmpTitleQuery);
 
     const tmpSourceQuery = searchParams.get('source');
     if (tmpSourceQuery !== null) setSourceQuery(tmpSourceQuery);
@@ -111,7 +107,6 @@ const QuestionList = () => {
         categoryId,
         orderBy: sorting,
         orderDirection: sortDirection,
-        title: titleQuery,
         source: sourceQuery,
         hasReply: showReply,
         tags: tagsFilter ? tagsFilter.join() : undefined,
@@ -128,7 +123,6 @@ const QuestionList = () => {
   const applyFilters = (opts?: { replace?: boolean }) => {
     const sp = new URLSearchParams();
     if (categoryId) sp.set('categoryId', String(categoryId));
-    if (titleQuery) sp.set('title', titleQuery);
     if (sourceQuery) sp.set('source', sourceQuery);
     if (sorting) sp.set('sorting', sorting);
     if (sortDirection === 'DESC') sp.set('sortDirection', 'DESC');
@@ -152,16 +146,6 @@ const QuestionList = () => {
             size="small"
             value={sourceQuery}
             onChange={(e) => setSourceQuery(e.target.value)}
-          />
-        </div>
-        <div className="xs:w-40">
-          <TextField
-            label="搜尋名稱"
-            fullWidth
-            variant="standard"
-            size="small"
-            value={titleQuery}
-            onChange={(e) => setTitleQuery(e.target.value)}
           />
         </div>
         <div className="xs:w-40">
@@ -197,14 +181,19 @@ const QuestionList = () => {
                   setSorting(undefined);
                   setSortDirection('DESC');
                 } else if (value === 2 || value === 3) {
-                  setSorting('scoringRate');
+                  setSorting('title');
                   setSortDirection(value === 2 ? 'ASC' : 'DESC');
+                } else if (value === 4 || value === 5) {
+                  setSorting('scoringRate');
+                  setSortDirection(value === 4 ? 'ASC' : 'DESC');
                 }
               }}
             >
               <MenuItem value={1}>預設</MenuItem>
-              <MenuItem value={2}>答對率(遞增)</MenuItem>
-              <MenuItem value={3}>答對率(遞減)</MenuItem>
+              <MenuItem value={2}>題號(遞增)</MenuItem>
+              <MenuItem value={3}>題號(遞減)</MenuItem>
+              <MenuItem value={4}>答對率(遞增)</MenuItem>
+              <MenuItem value={5}>答對率(遞減)</MenuItem>
             </Select>
           </FormControl>
         </div>
@@ -242,7 +231,7 @@ const QuestionList = () => {
           <TableHead>
             <TableRow>
               <TableCell>出處</TableCell>
-              <TableCell>名稱</TableCell>
+              <TableCell>題號</TableCell>
               <TableCell>標籤</TableCell>
               <TableCell>答對率</TableCell>
               <TableCell>是否作答</TableCell>

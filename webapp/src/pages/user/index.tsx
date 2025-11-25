@@ -119,7 +119,7 @@ const User = () => {
                 <TableRow>
                   <TableCell>時間</TableCell>
                   <TableCell>出處</TableCell>
-                  <TableCell>名稱</TableCell>
+                  <TableCell>題號</TableCell>
                   <TableCell>標籤</TableCell>
                   <TableCell>分數(滿分1)</TableCell>
                 </TableRow>
