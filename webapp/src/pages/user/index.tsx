@@ -43,7 +43,7 @@ const User = () => {
   useEffect(() => {
     const tmpCategoryId = searchParams.get('categoryId');
     if (tmpCategoryId === null || isNaN(Number(tmpCategoryId))) {
-      navigate('/category');
+      navigate('/');
       return;
     }
     if (!isLogin) {
@@ -118,9 +118,9 @@ const User = () => {
               <TableHead>
                 <TableRow>
                   <TableCell>時間</TableCell>
-                  <TableCell>題目名稱</TableCell>
+                  <TableCell>出處</TableCell>
+                  <TableCell>名稱</TableCell>
                   <TableCell>標籤</TableCell>
-                  <TableCell>來源</TableCell>
                   <TableCell>分數(滿分1)</TableCell>
                 </TableRow>
               </TableHead>
@@ -130,6 +130,7 @@ const User = () => {
                     <TableCell component="th" scope="row">
                       {format(new Date(row.recordedAt ?? ''), 'yyyy/MM/dd HH:mm:ss')}
                     </TableCell>
+                    <TableCell>{row.questionSource ?? '-'}</TableCell>
                     <TableCell>
                       <a
                         onClick={(e) => {
@@ -158,7 +159,6 @@ const User = () => {
                         ))}
                       </div>
                     </TableCell>
-                    <TableCell>{row.questionSource ?? '-'}</TableCell>
                     <TableCell>{row.complete === true ? row.score : '尚未完成'}</TableCell>
                   </TableRow>
                 ))}

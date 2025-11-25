@@ -1,4 +1,5 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
+import type { Category } from 'src/model/backend/entity/CategoryEntity';
 import type { Tag } from 'src/model/backend/entity/TagEntity';
 import type { User } from 'src/model/backend/entity/UserEntity';
 
@@ -7,6 +8,7 @@ export type UiState = {
   categoryId: number | null;
   isLogin: boolean;
   user: User | null;
+  categoryList: Category[] | null;
   tag: { [key: string]: Tag[] } | null;
 };
 
@@ -15,6 +17,7 @@ const initialState: UiState = {
   categoryId: null,
   isLogin: false,
   user: null,
+  categoryList: null,
   tag: null,
 };
 
@@ -37,6 +40,9 @@ export const uiSlice = createSlice({
     setUser: (state: UiState, action: PayloadAction<User | null>) => {
       state.user = action.payload;
     },
+    setCategoryList: (state: UiState, action: PayloadAction<Category[] | null>) => {
+      state.categoryList = action.payload;
+    },
     setTag: (
       state: UiState,
       action: PayloadAction<{ [key: number]: Pick<Tag, 'id' | 'name'>[] }>,
@@ -46,7 +52,14 @@ export const uiSlice = createSlice({
   },
 });
 
-export const { startWaiting, finishWaiting, setCategoryId, setIsLogin, setUser, setTag } =
-  uiSlice.actions;
+export const {
+  startWaiting,
+  finishWaiting,
+  setCategoryId,
+  setIsLogin,
+  setUser,
+  setCategoryList,
+  setTag,
+} = uiSlice.actions;
 
 export default uiSlice.reducer;

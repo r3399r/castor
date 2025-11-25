@@ -26,9 +26,6 @@ const Bar = () => {
         <div className="cursor-pointer font-bold text-blue-900" onClick={() => navigate('/')}>
           Practice Makes Perfect
         </div>
-        <Button variant="contained" onClick={() => navigate(`/category`)}>
-          類別清單
-        </Button>
         {!!categoryId && (
           <>
             <Button variant="contained" onClick={() => navigate(`/list?categoryId=${categoryId}`)}>
@@ -77,15 +74,6 @@ const Bar = () => {
       </div>
       <Drawer open={open} onClose={() => setOpen(false)} anchor="right">
         <div className="flex w-50 flex-col gap-2 p-5">
-          <Button
-            variant="contained"
-            onClick={() => {
-              setOpen(false);
-              navigate(`/category`);
-            }}
-          >
-            類別清單
-          </Button>
           {!!categoryId && (
             <>
               <Button

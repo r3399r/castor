@@ -48,12 +48,12 @@ const QuestionList = () => {
   const [showReplyValue, setShowReplyValue] = useState<number>(1);
   const [tagsFilter, setTagsFilter] = useState<string[]>();
   const [allTags, setAllTags] = useState<GetQuestionTagResponse>();
-  const { tag } = useSelector((rootState: RootState) => rootState.ui);
+  const { tag, isLogin } = useSelector((rootState: RootState) => rootState.ui);
 
   useEffect(() => {
     const tmpCategoryId = searchParams.get('categoryId');
     if (tmpCategoryId === null || isNaN(Number(tmpCategoryId))) {
-      navigate('/category');
+      navigate('/');
       return;
     }
     setCategoryId(Number(tmpCategoryId));
@@ -123,7 +123,7 @@ const QuestionList = () => {
       .finally(() => {
         dispatch(finishWaiting());
       });
-  }, [page, categoryId, searchParams]);
+  }, [page, categoryId, searchParams, isLogin]);
 
   const applyFilters = (opts?: { replace?: boolean }) => {
     const sp = new URLSearchParams();
@@ -141,12 +141,22 @@ const QuestionList = () => {
   return (
     <div>
       <div className="text-2xl font-bold">
-        題目清單 {list !== undefined && list.length > 0 ? `(${list[0].category.name})` : ''}
+        {list !== undefined && list.length > 0 ? `${list[0].category.name}` : '題目清單'}
       </div>
       <div className="my-3 flex flex-col flex-wrap gap-3 xs:flex-row xs:items-center">
         <div className="xs:w-40">
           <TextField
-            label="搜尋標題"
+            label="搜尋出處"
+            fullWidth
+            variant="standard"
+            size="small"
+            value={sourceQuery}
+            onChange={(e) => setSourceQuery(e.target.value)}
+          />
+        </div>
+        <div className="xs:w-40">
+          <TextField
+            label="搜尋名稱"
             fullWidth
             variant="standard"
             size="small"
@@ -156,7 +166,7 @@ const QuestionList = () => {
         </div>
         <div className="xs:w-40">
           <FormControl fullWidth variant="standard">
-            <InputLabel>Tag</InputLabel>
+            <InputLabel>選擇標籤</InputLabel>
             <Select
               size="small"
               value={tagsFilter ?? []}
@@ -172,16 +182,6 @@ const QuestionList = () => {
               ))}
             </Select>
           </FormControl>
-        </div>
-        <div className="xs:w-40">
-          <TextField
-            label="搜尋來源"
-            fullWidth
-            variant="standard"
-            size="small"
-            value={sourceQuery}
-            onChange={(e) => setSourceQuery(e.target.value)}
-          />
         </div>
         <div className="xs:w-40">
           <FormControl fullWidth variant="standard">
@@ -241,9 +241,9 @@ const QuestionList = () => {
         <Table sx={{ minWidth: 650 }} aria-label="simple table">
           <TableHead>
             <TableRow>
-              <TableCell>題目名稱</TableCell>
+              <TableCell>出處</TableCell>
+              <TableCell>名稱</TableCell>
               <TableCell>標籤</TableCell>
-              <TableCell>來源</TableCell>
               <TableCell>答對率</TableCell>
               <TableCell>是否作答</TableCell>
             </TableRow>
@@ -251,6 +251,7 @@ const QuestionList = () => {
           <TableBody>
             {list?.map((row) => (
               <TableRow key={row.uid}>
+                <TableCell>{row.source ?? '-'}</TableCell>
                 <TableCell>
                   <a
                     onClick={(e) => {
@@ -279,7 +280,6 @@ const QuestionList = () => {
                     ))}
                   </div>
                 </TableCell>
-                <TableCell>{row.source ?? '-'}</TableCell>
                 <TableCell>
                   {row.scoringRate !== null
                     ? bn(row.scoringRate).times(100).dp(2).toFormat() + '%'
