@@ -20,8 +20,8 @@ export default async (lambdaEvent: LambdaEvent) => {
   switch (event.resource) {
     case '/api/question':
       return await questionDefault();
-    case '/api/question/{uid}':
-      return await questionUid();
+    case '/api/question/{uuid}':
+      return await questionUuid();
     case '/api/question/start':
       return await questionStart();
     case '/api/question/complete':
@@ -51,12 +51,12 @@ const questionDefault = async () => {
   throw new Error('unexpected httpMethod');
 };
 
-const questionUid = async () => {
+const questionUuid = async () => {
   if (event.pathParameters === null)
     throw new BadRequestError('pathParameters should not be empty');
   switch (event.httpMethod) {
     case 'GET':
-      return await service.getQuestionByUid(event.pathParameters.uid);
+      return await service.getQuestionByUuid(event.pathParameters.uuid);
   }
 
   throw new Error('unexpected httpMethod');

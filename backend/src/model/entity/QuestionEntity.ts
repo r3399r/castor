@@ -11,24 +11,27 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { Category, CategoryEntity } from './CategoryEntity';
+import { Concept, ConceptEntity } from './ConceptEntity';
 import { QuestionMinor, QuestionMinorEntity } from './QuestionMinorEntity';
-import { Reply, ReplyEntity } from './ReplyEntity';
 import { Tag, TagEntity } from './TagEntity';
 
 export type Question = {
   id: number;
-  rid: string;
-  title: string;
+  uuid: string;
+  title: string | null;
   categoryId: number;
   category: Category;
-  content: string;
+  content: string | null;
   fbPostId: string | null;
   source: string | null;
+  difficulty: number | null;
+  attempCount: number;
+  scoringTotal: number;
+  discrimination: number | null;
   minor: QuestionMinor[];
-  reply: Reply[];
+  // reply: Reply[];
   tag: Tag[];
-  count: number;
-  scoringRate: number | null;
+  concept: Concept[];
   createdAt: string | null;
   updatedAt: string | null;
 };
@@ -39,10 +42,10 @@ export class QuestionEntity implements Question {
   id!: number;
 
   @Column({ type: 'varchar', length: 16 })
-  rid!: string;
+  uuid!: string;
 
   @Column({ type: 'varchar', length: 255 })
-  title!: string;
+  title: string | null = null;
 
   @Column({ type: 'int', unsigned: true, name: 'category_id' })
   categoryId!: number;
@@ -52,24 +55,25 @@ export class QuestionEntity implements Question {
   category!: Category;
 
   @Column({ type: 'text' })
-  content!: string;
+  content: string | null = null;
 
-  @Column({
-    type: 'varchar',
-    length: 255,
-    name: 'fb_post_id',
-    default: null,
-  })
+  @Column({ type: 'varchar', length: 255, name: 'fb_post_id' })
   fbPostId: string | null = null;
 
   @Column({ type: 'varchar', length: 255, default: null })
   source: string | null = null;
 
-  @Column({ type: 'int', unsigned: true })
-  count: number = 0;
+  @Column({ type: 'tinyint', unsigned: true })
+  difficulty: number | null = null;
 
-  @Column({ type: 'double', name: 'scoring_rate', default: null })
-  scoringRate: number | null = null;
+  @Column({ type: 'int', unsigned: true, name: 'attemp_count' })
+  attempCount: number = 0;
+
+  @Column({ type: 'double', name: 'scoring_total' })
+  scoringTotal: number = 0;
+
+  @Column({ type: 'float' })
+  discrimination: number | null = null;
 
   @OneToMany(
     () => QuestionMinorEntity,
@@ -77,8 +81,8 @@ export class QuestionEntity implements Question {
   )
   minor!: QuestionMinor[];
 
-  @OneToMany(() => ReplyEntity, (reply) => reply.question)
-  reply!: Reply[];
+  // @OneToMany(() => ReplyEntity, (reply) => reply.question)
+  // reply!: Reply[];
 
   @ManyToMany(() => TagEntity)
   @JoinTable({
@@ -87,6 +91,14 @@ export class QuestionEntity implements Question {
     inverseJoinColumn: { name: 'tag_id', referencedColumnName: 'id' },
   })
   tag!: Tag[];
+
+  @ManyToMany(() => ConceptEntity)
+  @JoinTable({
+    name: 'question_concept',
+    joinColumn: { name: 'question_id', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'concept_id', referencedColumnName: 'id' },
+  })
+  concept!: Concept[];
 
   @Column({ type: 'datetime', name: 'created_at', default: null })
   createdAt!: string;

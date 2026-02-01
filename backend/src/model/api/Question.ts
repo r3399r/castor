@@ -1,7 +1,5 @@
-import { Category } from 'src/model/entity/CategoryEntity';
-import { QuestionMinor } from 'src/model/entity/QuestionMinorEntity';
+import { Question } from 'src/model/entity/QuestionEntity';
 import { Reply } from 'src/model/entity/ReplyEntity';
-import { Tag } from 'src/model/entity/TagEntity';
 import { Paginate, PaginationParams } from 'src/model/Pagination';
 
 export type PostQuestionRequest = {
@@ -10,7 +8,9 @@ export type PostQuestionRequest = {
   content: string;
   imageUrl: string;
   source: string;
+  difficulty: number;
   tag: string[];
+  concept: string[];
   minor: {
     type: 'SINGLE' | 'MULTIPLE' | 'FILL';
     orderIndex: number;
@@ -47,8 +47,9 @@ export type GetQuestionParams = PaginationParams & {
   orderBy?: string;
   orderDirection?: string;
   title?: string;
-  hasReply?: 'true' | 'false';
+  // hasReply?: 'true' | 'false';
   tags?: string;
+  concepts?: string;
   source?: string;
 };
 
@@ -56,29 +57,30 @@ export type GetQuestionTagParams = { categoryId: number };
 
 export type GetQuestionTagResponse = { id: number; name: string }[];
 
-export type ModifiedQuestion = {
-  uid: string;
-  title: string;
-  categoryId: number;
-  category: Category;
-  source: string | null;
-  tag: Tag[];
-  count: number;
-  scoringRate: number | null;
-  lastReply: Reply | null;
-};
+// export type ModifiedQuestion = {
+//   uid: string;
+//   title: string;
+//   categoryId: number;
+//   category: Category;
+//   source: string | null;
+//   tag: Tag[];
+//   count: number;
+//   scoringRate: number | null;
+//   lastReply: Reply | null;
+// };
 
-export type GetQuestionResponse = Paginate<ModifiedQuestion>;
+export type GetQuestionResponse = Paginate<Question>;
 
-export type GetQuestionIdResponse = {
-  uid: string;
-  title: string;
-  category: Category;
-  content: string;
-  source: string | null;
-  minor: (QuestionMinor & { length: number | null })[];
-  tag: Tag[];
-  count: number;
-  scoringRate: number | null;
-  lastReply: ModifiedReply | null;
-};
+export type GetQuestionIdResponse = Question;
+// export type GetQuestionIdResponse = {
+//   uid: string;
+//   title: string;
+//   category: Category;
+//   content: string;
+//   source: string | null;
+//   minor: (QuestionMinor & { length: number | null })[];
+//   tag: Tag[];
+//   count: number;
+//   scoringRate: number | null;
+//   lastReply: ModifiedReply | null;
+// };

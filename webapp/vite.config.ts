@@ -8,7 +8,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'https://pmp-test.celestialstudio.net',
+        target: 'https://pmp.celestialstudio.net',
         changeOrigin: true,
       },
     },

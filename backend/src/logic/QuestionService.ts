@@ -1,7 +1,9 @@
 import axios from 'axios';
 import { inject, injectable } from 'inversify';
+import { v4 as uuidv4 } from 'uuid';
 import { LIMIT, OFFSET } from 'src/constant/Pagination';
 import { CategoryAccess } from 'src/dao/CategoryAccess';
+import { ConceptAccess } from 'src/dao/ConceptAccess';
 import { QuestionAccess } from 'src/dao/QuestionAccess';
 import { QuestionMinorAccess } from 'src/dao/QuestionMinorAccess';
 import { ReplyAccess } from 'src/dao/ReplyAccess';
@@ -18,15 +20,14 @@ import {
   PostQuestionStartRequest,
   PostQuestionStartResponse,
 } from 'src/model/api/Question';
+import { Concept } from 'src/model/entity/ConceptEntity';
 import { QuestionEntity } from 'src/model/entity/QuestionEntity';
 import { QuestionMinorEntity } from 'src/model/entity/QuestionMinorEntity';
 import { ReplyEntity } from 'src/model/entity/ReplyEntity';
 import { Tag, TagEntity } from 'src/model/entity/TagEntity';
 import { BadRequestError, UnauthorizedError } from 'src/model/error';
 import { bn } from 'src/utils/bignumber';
-import { compare } from 'src/utils/compare';
 import { genPagination } from 'src/utils/paginator';
-import { randomBase36 } from 'src/utils/random';
 import { UserService } from './UserService';
 
 /**
@@ -46,50 +47,19 @@ export class QuestionService {
   private readonly categoryAccess!: CategoryAccess;
   @inject(TagAccess)
   private readonly tagAccess!: TagAccess;
+  @inject(ConceptAccess)
+  private readonly conceptAccess!: ConceptAccess;
 
-  public async getQuestionByUid(uid: string): Promise<GetQuestionIdResponse> {
-    const id = parseInt(uid.substring(3), 36);
-    const rid = uid.substring(0, 3).toUpperCase();
-
-    const user = await this.userService.getUser();
-
-    const question = await this.questionAccess.findDetail({
-      id,
-      userId: user?.id ?? -1,
+  public async getQuestionByUuid(uuid: string): Promise<GetQuestionIdResponse> {
+    return await this.questionAccess.findOneOrFail({
+      where: { uuid },
+      relations: {
+        minor: true,
+        concept: true,
+        tag: true,
+        category: true,
+      },
     });
-    if (question.rid !== rid) throw new BadRequestError('rid is not matched');
-
-    const lastReply =
-      question.reply.length > 0
-        ? question.reply.sort(compare('createdAt', 'desc'))[0]
-        : null;
-
-    return {
-      uid: question.rid + question.id.toString(36).toUpperCase(),
-      title: question.title,
-      category: question.category,
-      content: question.content,
-      source: question.source,
-      minor: question.minor.sort(compare('orderIndex', 'asc')).map((m) => ({
-        ...m,
-        answer: lastReply?.complete === true ? m.answer : null,
-        length:
-          m.answer && m.type === 'FILL' ? m.answer.split(',').length : null,
-      })),
-      tag: question.tag,
-      count: question.count,
-      scoringRate: question.scoringRate,
-      lastReply: lastReply
-        ? {
-            ...lastReply,
-            actualAnswer:
-              lastReply.complete === true
-                ? question.minor.map((m) => m.answer).join('|')
-                : null,
-            fbPostId: lastReply.complete === true ? question.fbPostId : null,
-          }
-        : null,
-    };
   }
 
   public async getAllTags(
@@ -116,12 +86,12 @@ export class QuestionService {
     if (params.orderDirection === 'ASC' || params.orderDirection === 'DESC')
       orderDirection = params.orderDirection;
 
-    let hasReply: boolean | undefined = undefined;
-    if (params.hasReply === 'true') hasReply = true;
+    // let hasReply: boolean | undefined = undefined;
+    // if (params.hasReply === 'true') hasReply = true;
 
-    if (params.hasReply === 'false') hasReply = false;
+    // if (params.hasReply === 'false') hasReply = false;
 
-    const [question, total] = await this.questionAccess.findAndCount({
+    const [questions, total] = await this.questionAccess.findAndCount({
       categoryId: params.categoryId,
       userId: user?.id ?? 0,
       take: limit,
@@ -130,27 +100,31 @@ export class QuestionService {
       orderDirection,
       title: params.title,
       source: params.source,
-      hasReply,
+      // hasReply,
       tags: params.tags
         ? params.tags.split(',').map((v) => Number(v))
+        : undefined,
+      concepts: params.concepts
+        ? params.concepts.split(',').map((v) => Number(v))
         : undefined,
     });
 
     return {
-      data: question.map((v) => ({
-        uid: v.rid + v.id.toString(36).toUpperCase(),
-        title: v.title,
-        categoryId: v.categoryId,
-        category: v.category,
-        source: v.source,
-        tag: v.tag,
-        count: v.count,
-        scoringRate: v.scoringRate,
-        lastReply:
-          v.reply.length > 0
-            ? v.reply.sort(compare('createdAt', 'desc'))[0]
-            : null,
-      })),
+      data: questions,
+      // data: question.map((v) => ({
+      //   uid: v.rid + v.id.toString(36).toUpperCase(),
+      //   title: v.title,
+      //   categoryId: v.categoryId,
+      //   category: v.category,
+      //   source: v.source,
+      //   tag: v.tag,
+      //   count: v.count,
+      //   scoringRate: v.scoringRate,
+      //   lastReply:
+      //     v.reply.length > 0
+      //       ? v.reply.sort(compare('createdAt', 'desc'))[0]
+      //       : null,
+      // })),
       paginate: genPagination(total, limit, offset),
     };
   }
@@ -170,10 +144,10 @@ export class QuestionService {
     return res.data;
   }
 
-  private async commentFbPost(postId: string, questionUid: string) {
+  private async commentFbPost(postId: string, questionUuid: string) {
     const fbAccessToken = process.env.FB_ACCESS_TOKEN;
     await axios.post(`https://graph.facebook.com/${postId}/comments`, {
-      message: `https://pmp${process.env.ENVR === 'prod' ? '' : '-test'}.celestialstudio.net/q/${questionUid}`,
+      message: `https://pmp${process.env.ENVR === 'prod' ? '' : '-test'}.celestialstudio.net/q/${questionUuid}`,
       access_token: fbAccessToken,
     });
   }
@@ -182,37 +156,55 @@ export class QuestionService {
     const category = await this.categoryAccess.findOneOrFail({
       where: { name: data.category },
     });
-    const tagEntities: Tag[] = [];
+
+    const tags: Tag[] = [];
     for (const t of data.tag) {
-      let tagEntity = await this.tagAccess.findOne({ where: { name: t } });
-      if (tagEntity === null) {
-        tagEntity = new TagEntity();
-        tagEntity.name = t;
-        tagEntity = await this.tagAccess.save(tagEntity);
+      let tag = await this.tagAccess.findOne({ where: { name: t } });
+      if (tag === null) {
+        tag = new TagEntity();
+        tag.name = t;
+        tag = await this.tagAccess.save(tag);
       }
-      tagEntities.push(tagEntity);
+      tags.push(tag);
+    }
+
+    if (data.concept.length === 0)
+      throw new BadRequestError('At least one concept is required');
+
+    const concepts: Concept[] = [];
+    for (const c of data.concept) {
+      const concept = await this.conceptAccess.findOne({ where: { name: c } });
+      if (concept === null) throw new BadRequestError(`Concept ${c} not found`);
+
+      if (concept.conceptGroup.categoryId !== category.id)
+        throw new BadRequestError(
+          `Concept ${c} does not belong to category ${data.category}`
+        );
+
+      concepts.push(concept);
     }
 
     const fbPost = await this.postFb(
       data.imageUrl,
-      `#${data.category} ` + data.tag.map((t) => `#${t}`).join(' ')
+      [data.category, ...data.tag, ...data.concept]
+        .map((t) => `#${t}`)
+        .join(' ')
     );
 
     const questionEntity = new QuestionEntity();
-    questionEntity.rid = randomBase36(3);
+    questionEntity.uuid = uuidv4();
     questionEntity.categoryId = category.id;
     questionEntity.title = data.title;
     questionEntity.content = data.content;
     questionEntity.source = data.source;
     questionEntity.fbPostId = fbPost.post_id;
-    questionEntity.tag = tagEntities;
+    questionEntity.tag = tags;
+    questionEntity.concept = concepts;
+    questionEntity.difficulty = data.difficulty;
 
     const newQuestionEntity = await this.questionAccess.save(questionEntity);
 
-    await this.commentFbPost(
-      fbPost.post_id,
-      newQuestionEntity.rid + newQuestionEntity.id.toString(36).toUpperCase()
-    );
+    await this.commentFbPost(fbPost.post_id, newQuestionEntity.uuid);
 
     const minor: QuestionMinorEntity[] = [];
     for (const m of data.minor) {

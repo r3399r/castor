@@ -77,8 +77,9 @@ export class QuestionAccess {
     orderBy: string;
     orderDirection: 'ASC' | 'DESC';
     title?: string;
-    hasReply?: boolean;
+    // hasReply?: boolean;
     tags?: number[];
+    concepts?: number[];
     source?: string;
   }) {
     const qb = await this.createQueryBuilder();
@@ -89,10 +90,11 @@ export class QuestionAccess {
         'category.id = :categoryId',
         { categoryId: data.categoryId }
       )
-      .leftJoinAndSelect('question.reply', 'reply', 'reply.user_id = :userId', {
-        userId: data.userId,
-      })
-      .leftJoinAndSelect('question.tag', 'tag');
+      // .leftJoinAndSelect('question.reply', 'reply', 'reply.user_id = :userId', {
+      //   userId: data.userId,
+      // })
+      .leftJoinAndSelect('question.tag', 'tag')
+      .leftJoinAndSelect('question.concept', 'concept');
 
     if (data.title)
       base.andWhere('question.title like :title', {
@@ -102,9 +104,9 @@ export class QuestionAccess {
       base.andWhere('question.source like :source', {
         source: `%${data.source}%`,
       });
-    if (data.hasReply === true) base.andWhere('reply.id IS NOT NULL');
+    // if (data.hasReply === true) base.andWhere('reply.id IS NOT NULL');
 
-    if (data.hasReply === false) base.andWhere('reply.id IS NULL');
+    // if (data.hasReply === false) base.andWhere('reply.id IS NULL');
 
     if (data.tags !== undefined && data.tags.length > 0) {
       const tagIds = data.tags;
@@ -120,6 +122,25 @@ export class QuestionAccess {
         .getQuery();
 
       base.andWhere(`question.id IN ${subQuery}`, { tagIds, tagCount });
+    }
+
+    if (data.concepts !== undefined && data.concepts.length > 0) {
+      const conceptIds = data.concepts;
+      const conceptCount = conceptIds.length;
+
+      const subQuery = qb
+        .subQuery()
+        .select('qcFilter.question_id')
+        .from('question_concept', 'qcFilter')
+        .where('qcFilter.concept_id IN (:...conceptIds)', { conceptIds })
+        .groupBy('qcFilter.question_id')
+        .having('COUNT(DISTINCT qcFilter.concept_id) = :conceptCount')
+        .getQuery();
+
+      base.andWhere(`question.id IN ${subQuery}`, {
+        conceptIds,
+        conceptCount,
+      });
     }
 
     return (await Promise.all([

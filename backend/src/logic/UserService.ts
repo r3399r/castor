@@ -1,7 +1,5 @@
 import admin from 'firebase-admin';
 import { inject, injectable } from 'inversify';
-import { LIMIT, OFFSET } from 'src/constant/Pagination';
-import { ReplyAccess } from 'src/dao/ReplyAccess';
 import { UserAccess } from 'src/dao/UserAccess';
 import { UserStatsAccess } from 'src/dao/UserStatsAccess';
 import {
@@ -13,7 +11,6 @@ import {
 import { UserEntity } from 'src/model/entity/UserEntity';
 import { BadRequestError, UnauthorizedError } from 'src/model/error';
 import { authorizationSymbol } from 'src/utils/LambdaHelper';
-import { genPagination } from 'src/utils/paginator';
 
 admin.initializeApp({
   credential: admin.credential.cert(
@@ -30,8 +27,8 @@ export class UserService {
   private readonly userAccess!: UserAccess;
   @inject(UserStatsAccess)
   private readonly userStatsAccess!: UserStatsAccess;
-  @inject(ReplyAccess)
-  private readonly replyAccess!: ReplyAccess;
+  // @inject(ReplyAccess)
+  // private readonly replyAccess!: ReplyAccess;
   @inject(authorizationSymbol)
   private readonly token!: string;
 
@@ -93,22 +90,22 @@ export class UserService {
       relations: { user: true, category: true },
     });
 
-    const limit = params?.limit ? Number(params.limit) : LIMIT;
-    const offset = params?.offset ? Number(params.offset) : OFFSET;
-    const [reply, total] = await this.replyAccess.findAndCount({
-      where: {
-        userId: user.id,
-        question: {
-          categoryId: params.categoryId,
-        },
-      },
-      relations: {
-        question: { tag: true },
-      },
-      order: { recordedAt: 'DESC' },
-      take: limit,
-      skip: offset,
-    });
+    // const limit = params?.limit ? Number(params.limit) : LIMIT;
+    // const offset = params?.offset ? Number(params.offset) : OFFSET;
+    // const [reply, total] = await this.replyAccess.findAndCount({
+    //   where: {
+    //     userId: user.id,
+    //     question: {
+    //       categoryId: params.categoryId,
+    //     },
+    //   },
+    //   relations: {
+    //     question: { tag: true },
+    //   },
+    //   order: { recordedAt: 'DESC' },
+    //   take: limit,
+    //   skip: offset,
+    // });
 
     const currentUs = userStats.find(
       (v) => v.category.id === Number(params.categoryId)
@@ -124,21 +121,21 @@ export class UserService {
         })) ?? [],
       count: currentUs?.count ?? null,
       scoringRate: currentUs?.scoringRate ?? null,
-      reply: {
-        data: reply.map((v) => ({
-          id: v.id,
-          questionUid:
-            v.question.rid + v.question.id.toString(36).toUpperCase(),
-          questionTitle: v.question.title,
-          questionSource: v.question.source,
-          tag: v.question.tag,
-          score: v.score,
-          repliedAnswer: v.repliedAnswer,
-          complete: v.complete,
-          recordedAt: v.recordedAt,
-        })),
-        paginate: genPagination(total, limit, offset),
-      },
+      // reply: {
+      //   data: reply.map((v) => ({
+      //     id: v.id,
+      //     questionUid:
+      //       v.question.rid + v.question.id.toString(36).toUpperCase(),
+      //     questionTitle: v.question.title,
+      //     questionSource: v.question.source,
+      //     tag: v.question.tag,
+      //     score: v.score,
+      //     repliedAnswer: v.repliedAnswer,
+      //     complete: v.complete,
+      //     recordedAt: v.recordedAt,
+      //   })),
+      //   paginate: genPagination(total, limit, offset),
+      // },
     };
   }
 }

@@ -16,20 +16,21 @@
   "author": "Yue Chang",
   "license": "ISC",
   "dependencies": {
-    "aws-sdk": "^2.1692.0",
+    "aws-sdk": "^2.1693.0",
     "axios": "^1.12.2",
     "bignumber.js": "^9.3.1",
-    "firebase-admin": "^13.5.0",
+    "firebase-admin": "^13.6.0",
     "inversify": "^7.10.1",
     "mysql2": "^3.15.1",
     "reflect-metadata": "^0.2.2",
     "tslib": "^2.8.1",
     "typeorm": "^0.3.27",
-    "uuid": "^13.0.0"
+    "uuid": "^8.3.2"
   },
   "devDependencies": {
     "@eslint/compat": "^1.4.0",
     "@types/node": "^24.5.2",
+    "@types/uuid": "^8.3.2",
     "@typescript-eslint/eslint-plugin": "^8.44.1",
     "@typescript-eslint/parser": "^8.44.1",
     "del-cli": "^7.0.0",

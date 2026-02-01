@@ -6,20 +6,24 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 
-export type Category = {
+export type ConceptGroup = {
   id: number;
   name: string;
+  categoryId: number;
   createdAt: string | null;
   updatedAt: string | null;
 };
 
-@Entity({ name: 'category' })
-export class CategoryEntity implements Category {
+@Entity({ name: 'concept_group' })
+export class ConceptGroupEntity implements ConceptGroup {
   @PrimaryGeneratedColumn({ type: 'int', unsigned: true })
   id!: number;
 
   @Column({ type: 'varchar', length: 255 })
   name!: string;
+
+  @Column({ type: 'int', unsigned: true, name: 'category_id' })
+  categoryId!: number;
 
   @Column({ type: 'datetime', name: 'created_at', default: null })
   createdAt!: string;

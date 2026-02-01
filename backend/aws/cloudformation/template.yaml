@@ -274,7 +274,7 @@ Resources:
                 }
               }
             },
-            "/api/question/{uid}": {
+            "/api/question/{uuid}": {
               "get": {
                 "parameters": [{
                   "name": "Authorization",
@@ -479,7 +479,12 @@ Resources:
                 "content":{"type": "string"},
                 "imageUrl":{"type": "string"},
                 "source":{"type": "string"},
+                "difficulty":{"type": "integer", "minimum": 1, "maximum": 10},
                 "tag": {
+                  "type": "array",
+                  "items": {"type": "string"}
+                },
+                "concept": {
                   "type": "array",
                   "items": {"type": "string"}
                 },
@@ -498,7 +503,7 @@ Resources:
                   }
                 }
               },
-              "required": ["category","title","content","imageUrl","source","tag"]
+              "required": ["category","title","content","imageUrl","source","difficulty","tag","concept"]
             },            
             "postQuestionStart": {
               "type": "object",
@@ -568,35 +573,35 @@ Resources:
       Action: 'lambda:InvokeFunction'
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ServerlessApi}/*
-  LambdaStatsLoader:
-    Type: AWS::Serverless::Function
-    Properties:
-      Architectures: [arm64]
-      Handler: index.statsLoader
-      Runtime: nodejs22.x
-      FunctionName: !Sub ${Project}-${TargetEnvr}-stats-loader
-      Role: !GetAtt ExecutionRole.Arn
-      CodeUri: ../../lib/src
-      MemorySize: 200
-      Timeout: 30
-      Layers: [!Ref LambdaLayer]
-      Environment:
-        Variables:
-          PROJECT: !Sub ${Project}
-          ENVR: !Sub ${TargetEnvr}
-          DB_HOST:
-            Fn::ImportValue: !Sub celestial-studio-${TargetEnvr}-db-endpoint
-          DB_PWD: !Sub '{{resolve:ssm:mysql-${TargetEnvr}-${Project}-pwd}}'
-          INTERVAL_EXPRESSION: '65 minute'
-          FIREBAE_ADMIN_KEY: !Sub '{{resolve:ssm:${Project}-firebase-admin-key}}'
-  InvokePermissionStatsLoader:
-    Type: AWS::Lambda::Permission
-    DependsOn: [LambdaStatsLoader]
-    Properties:
-      FunctionName: !Sub ${Project}-${TargetEnvr}-stats-loader
-      Action: 'lambda:InvokeFunction'
-      Principal: events.amazonaws.com
-      SourceArn: !GetAtt EventBridgeStatsLoader.Arn
+  # LambdaStatsLoader:
+  #   Type: AWS::Serverless::Function
+  #   Properties:
+  #     Architectures: [arm64]
+  #     Handler: index.statsLoader
+  #     Runtime: nodejs22.x
+  #     FunctionName: !Sub ${Project}-${TargetEnvr}-stats-loader
+  #     Role: !GetAtt ExecutionRole.Arn
+  #     CodeUri: ../../lib/src
+  #     MemorySize: 200
+  #     Timeout: 30
+  #     Layers: [!Ref LambdaLayer]
+  #     Environment:
+  #       Variables:
+  #         PROJECT: !Sub ${Project}
+  #         ENVR: !Sub ${TargetEnvr}
+  #         DB_HOST:
+  #           Fn::ImportValue: !Sub celestial-studio-${TargetEnvr}-db-endpoint
+  #         DB_PWD: !Sub '{{resolve:ssm:mysql-${TargetEnvr}-${Project}-pwd}}'
+  #         INTERVAL_EXPRESSION: '65 minute'
+  #         FIREBAE_ADMIN_KEY: !Sub '{{resolve:ssm:${Project}-firebase-admin-key}}'
+  # InvokePermissionStatsLoader:
+  #   Type: AWS::Lambda::Permission
+  #   DependsOn: [LambdaStatsLoader]
+  #   Properties:
+  #     FunctionName: !Sub ${Project}-${TargetEnvr}-stats-loader
+  #     Action: 'lambda:InvokeFunction'
+  #     Principal: events.amazonaws.com
+  #     SourceArn: !GetAtt EventBridgeStatsLoader.Arn
   LambdaLayer:
     Type: AWS::Serverless::LayerVersion
     Properties:
@@ -708,13 +713,13 @@ Resources:
   #######################
   ##### EventBridge #####
   #######################
-  EventBridgeStatsLoader:
-    Type: AWS::Events::Rule
-    DependsOn: [LambdaStatsLoader]
-    Properties:
-      Name: !Sub ${Project}-${TargetEnvr}-stats-loader
-      ScheduleExpression: cron(5 * * * ? *)
-      State: ENABLED
-      Targets:
-        - Arn: !GetAtt LambdaStatsLoader.Arn
-          Id: !Sub ${Project}-${TargetEnvr}-stats-loader
+  # EventBridgeStatsLoader:
+  #   Type: AWS::Events::Rule
+  #   DependsOn: [LambdaStatsLoader]
+  #   Properties:
+  #     Name: !Sub ${Project}-${TargetEnvr}-stats-loader
+  #     ScheduleExpression: cron(5 * * * ? *)
+  #     State: ENABLED
+  #     Targets:
+  #       - Arn: !GetAtt LambdaStatsLoader.Arn
+  #         Id: !Sub ${Project}-${TargetEnvr}-stats-loader

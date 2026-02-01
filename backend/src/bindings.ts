@@ -1,6 +1,7 @@
 import { SQS } from 'aws-sdk';
 import { Container } from 'inversify';
 import { CategoryAccess } from './dao/CategoryAccess';
+import { ConceptAccess } from './dao/ConceptAccess';
 import { DbAccess } from './dao/DbAccess';
 import { QuestionAccess } from './dao/QuestionAccess';
 import { QuestionMinorAccess } from './dao/QuestionMinorAccess';
@@ -13,6 +14,8 @@ import { QuestionService } from './logic/QuestionService';
 import { StatsService } from './logic/StatsService';
 import { UserService } from './logic/UserService';
 import { CategoryEntity } from './model/entity/CategoryEntity';
+import { ConceptEntity } from './model/entity/ConceptEntity';
+import { ConceptGroupEntity } from './model/entity/ConceptGroupEntity';
 import { QuestionEntity } from './model/entity/QuestionEntity';
 import { QuestionMinorEntity } from './model/entity/QuestionMinorEntity';
 import { ReplyEntity } from './model/entity/ReplyEntity';
@@ -35,6 +38,10 @@ container.bind<Function>(dbEntitiesBindingId).toConstantValue(ReplyEntity);
 container.bind<Function>(dbEntitiesBindingId).toConstantValue(CategoryEntity);
 container.bind<Function>(dbEntitiesBindingId).toConstantValue(TagEntity);
 container.bind<Function>(dbEntitiesBindingId).toConstantValue(UserStatsEntity);
+container.bind<Function>(dbEntitiesBindingId).toConstantValue(ConceptEntity);
+container
+  .bind<Function>(dbEntitiesBindingId)
+  .toConstantValue(ConceptGroupEntity);
 
 // db access
 container.bind(DbAccess).toSelf();
@@ -45,6 +52,7 @@ container.bind(UserAccess).toSelf();
 container.bind(CategoryAccess).toSelf();
 container.bind(UserStatsAccess).toSelf();
 container.bind(TagAccess).toSelf();
+container.bind(ConceptAccess).toSelf();
 
 // service
 container.bind(QuestionService).toSelf();
