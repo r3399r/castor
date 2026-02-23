@@ -1,22 +1,18 @@
 import { BeforeInsert, Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
 
-export type Tag = {
+export type Subject = {
   id: number;
   name: string;
-  subjectId: number;
   createdAt: string | null;
 };
 
-@Entity({ name: 'tag' })
-export class TagEntity implements Tag {
+@Entity({ name: 'subject' })
+export class SubjectEntity implements Subject {
   @PrimaryGeneratedColumn({ type: 'int', unsigned: true })
   id!: number;
 
   @Column({ type: 'varchar', length: 255 })
   name!: string;
-
-  @Column({ type: 'int', unsigned: true, name: 'subject_id' })
-  subjectId!: number;
 
   @Column({ type: 'datetime', name: 'created_at', default: null })
   createdAt!: string;

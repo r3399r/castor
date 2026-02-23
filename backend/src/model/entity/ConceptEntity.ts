@@ -1,6 +1,5 @@
 import {
   BeforeInsert,
-  BeforeUpdate,
   Column,
   Entity,
   JoinColumn,
@@ -15,7 +14,6 @@ export type Concept = {
   conceptGroupId: number;
   conceptGroup: ConceptGroup;
   createdAt: string | null;
-  updatedAt: string | null;
 };
 
 @Entity({ name: 'concept' })
@@ -36,16 +34,8 @@ export class ConceptEntity implements Concept {
   @Column({ type: 'datetime', name: 'created_at', default: null })
   createdAt!: string;
 
-  @Column({ type: 'datetime', name: 'updated_at', default: null })
-  updatedAt: string | null = null;
-
   @BeforeInsert()
   setDateCreated(): void {
     this.createdAt = new Date().toISOString();
-  }
-
-  @BeforeUpdate()
-  setDateUpdated(): void {
-    this.updatedAt = new Date().toISOString();
   }
 }

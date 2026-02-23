@@ -21,4 +21,12 @@ export class ConceptAccess {
       ...options,
     });
   }
+
+  public async save(data: Concept): Promise<Concept> {
+    const qr = await this.database.getQueryRunner();
+    const entity = new ConceptEntity();
+    Object.assign(entity, data);
+
+    return await qr.manager.save(entity);
+  }
 }

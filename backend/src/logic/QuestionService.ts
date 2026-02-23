@@ -176,10 +176,10 @@ export class QuestionService {
       const concept = await this.conceptAccess.findOne({ where: { name: c } });
       if (concept === null) throw new BadRequestError(`Concept ${c} not found`);
 
-      if (concept.conceptGroup.categoryId !== category.id)
-        throw new BadRequestError(
-          `Concept ${c} does not belong to category ${data.category}`
-        );
+      // if (concept.conceptGroup.categoryId !== category.id)
+      //   throw new BadRequestError(
+      //     `Concept ${c} does not belong to category ${data.category}`
+      //   );
 
       concepts.push(concept);
     }
