@@ -302,18 +302,6 @@ Resources:
                     "name": "subjectId",
                     "in": "query",
                     "required": true
-                },{
-                    "name": "examId",
-                    "in": "query",
-                    "required": true
-                },{
-                    "name": "conceptId",
-                    "in": "query",
-                    "required": true
-                },{
-                    "name": "tagId",
-                    "in": "query",
-                    "required": true
                 }],
                 "responses": {
                   "200": {
@@ -932,36 +920,39 @@ Resources:
             "postQuestion": {
               "type": "object",
               "properties": {
-                "category":{"type": "string"},
-                "title":{"type": "string"},
-                "content":{"type": "string"},
+                "subjectId":{"type": "number"},
+                "examId":{"type": "number"},
+                "type":{"type": "string", "enum": ["GROUP","SINGLE","MULTIPLE","TRUE_FALSE","FILL"]},
                 "imageUrl":{"type": "string"},
-                "source":{"type": "string"},
+                "content":{"type": "string"},
+                "options": {"type": "string",nullable: true},
+                "answer": {"type": "string",nullable: true},
                 "difficulty":{"type": "integer", "minimum": 1, "maximum": 10},
-                "tag": {
+                "tagIds": {
                   "type": "array",
-                  "items": {"type": "string"}
+                  "items": {"type": "number"}
                 },
-                "concept": {
+                "conceptIds": {
                   "type": "array",
-                  "items": {"type": "string"}
+                  "items": {"type": "number"}
                 },
-                "minor": {
+                "childQuestions": {
                   "type": "array",
                   "items": {
                     "type": "object",
                     "properties": {
-                      "type": {"type": "string", enum: ["SINGLE","MULTIPLE","FILL"]},
-                      "orderIndex": {"type": "integer", "minimum": 0},
+                      "type": {"type": "string", enum: ["SINGLE","MULTIPLE","TRUE_FALSE","FILL"]},
+                      "sortOrder": {"type": "integer", "minimum": 0},
                       "content": {"type":"string"},
                       "options": {"type": "string"},
-                      "answer": {"type": "string"}
+                      "answer": {"type": "string"},
+                      "difficulty":{"type": "integer", "minimum": 1, "maximum": 10}
                     },
-                    "required": ["type","orderIndex","options","answer"]
+                    "required": ["type","sortOrder","content","options","answer","difficulty"]
                   }
                 }
               },
-              "required": ["category","title","content","imageUrl","source","difficulty","tag","concept"]
+              "required": ["subjectId","examId","type","imageUrl","difficulty","conceptIds"]
             },
             "postConceptGroup": {
               "type": "object",

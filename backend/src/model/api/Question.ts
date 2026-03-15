@@ -3,22 +3,27 @@ import { Reply } from 'src/model/entity/ReplyEntity';
 import { Paginate, PaginationParams } from 'src/model/Pagination';
 
 export type PostQuestionRequest = {
-  category: string;
-  title: string;
-  content: string;
+  subjectId: number;
+  examId: number;
+  type: 'GROUP' | 'SINGLE' | 'MULTIPLE' | 'TRUE_FALSE' | 'FILL';
   imageUrl: string;
-  source: string;
+  content?: string;
+  options?: string;
+  answer?: string;
   difficulty: number;
-  tag: string[];
-  concept: string[];
-  minor: {
-    type: 'SINGLE' | 'MULTIPLE' | 'FILL';
-    orderIndex: number;
-    content?: string;
+  tagIds?: number[];
+  conceptIds: number[];
+  childQuestions?: {
+    type: 'SINGLE' | 'MULTIPLE' | 'TRUE_FALSE' | 'FILL';
+    sortOrder: number;
+    content: string;
     options: string;
     answer: string;
+    difficulty: number;
   }[];
 };
+
+export type PostQuestionResponse = Question[];
 
 export type PostQuestionStartRequest = {
   id: number;
@@ -43,14 +48,14 @@ export type ModifiedReply = Reply & {
 export type PostQuestionCompleteResponse = ModifiedReply;
 
 export type GetQuestionParams = PaginationParams & {
-  categoryId: number;
-  orderBy?: string;
-  orderDirection?: string;
-  title?: string;
+  subjectId: string;
+  // orderBy?: string;
+  // orderDirection?: string;
+  // title?: string;
   // hasReply?: 'true' | 'false';
-  tags?: string;
-  concepts?: string;
-  source?: string;
+  tagIds?: string;
+  conceptIds?: string;
+  // source?: string;
 };
 
 export type GetQuestionTagParams = { categoryId: number };

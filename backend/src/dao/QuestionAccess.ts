@@ -23,9 +23,6 @@ export class QuestionAccess {
     const qr = await this.database.getQueryRunner();
 
     return await qr.manager.findOneOrFail<Question>(QuestionEntity.name, {
-      relations: {
-        minor: true,
-      },
       ...options,
     });
   }
@@ -70,43 +67,24 @@ export class QuestionAccess {
   }
 
   public async findAndCount(data: {
-    categoryId: number;
-    userId: number;
+    subjectId: number;
     take: number;
     skip: number;
-    orderBy: string;
-    orderDirection: 'ASC' | 'DESC';
-    title?: string;
-    // hasReply?: boolean;
     tags?: number[];
     concepts?: number[];
-    source?: string;
   }) {
     const qb = await this.createQueryBuilder();
     const base = qb
       .innerJoinAndSelect(
-        'question.category',
-        'category',
-        'category.id = :categoryId',
-        { categoryId: data.categoryId }
+        'question.subject',
+        'subject',
+        'subject.id = :subjectId',
+        { subjectId: data.subjectId }
       )
-      // .leftJoinAndSelect('question.reply', 'reply', 'reply.user_id = :userId', {
-      //   userId: data.userId,
-      // })
       .leftJoinAndSelect('question.tag', 'tag')
-      .leftJoinAndSelect('question.concept', 'concept');
-
-    if (data.title)
-      base.andWhere('question.title like :title', {
-        title: `%${data.title}%`,
-      });
-    if (data.source)
-      base.andWhere('question.source like :source', {
-        source: `%${data.source}%`,
-      });
-    // if (data.hasReply === true) base.andWhere('reply.id IS NOT NULL');
-
-    // if (data.hasReply === false) base.andWhere('reply.id IS NULL');
+      .leftJoinAndSelect('question.concept', 'concept')
+      .leftJoinAndSelect('question.children', 'children')
+      .andWhere('question.parentId IS NULL');
 
     if (data.tags !== undefined && data.tags.length > 0) {
       const tagIds = data.tags;
@@ -146,7 +124,7 @@ export class QuestionAccess {
     return (await Promise.all([
       base
         .clone()
-        .orderBy(`question.${data.orderBy}`, data.orderDirection)
+        // .orderBy(`question.${data.orderBy}`, data.orderDirection)
         .skip(data.skip)
         .take(data.take)
         .getMany(),

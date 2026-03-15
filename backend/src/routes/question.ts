@@ -3,7 +3,6 @@ import { QuestionService } from 'src/logic/QuestionService';
 import {
   GetQuestionParams,
   GetQuestionTagParams,
-  PostQuestionCompleteRequest,
   PostQuestionRequest,
   PostQuestionStartRequest,
 } from 'src/model/api/Question';
@@ -82,9 +81,9 @@ const questionComplete = async () => {
       if (event.body === null)
         throw new BadRequestError('body should not be empty');
 
-      return await service.completeQuestion(
-        JSON.parse(event.body) as PostQuestionCompleteRequest
-      );
+    // return await service.completeQuestion(
+    //   JSON.parse(event.body) as PostQuestionCompleteRequest
+    // );
   }
 
   throw new Error('unexpected httpMethod');

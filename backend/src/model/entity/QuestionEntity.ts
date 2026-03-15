@@ -10,26 +10,29 @@ import {
   OneToMany,
   PrimaryGeneratedColumn,
 } from 'typeorm';
-import { Category, CategoryEntity } from './CategoryEntity';
 import { Concept, ConceptEntity } from './ConceptEntity';
-import { QuestionMinor, QuestionMinorEntity } from './QuestionMinorEntity';
+import { Subject, SubjectEntity } from './SubjectEntity';
 import { Tag, TagEntity } from './TagEntity';
 
 export type Question = {
   id: number;
   uuid: string;
-  title: string | null;
-  categoryId: number;
-  category: Category;
-  content: string | null;
+  subjectId: number;
+  subject: Subject;
+  examId: number;
+  parentId: number | null;
   fbPostId: string | null;
-  source: string | null;
-  difficulty: number | null;
+  isGroup: boolean;
+  type: 'GROUP' | 'SINGLE' | 'MULTIPLE' | 'TRUE_FALSE' | 'FILL';
+  sortOrder: number | null;
+  content: string | null;
+  options: string | null;
+  answer: string | null;
+  difficulty: number;
   attempCount: number;
   scoringTotal: number;
   discrimination: number | null;
-  minor: QuestionMinor[];
-  // reply: Reply[];
+  adjustedDifficulty: number | null;
   tag: Tag[];
   concept: Concept[];
   createdAt: string | null;
@@ -41,30 +44,45 @@ export class QuestionEntity implements Question {
   @PrimaryGeneratedColumn({ type: 'int', unsigned: true })
   id!: number;
 
-  @Column({ type: 'varchar', length: 16 })
+  @Column({ type: 'varchar', length: 36 })
   uuid!: string;
 
-  @Column({ type: 'varchar', length: 255 })
-  title: string | null = null;
+  @Column({ type: 'int', unsigned: true, name: 'subject_id' })
+  subjectId!: number;
 
-  @Column({ type: 'int', unsigned: true, name: 'category_id' })
-  categoryId!: number;
+  @ManyToOne(() => SubjectEntity)
+  @JoinColumn({ name: 'subject_id' })
+  subject!: Subject;
 
-  @ManyToOne(() => CategoryEntity)
-  @JoinColumn({ name: 'category_id' })
-  category!: Category;
+  @Column({ type: 'int', unsigned: true, name: 'exam_id' })
+  examId!: number;
 
-  @Column({ type: 'text' })
-  content: string | null = null;
+  @Column({ type: 'int', unsigned: true, name: 'parent_id' })
+  parentId!: number | null;
 
   @Column({ type: 'varchar', length: 255, name: 'fb_post_id' })
   fbPostId: string | null = null;
 
-  @Column({ type: 'varchar', length: 255, default: null })
-  source: string | null = null;
+  @Column({ type: 'boolean', name: 'is_group' })
+  isGroup: boolean = false;
+
+  @Column({ type: 'varchar', length: 255 })
+  type!: 'GROUP' | 'SINGLE' | 'MULTIPLE' | 'TRUE_FALSE' | 'FILL';
+
+  @Column({ type: 'int', name: 'sort_order' })
+  sortOrder: number | null = null;
+
+  @Column({ type: 'text' })
+  content: string | null = null;
+
+  @Column({ type: 'varchar', length: 255 })
+  options: string | null = null;
+
+  @Column({ type: 'varchar', length: 255 })
+  answer: string | null = null;
 
   @Column({ type: 'tinyint', unsigned: true })
-  difficulty: number | null = null;
+  difficulty!: number;
 
   @Column({ type: 'int', unsigned: true, name: 'attemp_count' })
   attempCount: number = 0;
@@ -72,17 +90,20 @@ export class QuestionEntity implements Question {
   @Column({ type: 'double', name: 'scoring_total' })
   scoringTotal: number = 0;
 
-  @Column({ type: 'float' })
+  @Column({ type: 'double' })
   discrimination: number | null = null;
 
-  @OneToMany(
-    () => QuestionMinorEntity,
-    (questionMinor) => questionMinor.question
-  )
-  minor!: QuestionMinor[];
+  @Column({ type: 'double', name: 'adjusted_difficulty' })
+  adjustedDifficulty!: number;
 
-  // @OneToMany(() => ReplyEntity, (reply) => reply.question)
-  // reply!: Reply[];
+  @ManyToOne(() => QuestionEntity, (question) => question.children, {
+    nullable: true,
+  })
+  @JoinColumn({ name: 'parent_id' })
+  parent!: QuestionEntity | null;
+
+  @OneToMany(() => QuestionEntity, (question) => question.parent)
+  children!: Question[];
 
   @ManyToMany(() => TagEntity)
   @JoinTable({

@@ -1,5 +1,5 @@
 import { inject, injectable } from 'inversify';
-import { FindOneOptions } from 'typeorm';
+import { FindManyOptions, FindOneOptions } from 'typeorm';
 import { Tag, TagEntity } from 'src/model/entity/TagEntity';
 import { Database } from 'src/utils/Database';
 
@@ -10,6 +10,14 @@ import { Database } from 'src/utils/Database';
 export class TagAccess {
   @inject(Database)
   private readonly database!: Database;
+
+  public async find(options?: FindManyOptions<Tag>) {
+    const qr = await this.database.getQueryRunner();
+
+    return await qr.manager.find<Tag>(TagEntity.name, {
+      ...options,
+    });
+  }
 
   public async findOne(options?: FindOneOptions<Tag>) {
     const qr = await this.database.getQueryRunner();
