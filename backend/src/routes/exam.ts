@@ -14,8 +14,6 @@ export default async (lambdaEvent: LambdaEvent) => {
   switch (event.resource) {
     case '/api/exam':
       return await examDefault();
-    case '/api/exam/{id}':
-      return await examId();
   }
 
   throw new BadRequestError('unexpected resource');
@@ -30,17 +28,6 @@ const examDefault = async () => {
       return await service.createExam(
         JSON.parse(event.body) as PostExamRequest
       );
-  }
-
-  throw new Error('unexpected httpMethod');
-};
-
-const examId = async () => {
-  if (event.pathParameters === null)
-    throw new BadRequestError('pathParameters should not be empty');
-  switch (event.httpMethod) {
-    case 'GET':
-      return await service.getExamsById(event.pathParameters.id);
   }
 
   throw new Error('unexpected httpMethod');

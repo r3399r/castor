@@ -95,8 +95,8 @@ export class QuestionAccess {
         .select('qtFilter.question_id')
         .from('question_tag', 'qtFilter')
         .where('qtFilter.tag_id IN (:...tagIds)', { tagIds })
-        .groupBy('qtFilter.question_id')
-        .having('COUNT(DISTINCT qtFilter.tag_id) = :tagCount')
+        // .groupBy('qtFilter.question_id') // groupBy and having are for INTERSECTION, but we want UNION, so we don't use them
+        // .having('COUNT(DISTINCT qtFilter.tag_id) = :tagCount')
         .getQuery();
 
       base.andWhere(`question.id IN ${subQuery}`, { tagIds, tagCount });
@@ -111,8 +111,8 @@ export class QuestionAccess {
         .select('qcFilter.question_id')
         .from('question_concept', 'qcFilter')
         .where('qcFilter.concept_id IN (:...conceptIds)', { conceptIds })
-        .groupBy('qcFilter.question_id')
-        .having('COUNT(DISTINCT qcFilter.concept_id) = :conceptCount')
+        // .groupBy('qcFilter.question_id') // groupBy and having are for INTERSECTION, but we want UNION, so we don't use them
+        // .having('COUNT(DISTINCT qcFilter.concept_id) = :conceptCount')
         .getQuery();
 
       base.andWhere(`question.id IN ${subQuery}`, {

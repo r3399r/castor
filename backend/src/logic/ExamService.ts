@@ -1,10 +1,6 @@
 import { inject, injectable } from 'inversify';
 import { ExamAccess } from 'src/dao/ExamAccess';
-import {
-  GetExamResponse,
-  PostExamRequest,
-  PostExamResponse,
-} from 'src/model/api/Exam';
+import { PostExamRequest, PostExamResponse } from 'src/model/api/Exam';
 import { ExamEntity } from 'src/model/entity/ExamEntity';
 
 /**
@@ -14,12 +10,6 @@ import { ExamEntity } from 'src/model/entity/ExamEntity';
 export class ExamService {
   @inject(ExamAccess)
   private readonly examAccess!: ExamAccess;
-
-  public async getExamsById(id: string): Promise<GetExamResponse> {
-    return await this.examAccess.find({
-      where: { subjectId: Number(id) },
-    });
-  }
 
   public async createExam(exam: PostExamRequest): Promise<PostExamResponse> {
     const examEntity = new ExamEntity();

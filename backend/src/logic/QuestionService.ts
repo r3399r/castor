@@ -50,12 +50,11 @@ export class QuestionService {
   public async getQuestionByUuid(uuid: string): Promise<GetQuestionIdResponse> {
     return await this.questionAccess.findOneOrFail({
       where: { uuid },
-      // relations: {
-      //   minor: true,
-      //   concept: true,
-      //   tag: true,
-      //   category: true,
-      // },
+      relations: {
+        subject: true,
+        concept: true,
+        tag: true,
+      },
     });
   }
 
