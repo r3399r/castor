@@ -1,5 +1,4 @@
 import { inject, injectable } from 'inversify';
-import { FindOneOptions } from 'typeorm';
 import { Question, QuestionEntity } from 'src/model/entity/QuestionEntity';
 import { Database } from 'src/utils/Database';
 
@@ -19,12 +18,18 @@ export class QuestionAccess {
     return await qr.manager.save(entity);
   }
 
-  public async findOneOrFail(options?: FindOneOptions<Question>) {
-    const qr = await this.database.getQueryRunner();
+  public async findOneOrFail(uuid: string) {
+    const qb = await this.createQueryBuilder();
+    const question = await qb
+      .innerJoinAndSelect('question.subject', 'subject')
+      .leftJoinAndSelect('question.tag', 'tag')
+      .leftJoinAndSelect('question.concept', 'concept')
+      .leftJoinAndSelect('question.children', 'children')
+      .andWhere('question.uuid = :uuid', { uuid })
+      .andWhere('question.parentId IS NULL')
+      .getOneOrFail();
 
-    return await qr.manager.findOneOrFail<Question>(QuestionEntity.name, {
-      ...options,
-    });
+    return question as Question;
   }
 
   private async createQueryBuilder() {

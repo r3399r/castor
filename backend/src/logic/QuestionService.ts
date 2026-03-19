@@ -48,14 +48,7 @@ export class QuestionService {
   private readonly conceptAccess!: ConceptAccess;
 
   public async getQuestionByUuid(uuid: string): Promise<GetQuestionIdResponse> {
-    return await this.questionAccess.findOneOrFail({
-      where: { uuid },
-      relations: {
-        subject: true,
-        concept: true,
-        tag: true,
-      },
-    });
+    return await this.questionAccess.findOneOrFail(uuid);
   }
 
   public async getAllTags(

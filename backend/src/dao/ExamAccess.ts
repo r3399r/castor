@@ -15,9 +15,6 @@ export class ExamAccess {
     const qr = await this.database.getQueryRunner();
 
     return await qr.manager.find<Exam>(ExamEntity.name, {
-      relations: {
-        subject: true,
-      },
       ...options,
     });
   }

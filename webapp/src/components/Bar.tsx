@@ -1,5 +1,4 @@
 import { useNavigate } from 'react-router-dom';
-import randomcolor from 'randomcolor';
 import { useSelector } from 'react-redux';
 import type { RootState } from 'src/redux/store';
 import { useAuth } from 'src/hooks/useAuth';
@@ -15,14 +14,7 @@ const Bar = () => {
 
   if (matches)
     return (
-      <div
-        className="flex items-center gap-3 px-5 py-3"
-        style={{
-          background: categoryId
-            ? randomcolor({ luminosity: 'light', seed: categoryId })
-            : '#00000000',
-        }}
-      >
+      <div className="flex items-center gap-3 px-5 py-3">
         <div className="cursor-pointer font-bold text-blue-900" onClick={() => navigate('/')}>
           Practice Makes Perfect
         </div>
@@ -56,14 +48,7 @@ const Bar = () => {
     );
 
   return (
-    <div
-      className="flex items-center gap-5 px-5 py-3"
-      style={{
-        background: categoryId
-          ? randomcolor({ luminosity: 'light', seed: categoryId })
-          : '#00000000',
-      }}
-    >
+    <div className="flex items-center gap-5 px-5 py-3">
       <div className="cursor-pointer font-bold text-blue-900" onClick={() => navigate('/')}>
         Practice Makes Perfect
       </div>
