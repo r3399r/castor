@@ -16,6 +16,10 @@ export default async (lambdaEvent: LambdaEvent) => {
       return await subjectDefault();
     case '/api/subject/{id}/exam':
       return await subjectIdExam();
+    case '/api/subject/{id}/concept-group':
+      return await subjectIdConceptGroup();
+    case '/api/subject/{id}/tag':
+      return await subjectIdTag();
   }
 
   throw new BadRequestError('unexpected resource');
@@ -43,6 +47,28 @@ const subjectIdExam = async () => {
   switch (event.httpMethod) {
     case 'GET':
       return await service.getExamsById(event.pathParameters.id);
+  }
+
+  throw new Error('unexpected httpMethod');
+};
+
+const subjectIdConceptGroup = async () => {
+  if (event.pathParameters === null)
+    throw new BadRequestError('pathParameters should not be empty');
+  switch (event.httpMethod) {
+    case 'GET':
+      return await service.getConceptGroupsById(event.pathParameters.id);
+  }
+
+  throw new Error('unexpected httpMethod');
+};
+
+const subjectIdTag = async () => {
+  if (event.pathParameters === null)
+    throw new BadRequestError('pathParameters should not be empty');
+  switch (event.httpMethod) {
+    case 'GET':
+      return await service.getTagsById(event.pathParameters.id);
   }
 
   throw new Error('unexpected httpMethod');

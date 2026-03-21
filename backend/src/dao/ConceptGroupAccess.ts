@@ -1,4 +1,5 @@
 import { inject, injectable } from 'inversify';
+import { FindManyOptions } from 'typeorm';
 import {
   ConceptGroup,
   ConceptGroupEntity,
@@ -12,6 +13,14 @@ import { Database } from 'src/utils/Database';
 export class ConceptGroupAccess {
   @inject(Database)
   private readonly database!: Database;
+
+  public async find(options?: FindManyOptions<ConceptGroup>) {
+    const qr = await this.database.getQueryRunner();
+
+    return await qr.manager.find<ConceptGroup>(ConceptGroupEntity.name, {
+      ...options,
+    });
+  }
 
   public async save(data: ConceptGroup): Promise<ConceptGroup> {
     const qr = await this.database.getQueryRunner();

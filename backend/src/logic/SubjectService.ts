@@ -1,6 +1,8 @@
 import { inject, injectable } from 'inversify';
+import { ConceptGroupAccess } from 'src/dao/ConceptGroupAccess';
 import { ExamAccess } from 'src/dao/ExamAccess';
 import { SubjectAccess } from 'src/dao/SubjectAccess';
+import { TagAccess } from 'src/dao/TagAccess';
 import {
   GetSubjectIdExamResponse,
   GetSubjectResponse,
@@ -18,21 +20,37 @@ export class SubjectService {
   private readonly subjectAccess!: SubjectAccess;
   @inject(ExamAccess)
   private readonly examAccess!: ExamAccess;
+  @inject(ConceptGroupAccess)
+  private readonly conceptGroupAccess!: ConceptGroupAccess;
+  @inject(TagAccess)
+  private readonly tagAccess!: TagAccess;
 
   public async getSubjects(): Promise<GetSubjectResponse> {
     return await this.subjectAccess.find();
   }
 
   public async getExamsById(id: string): Promise<GetSubjectIdExamResponse> {
-    return await this.examAccess.find({
+    return await this.examAccess.find({ where: { subjectId: Number(id) } });
+  }
+
+  public async getConceptGroupsById(id: string) {
+    return await this.conceptGroupAccess.find({
       where: { subjectId: Number(id) },
+      relations: {
+        concepts: true,
+      },
     });
+  }
+
+  public async getTagsById(id: string) {
+    return await this.tagAccess.find({ where: { subjectId: Number(id) } });
   }
 
   public async createSubject(
     subject: PostSubjectRequest
   ): Promise<PostSubjectResponse> {
     const subjectEntity = new SubjectEntity();
+    subjectEntity.categoryId = subject.categoryId;
     subjectEntity.name = subject.name;
 
     return await this.subjectAccess.save(subjectEntity);

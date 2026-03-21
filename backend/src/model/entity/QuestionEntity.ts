@@ -11,6 +11,7 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { Concept, ConceptEntity } from './ConceptEntity';
+import { Exam, ExamEntity } from './ExamEntity';
 import { Subject, SubjectEntity } from './SubjectEntity';
 import { Tag, TagEntity } from './TagEntity';
 
@@ -56,6 +57,10 @@ export class QuestionEntity implements Question {
 
   @Column({ type: 'int', unsigned: true, name: 'exam_id' })
   examId!: number;
+
+  @ManyToOne(() => ExamEntity)
+  @JoinColumn({ name: 'exam_id' })
+  exam!: Exam;
 
   @Column({ type: 'int', unsigned: true, name: 'parent_id' })
   parentId!: number | null;

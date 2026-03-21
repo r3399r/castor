@@ -1,9 +1,17 @@
-import { BeforeInsert, Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  BeforeInsert,
+  Column,
+  Entity,
+  OneToMany,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
+import { Concept, ConceptEntity } from './ConceptEntity';
 
 export type ConceptGroup = {
   id: number;
   name: string;
   subjectId: number;
+  concepts: Concept[];
   createdAt: string | null;
 };
 
@@ -20,6 +28,9 @@ export class ConceptGroupEntity implements ConceptGroup {
 
   @Column({ type: 'datetime', name: 'created_at', default: null })
   createdAt!: string;
+
+  @OneToMany(() => ConceptEntity, (concept) => concept.conceptGroup)
+  concepts!: Concept[];
 
   @BeforeInsert()
   setDateCreated(): void {

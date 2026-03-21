@@ -4,8 +4,10 @@ import {
   Entity,
   JoinColumn,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
 } from 'typeorm';
+import { Question, QuestionEntity } from './QuestionEntity';
 import { Subject, SubjectEntity } from './SubjectEntity';
 
 export type Exam = {
@@ -33,6 +35,9 @@ export class ExamEntity implements Exam {
 
   @Column({ type: 'datetime', name: 'created_at', default: null })
   createdAt!: string;
+
+  @OneToMany(() => QuestionEntity, (question) => question.exam)
+  question!: Question[];
 
   @BeforeInsert()
   setDateCreated(): void {

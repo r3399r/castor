@@ -2,6 +2,7 @@ import { BeforeInsert, Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
 
 export type Subject = {
   id: number;
+  categoryId: number;
   name: string;
   createdAt: string | null;
 };
@@ -10,6 +11,9 @@ export type Subject = {
 export class SubjectEntity implements Subject {
   @PrimaryGeneratedColumn({ type: 'int', unsigned: true })
   id!: number;
+
+  @Column({ type: 'int', unsigned: true, name: 'category_id' })
+  categoryId!: number;
 
   @Column({ type: 'varchar', length: 255 })
   name!: string;

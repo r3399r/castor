@@ -6,6 +6,7 @@ export type GetSubjectResponse = Subject[];
 export type PostSubjectResponse = Subject;
 
 export type PostSubjectRequest = {
+  categoryId: number;
   name: string;
 };
 
