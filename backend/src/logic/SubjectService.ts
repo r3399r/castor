@@ -4,7 +4,9 @@ import { ExamAccess } from 'src/dao/ExamAccess';
 import { SubjectAccess } from 'src/dao/SubjectAccess';
 import { TagAccess } from 'src/dao/TagAccess';
 import {
+  GetSubjectIdConceptGroupResponse,
   GetSubjectIdExamResponse,
+  GetSubjectIdTagResponse,
   GetSubjectResponse,
   PostSubjectRequest,
   PostSubjectResponse,
@@ -33,7 +35,9 @@ export class SubjectService {
     return await this.examAccess.find({ where: { subjectId: Number(id) } });
   }
 
-  public async getConceptGroupsById(id: string) {
+  public async getConceptGroupsById(
+    id: string
+  ): Promise<GetSubjectIdConceptGroupResponse> {
     return await this.conceptGroupAccess.find({
       where: { subjectId: Number(id) },
       relations: {
@@ -42,7 +46,7 @@ export class SubjectService {
     });
   }
 
-  public async getTagsById(id: string) {
+  public async getTagsById(id: string): Promise<GetSubjectIdTagResponse> {
     return await this.tagAccess.find({ where: { subjectId: Number(id) } });
   }
 
