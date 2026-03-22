@@ -176,7 +176,7 @@ export class QuestionService {
     const questionEntity = new QuestionEntity();
     questionEntity.uuid = uuidv4();
     questionEntity.subjectId = data.subjectId;
-    questionEntity.examId = data.examId;
+    // questionEntity.examId = data.examId;
     questionEntity.parentId = null;
     questionEntity.fbPostId = fbPost.post_id;
     questionEntity.isGroup = data.type === 'GROUP';
@@ -200,7 +200,7 @@ export class QuestionService {
         const childEntity = new QuestionEntity();
         childEntity.uuid = uuidv4();
         childEntity.subjectId = data.subjectId;
-        childEntity.examId = data.examId;
+        // childEntity.examId = data.examId;
         childEntity.parentId = newQuestionEntity.id;
         childEntity.fbPostId = null;
         childEntity.isGroup = false;

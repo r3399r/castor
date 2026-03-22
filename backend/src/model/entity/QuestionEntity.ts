@@ -11,7 +11,6 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { Concept, ConceptEntity } from './ConceptEntity';
-import { Exam, ExamEntity } from './ExamEntity';
 import { Subject, SubjectEntity } from './SubjectEntity';
 import { Tag, TagEntity } from './TagEntity';
 
@@ -20,7 +19,7 @@ export type Question = {
   uuid: string;
   subjectId: number;
   subject: Subject;
-  examId: number;
+  // examId: number;
   parentId: number | null;
   fbPostId: string | null;
   isGroup: boolean;
@@ -55,12 +54,12 @@ export class QuestionEntity implements Question {
   @JoinColumn({ name: 'subject_id' })
   subject!: Subject;
 
-  @Column({ type: 'int', unsigned: true, name: 'exam_id' })
-  examId!: number;
+  // @Column({ type: 'int', unsigned: true, name: 'exam_id' })
+  // examId!: number;
 
-  @ManyToOne(() => ExamEntity)
-  @JoinColumn({ name: 'exam_id' })
-  exam!: Exam;
+  // @ManyToOne(() => ExamEntity)
+  // @JoinColumn({ name: 'exam_id' })
+  // exam!: Exam;
 
   @Column({ type: 'int', unsigned: true, name: 'parent_id' })
   parentId!: number | null;

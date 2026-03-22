@@ -2,7 +2,7 @@ CREATE TABLE IF NOT EXISTS castor.question (
     id INT UNSIGNED AUTO_INCREMENT,
     uuid VARCHAR(36) NOT NULL,
     subject_id INT UNSIGNED NOT NULL,
-    exam_id INT UNSIGNED NOT NULL,
+    -- exam_id INT UNSIGNED NOT NULL,
     parent_id INT UNSIGNED NULL,
     fb_post_id VARCHAR(255) NULL,
     is_group TINYINT(1) NOT NULL DEFAULT 0,

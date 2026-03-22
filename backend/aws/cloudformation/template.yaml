@@ -1120,7 +1120,10 @@ Resources:
               "type": "object",
               "properties": {
                 "subjectId":{"type": "number"},
-                "examId":{"type": "number"},
+                "examIds": {
+                  "type": "array",
+                  "items": {"type": "number"}
+                },
                 "type":{"type": "string", "enum": ["GROUP","SINGLE","MULTIPLE","TRUE_FALSE","FILL"]},
                 "imageUrl":{"type": "string"},
                 "content":{"type": "string"},
