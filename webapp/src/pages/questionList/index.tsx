@@ -1,4 +1,4 @@
-import { FormControl, InputLabel, MenuItem, Select } from '@mui/material';
+import { FormControl, InputLabel, ListSubheader, MenuItem, Select } from '@mui/material';
 import { useEffect, useState } from 'react';
 import categoryEndpoint from 'src/api/categoryEndpoint';
 import subjectEndpoint from 'src/api/subjectEndpoint';
@@ -9,9 +9,12 @@ import type { Subject } from 'src/model/backend/entity/SubjectEntity';
 import type { Tag } from 'src/model/backend/entity/TagEntity';
 
 const QuestionList = () => {
-  const [categoryId, setCategoryId] = useState<number>();
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number>();
+  const [selectedSubjectId, setSelectedSubjectId] = useState<number>();
+  const [selectedExamId, setSelectedExamId] = useState<number>();
+  const [selectedConceptIds, setSelectedConceptIds] = useState<number[]>([]);
+  const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
   const [categoryList, setCategoryList] = useState<Category[]>();
-  const [subjectId, setSubjectId] = useState<number>();
   const [subjectList, setSubjectList] = useState<Subject[]>();
   const [examList, setExamList] = useState<Exam[]>();
   const [conceptGroupList, setConceptGroupList] = useState<ConceptGroup[]>();
@@ -24,25 +27,28 @@ const QuestionList = () => {
   }, []);
 
   useEffect(() => {
-    if (!categoryId) return;
-    setSubjectId(undefined);
-    categoryEndpoint.getCategoryIdSubject(categoryId).then((res) => {
+    if (!selectedCategoryId) return;
+    setSelectedSubjectId(undefined);
+    setSelectedExamId(undefined);
+    setSelectedConceptIds([]);
+    setSelectedTagIds([]);
+    categoryEndpoint.getCategoryIdSubject(selectedCategoryId).then((res) => {
       setSubjectList(res?.data);
     });
-  }, [categoryId]);
+  }, [selectedCategoryId]);
 
   useEffect(() => {
-    if (!subjectId) return;
-    subjectEndpoint.getSubjectIdExam(subjectId).then((res) => {
+    if (!selectedSubjectId) return;
+    subjectEndpoint.getSubjectIdExam(selectedSubjectId).then((res) => {
       setExamList(res?.data);
     });
-    subjectEndpoint.getSubjectIdConceptGroup(subjectId).then((res) => {
+    subjectEndpoint.getSubjectIdConceptGroup(selectedSubjectId).then((res) => {
       setConceptGroupList(res?.data);
     });
-    subjectEndpoint.getSubjectIdTag(subjectId).then((res) => {
+    subjectEndpoint.getSubjectIdTag(selectedSubjectId).then((res) => {
       setTagList(res?.data);
     });
-  }, [subjectId]);
+  }, [selectedSubjectId]);
 
   return (
     <>
@@ -50,9 +56,9 @@ const QuestionList = () => {
         <FormControl fullWidth>
           <InputLabel>選擇類別</InputLabel>
           <Select
-            value={categoryId ?? ''}
+            value={selectedCategoryId ?? ''}
             label="category"
-            onChange={(e) => setCategoryId(Number(e.target.value))}
+            onChange={(e) => setSelectedCategoryId(e.target.value)}
           >
             {categoryList?.map((item) => (
               <MenuItem value={item.id}>{item.name}</MenuItem>
@@ -62,10 +68,10 @@ const QuestionList = () => {
         <FormControl fullWidth>
           <InputLabel>選擇科目</InputLabel>
           <Select
-            value={subjectId ?? ''}
+            value={selectedSubjectId ?? ''}
             label="subject"
-            onChange={(e) => setSubjectId(Number(e.target.value))}
-            disabled={!categoryId}
+            onChange={(e) => setSelectedSubjectId(e.target.value)}
+            disabled={!selectedCategoryId}
           >
             {subjectList?.map((item) => (
               <MenuItem value={item.id}>{item.name}</MenuItem>
@@ -73,12 +79,12 @@ const QuestionList = () => {
           </Select>
         </FormControl>
         <FormControl fullWidth>
-          <InputLabel>選擇試卷 (optional)</InputLabel>
+          <InputLabel>選擇試卷 (非必填)</InputLabel>
           <Select
-            // value={subjectId ?? ''}
+            value={selectedExamId ?? ''}
             label="exam"
-            // onChange={(e) => setSubjectId(Number(e.target.value))}
-            disabled={!categoryId || !subjectId}
+            onChange={(e) => setSelectedExamId(e.target.value)}
+            disabled={!selectedSubjectId}
           >
             {examList?.map((item) => (
               <MenuItem value={item.id}>{item.name}</MenuItem>
@@ -86,25 +92,32 @@ const QuestionList = () => {
           </Select>
         </FormControl>
         <FormControl fullWidth>
-          <InputLabel>選擇觀念 (optional)</InputLabel>
+          <InputLabel>選擇觀念 (非必填)</InputLabel>
           <Select
-            // value={subjectId ?? ''}
+            value={selectedConceptIds}
             label="concept-group"
-            // onChange={(e) => setSubjectId(Number(e.target.value))}
-            disabled={!categoryId || !subjectId}
+            onChange={(e) => setSelectedConceptIds(e.target.value as number[])}
+            disabled={!selectedSubjectId}
+            multiple
           >
-            {conceptGroupList?.map((item) => (
-              <MenuItem value={item.id}>{item.name}</MenuItem>
-            ))}
+            {conceptGroupList?.flatMap((item) => [
+              <ListSubheader key={`sub-${item.id}`}>{item.name}</ListSubheader>,
+              ...item.concepts.map((c) => (
+                <MenuItem key={c.id} value={c.id}>
+                  {c.name}
+                </MenuItem>
+              )),
+            ])}
           </Select>
         </FormControl>
         <FormControl fullWidth>
-          <InputLabel>選擇標籤 (optional)</InputLabel>
+          <InputLabel>選擇標籤 (非必填)</InputLabel>
           <Select
-            // value={subjectId ?? ''}
+            value={selectedTagIds}
             label="tag"
-            // onChange={(e) => setSubjectId(Number(e.target.value))}
-            disabled={!categoryId || !subjectId}
+            onChange={(e) => setSelectedTagIds(e.target.value as number[])}
+            disabled={!selectedSubjectId}
+            multiple
           >
             {tagList?.map((item) => (
               <MenuItem value={item.id}>{item.name}</MenuItem>
