@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS castor.exam_question (
+CREATE TABLE IF NOT EXISTS castor.question_exam (
     question_id INT UNSIGNED NOT NULL,
     exam_id INT UNSIGNED NOT NULL,
     PRIMARY KEY (question_id, exam_id),

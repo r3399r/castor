@@ -11,6 +11,7 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { Concept, ConceptEntity } from './ConceptEntity';
+import { Exam, ExamEntity } from './ExamEntity';
 import { Subject, SubjectEntity } from './SubjectEntity';
 import { Tag, TagEntity } from './TagEntity';
 
@@ -19,7 +20,6 @@ export type Question = {
   uuid: string;
   subjectId: number;
   subject: Subject;
-  // examId: number;
   parentId: number | null;
   fbPostId: string | null;
   isGroup: boolean;
@@ -32,7 +32,9 @@ export type Question = {
   attempCount: number;
   scoringTotal: number;
   discrimination: number | null;
-  adjustedDifficulty: number | null;
+  adjustedDifficulty: number;
+  children: Question[];
+  exam: Exam[];
   tag: Tag[];
   concept: Concept[];
   createdAt: string | null;
@@ -53,13 +55,6 @@ export class QuestionEntity implements Question {
   @ManyToOne(() => SubjectEntity)
   @JoinColumn({ name: 'subject_id' })
   subject!: Subject;
-
-  // @Column({ type: 'int', unsigned: true, name: 'exam_id' })
-  // examId!: number;
-
-  // @ManyToOne(() => ExamEntity)
-  // @JoinColumn({ name: 'exam_id' })
-  // exam!: Exam;
 
   @Column({ type: 'int', unsigned: true, name: 'parent_id' })
   parentId!: number | null;
@@ -108,6 +103,14 @@ export class QuestionEntity implements Question {
 
   @OneToMany(() => QuestionEntity, (question) => question.parent)
   children!: Question[];
+
+  @ManyToMany(() => ExamEntity)
+  @JoinTable({
+    name: 'question_exam',
+    joinColumn: { name: 'question_id', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'exam_id', referencedColumnName: 'id' },
+  })
+  exam!: Exam[];
 
   @ManyToMany(() => TagEntity)
   @JoinTable({

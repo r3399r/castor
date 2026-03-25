@@ -22,6 +22,7 @@ export class QuestionAccess {
     const qb = await this.createQueryBuilder();
     const question = await qb
       .innerJoinAndSelect('question.subject', 'subject')
+      .leftJoinAndSelect('question.exam', 'exam')
       .leftJoinAndSelect('question.tag', 'tag')
       .leftJoinAndSelect('question.concept', 'concept')
       .leftJoinAndSelect('question.children', 'children')
@@ -75,8 +76,9 @@ export class QuestionAccess {
     subjectId: number;
     take: number;
     skip: number;
-    tags?: number[];
-    concepts?: number[];
+    examId?: number;
+    tagIds?: number[];
+    conceptIds?: number[];
   }) {
     const qb = await this.createQueryBuilder();
     const base = qb
@@ -86,13 +88,27 @@ export class QuestionAccess {
         'subject.id = :subjectId',
         { subjectId: data.subjectId }
       )
+      .leftJoinAndSelect('question.exam', 'exam')
       .leftJoinAndSelect('question.tag', 'tag')
       .leftJoinAndSelect('question.concept', 'concept')
       .leftJoinAndSelect('question.children', 'children')
       .andWhere('question.parentId IS NULL');
 
-    if (data.tags !== undefined && data.tags.length > 0) {
-      const tagIds = data.tags;
+    if (data.examId !== undefined) {
+      const examId = data.examId;
+
+      const subQuery = qb
+        .subQuery()
+        .select('qeFilter.question_id')
+        .from('question_exam', 'qeFilter')
+        .where('qeFilter.exam_id = :examId', { examId })
+        .getQuery();
+
+      base.andWhere(`question.id IN ${subQuery}`, { examId });
+    }
+
+    if (data.tagIds !== undefined && data.tagIds.length > 0) {
+      const tagIds = data.tagIds;
       const tagCount = tagIds.length;
 
       const subQuery = qb
@@ -107,8 +123,8 @@ export class QuestionAccess {
       base.andWhere(`question.id IN ${subQuery}`, { tagIds, tagCount });
     }
 
-    if (data.concepts !== undefined && data.concepts.length > 0) {
-      const conceptIds = data.concepts;
+    if (data.conceptIds !== undefined && data.conceptIds.length > 0) {
+      const conceptIds = data.conceptIds;
       const conceptCount = conceptIds.length;
 
       const subQuery = qb

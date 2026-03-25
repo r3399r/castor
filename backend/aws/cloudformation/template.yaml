@@ -1120,10 +1120,6 @@ Resources:
               "type": "object",
               "properties": {
                 "subjectId":{"type": "number"},
-                "examIds": {
-                  "type": "array",
-                  "items": {"type": "number"}
-                },
                 "type":{"type": "string", "enum": ["GROUP","SINGLE","MULTIPLE","TRUE_FALSE","FILL"]},
                 "imageUrl":{"type": "string"},
                 "content":{"type": "string"},
@@ -1154,7 +1150,7 @@ Resources:
                   }
                 }
               },
-              "required": ["subjectId","examId","type","imageUrl","difficulty","conceptIds"]
+              "required": ["subjectId","type","imageUrl","difficulty","conceptIds"]
             },
             "postConceptGroup": {
               "type": "object",

@@ -49,13 +49,9 @@ export type PostQuestionCompleteResponse = ModifiedReply;
 
 export type GetQuestionParams = PaginationParams & {
   subjectId: string;
-  // orderBy?: string;
-  // orderDirection?: string;
-  // title?: string;
-  // hasReply?: 'true' | 'false';
+  examId?: string;
   tagIds?: string;
   conceptIds?: string;
-  // source?: string;
 };
 
 export type GetQuestionTagParams = { categoryId: number };
