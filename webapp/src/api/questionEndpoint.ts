@@ -14,7 +14,7 @@ import { alertError } from './errorHandler';
 
 const getQuestion = async (params?: GetQuestionParams) => {
   try {
-    return await http.get<GetQuestionResponse>('question', {
+    return await http.get<GetQuestionResponse, GetQuestionParams>('question', {
       params,
     });
   } catch (e) {

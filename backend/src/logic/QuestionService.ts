@@ -72,30 +72,17 @@ export class QuestionService {
       subjectId: Number(params.subjectId),
       take: limit,
       skip: offset,
-      tags: params.tagIds
+      examId: params.examId ? Number(params.examId) : undefined,
+      tagIds: params.tagIds
         ? params.tagIds.split(',').map((v) => Number(v))
         : undefined,
-      concepts: params.conceptIds
+      conceptIds: params.conceptIds
         ? params.conceptIds.split(',').map((v) => Number(v))
         : undefined,
     });
 
     return {
       data: questions,
-      // data: question.map((v) => ({
-      //   uid: v.rid + v.id.toString(36).toUpperCase(),
-      //   title: v.title,
-      //   categoryId: v.categoryId,
-      //   category: v.category,
-      //   source: v.source,
-      //   tag: v.tag,
-      //   count: v.count,
-      //   scoringRate: v.scoringRate,
-      //   lastReply:
-      //     v.reply.length > 0
-      //       ? v.reply.sort(compare('createdAt', 'desc'))[0]
-      //       : null,
-      // })),
       paginate: genPagination(total, limit, offset),
     };
   }
@@ -176,7 +163,6 @@ export class QuestionService {
     const questionEntity = new QuestionEntity();
     questionEntity.uuid = uuidv4();
     questionEntity.subjectId = data.subjectId;
-    questionEntity.examId = data.examId;
     questionEntity.parentId = null;
     questionEntity.fbPostId = fbPost.post_id;
     questionEntity.isGroup = data.type === 'GROUP';
@@ -200,7 +186,6 @@ export class QuestionService {
         const childEntity = new QuestionEntity();
         childEntity.uuid = uuidv4();
         childEntity.subjectId = data.subjectId;
-        childEntity.examId = data.examId;
         childEntity.parentId = newQuestionEntity.id;
         childEntity.fbPostId = null;
         childEntity.isGroup = false;

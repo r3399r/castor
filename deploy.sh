@@ -22,9 +22,9 @@ echo ===========================================================================
 
 echo prepare frontend files...
 rm -rf ../webapp/src/model/backend
-# rm -rf ../webapp/src/constant/backend
+rm -rf ../webapp/src/constant/backend
 cp -R lib/src/model ../webapp/src/model/backend
-# cp -R src/constant ../webapp/src/constant/backend
+cp -R src/constant ../webapp/src/constant/backend
 echo ====================================================================================
 
 # echo deploy frontend to S3...
