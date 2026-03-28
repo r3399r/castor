@@ -8,7 +8,7 @@
     "fix:format": "npm run lint:format -- --write",
     "lint": "run-p lint:*",
     "fix": "run-s fix:*",
-    "clean": "del-cli dist lib -f",
+    "clean": "del-cli dist lib node_modules -f",
     "build:layer": "npm install --production && mkdir -p dist/nodejs && cp -R node_modules dist/nodejs",
     "build:lambda": "npm install && tspc",
     "pre:deploy": "run-s clean build:*"

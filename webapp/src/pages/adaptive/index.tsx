@@ -5,7 +5,6 @@ import {
   InputLabel,
   ListSubheader,
   MenuItem,
-  Pagination,
   Rating,
   Select,
 } from '@mui/material';
@@ -13,15 +12,14 @@ import { useEffect, useState } from 'react';
 import categoryEndpoint from 'src/api/categoryEndpoint';
 import questionEndpoint from 'src/api/questionEndpoint';
 import subjectEndpoint from 'src/api/subjectEndpoint';
-import { LIMIT } from 'src/constant/backend/Pagination';
-import type { GetQuestionResponse } from 'src/model/backend/api/Question';
 import type { Category } from 'src/model/backend/entity/CategoryEntity';
 import type { ConceptGroup } from 'src/model/backend/entity/ConceptGroupEntity';
 import type { Exam } from 'src/model/backend/entity/ExamEntity';
+import type { Question } from 'src/model/backend/entity/QuestionEntity';
 import type { Subject } from 'src/model/backend/entity/SubjectEntity';
 import type { Tag } from 'src/model/backend/entity/TagEntity';
 
-const QuestionList = () => {
+const Adaptive = () => {
   const [selectedCategoryId, setSelectedCategoryId] = useState<number>();
   const [selectedSubjectId, setSelectedSubjectId] = useState<number>();
   const [selectedExamId, setSelectedExamId] = useState<number>();
@@ -32,8 +30,7 @@ const QuestionList = () => {
   const [examList, setExamList] = useState<Exam[]>();
   const [conceptGroupList, setConceptGroupList] = useState<ConceptGroup[]>();
   const [tagList, setTagList] = useState<Tag[]>();
-  const [resultQuestionList, setResultQuestionList] = useState<GetQuestionResponse>();
-  const [openSolutionIds, setOpenSolutionIds] = useState<Set<number>>(new Set());
+  const [adaptiveQuestion, setAdaptiveQuestion] = useState<Question>();
 
   useEffect(() => {
     categoryEndpoint.getCategory().then((res) => {
@@ -47,7 +44,6 @@ const QuestionList = () => {
     setSelectedExamId(undefined);
     setSelectedConceptIds([]);
     setSelectedTagIds([]);
-    setResultQuestionList(undefined);
     categoryEndpoint.getCategoryIdSubject(selectedCategoryId).then((res) => {
       setSubjectList(res?.data);
     });
@@ -72,40 +68,15 @@ const QuestionList = () => {
   const onClickSearch = () => {
     if (!selectedSubjectId) return;
     questionEndpoint
-      .getQuestion({
+      .getQuestionAdaptive({
         subjectId: selectedSubjectId.toString(),
         examId: selectedExamId ? selectedExamId.toString() : undefined,
         conceptIds: selectedConceptIds.length > 0 ? selectedConceptIds.join(',') : undefined,
         tagIds: selectedTagIds.length > 0 ? selectedTagIds.join(',') : undefined,
       })
       .then((res) => {
-        setResultQuestionList(res?.data);
+        setAdaptiveQuestion(res?.data);
       });
-  };
-
-  const onChangePage = (_event: React.ChangeEvent<unknown>, page: number) => {
-    if (!selectedSubjectId) return;
-    questionEndpoint
-      .getQuestion({
-        subjectId: selectedSubjectId.toString(),
-        examId: selectedExamId ? selectedExamId.toString() : undefined,
-        conceptIds: selectedConceptIds ? selectedConceptIds.join(',') : undefined,
-        tagIds: selectedTagIds ? selectedTagIds.join(',') : undefined,
-        offset: ((page - 1) * LIMIT).toString(),
-      })
-      .then((res) => {
-        setResultQuestionList(res?.data);
-      });
-  };
-
-  const onClickRevealSolution = (questionId: number) => {
-    if (openSolutionIds.has(questionId))
-      setOpenSolutionIds((prev) => {
-        const newSet = new Set(prev);
-        newSet.delete(questionId);
-        return newSet;
-      });
-    else setOpenSolutionIds((prev) => new Set(prev).add(questionId));
   };
 
   return (
@@ -117,6 +88,7 @@ const QuestionList = () => {
             value={selectedCategoryId ?? ''}
             label="category"
             onChange={(e) => setSelectedCategoryId(e.target.value)}
+            disabled={!!adaptiveQuestion}
           >
             {categoryList?.map((item) => (
               <MenuItem value={item.id}>{item.name}</MenuItem>
@@ -129,7 +101,7 @@ const QuestionList = () => {
             value={selectedSubjectId ?? ''}
             label="subject"
             onChange={(e) => setSelectedSubjectId(e.target.value)}
-            disabled={!selectedCategoryId}
+            disabled={!selectedCategoryId || !!adaptiveQuestion}
           >
             {subjectList?.map((item) => (
               <MenuItem value={item.id}>{item.name}</MenuItem>
@@ -142,7 +114,7 @@ const QuestionList = () => {
             value={selectedExamId ?? ''}
             label="exam"
             onChange={(e) => setSelectedExamId(e.target.value)}
-            disabled={!selectedSubjectId}
+            disabled={!selectedSubjectId || !!adaptiveQuestion}
           >
             <MenuItem value="">
               <em>無</em>
@@ -158,7 +130,7 @@ const QuestionList = () => {
             value={selectedConceptIds}
             label="concept-group"
             onChange={(e) => setSelectedConceptIds(e.target.value as number[])}
-            disabled={!selectedSubjectId}
+            disabled={!selectedSubjectId || !!adaptiveQuestion}
             multiple
           >
             {conceptGroupList?.flatMap((item) => [
@@ -177,7 +149,7 @@ const QuestionList = () => {
             value={selectedTagIds}
             label="tag"
             onChange={(e) => setSelectedTagIds(e.target.value as number[])}
-            disabled={!selectedSubjectId}
+            disabled={!selectedSubjectId || !!adaptiveQuestion}
             multiple
           >
             {tagList?.map((item) => (
@@ -186,87 +158,49 @@ const QuestionList = () => {
           </Select>
         </FormControl>
         <div>
-          <Button variant="contained" onClick={onClickSearch} disabled={!selectedSubjectId}>
-            搜尋
+          <Button
+            variant="contained"
+            onClick={onClickSearch}
+            disabled={!selectedSubjectId || !!adaptiveQuestion}
+          >
+            AI選題
           </Button>
         </div>
       </div>
       <hr className="my-4" />
-      {resultQuestionList && resultQuestionList.data.length === 0 && <div>查無題目</div>}
-      {resultQuestionList && resultQuestionList.data.length > 0 && (
-        <div className="flex flex-col gap-4">
-          {resultQuestionList.data.map((item) => (
-            <div key={item.id} className="rounded-xl border">
-              <div className="rounded-tl-xl rounded-tr-xl border-b bg-blue-100/80 p-2">
-                <div className="flex items-center justify-between gap-2">
-                  <div>{item.uuid.toUpperCase()}</div>
-                  <Rating
-                    value={item.adjustedDifficulty / 2}
-                    precision={0.1}
-                    readOnly
-                    size="small"
-                  />
-                </div>
-                <div className="mt-1 flex flex-wrap gap-2">
-                  {item.exam.map((e) => (
-                    <Chip key={e.id} label={e.name} size="small" color="success" />
-                  ))}
-                  {item.concept.map((c) => (
-                    <Chip key={c.id} label={c.name} size="small" color="info" />
-                  ))}
-                  {item.tag.map((t) => (
-                    <Chip key={t.id} label={t.name} size="small" color="warning" />
-                  ))}
-                </div>
-              </div>
-              <div className="p-4">
-                {item.content && <div dangerouslySetInnerHTML={{ __html: item.content }} />}
-                {item.answer && (
-                  <div className="mt-4 flex gap-2">
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      onClick={() => onClickRevealSolution(item.id)}
-                    >
-                      看答案
-                    </Button>
-                  </div>
-                )}
-                <div>
-                  {openSolutionIds.has(item.id) && item.answer && (
-                    <div className="mt-4 rounded-lg border bg-green-100/80 p-4">
-                      <div className="font-bold">解答</div>
-                      <div dangerouslySetInnerHTML={{ __html: item.answer }} />
-                    </div>
-                  )}
-                </div>
-                {item.children.map((c) => (
-                  <div key={c.id} className="mt-4">
-                    <div dangerouslySetInnerHTML={{ __html: c.content ?? '' }} />
-                    <div className="mt-4 flex gap-2">
-                      <Button
-                        variant="outlined"
-                        size="small"
-                        onClick={() => onClickRevealSolution(c.id)}
-                      >
-                        看答案
-                      </Button>
-                    </div>
-                    <div>
-                      {openSolutionIds.has(c.id) && c.answer && (
-                        <div className="mt-4 rounded-lg border bg-green-100/80 p-4">
-                          <div className="font-bold">解答</div>
-                          <div dangerouslySetInnerHTML={{ __html: c.answer }} />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
+      {adaptiveQuestion && (
+        <div className="rounded-xl border">
+          <div className="rounded-tl-xl rounded-tr-xl border-b bg-blue-100/80 p-2">
+            <div className="flex items-center justify-between gap-2">
+              <div>{adaptiveQuestion.uuid.toUpperCase()}</div>
+              <Rating
+                value={adaptiveQuestion.adjustedDifficulty / 2}
+                precision={0.1}
+                readOnly
+                size="small"
+              />
             </div>
-          ))}
-          <div className="flex justify-center">
-            <Pagination count={resultQuestionList.paginate.totalPages} onChange={onChangePage} />
+            <div className="mt-1 flex flex-wrap gap-2">
+              {adaptiveQuestion.exam.map((e) => (
+                <Chip key={e.id} label={e.name} size="small" color="success" />
+              ))}
+              {adaptiveQuestion.concept.map((c) => (
+                <Chip key={c.id} label={c.name} size="small" color="info" />
+              ))}
+              {adaptiveQuestion.tag.map((t) => (
+                <Chip key={t.id} label={t.name} size="small" color="warning" />
+              ))}
+            </div>
+          </div>
+          <div className="p-4">
+            {adaptiveQuestion.content && (
+              <div dangerouslySetInnerHTML={{ __html: adaptiveQuestion.content }} />
+            )}
+            {adaptiveQuestion.children.map((c) => (
+              <div key={c.id} className="mt-4">
+                <div dangerouslySetInnerHTML={{ __html: c.content ?? '' }} />
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -274,4 +208,4 @@ const QuestionList = () => {
   );
 };
 
-export default QuestionList;
+export default Adaptive;

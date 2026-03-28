@@ -575,8 +575,18 @@ Resources:
                 }
               }
             },
-            "/api/question/{uuid}": {
+            "/api/question/adaptive": {
               "get": {
+                "parameters": [{
+                  "name": "Authorization",
+                  "in": "header",
+                  "required": true,
+                  "schema": {"type": "string"}
+                },{
+                    "name": "subjectId",
+                    "in": "query",
+                    "required": true
+                }],
                 "responses": {
                   "200": {
                     "description": "200 response",
@@ -612,7 +622,7 @@ Resources:
                 }
               }
             },
-            "/api/question/customized": {
+            "/api/question/{uuid}": {
               "get": {
                 "parameters": [{
                   "name": "Authorization",

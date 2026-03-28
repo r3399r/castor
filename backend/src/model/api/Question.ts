@@ -58,6 +58,15 @@ export type GetQuestionTagParams = { categoryId: number };
 
 export type GetQuestionTagResponse = { id: number; name: string }[];
 
+export type GetQuestionAdaptiveParams = {
+  subjectId: string;
+  examId?: string;
+  tagIds?: string;
+  conceptIds?: string;
+};
+
+export type GetQuestionAdaptiveResponse = Question;
+
 // export type ModifiedQuestion = {
 //   uid: string;
 //   title: string;

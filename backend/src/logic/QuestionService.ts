@@ -10,6 +10,8 @@ import { ReplyAccess } from 'src/dao/ReplyAccess';
 import { SubjectAccess } from 'src/dao/SubjectAccess';
 import { TagAccess } from 'src/dao/TagAccess';
 import {
+  GetQuestionAdaptiveParams,
+  GetQuestionAdaptiveResponse,
   GetQuestionIdResponse,
   GetQuestionParams,
   GetQuestionResponse,
@@ -48,7 +50,15 @@ export class QuestionService {
   private readonly conceptAccess!: ConceptAccess;
 
   public async getQuestionByUuid(uuid: string): Promise<GetQuestionIdResponse> {
-    return await this.questionAccess.findOneOrFail(uuid);
+    return await this.questionAccess.findOneOrFailByUuid(uuid);
+  }
+
+  public async getAdaptiveQuestion(
+    params: GetQuestionAdaptiveParams | null
+  ): Promise<GetQuestionAdaptiveResponse> {
+    console.log(params);
+
+    return await this.questionAccess.findOneOrFailById(2);
   }
 
   public async getAllTags(

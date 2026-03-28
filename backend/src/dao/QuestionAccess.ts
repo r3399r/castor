@@ -18,7 +18,22 @@ export class QuestionAccess {
     return await qr.manager.save(entity);
   }
 
-  public async findOneOrFail(uuid: string) {
+  public async findOneOrFailById(id: number) {
+    const qb = await this.createQueryBuilder();
+    const question = await qb
+      .innerJoinAndSelect('question.subject', 'subject')
+      .leftJoinAndSelect('question.exam', 'exam')
+      .leftJoinAndSelect('question.tag', 'tag')
+      .leftJoinAndSelect('question.concept', 'concept')
+      .leftJoinAndSelect('question.children', 'children')
+      .andWhere('question.id = :id', { id })
+      .andWhere('question.parentId IS NULL')
+      .getOneOrFail();
+
+    return question as Question;
+  }
+
+  public async findOneOrFailByUuid(uuid: string) {
     const qb = await this.createQueryBuilder();
     const question = await qb
       .innerJoinAndSelect('question.subject', 'subject')

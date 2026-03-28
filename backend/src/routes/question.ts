@@ -1,6 +1,7 @@
 import { bindings } from 'src/bindings';
 import { QuestionService } from 'src/logic/QuestionService';
 import {
+  GetQuestionAdaptiveParams,
   GetQuestionParams,
   GetQuestionTagParams,
   PostQuestionRequest,
@@ -27,6 +28,8 @@ export default async (lambdaEvent: LambdaEvent) => {
       return await questionComplete();
     case '/api/question/tag':
       return await questionTag();
+    case '/api/question/adaptive':
+      return await questionAdaptive();
   }
 
   throw new BadRequestError('unexpected resource');
@@ -94,6 +97,17 @@ const questionTag = async () => {
     case 'GET':
       return await service.getAllTags(
         event.queryStringParameters as GetQuestionTagParams | null
+      );
+  }
+
+  throw new Error('unexpected httpMethod');
+};
+
+const questionAdaptive = async () => {
+  switch (event.httpMethod) {
+    case 'GET':
+      return await service.getAdaptiveQuestion(
+        event.queryStringParameters as GetQuestionAdaptiveParams | null
       );
   }
 
