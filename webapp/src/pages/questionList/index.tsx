@@ -108,6 +108,23 @@ const QuestionList = () => {
     else setOpenSolutionIds((prev) => new Set(prev).add(questionId));
   };
 
+  const getTypeName = (type: string) => {
+    switch (type) {
+      case 'SINGLE':
+        return '單選題';
+      case 'MULTIPLE':
+        return '多選題';
+      case 'TRUE_FALSE':
+        return '是非題';
+      case 'FILL':
+        return '選填題';
+      case 'GROUP':
+        return '題組';
+      default:
+        return type;
+    }
+  };
+
   return (
     <>
       <div className="flex flex-col gap-4">
@@ -208,6 +225,11 @@ const QuestionList = () => {
                   />
                 </div>
                 <div className="mt-1 flex flex-wrap gap-2">
+                  <Chip label={getTypeName(item.type)} size="small" />
+                  {item.type === 'GROUP' &&
+                    item.children.map((v, i) => (
+                      <Chip label={i + 1 + '-' + getTypeName(v.type)} size="small" />
+                    ))}
                   {item.exam.map((e) => (
                     <Chip key={e.id} label={e.name} size="small" color="success" />
                   ))}

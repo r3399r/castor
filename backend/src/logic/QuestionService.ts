@@ -58,7 +58,14 @@ export class QuestionService {
   ): Promise<GetQuestionAdaptiveResponse> {
     console.log(params);
 
-    return await this.questionAccess.findOneOrFailById(2);
+    const question = await this.questionAccess.findOneOrFailById(2);
+
+    return {
+      ...question,
+      children: question.children?.sort(
+        (a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)
+      ),
+    };
   }
 
   public async getAllTags(
@@ -92,7 +99,12 @@ export class QuestionService {
     });
 
     return {
-      data: questions,
+      data: questions.map((q) => ({
+        ...q,
+        children: q.children?.sort(
+          (a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)
+        ),
+      })),
       paginate: genPagination(total, limit, offset),
     };
   }

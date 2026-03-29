@@ -1,10 +1,15 @@
 import {
   Button,
+  Checkbox,
   Chip,
   FormControl,
+  FormControlLabel,
+  FormGroup,
   InputLabel,
   ListSubheader,
   MenuItem,
+  Radio,
+  RadioGroup,
   Rating,
   Select,
 } from '@mui/material';
@@ -31,6 +36,7 @@ const Adaptive = () => {
   const [conceptGroupList, setConceptGroupList] = useState<ConceptGroup[]>();
   const [tagList, setTagList] = useState<Tag[]>();
   const [adaptiveQuestion, setAdaptiveQuestion] = useState<Question>();
+  const [repliedAnswer, setRepliedAnswer] = useState<Map<number, string>>(new Map());
 
   useEffect(() => {
     categoryEndpoint.getCategory().then((res) => {
@@ -77,6 +83,110 @@ const Adaptive = () => {
       .then((res) => {
         setAdaptiveQuestion(res?.data);
       });
+  };
+
+  const getTypeName = (type: string) => {
+    switch (type) {
+      case 'SINGLE':
+        return '單選題';
+      case 'MULTIPLE':
+        return '多選題';
+      case 'TRUE_FALSE':
+        return '是非題';
+      case 'FILL':
+        return '選填題';
+      case 'GROUP':
+        return '題組';
+      default:
+        return type;
+    }
+  };
+
+  const Reply = ({ question }: { question: Question }) => {
+    return (
+      <>
+        {question.type === 'TRUE_FALSE' && (
+          <FormControl>
+            <RadioGroup
+              row
+              value={repliedAnswer.get(question.id) ?? ''}
+              onChange={(e) => {
+                const newRepliedAnswer = new Map(repliedAnswer);
+                newRepliedAnswer.set(question.id, e.target.value);
+                setRepliedAnswer(newRepliedAnswer);
+              }}
+            >
+              <FormControlLabel value="True" control={<Radio />} label="是" />
+              <FormControlLabel value="False" control={<Radio />} label="非" />
+            </RadioGroup>
+          </FormControl>
+        )}
+        {question.type === 'SINGLE' && (
+          <FormControl>
+            <RadioGroup
+              row
+              value={repliedAnswer.get(question.id) ?? ''}
+              onChange={(e) => {
+                const newRepliedAnswer = new Map(repliedAnswer);
+                newRepliedAnswer.set(question.id, e.target.value);
+                setRepliedAnswer(newRepliedAnswer);
+              }}
+            >
+              {question.options?.split('|').map((o, i) => (
+                <FormControlLabel key={i} value={o} control={<Radio />} label={o} />
+              ))}
+            </RadioGroup>
+          </FormControl>
+        )}
+        {question.type === 'MULTIPLE' && (
+          <FormControl>
+            <FormGroup row>
+              {question.options?.split('|').map((o, i) => (
+                <FormControlLabel
+                  key={i}
+                  checked={repliedAnswer.get(question.id)?.at(i) === 'O'}
+                  onChange={(_, checked) => {
+                    const newRepliedAnswer = new Map(repliedAnswer);
+                    const prev =
+                      newRepliedAnswer.get(question.id) ??
+                      'X'.repeat(question.options!.split('|').length);
+                    const newValue =
+                      prev.substring(0, i) + (checked ? 'O' : 'X') + prev.substring(i + 1);
+                    newRepliedAnswer.set(question.id, newValue);
+                    setRepliedAnswer(newRepliedAnswer);
+                  }}
+                  value={o}
+                  control={<Checkbox />}
+                  label={o}
+                />
+              ))}
+            </FormGroup>
+          </FormControl>
+        )}
+        {question.type === 'FILL' && (
+          <FormControl>
+            {question.answer?.split('').map((_, i) => (
+              <RadioGroup
+                key={i}
+                row
+                value={repliedAnswer.get(question.id)?.at(i) ?? ''}
+                onChange={(e) => {
+                  const newRepliedAnswer = new Map(repliedAnswer);
+                  const prev = newRepliedAnswer.get(question.id) ?? '';
+                  const newValue = prev.substring(0, i) + e.target.value + prev.substring(i + 1);
+                  newRepliedAnswer.set(question.id, newValue);
+                  setRepliedAnswer(newRepliedAnswer);
+                }}
+              >
+                {question.options?.split('|').map((o1, i1) => (
+                  <FormControlLabel key={i1} value={o1} control={<Radio />} label={o1} />
+                ))}
+              </RadioGroup>
+            ))}
+          </FormControl>
+        )}
+      </>
+    );
   };
 
   return (
@@ -171,8 +281,27 @@ const Adaptive = () => {
       {adaptiveQuestion && (
         <div className="rounded-xl border">
           <div className="rounded-tl-xl rounded-tr-xl border-b bg-blue-100/80 p-2">
-            <div className="flex items-center justify-between gap-2">
-              <div>{adaptiveQuestion.uuid.toUpperCase()}</div>
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex flex-wrap gap-2">
+                <Chip label={getTypeName(adaptiveQuestion.type)} size="small" />
+                {adaptiveQuestion.type === 'GROUP' &&
+                  adaptiveQuestion.children.map((v, i) => (
+                    <Chip
+                      key={'q-' + v.id}
+                      label={i + 1 + '-' + getTypeName(v.type)}
+                      size="small"
+                    />
+                  ))}
+                {adaptiveQuestion.exam.map((e) => (
+                  <Chip key={'e-' + e.id} label={e.name} size="small" color="success" />
+                ))}
+                {adaptiveQuestion.concept.map((c) => (
+                  <Chip key={'c-' + c.id} label={c.name} size="small" color="info" />
+                ))}
+                {adaptiveQuestion.tag.map((t) => (
+                  <Chip key={'t-' + t.id} label={t.name} size="small" color="warning" />
+                ))}
+              </div>
               <Rating
                 value={adaptiveQuestion.adjustedDifficulty / 2}
                 precision={0.1}
@@ -180,25 +309,16 @@ const Adaptive = () => {
                 size="small"
               />
             </div>
-            <div className="mt-1 flex flex-wrap gap-2">
-              {adaptiveQuestion.exam.map((e) => (
-                <Chip key={e.id} label={e.name} size="small" color="success" />
-              ))}
-              {adaptiveQuestion.concept.map((c) => (
-                <Chip key={c.id} label={c.name} size="small" color="info" />
-              ))}
-              {adaptiveQuestion.tag.map((t) => (
-                <Chip key={t.id} label={t.name} size="small" color="warning" />
-              ))}
-            </div>
           </div>
           <div className="p-4">
             {adaptiveQuestion.content && (
               <div dangerouslySetInnerHTML={{ __html: adaptiveQuestion.content }} />
             )}
+            <Reply question={adaptiveQuestion} />
             {adaptiveQuestion.children.map((c) => (
               <div key={c.id} className="mt-4">
                 <div dangerouslySetInnerHTML={{ __html: c.content ?? '' }} />
+                <Reply question={c} />
               </div>
             ))}
           </div>
