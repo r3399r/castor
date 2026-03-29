@@ -4,8 +4,6 @@ CREATE TABLE IF NOT EXISTS castor.reply (
     user_id INT UNSIGNED NOT NULL,
     score DOUBLE NOT NULL DEFAULT 0,
     replied_answer VARCHAR(255) NULL,
-    complete BOOLEAN NOT NULL DEFAULT FALSE,
-    recorded_at DATETIME(3) NULL,
     created_at DATETIME(3) NULL,
     updated_at DATETIME(3) NULL,
     PRIMARY KEY (id),

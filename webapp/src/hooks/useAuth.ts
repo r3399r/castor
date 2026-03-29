@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { auth, provider } from 'src/firebase/config';
 import { signInWithPopup, signOut } from 'firebase/auth';
 import { useDispatch } from 'react-redux';
-import { setIsLogin, setUser } from 'src/redux/uiSlice';
+import { finishWaiting, setIsLogin, setUser, startWaiting } from 'src/redux/uiSlice';
 import { isInAppBrowser } from 'src/util/isInAppBrowser';
+import userEndpoint from 'src/api/userEndpoint';
 
 export const useAuth = () => {
   const dispatch = useDispatch();
@@ -17,15 +18,15 @@ export const useAuth = () => {
         dispatch(setIsLogin(true));
         sessionStorage.setItem('idToken', token);
 
-        // dispatch(startWaiting());
-        // userEndpoint
-        //   .postUserSync()
-        //   .then((res) => {
-        //     if (res) dispatch(setUser(res.data));
-        //   })
-        //   .finally(() => {
-        //     dispatch(finishWaiting());
-        //   });
+        dispatch(startWaiting());
+        userEndpoint
+          .postUserSync()
+          .then((res) => {
+            if (res) dispatch(setUser(res.data));
+          })
+          .finally(() => {
+            dispatch(finishWaiting());
+          });
       } else {
         setIsAuthenticated(false);
         dispatch(setIsLogin(false));

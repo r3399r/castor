@@ -269,8 +269,8 @@ export class QuestionService {
     replyEntity.userId = user.id;
     replyEntity.questionId = data.id;
     replyEntity.score = 0;
-    replyEntity.complete = false;
-    replyEntity.recordedAt = new Date().toISOString();
+    // replyEntity.complete = false;
+    // replyEntity.recordedAt = new Date().toISOString();
 
     const newReply = await this.replyAccess.save(replyEntity);
 

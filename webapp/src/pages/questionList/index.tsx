@@ -188,20 +188,22 @@ const QuestionList = () => {
             ])}
           </Select>
         </FormControl>
-        <FormControl fullWidth>
-          <InputLabel>選擇標籤 (非必填)</InputLabel>
-          <Select
-            value={selectedTagIds}
-            label="tag"
-            onChange={(e) => setSelectedTagIds(e.target.value as number[])}
-            disabled={!selectedSubjectId}
-            multiple
-          >
-            {tagList?.map((item) => (
-              <MenuItem value={item.id}>{item.name}</MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+        {tagList && tagList.length > 0 && (
+          <FormControl fullWidth>
+            <InputLabel>選擇標籤 (非必填)</InputLabel>
+            <Select
+              value={selectedTagIds}
+              label="tag"
+              onChange={(e) => setSelectedTagIds(e.target.value as number[])}
+              disabled={!selectedSubjectId}
+              multiple
+            >
+              {tagList?.map((item) => (
+                <MenuItem value={item.id}>{item.name}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        )}
         <div>
           <Button variant="contained" onClick={onClickSearch} disabled={!selectedSubjectId}>
             搜尋
@@ -226,10 +228,6 @@ const QuestionList = () => {
                 </div>
                 <div className="mt-1 flex flex-wrap gap-2">
                   <Chip label={getTypeName(item.type)} size="small" />
-                  {item.type === 'GROUP' &&
-                    item.children.map((v, i) => (
-                      <Chip label={i + 1 + '-' + getTypeName(v.type)} size="small" />
-                    ))}
                   {item.exam.map((e) => (
                     <Chip key={e.id} label={e.name} size="small" color="success" />
                   ))}
@@ -264,6 +262,7 @@ const QuestionList = () => {
                 </div>
                 {item.children.map((c) => (
                   <div key={c.id} className="mt-4">
+                    <Chip label={getTypeName(c.type)} size="small" className="mb-1" />
                     <div dangerouslySetInnerHTML={{ __html: c.content ?? '' }} />
                     <div className="mt-4 flex gap-2">
                       <Button

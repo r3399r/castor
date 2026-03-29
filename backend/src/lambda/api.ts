@@ -7,6 +7,7 @@ import category from 'src/routes/category';
 import concept from 'src/routes/concept';
 import exam from 'src/routes/exam';
 import question from 'src/routes/question';
+import reply from 'src/routes/reply';
 import subject from 'src/routes/subject';
 import tag from 'src/routes/tag';
 import user from 'src/routes/user';
@@ -44,6 +45,8 @@ const apiProcess = async (event: LambdaEvent): Promise<LambdaOutput> => {
       case 'category':
         res = await category(event);
         break;
+      case 'reply':
+        res = await reply(event);
     }
 
     output = successOutput(res);

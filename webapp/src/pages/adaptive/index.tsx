@@ -14,6 +14,7 @@ import {
   Select,
 } from '@mui/material';
 import { useEffect, useState } from 'react';
+import { useDispatch } from 'react-redux';
 import categoryEndpoint from 'src/api/categoryEndpoint';
 import questionEndpoint from 'src/api/questionEndpoint';
 import subjectEndpoint from 'src/api/subjectEndpoint';
@@ -23,8 +24,10 @@ import type { Exam } from 'src/model/backend/entity/ExamEntity';
 import type { Question } from 'src/model/backend/entity/QuestionEntity';
 import type { Subject } from 'src/model/backend/entity/SubjectEntity';
 import type { Tag } from 'src/model/backend/entity/TagEntity';
+import { finishWaiting, startWaiting } from 'src/redux/uiSlice';
 
 const Adaptive = () => {
+  const dispatch = useDispatch();
   const [selectedCategoryId, setSelectedCategoryId] = useState<number>();
   const [selectedSubjectId, setSelectedSubjectId] = useState<number>();
   const [selectedExamId, setSelectedExamId] = useState<number>();
@@ -73,6 +76,7 @@ const Adaptive = () => {
 
   const onClickSearch = () => {
     if (!selectedSubjectId) return;
+    dispatch(startWaiting());
     questionEndpoint
       .getQuestionAdaptive({
         subjectId: selectedSubjectId.toString(),
@@ -82,6 +86,9 @@ const Adaptive = () => {
       })
       .then((res) => {
         setAdaptiveQuestion(res?.data);
+      })
+      .finally(() => {
+        dispatch(finishWaiting());
       });
   };
 
@@ -166,22 +173,24 @@ const Adaptive = () => {
         {question.type === 'FILL' && (
           <FormControl>
             {question.answer?.split('').map((_, i) => (
-              <RadioGroup
-                key={i}
-                row
-                value={repliedAnswer.get(question.id)?.at(i) ?? ''}
-                onChange={(e) => {
-                  const newRepliedAnswer = new Map(repliedAnswer);
-                  const prev = newRepliedAnswer.get(question.id) ?? '';
-                  const newValue = prev.substring(0, i) + e.target.value + prev.substring(i + 1);
-                  newRepliedAnswer.set(question.id, newValue);
-                  setRepliedAnswer(newRepliedAnswer);
-                }}
-              >
-                {question.options?.split('|').map((o1, i1) => (
-                  <FormControlLabel key={i1} value={o1} control={<Radio />} label={o1} />
-                ))}
-              </RadioGroup>
+              <div className="flex items-center gap-2" key={i}>
+                {i + 1}.
+                <RadioGroup
+                  row
+                  value={repliedAnswer.get(question.id)?.at(i) ?? ''}
+                  onChange={(e) => {
+                    const newRepliedAnswer = new Map(repliedAnswer);
+                    const prev = newRepliedAnswer.get(question.id) ?? '';
+                    const newValue = prev.substring(0, i) + e.target.value + prev.substring(i + 1);
+                    newRepliedAnswer.set(question.id, newValue);
+                    setRepliedAnswer(newRepliedAnswer);
+                  }}
+                >
+                  {question.options?.split('|').map((o1, i1) => (
+                    <FormControlLabel key={i1} value={o1} control={<Radio />} label={o1} />
+                  ))}
+                </RadioGroup>
+              </div>
             ))}
           </FormControl>
         )}
@@ -253,20 +262,22 @@ const Adaptive = () => {
             ])}
           </Select>
         </FormControl>
-        <FormControl fullWidth>
-          <InputLabel>選擇標籤 (非必填)</InputLabel>
-          <Select
-            value={selectedTagIds}
-            label="tag"
-            onChange={(e) => setSelectedTagIds(e.target.value as number[])}
-            disabled={!selectedSubjectId || !!adaptiveQuestion}
-            multiple
-          >
-            {tagList?.map((item) => (
-              <MenuItem value={item.id}>{item.name}</MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+        {tagList && tagList.length > 0 && (
+          <FormControl fullWidth>
+            <InputLabel>選擇標籤 (非必填)</InputLabel>
+            <Select
+              value={selectedTagIds}
+              label="tag"
+              onChange={(e) => setSelectedTagIds(e.target.value as number[])}
+              disabled={!selectedSubjectId || !!adaptiveQuestion}
+              multiple
+            >
+              {tagList?.map((item) => (
+                <MenuItem value={item.id}>{item.name}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        )}
         <div>
           <Button
             variant="contained"
@@ -284,14 +295,14 @@ const Adaptive = () => {
             <div className="flex items-start justify-between gap-2">
               <div className="flex flex-wrap gap-2">
                 <Chip label={getTypeName(adaptiveQuestion.type)} size="small" />
-                {adaptiveQuestion.type === 'GROUP' &&
+                {/* {adaptiveQuestion.type === 'GROUP' &&
                   adaptiveQuestion.children.map((v, i) => (
                     <Chip
                       key={'q-' + v.id}
                       label={i + 1 + '-' + getTypeName(v.type)}
                       size="small"
                     />
-                  ))}
+                  ))} */}
                 {adaptiveQuestion.exam.map((e) => (
                   <Chip key={'e-' + e.id} label={e.name} size="small" color="success" />
                 ))}
@@ -317,6 +328,7 @@ const Adaptive = () => {
             <Reply question={adaptiveQuestion} />
             {adaptiveQuestion.children.map((c) => (
               <div key={c.id} className="mt-4">
+                <Chip label={getTypeName(c.type)} size="small" className="mb-1" />
                 <div dangerouslySetInnerHTML={{ __html: c.content ?? '' }} />
                 <Reply question={c} />
               </div>
