@@ -11,6 +11,7 @@ import { ReplyAccess } from './dao/ReplyAccess';
 import { SubjectAccess } from './dao/SubjectAccess';
 import { TagAccess } from './dao/TagAccess';
 import { UserAccess } from './dao/UserAccess';
+import { UserConceptStatAccess } from './dao/UserConceptStatAccess';
 import { UserStatsAccess } from './dao/UserStatsAccess';
 import { CategoryService } from './logic/CategoryService';
 import { ConceptService } from './logic/ConceptService';
@@ -30,6 +31,7 @@ import { QuestionMinorEntity } from './model/entity/QuestionMinorEntity';
 import { ReplyEntity } from './model/entity/ReplyEntity';
 import { SubjectEntity } from './model/entity/SubjectEntity';
 import { TagEntity } from './model/entity/TagEntity';
+import { UserConceptStatEntity } from './model/entity/UserConceptStatEntity';
 import { UserEntity } from './model/entity/UserEntity';
 import { UserStatsEntity } from './model/entity/UserStatsEntity';
 import { Database, dbEntitiesBindingId } from './utils/Database';
@@ -54,6 +56,9 @@ container
   .toConstantValue(ConceptGroupEntity);
 container.bind<Function>(dbEntitiesBindingId).toConstantValue(ExamEntity);
 container.bind<Function>(dbEntitiesBindingId).toConstantValue(SubjectEntity);
+container
+  .bind<Function>(dbEntitiesBindingId)
+  .toConstantValue(UserConceptStatEntity);
 
 // db access
 container.bind(DbAccess).toSelf();
@@ -68,6 +73,7 @@ container.bind(ConceptAccess).toSelf();
 container.bind(ConceptGroupAccess).toSelf();
 container.bind(ExamAccess).toSelf();
 container.bind(SubjectAccess).toSelf();
+container.bind(UserConceptStatAccess).toSelf();
 
 // service
 container.bind(QuestionService).toSelf();

@@ -2,10 +2,12 @@ CREATE TABLE IF NOT EXISTS castor.user_concept_stat (
     id INT UNSIGNED AUTO_INCREMENT,
     user_id INT UNSIGNED NOT NULL,
     concept_id INT UNSIGNED NOT NULL,
-    mastery FLOAT NULL, -- Accuracy, RecentPerformance, Exposure
-    score_rolling VARCHAR(255) NULL, -- for Accuracy & Exposure 0.1|0.1|1.0|1.0|0.0...
-    weighted_sum FLOAT NULL, -- sum of (score * decay), for RecentPerformance
-    decay_sum FLOAT NULL,    -- sum of decay, for RecentPerformance
+    mastery DOUBLE NULL, -- Accuracy, RecentPerformance, Exposure
+    attempt_count INT UNSIGNED NOT NULL DEFAULT 0, -- for Accuracy and Exposure
+    scoring_total DOUBLE NOT NULL DEFAULT 0,    -- sum of all scores, for Accuracy
+    last_attempt_at DATETIME(3) NULL, -- for RecentPerformance
+    weighted_sum DOUBLE NOT NULL DEFAULT 0, -- sum of (score * decay), for RecentPerformance
+    decay_sum DOUBLE NOT NULL DEFAULT 0,    -- sum of decay, for RecentPerformance
     created_at DATETIME(3) NULL,
     updated_at DATETIME(3) NULL,
     PRIMARY KEY (id),

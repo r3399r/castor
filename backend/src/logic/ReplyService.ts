@@ -1,10 +1,13 @@
+import { differenceInDays } from 'date-fns';
 import { inject, injectable } from 'inversify';
 import { In } from 'typeorm';
 import { QuestionAccess } from 'src/dao/QuestionAccess';
 import { ReplyAccess } from 'src/dao/ReplyAccess';
+import { UserConceptStatAccess } from 'src/dao/UserConceptStatAccess';
 import { PostReplyRequest } from 'src/model/api/Reply';
 import { Question } from 'src/model/entity/QuestionEntity';
 import { ReplyEntity } from 'src/model/entity/ReplyEntity';
+import { UserConceptStatEntity } from 'src/model/entity/UserConceptStatEntity';
 import { UnauthorizedError } from 'src/model/error';
 import { UserService } from './UserService';
 
@@ -19,6 +22,8 @@ export class ReplyService {
   private readonly replyAccess!: ReplyAccess;
   @inject(UserService)
   private readonly userService!: UserService;
+  @inject(UserConceptStatAccess)
+  private readonly userConceptStatAccess!: UserConceptStatAccess;
 
   private calTrueFalseScore(
     repliedAnswer: string,
@@ -54,6 +59,7 @@ export class ReplyService {
 
   private async replyOne(
     question: Question,
+    parentQuestion: Question | null,
     repliedAnswer: string,
     userId: number
   ) {
@@ -85,33 +91,105 @@ export class ReplyService {
     replyEntity.score = score;
     replyEntity.repliedAnswer = repliedAnswer;
     await this.replyAccess.save(replyEntity);
+
+    const conceptIds = new Set<number>();
+    question.concept.forEach((c) => conceptIds.add(c.id));
+    if (parentQuestion)
+      parentQuestion.concept.forEach((c) => conceptIds.add(c.id));
+    const userConceptStatList = await this.userConceptStatAccess.find({
+      where: {
+        userId,
+        conceptId: In([...conceptIds]),
+      },
+    });
+    for (const conceptId of conceptIds) {
+      const stat = userConceptStatList.find((s) => s.conceptId === conceptId);
+      if (stat) {
+        const deltaDay = stat.lastAttemptAt
+          ? differenceInDays(new Date(), stat.lastAttemptAt)
+          : 0;
+        const decayFactor = Math.exp(-deltaDay / 7);
+
+        stat.attemptCount += 1;
+        stat.scoringTotal += score;
+        stat.lastAttemptAt = new Date().toISOString();
+        stat.weightedSum = stat.weightedSum * decayFactor + score;
+        stat.decaySum = stat.decaySum * decayFactor + 1;
+
+        const accuracy = stat.scoringTotal / stat.attemptCount;
+        const recentPerformance = stat.weightedSum / stat.decaySum;
+        const exposure =
+          stat.attemptCount >= 20
+            ? 10
+            : (10 * Math.log10(stat.attemptCount + 1)) / Math.log10(21);
+        stat.mastery =
+          0.5 * accuracy + 0.3 * recentPerformance + 0.2 * exposure;
+
+        await this.userConceptStatAccess.save(stat);
+      } else {
+        const userConceptEntity = new UserConceptStatEntity();
+        userConceptEntity.userId = userId;
+        userConceptEntity.conceptId = conceptId;
+        userConceptEntity.attemptCount = 1;
+        userConceptEntity.scoringTotal = score;
+        userConceptEntity.lastAttemptAt = new Date().toISOString();
+        userConceptEntity.weightedSum = score;
+        userConceptEntity.decaySum = 1;
+
+        const accuracy = score;
+        const recentPerformance = score;
+        const exposure = (10 * Math.log10(2)) / Math.log10(21);
+        userConceptEntity.mastery =
+          0.5 * accuracy + 0.3 * recentPerformance + 0.2 * exposure;
+
+        await this.userConceptStatAccess.save(userConceptEntity);
+      }
+    }
   }
 
   public async reply(data: PostReplyRequest) {
     const user = await this.userService.getUser();
     if (user === null) throw new UnauthorizedError('User not found');
 
+    const questionMap = new Map<number, Question>();
+
     const questionIds = data.map((d) => d.questionId);
     const questions = await this.questionAccess.find({
       where: { id: In(questionIds) },
+      relations: { concept: true },
     });
-    Promise.all(
-      data.map((d) => {
-        const question = questions.find((q) => q.id === d.questionId);
-        if (!question)
-          throw new Error(`Question with id ${d.questionId} not found`);
-        this.replyOne(question, d.repliedAnswer, user.id);
-      })
-    );
+    questions.forEach((q) => questionMap.set(q.id, q));
 
-    // TODO: use loader to optimize the above code to avoid N+1 query problem when updating group question difficulty
-    // const groupIds = new Set(questions.flatMap(q => q.parentId ? [q.parentId] : []))
-    // for (const groupId of groupIds) {
-    //   const groupQuestions = await this.questionAccess.find({ where: { parentId: groupId } });
-    //   const difficulty = groupQuestions.reduce((acc, q) => acc + q.adjustedDifficulty, 0) / groupQuestions.length;
-    //   const groupQuestion = await this.questionAccess.findOneOrFail({ where: { id: groupId } });
-    //   groupQuestion.adjustedDifficulty = difficulty;
-    //   await this.questionAccess.save(groupQuestion);
-    // }
+    const parentQuestionIds = questions.flatMap((q) =>
+      q.parentId ? [q.parentId] : []
+    );
+    if (parentQuestionIds.length > 0) {
+      const parentQuestions = await this.questionAccess.find({
+        where: { id: In(parentQuestionIds) },
+        relations: { concept: true },
+      });
+      parentQuestions.forEach((q) => questionMap.set(q.id, q));
+    }
+
+    for (const d of data) {
+      const question = questionMap.get(d.questionId) ?? null;
+      const parentQuestion = questionMap.get(question?.parentId ?? -1) ?? null;
+      if (!question) continue;
+      this.replyOne(question, parentQuestion, d.repliedAnswer, user.id);
+    }
+
+    for (const parentId of new Set([...parentQuestionIds])) {
+      const parentQuestion = questionMap.get(parentId);
+      if (!parentQuestion) continue;
+
+      const childrenQuestions = await this.questionAccess.find({
+        where: { parentId },
+      });
+      const difficulty =
+        childrenQuestions.reduce((acc, q) => acc + q.adjustedDifficulty, 0) /
+        childrenQuestions.length;
+      parentQuestion.adjustedDifficulty = difficulty;
+      await this.questionAccess.save(parentQuestion);
+    }
   }
 }
