@@ -262,7 +262,6 @@ const QuestionList = () => {
                 </div>
                 {item.children.map((c) => (
                   <div key={c.id} className="mt-4">
-                    <Chip label={getTypeName(c.type)} size="small" className="mb-1" />
                     <div dangerouslySetInnerHTML={{ __html: c.content ?? '' }} />
                     <div className="mt-4 flex gap-2">
                       <Button

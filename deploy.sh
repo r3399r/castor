@@ -27,9 +27,9 @@ cp -R lib/src/model ../webapp/src/model/backend
 cp -R src/constant ../webapp/src/constant/backend
 echo ====================================================================================
 
-# echo deploy frontend to S3...
-# cd ../webapp
-# npm i
-# npm run build
-# aws s3 sync ./dist s3://$project-$env-y --delete --cache-control no-cache
-# echo ====================================================================================
+echo deploy frontend to S3...
+cd ../webapp
+npm i
+npm run build
+aws s3 sync ./dist s3://$project-$env-y --delete --cache-control no-cache
+echo ====================================================================================

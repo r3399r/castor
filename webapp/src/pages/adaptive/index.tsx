@@ -295,14 +295,6 @@ const Adaptive = () => {
             <div className="flex items-start justify-between gap-2">
               <div className="flex flex-wrap gap-2">
                 <Chip label={getTypeName(adaptiveQuestion.type)} size="small" />
-                {/* {adaptiveQuestion.type === 'GROUP' &&
-                  adaptiveQuestion.children.map((v, i) => (
-                    <Chip
-                      key={'q-' + v.id}
-                      label={i + 1 + '-' + getTypeName(v.type)}
-                      size="small"
-                    />
-                  ))} */}
                 {adaptiveQuestion.exam.map((e) => (
                   <Chip key={'e-' + e.id} label={e.name} size="small" color="success" />
                 ))}
@@ -328,7 +320,6 @@ const Adaptive = () => {
             <Reply question={adaptiveQuestion} />
             {adaptiveQuestion.children.map((c) => (
               <div key={c.id} className="mt-4">
-                <Chip label={getTypeName(c.type)} size="small" className="mb-1" />
                 <div dangerouslySetInnerHTML={{ __html: c.content ?? '' }} />
                 <Reply question={c} />
               </div>
