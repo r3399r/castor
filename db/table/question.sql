@@ -13,13 +13,11 @@ CREATE TABLE IF NOT EXISTS castor.question (
     difficulty TINYINT UNSIGNED NOT NULL, -- 1~10
     attemp_count INT UNSIGNED NOT NULL DEFAULT 0,
     scoring_total DOUBLE NOT NULL DEFAULT 0, -- scoring_rate = scoring_total / attemp_count
-    discrimination DOUBLE NULL, -- first 33% - last 33% scoring_rate
     adjusted_difficulty DOUBLE NOT NULL, -- difficulty adjusted by user reply
     created_at DATETIME(3) NULL,
     updated_at DATETIME(3) NULL,
     PRIMARY KEY (id),
     UNIQUE (uuid),
     FOREIGN KEY (subject_id) REFERENCES castor.subject(id),
-    FOREIGN KEY (exam_id) REFERENCES castor.exam(id),
     FOREIGN KEY (parent_id) REFERENCES castor.question(id)
 );

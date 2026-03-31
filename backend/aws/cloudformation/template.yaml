@@ -1136,6 +1136,7 @@ Resources:
                 "options": {"type": "string",nullable: true},
                 "answer": {"type": "string",nullable: true},
                 "difficulty":{"type": "integer", "minimum": 1, "maximum": 10},
+                "examId":{"type": "number"},
                 "tagIds": {
                   "type": "array",
                   "items": {"type": "number"}
@@ -1160,7 +1161,7 @@ Resources:
                   }
                 }
               },
-              "required": ["subjectId","type","imageUrl","difficulty","conceptIds"]
+              "required": ["subjectId","type","imageUrl","difficulty","examId","conceptIds"]
             },
             "postConceptGroup": {
               "type": "object",

@@ -144,7 +144,7 @@ export class QuestionService {
       where: { id: data.subjectId },
     });
 
-    await this.examAccess.findOneOrFail({
+    const exam = await this.examAccess.findOneOrFail({
       where: { id: data.examId, subjectId: data.subjectId },
     });
 
@@ -195,6 +195,7 @@ export class QuestionService {
     questionEntity.answer = data.answer ?? null;
     questionEntity.difficulty = data.difficulty;
     questionEntity.adjustedDifficulty = data.difficulty;
+    questionEntity.exam = [exam];
     questionEntity.tag = tags;
     questionEntity.concept = concepts;
 

@@ -4,7 +4,7 @@ import { In } from 'typeorm';
 import { QuestionAccess } from 'src/dao/QuestionAccess';
 import { ReplyAccess } from 'src/dao/ReplyAccess';
 import { UserConceptStatAccess } from 'src/dao/UserConceptStatAccess';
-import { PostReplyRequest } from 'src/model/api/Reply';
+import { PostReplyRequest, PostReplyResponse } from 'src/model/api/Reply';
 import { Question } from 'src/model/entity/QuestionEntity';
 import { ReplyEntity } from 'src/model/entity/ReplyEntity';
 import { UserConceptStatEntity } from 'src/model/entity/UserConceptStatEntity';
@@ -25,34 +25,28 @@ export class ReplyService {
   @inject(UserConceptStatAccess)
   private readonly userConceptStatAccess!: UserConceptStatAccess;
 
-  private calTrueFalseScore(
-    repliedAnswer: string,
-    correctAnswer: string
-  ): number {
-    return repliedAnswer === correctAnswer ? 10 : 0;
+  private calTrueFalseScore(replied: string, correct: string): number {
+    return replied === correct ? 10 : 0;
   }
 
-  private calSingleScore(repliedAnswer: string, correctAnswer: string): number {
-    return repliedAnswer === correctAnswer ? 10 : 0;
+  private calSingleScore(replied: string, correct: string): number {
+    return replied === correct ? 10 : 0;
   }
 
-  private calMultipleScore(
-    repliedAnswer: string,
-    correctAnswer: string
-  ): number {
-    const optionCount = correctAnswer.length;
+  private calMultipleScore(replied: string, correct: string): number {
+    const optionCount = correct.length;
     let incorrectCount = 0;
     for (let i = 0; i < optionCount; i++)
-      if (repliedAnswer.at(i) !== correctAnswer.at(i)) incorrectCount++;
+      if (replied.at(i) !== correct.at(i)) incorrectCount++;
 
     const score = ((optionCount - 2 * incorrectCount) / optionCount) * 10;
 
     return score < 0 ? 0 : score;
   }
 
-  private calFillScore(repliedAnswer: string, correctAnswer: string): number {
-    for (let i = 0; i < correctAnswer.length; i++)
-      if (repliedAnswer.at(i) !== correctAnswer.at(i)) return 0;
+  private calFillScore(replied: string, correct: string): number {
+    for (let i = 0; i < correct.length; i++)
+      if (replied.at(i) !== correct.at(i)) return 0;
 
     return 10;
   }
@@ -81,8 +75,13 @@ export class ReplyService {
 
     question.attempCount += 1;
     question.scoringTotal += score;
+
+    const weight =
+      question.attempCount > 1068 ? 1 : question.attempCount / 1068;
     question.adjustedDifficulty =
-      (question.scoringTotal / question.attempCount + question.difficulty) / 2;
+      weight * (question.scoringTotal / question.attempCount) +
+      (1 - weight) * question.difficulty;
+
     await this.questionAccess.save(question);
 
     const replyEntity = new ReplyEntity();
@@ -145,9 +144,16 @@ export class ReplyService {
         await this.userConceptStatAccess.save(userConceptEntity);
       }
     }
+
+    return {
+      questionId: question.id,
+      repliedAnswer,
+      correctAnswer: question.answer ?? '',
+      score,
+    };
   }
 
-  public async reply(data: PostReplyRequest) {
+  public async reply(data: PostReplyRequest): Promise<PostReplyResponse> {
     const user = await this.userService.getUser();
     if (user === null) throw new UnauthorizedError('User not found');
 
@@ -171,11 +177,18 @@ export class ReplyService {
       parentQuestions.forEach((q) => questionMap.set(q.id, q));
     }
 
+    const responses: PostReplyResponse = [];
     for (const d of data) {
       const question = questionMap.get(d.questionId) ?? null;
       const parentQuestion = questionMap.get(question?.parentId ?? -1) ?? null;
       if (!question) continue;
-      this.replyOne(question, parentQuestion, d.repliedAnswer, user.id);
+      const res = await this.replyOne(
+        question,
+        parentQuestion,
+        d.repliedAnswer,
+        user.id
+      );
+      responses.push(res);
     }
 
     for (const parentId of new Set([...parentQuestionIds])) {
@@ -191,5 +204,7 @@ export class ReplyService {
       parentQuestion.adjustedDifficulty = difficulty;
       await this.questionAccess.save(parentQuestion);
     }
+
+    return responses;
   }
 }

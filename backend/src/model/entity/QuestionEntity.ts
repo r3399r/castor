@@ -31,7 +31,6 @@ export type Question = {
   difficulty: number;
   attempCount: number;
   scoringTotal: number;
-  discrimination: number | null;
   adjustedDifficulty: number;
   children: Question[];
   exam: Exam[];
@@ -88,9 +87,6 @@ export class QuestionEntity implements Question {
 
   @Column({ type: 'double', name: 'scoring_total' })
   scoringTotal: number = 0;
-
-  @Column({ type: 'double' })
-  discrimination: number | null = null;
 
   @Column({ type: 'double', name: 'adjusted_difficulty' })
   adjustedDifficulty!: number;

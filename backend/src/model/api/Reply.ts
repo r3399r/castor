@@ -1,8 +1,11 @@
-import { Question } from 'src/model/entity/QuestionEntity';
-
-export type PostReplyResponse = Question;
-
 export type PostReplyRequest = {
   questionId: number;
   repliedAnswer: string;
+}[];
+
+export type PostReplyResponse = {
+  questionId: number;
+  repliedAnswer: string;
+  correctAnswer: string;
+  score: number;
 }[];

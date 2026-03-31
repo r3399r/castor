@@ -4,13 +4,13 @@ import { Paginate, PaginationParams } from 'src/model/Pagination';
 
 export type PostQuestionRequest = {
   subjectId: number;
-  examId: number;
   type: 'GROUP' | 'SINGLE' | 'MULTIPLE' | 'TRUE_FALSE' | 'FILL';
   imageUrl: string;
   content?: string;
   options?: string;
   answer?: string;
   difficulty: number;
+  examId: number;
   tagIds?: number[];
   conceptIds: number[];
   childQuestions?: {
