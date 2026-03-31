@@ -8,10 +8,9 @@
     "fix:format": "npm run lint:format -- --write",
     "lint": "run-p lint:*",
     "fix": "run-s fix:*",
-    "clean": "del-cli dist lib node_modules -f",
-    "build:layer": "npm install --production && mkdir -p dist/nodejs && cp -R node_modules dist/nodejs",
-    "build:lambda": "npm install && tspc",
-    "pre:deploy": "run-s clean build:*"
+    "clean": "del-cli dist -f",
+    "build": "tspc && esbuild src/index.ts --bundle --minify --platform=node --target=node22 --outfile=dist/index.js",
+    "pre:deploy": "run-s clean build"
   },
   "author": "Yue Chang",
   "license": "ISC",
@@ -35,6 +34,7 @@
     "@typescript-eslint/eslint-plugin": "^8.44.1",
     "@typescript-eslint/parser": "^8.44.1",
     "del-cli": "^7.0.0",
+    "esbuild": "^0.27.4",
     "eslint": "^9.36.0",
     "eslint-import-resolver-typescript": "^4.4.4",
     "eslint-plugin-import": "^2.32.0",

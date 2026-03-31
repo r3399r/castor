@@ -1243,9 +1243,8 @@ Resources:
       Runtime: nodejs22.x
       FunctionName: !Sub ${Project}-${TargetEnvr}-api
       Role: !GetAtt ExecutionRole.Arn
-      CodeUri: ../../lib/src
-      MemorySize: 200
-      Layers: [!Ref LambdaLayer]
+      CodeUri: ../../dist
+      MemorySize: 512
       Environment:
         Variables:
           ENVR: !Sub ${TargetEnvr}
@@ -1273,10 +1272,9 @@ Resources:
   #     Runtime: nodejs22.x
   #     FunctionName: !Sub ${Project}-${TargetEnvr}-stats-loader
   #     Role: !GetAtt ExecutionRole.Arn
-  #     CodeUri: ../../lib/src
-  #     MemorySize: 200
+  #     CodeUri: ../../dist
+  #     MemorySize: 512
   #     Timeout: 30
-  #     Layers: [!Ref LambdaLayer]
   #     Environment:
   #       Variables:
   #         PROJECT: !Sub ${Project}
@@ -1294,14 +1292,6 @@ Resources:
   #     Action: 'lambda:InvokeFunction'
   #     Principal: events.amazonaws.com
   #     SourceArn: !GetAtt EventBridgeStatsLoader.Arn
-  LambdaLayer:
-    Type: AWS::Serverless::LayerVersion
-    Properties:
-      LayerName: !Sub ${Project}-${TargetEnvr}-layer
-      CompatibleArchitectures: [arm64]
-      CompatibleRuntimes: [nodejs22.x]
-      ContentUri: ../../dist
-      RetentionPolicy: Delete
   #########################################
   ##### Cloudfront and Route53 config #####
   #########################################
