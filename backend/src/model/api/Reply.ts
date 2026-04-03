@@ -8,4 +8,5 @@ export type PostReplyResponse = {
   repliedAnswer: string;
   correctAnswer: string;
   score: number;
+  fbPostId: string | null;
 }[];

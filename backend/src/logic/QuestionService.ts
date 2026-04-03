@@ -56,16 +56,30 @@ export class QuestionService {
   public async getAdaptiveQuestion(
     params: GetQuestionAdaptiveParams | null
   ): Promise<GetQuestionAdaptiveResponse> {
+    if (!params) throw new BadRequestError('query parameters are required');
     console.log(params);
 
-    const question = await this.questionAccess.findOneOrFailById(2);
+    return await this.questionAccess.findAdaptive({
+      mastery: 5,
+      subjectId: Number(params.subjectId),
+      take: 2,
+      examId: params.examId ? Number(params.examId) : undefined,
+      tagIds: params.tagIds
+        ? params.tagIds.split(',').map((v) => Number(v))
+        : undefined,
+      conceptIds: params.conceptIds
+        ? params.conceptIds.split(',').map((v) => Number(v))
+        : undefined,
+    });
 
-    return {
-      ...question,
-      children: question.children?.sort(
-        (a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)
-      ),
-    };
+    // const question = await this.questionAccess.findOneOrFailById(2);
+
+    // return {
+    //   ...question,
+    //   children: question.children?.sort(
+    //     (a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)
+    //   ),
+    // };
   }
 
   public async getAllTags(

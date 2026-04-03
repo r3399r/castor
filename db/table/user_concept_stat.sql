@@ -12,5 +12,6 @@ CREATE TABLE IF NOT EXISTS castor.user_concept_stat (
     updated_at DATETIME(3) NULL,
     PRIMARY KEY (id),
     FOREIGN KEY (user_id) REFERENCES user(id),
-    FOREIGN KEY (concept_id) REFERENCES concept(id)
+    FOREIGN KEY (concept_id) REFERENCES concept(id),
+    UNIQUE KEY unique_user_concept (user_id, concept_id)
 );

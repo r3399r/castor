@@ -19,5 +19,6 @@ CREATE TABLE IF NOT EXISTS castor.question (
     PRIMARY KEY (id),
     UNIQUE (uuid),
     FOREIGN KEY (subject_id) REFERENCES castor.subject(id),
-    FOREIGN KEY (parent_id) REFERENCES castor.question(id)
+    FOREIGN KEY (parent_id) REFERENCES castor.question(id),
+    INDEX idx_subject_difficulty (subject_id, adjusted_difficulty)
 );

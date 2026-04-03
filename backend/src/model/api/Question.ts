@@ -65,7 +65,7 @@ export type GetQuestionAdaptiveParams = {
   conceptIds?: string;
 };
 
-export type GetQuestionAdaptiveResponse = Question;
+export type GetQuestionAdaptiveResponse = any;
 
 // export type ModifiedQuestion = {
 //   uid: string;

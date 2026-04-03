@@ -9,7 +9,9 @@ import {
 export type Reply = {
   id: number;
   questionId: number;
+  subjectId: number;
   userId: number;
+  parentId: number | null;
   score: number;
   repliedAnswer: string | null;
   createdAt: string | null;
@@ -24,8 +26,14 @@ export class ReplyEntity implements Reply {
   @Column({ type: 'int', unsigned: true, name: 'question_id' })
   questionId!: number;
 
+  @Column({ type: 'int', unsigned: true, name: 'subject_id' })
+  subjectId!: number;
+
   @Column({ type: 'int', unsigned: true, name: 'user_id' })
   userId!: number;
+
+  @Column({ type: 'int', unsigned: true, name: 'parent_id' })
+  parentId: number | null = null;
 
   @Column({ type: 'double' })
   score!: number;

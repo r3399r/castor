@@ -84,9 +84,19 @@ export class ReplyService {
 
     await this.questionAccess.save(question);
 
+    const result = {
+      questionId: question.id,
+      repliedAnswer,
+      correctAnswer: question.answer ?? '',
+      score,
+      fbPostId: question.fbPostId,
+    };
+
     const replyEntity = new ReplyEntity();
     replyEntity.questionId = question.id;
+    replyEntity.subjectId = question.subjectId;
     replyEntity.userId = userId;
+    replyEntity.parentId = parentQuestion ? parentQuestion.id : null;
     replyEntity.score = score;
     replyEntity.repliedAnswer = repliedAnswer;
     await this.replyAccess.save(replyEntity);
@@ -95,6 +105,9 @@ export class ReplyService {
     question.concept.forEach((c) => conceptIds.add(c.id));
     if (parentQuestion)
       parentQuestion.concept.forEach((c) => conceptIds.add(c.id));
+
+    if (conceptIds.size === 0) return result;
+
     const userConceptStatList = await this.userConceptStatAccess.find({
       where: {
         userId,
@@ -145,12 +158,7 @@ export class ReplyService {
       }
     }
 
-    return {
-      questionId: question.id,
-      repliedAnswer,
-      correctAnswer: question.answer ?? '',
-      score,
-    };
+    return result;
   }
 
   public async reply(data: PostReplyRequest): Promise<PostReplyResponse> {
