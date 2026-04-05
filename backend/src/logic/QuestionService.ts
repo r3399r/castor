@@ -98,7 +98,8 @@ export class QuestionService {
       });
       for (const group of conceptGroups)
         for (const concept of group.concepts)
-          conceptIds.set(concept.id, concept.numberOfQuestions);
+          if (concept.numberOfQuestions > 0)
+            conceptIds.set(concept.id, concept.numberOfQuestions);
     }
 
     // random picking conceptId with weight of numberOfQuestions
