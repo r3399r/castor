@@ -27,6 +27,7 @@ export class ConceptService {
     const conceptEntity = new ConceptEntity();
     conceptEntity.conceptGroupId = data.conceptGroupId;
     conceptEntity.name = data.name;
+    conceptEntity.numberOfQuestions = 0;
 
     return await this.conceptAccess.save(conceptEntity);
   }

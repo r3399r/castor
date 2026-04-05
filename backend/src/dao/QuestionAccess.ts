@@ -176,7 +176,7 @@ export class QuestionAccess {
       take: number;
       examId?: number;
       tagIds?: number[];
-      conceptIds?: number[];
+      conceptId: number;
     },
     direction: 'less' | 'greater'
   ) {
@@ -234,24 +234,14 @@ export class QuestionAccess {
       base.andWhere(`question.id IN ${subQuery}`, { tagIds, tagCount });
     }
 
-    if (data.conceptIds !== undefined && data.conceptIds.length > 0) {
-      const conceptIds = data.conceptIds;
-      const conceptCount = conceptIds.length;
+    const subQueryConcept = qb
+      .subQuery()
+      .select('qcFilter.question_id')
+      .from('question_concept', 'qcFilter')
+      .where('qcFilter.concept_id = :conceptId', { conceptId: data.conceptId })
+      .getQuery();
 
-      const subQuery = qb
-        .subQuery()
-        .select('qcFilter.question_id')
-        .from('question_concept', 'qcFilter')
-        .where('qcFilter.concept_id IN (:...conceptIds)', { conceptIds })
-        // .groupBy('qcFilter.question_id') // groupBy and having are for INTERSECTION, but we want UNION, so we don't use them
-        // .having('COUNT(DISTINCT qcFilter.concept_id) = :conceptCount')
-        .getQuery();
-
-      base.andWhere(`question.id IN ${subQuery}`, {
-        conceptIds,
-        conceptCount,
-      });
-    }
+    base.andWhere(`question.id IN ${subQueryConcept}`);
 
     return base.clone().take(data.take).getMany();
   }
@@ -262,17 +252,13 @@ export class QuestionAccess {
     take: number;
     examId?: number;
     tagIds?: number[];
-    conceptIds?: number[];
+    conceptId: number;
   }) {
     const [less, greater] = await Promise.all([
       this.getBaseAdaptiveQuery(data, 'less'),
       this.getBaseAdaptiveQuery(data, 'greater'),
     ]);
 
-    return [...less, ...greater].sort(
-      (a, b) =>
-        Math.abs(a.adjustedDifficulty - data.mastery) -
-        Math.abs(b.adjustedDifficulty - data.mastery)
-    );
+    return [...less, ...greater] as Question[];
   }
 }

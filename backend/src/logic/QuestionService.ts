@@ -1,14 +1,16 @@
 import axios from 'axios';
 import { inject, injectable } from 'inversify';
-import { In } from 'typeorm';
+import { In, MoreThan } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { LIMIT, OFFSET } from 'src/constant/Pagination';
 import { ConceptAccess } from 'src/dao/ConceptAccess';
+import { ConceptGroupAccess } from 'src/dao/ConceptGroupAccess';
 import { ExamAccess } from 'src/dao/ExamAccess';
 import { QuestionAccess } from 'src/dao/QuestionAccess';
 import { ReplyAccess } from 'src/dao/ReplyAccess';
 import { SubjectAccess } from 'src/dao/SubjectAccess';
 import { TagAccess } from 'src/dao/TagAccess';
+import { UserConceptStatAccess } from 'src/dao/UserConceptStatAccess';
 import {
   GetQuestionAdaptiveParams,
   GetQuestionAdaptiveResponse,
@@ -48,6 +50,10 @@ export class QuestionService {
   private readonly tagAccess!: TagAccess;
   @inject(ConceptAccess)
   private readonly conceptAccess!: ConceptAccess;
+  @inject(UserConceptStatAccess)
+  private readonly userConceptStatAccess!: UserConceptStatAccess;
+  @inject(ConceptGroupAccess)
+  private readonly conceptGroupAccess!: ConceptGroupAccess;
 
   public async getQuestionByUuid(uuid: string): Promise<GetQuestionIdResponse> {
     return await this.questionAccess.findOneOrFailByUuid(uuid);
@@ -57,29 +63,100 @@ export class QuestionService {
     params: GetQuestionAdaptiveParams | null
   ): Promise<GetQuestionAdaptiveResponse> {
     if (!params) throw new BadRequestError('query parameters are required');
-    console.log(params);
 
-    return await this.questionAccess.findAdaptive({
-      mastery: 5,
+    // find last 7 days reply of the user for the subject
+    const interval = 7 * 24 * 60 * 60 * 1000;
+    const user = await this.userService.getUser();
+    if (user === null) throw new UnauthorizedError('User not found');
+    const lastReplies = await this.replyAccess.find({
+      where: {
+        subjectId: Number(params.subjectId),
+        userId: user.id,
+        createdAt: MoreThan(new Date(Date.now() - interval).toISOString()),
+      },
+    });
+
+    // get candidate concepts and their numberOfQuestions
+    const conceptIds = new Map<number, number>();
+    if (params.conceptIds) {
+      const conceptList = await this.conceptAccess.find({
+        where: { id: In(params.conceptIds.split(',').map((v) => Number(v))) },
+      });
+      for (const concept of conceptList) {
+        if (concept.conceptGroup.subjectId !== Number(params.subjectId))
+          throw new BadRequestError(
+            'Invalid concept for the specified subject'
+          );
+        conceptIds.set(concept.id, concept.numberOfQuestions);
+      }
+    } else {
+      const conceptGroups = await this.conceptGroupAccess.find({
+        where: { subjectId: Number(params.subjectId) },
+        relations: {
+          concepts: true,
+        },
+      });
+      for (const group of conceptGroups)
+        for (const concept of group.concepts)
+          conceptIds.set(concept.id, concept.numberOfQuestions);
+    }
+
+    // random picking conceptId with weight of numberOfQuestions
+    const totalQuestions = Array.from(conceptIds.values()).reduce(
+      (a, b) => a + b,
+      0
+    );
+    let random = Math.random() * totalQuestions;
+    let selectedConceptId: number | null = null;
+    for (const [conceptId, numberOfQuestions] of conceptIds) {
+      random -= numberOfQuestions;
+      if (random <= 0) {
+        selectedConceptId = conceptId;
+        break;
+      }
+    }
+    if (selectedConceptId === null)
+      throw new BadRequestError('No concept found');
+
+    const userConceptStat = await this.userConceptStatAccess.findOne({
+      where: {
+        userId: user.id,
+        conceptId: selectedConceptId,
+      },
+    });
+
+    const mastery = userConceptStat?.mastery ?? 0;
+    const questionList = await this.questionAccess.findAdaptive({
+      mastery,
       subjectId: Number(params.subjectId),
-      take: 2,
+      take: 20 + lastReplies.length,
       examId: params.examId ? Number(params.examId) : undefined,
       tagIds: params.tagIds
         ? params.tagIds.split(',').map((v) => Number(v))
         : undefined,
-      conceptIds: params.conceptIds
-        ? params.conceptIds.split(',').map((v) => Number(v))
-        : undefined,
+      conceptId: selectedConceptId,
     });
 
-    // const question = await this.questionAccess.findOneOrFailById(2);
+    // sort question list and exclude reason replied questions and pick top 20
+    const candidateQuestions = questionList
+      .filter((q) => !lastReplies.some((r) => r.questionId === q.id))
+      .sort(
+        (a, b) =>
+          Math.abs(a.adjustedDifficulty - mastery) -
+          Math.abs(b.adjustedDifficulty - mastery)
+      )
+      .slice(0, 20);
 
-    // return {
-    //   ...question,
-    //   children: question.children?.sort(
-    //     (a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)
-    //   ),
-    // };
+    // return randomly picked question
+    const question =
+      candidateQuestions[Math.floor(Math.random() * candidateQuestions.length)];
+
+    return {
+      ...question,
+      children: question.children?.sort(
+        (a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)
+      ),
+    };
   }
 
   public async getAllTags(
@@ -185,10 +262,12 @@ export class QuestionService {
       throw new BadRequestError(
         'Some concepts are invalid for the specified subject'
       );
-    for (const concept of concepts)
+    for (const concept of concepts) {
       if (concept.conceptGroup.subjectId !== subject.id)
         throw new BadRequestError('Invalid concept for the specified subject');
-
+      concept.numberOfQuestions += 1;
+      await this.conceptAccess.save(concept);
+    }
     const fbPost = await this.postFb(
       data.imageUrl,
       [subject.name, ...tags.map((t) => t.name), ...concepts.map((c) => c.name)]

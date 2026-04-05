@@ -13,6 +13,7 @@ export type Concept = {
   name: string;
   conceptGroupId: number;
   conceptGroup: ConceptGroup;
+  numberOfQuestions: number;
   createdAt: string | null;
 };
 
@@ -30,6 +31,9 @@ export class ConceptEntity implements Concept {
   @ManyToOne(() => ConceptGroupEntity)
   @JoinColumn({ name: 'concept_group_id' })
   conceptGroup!: ConceptGroup;
+
+  @Column({ type: 'int', unsigned: true, name: 'number_of_questions' })
+  numberOfQuestions!: number;
 
   @Column({ type: 'datetime', name: 'created_at', default: null })
   createdAt!: string;
