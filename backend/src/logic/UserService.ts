@@ -1,15 +1,17 @@
 import admin from 'firebase-admin';
 import { inject, injectable } from 'inversify';
+import { In } from 'typeorm';
+import { ConceptGroupAccess } from 'src/dao/ConceptGroupAccess';
 import { UserAccess } from 'src/dao/UserAccess';
-import { UserStatsAccess } from 'src/dao/UserStatsAccess';
+import { UserConceptStatAccess } from 'src/dao/UserConceptStatAccess';
 import {
-  GetUserDetailParams,
-  GetUserDetailResponse,
   GetUserResponse,
+  GetUserStatsResponse,
   PostUserSyncResponse,
+  StatsCategory,
 } from 'src/model/api/User';
 import { UserEntity } from 'src/model/entity/UserEntity';
-import { BadRequestError, UnauthorizedError } from 'src/model/error';
+import { UnauthorizedError } from 'src/model/error';
 import { authorizationSymbol } from 'src/utils/LambdaHelper';
 
 admin.initializeApp({
@@ -25,10 +27,10 @@ admin.initializeApp({
 export class UserService {
   @inject(UserAccess)
   private readonly userAccess!: UserAccess;
-  @inject(UserStatsAccess)
-  private readonly userStatsAccess!: UserStatsAccess;
-  // @inject(ReplyAccess)
-  // private readonly replyAccess!: ReplyAccess;
+  @inject(UserConceptStatAccess)
+  private readonly userConceptStatAccess!: UserConceptStatAccess;
+  @inject(ConceptGroupAccess)
+  private readonly conceptGroupAccess!: ConceptGroupAccess;
   @inject(authorizationSymbol)
   private readonly token!: string;
 
@@ -74,68 +76,70 @@ export class UserService {
     });
   }
 
-  public async getUserDetail(
-    params: GetUserDetailParams | null
-  ): Promise<GetUserDetailResponse> {
-    if (!params?.categoryId)
-      throw new BadRequestError('categoryId is required');
-
+  public async getUserStats(): Promise<GetUserStatsResponse> {
     const user = await this.getUser();
     if (user === null) throw new UnauthorizedError('User not found');
 
-    const userStats = await this.userStatsAccess.find({
-      where: {
-        userId: user.id,
+    const stats = await this.userConceptStatAccess.find({
+      where: { userId: user.id },
+      select: ['mastery', 'conceptId'],
+      relations: {
+        concept: {
+          conceptGroup: true,
+        },
       },
-      relations: { user: true, category: true },
     });
 
-    // const limit = params?.limit ? Number(params.limit) : LIMIT;
-    // const offset = params?.offset ? Number(params.offset) : OFFSET;
-    // const [reply, total] = await this.replyAccess.findAndCount({
-    //   where: {
-    //     userId: user.id,
-    //     question: {
-    //       categoryId: params.categoryId,
-    //     },
-    //   },
-    //   relations: {
-    //     question: { tag: true },
-    //   },
-    //   order: { recordedAt: 'DESC' },
-    //   take: limit,
-    //   skip: offset,
-    // });
-
-    const currentUs = userStats.find(
-      (v) => v.category.id === Number(params.categoryId)
+    const statsMap = new Map(stats.map((s) => [s.conceptId, s]));
+    const subjectIds = new Set(
+      stats.map((v) => v.concept.conceptGroup.subjectId)
     );
+    const conceptGroups = await this.conceptGroupAccess.find({
+      where: { subjectId: In([...subjectIds]) },
+      relations: {
+        concepts: true,
+        subject: {
+          category: true,
+        },
+      },
+    });
 
-    return {
-      user,
-      category:
-        userStats?.map((v) => ({
-          id: v.category.id,
-          name: v.category.name,
-          isCurrent: v.category.id === Number(params.categoryId),
-        })) ?? [],
-      count: currentUs?.count ?? null,
-      scoringRate: currentUs?.scoringRate ?? null,
-      // reply: {
-      //   data: reply.map((v) => ({
-      //     id: v.id,
-      //     questionUid:
-      //       v.question.rid + v.question.id.toString(36).toUpperCase(),
-      //     questionTitle: v.question.title,
-      //     questionSource: v.question.source,
-      //     tag: v.question.tag,
-      //     score: v.score,
-      //     repliedAnswer: v.repliedAnswer,
-      //     complete: v.complete,
-      //     recordedAt: v.recordedAt,
-      //   })),
-      //   paginate: genPagination(total, limit, offset),
-      // },
-    };
+    const categoryMap = new Map<number, StatsCategory>();
+    // const subjects = new Map<number, StatsSubject>()
+    for (const cg of conceptGroups) {
+      let [totalMastery, totalCount] = [0, 0];
+      for (const c of cg.concepts) {
+        const mastery = statsMap.get(c.id)?.mastery ?? 0;
+        totalMastery += mastery * c.numberOfQuestions;
+        totalCount += c.numberOfQuestions;
+      }
+
+      const resultConceptGroup = {
+        id: cg.id,
+        name: cg.name,
+        mastery: totalCount > 0 ? totalMastery / totalCount : 0,
+      };
+
+      if (!categoryMap.has(cg.subject.category.id))
+        categoryMap.set(cg.subject.category.id, {
+          id: cg.subject.category.id,
+          name: cg.subject.category.name,
+          subjects: [],
+        });
+
+      const category = categoryMap.get(cg.subject.category.id)!;
+      let subject = category.subjects.find((s) => s.id === cg.subject.id);
+      if (!subject) {
+        subject = {
+          id: cg.subject.id,
+          name: cg.subject.name,
+          conceptGroups: [],
+        };
+        category.subjects.push(subject);
+      }
+      subject.conceptGroups.push(resultConceptGroup);
+    }
+
+    return [...categoryMap.values()];
   }
 }

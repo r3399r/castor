@@ -1,8 +1,17 @@
-import { BeforeInsert, Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  BeforeInsert,
+  Column,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
+import { Category, CategoryEntity } from './CategoryEntity';
 
 export type Subject = {
   id: number;
   categoryId: number;
+  category: Category;
   name: string;
   createdAt: string | null;
 };
@@ -14,6 +23,10 @@ export class SubjectEntity implements Subject {
 
   @Column({ type: 'int', unsigned: true, name: 'category_id' })
   categoryId!: number;
+
+  @ManyToOne(() => CategoryEntity)
+  @JoinColumn({ name: 'category_id' })
+  category!: Category;
 
   @Column({ type: 'varchar', length: 255 })
   name!: string;

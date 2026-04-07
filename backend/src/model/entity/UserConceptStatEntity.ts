@@ -3,13 +3,17 @@ import {
   BeforeUpdate,
   Column,
   Entity,
+  JoinColumn,
+  ManyToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
+import { Concept, ConceptEntity } from './ConceptEntity';
 
 export type UserConceptStat = {
   id: number;
   userId: number;
   conceptId: number;
+  concept: Concept;
   mastery: number | null;
   attemptCount: number;
   scoringTotal: number;
@@ -30,6 +34,10 @@ export class UserConceptStatEntity implements UserConceptStat {
 
   @Column({ type: 'int', unsigned: true, name: 'concept_id' })
   conceptId!: number;
+
+  @ManyToOne(() => ConceptEntity)
+  @JoinColumn({ name: 'concept_id' })
+  concept!: Concept;
 
   @Column({ type: 'double', nullable: true })
   mastery: number | null = null;

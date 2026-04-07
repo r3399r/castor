@@ -2,15 +2,19 @@ import {
   BeforeInsert,
   Column,
   Entity,
+  JoinColumn,
+  ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { Concept, ConceptEntity } from './ConceptEntity';
+import { Subject, SubjectEntity } from './SubjectEntity';
 
 export type ConceptGroup = {
   id: number;
   name: string;
   subjectId: number;
+  subject: Subject;
   concepts: Concept[];
   createdAt: string | null;
 };
@@ -25,6 +29,10 @@ export class ConceptGroupEntity implements ConceptGroup {
 
   @Column({ type: 'int', unsigned: true, name: 'subject_id' })
   subjectId!: number;
+
+  @ManyToOne(() => SubjectEntity)
+  @JoinColumn({ name: 'subject_id' })
+  subject!: Subject;
 
   @Column({ type: 'datetime', name: 'created_at', default: null })
   createdAt!: string;

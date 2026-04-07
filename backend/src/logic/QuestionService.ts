@@ -27,7 +27,11 @@ import {
 import { QuestionEntity } from 'src/model/entity/QuestionEntity';
 import { ReplyEntity } from 'src/model/entity/ReplyEntity';
 import { Tag } from 'src/model/entity/TagEntity';
-import { BadRequestError, UnauthorizedError } from 'src/model/error';
+import {
+  BadRequestError,
+  NotFoundError,
+  UnauthorizedError,
+} from 'src/model/error';
 import { genPagination } from 'src/utils/paginator';
 import { UserService } from './UserService';
 
@@ -65,16 +69,8 @@ export class QuestionService {
     if (!params) throw new BadRequestError('query parameters are required');
 
     // find last 7 days reply of the user for the subject
-    const interval = 7 * 24 * 60 * 60 * 1000;
     const user = await this.userService.getUser();
     if (user === null) throw new UnauthorizedError('User not found');
-    const lastReplies = await this.replyAccess.find({
-      where: {
-        subjectId: Number(params.subjectId),
-        userId: user.id,
-        createdAt: MoreThan(new Date(Date.now() - interval).toISOString()),
-      },
-    });
 
     // get candidate concepts and their numberOfQuestions
     const conceptIds = new Map<number, number>();
@@ -119,6 +115,15 @@ export class QuestionService {
     if (selectedConceptId === null)
       throw new BadRequestError('No concept found');
 
+    const interval = 7 * 24 * 60 * 60 * 1000;
+    const lastReplies = await this.replyAccess.find({
+      where: {
+        subjectId: Number(params.subjectId),
+        userId: user.id,
+        createdAt: MoreThan(new Date(Date.now() - interval).toISOString()),
+      },
+    });
+
     const userConceptStat = await this.userConceptStatAccess.findOne({
       where: {
         userId: user.id,
@@ -137,9 +142,10 @@ export class QuestionService {
         : undefined,
       conceptId: selectedConceptId,
     });
+    if (questionList.length === 0) throw new NotFoundError('No question found');
 
     // sort question list and exclude reason replied questions and pick top 20
-    const candidateQuestions = questionList
+    const candidateList = questionList
       .filter((q) => !lastReplies.some((r) => r.questionId === q.id))
       .sort(
         (a, b) =>
@@ -150,7 +156,9 @@ export class QuestionService {
 
     // return randomly picked question
     const question =
-      candidateQuestions[Math.floor(Math.random() * candidateQuestions.length)];
+      candidateList.length > 0
+        ? candidateList[Math.floor(Math.random() * candidateList.length)]
+        : questionList[Math.floor(Math.random() * questionList.length)];
 
     return {
       ...question,
