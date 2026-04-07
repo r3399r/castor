@@ -392,7 +392,7 @@ const Adaptive = () => {
             {replyResponse && replyResponse.at(0) && (
               <div>
                 <a
-                  href={`https://facebook.com/${replyResponse?.at(0)?.fbPostId}`}
+                  href={`https://m.facebook.com/${replyResponse[0].fbPostId?.split('_')[0]}/posts/${replyResponse[0].fbPostId?.split('_')[1]}`}
                   target="_blank"
                   className="text-blue-600 underline"
                 >

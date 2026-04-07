@@ -284,7 +284,7 @@ const QuestionList = () => {
                 ))}
                 <div className="mt-4">
                   <a
-                    href={`https://facebook.com/${item.fbPostId}`}
+                    href={`https://m.facebook.com/${item?.fbPostId?.split('_')[0]}/posts/${item?.fbPostId?.split('_')[1]}`}
                     target="_blank"
                     className="text-blue-600 underline"
                   >

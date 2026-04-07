@@ -128,15 +128,6 @@ export class UserService {
         });
 
       const subject = subjectMap.get(cg.subject.id)!;
-      // let subject = category.subjects.find((s) => s.id === cg.subject.id);
-      // if (!subject) {
-      //   subject = {
-      //     id: cg.subject.id,
-      //     name: cg.subject.name,
-      //     conceptGroups: [],
-      //   };
-      //   category.subjects.push(subject);
-      // }
       subject.conceptGroup.push(resultConceptGroup);
     }
 
