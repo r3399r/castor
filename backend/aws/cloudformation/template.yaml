@@ -952,10 +952,6 @@ Resources:
                   "in": "header",
                   "required": true,
                   "schema": {"type": "string"}
-                }, {
-                    "name": "categoryId",
-                    "in": "query",
-                    "required": true
                 }],
                 "responses": {
                   "200": {
@@ -1034,113 +1030,7 @@ Resources:
                   "contentHandling": "CONVERT_TO_TEXT"
                 }
               }
-            },
-            # "/api/question/start": {
-            #   "post": {
-            #     "parameters": [{
-            #       "name": "Authorization",
-            #       "in": "header",
-            #       "required": true,
-            #       "schema": {"type": "string"}
-            #     }],
-            #     "requestBody": {
-            #       "content": {
-            #         "application/json": {
-            #           "schema": {
-            #             "$ref": "#/components/schemas/postQuestionStart"
-            #           }
-            #         }
-            #       },
-            #       "required": true
-            #     },
-            #     "responses": {
-            #       "200": {
-            #         "description": "200 response",
-            #         "headers": {
-            #           "Access-Control-Allow-Origin": {
-            #             "schema": {"type": "string"}
-            #           }
-            #         },
-            #         "content": {
-            #           "application/json": {
-            #             "schema": {
-            #               "$ref": "#/components/schemas/Empty"
-            #             }
-            #           }
-            #         }
-            #       }
-            #     },
-            #     "x-amazon-apigateway-request-validator": "Validate body, query string parameters, and headers",
-            #     "x-amazon-apigateway-integration": {
-            #       "type": "aws_proxy",
-            #       "httpMethod": "POST",
-            #       "uri": !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${Project}-${TargetEnvr}-api/invocations",
-            #       "responses": {
-            #         "default": {
-            #           "statusCode": "200",
-            #           "responseParameters": {
-            #             "method.response.header.Access-Control-Allow-Origin": "'*'"
-            #           }
-            #         }
-            #       },
-            #       "passthroughBehavior": "when_no_match",
-            #       "contentHandling": "CONVERT_TO_TEXT"
-            #     }
-            #   }
-            # },
-            # "/api/question/complete": {
-            #   "post": {
-            #     "parameters": [{
-            #       "name": "Authorization",
-            #       "in": "header",
-            #       "required": true,
-            #       "schema": {"type": "string"}
-            #     }],
-            #     "requestBody": {
-            #       "content": {
-            #         "application/json": {
-            #           "schema": {
-            #             "$ref": "#/components/schemas/postQuestionComplete"
-            #           }
-            #         }
-            #       },
-            #       "required": true
-            #     },
-            #     "responses": {
-            #       "200": {
-            #         "description": "200 response",
-            #         "headers": {
-            #           "Access-Control-Allow-Origin": {
-            #             "schema": {"type": "string"}
-            #           }
-            #         },
-            #         "content": {
-            #           "application/json": {
-            #             "schema": {
-            #               "$ref": "#/components/schemas/Empty"
-            #             }
-            #           }
-            #         }
-            #       }
-            #     },
-            #     "x-amazon-apigateway-request-validator": "Validate body, query string parameters, and headers",
-            #     "x-amazon-apigateway-integration": {
-            #       "type": "aws_proxy",
-            #       "httpMethod": "POST",
-            #       "uri": !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${Project}-${TargetEnvr}-api/invocations",
-            #       "responses": {
-            #         "default": {
-            #           "statusCode": "200",
-            #           "responseParameters": {
-            #             "method.response.header.Access-Control-Allow-Origin": "'*'"
-            #           }
-            #         }
-            #       },
-            #       "passthroughBehavior": "when_no_match",
-            #       "contentHandling": "CONVERT_TO_TEXT"
-            #     }
-            #   }
-            # }
+            }
           },
           "definitions": {
             "Empty": {
@@ -1241,32 +1131,6 @@ Resources:
                 "required": ["questionId","repliedAnswer"]
               }
             }
-            # "postQuestionStart": {
-            #   "type": "object",
-            #   "properties": {
-            #     "id":{"type": "number"}
-            #   },
-            #   "required": ["id"]
-            # },
-            # "postQuestionComplete": {
-            #   "type": "object",
-            #   "properties": {
-            #     "id":{"type": "number"},
-            #     "replyId":{"type": "number"},
-            #     "replied": {
-            #       "type": "array",
-            #       "items": {
-            #         "type": "object",
-            #         "properties": {
-            #           "id": {"type":"number"},
-            #           "answer": {"type": "string"}
-            #         },
-            #         "required": ["id","answer"]
-            #       }
-            #     }
-            #   },
-            #   "required": ["id","replyId","replied"]
-            # }
           },
           "x-amazon-apigateway-request-validators" : {
             "Validate body, query string parameters, and headers" : {

@@ -8,7 +8,7 @@ import {
   GetUserResponse,
   GetUserStatsResponse,
   PostUserSyncResponse,
-  StatsCategory,
+  StatsSubject,
 } from 'src/model/api/User';
 import { UserEntity } from 'src/model/entity/UserEntity';
 import { UnauthorizedError } from 'src/model/error';
@@ -104,8 +104,7 @@ export class UserService {
       },
     });
 
-    const categoryMap = new Map<number, StatsCategory>();
-    // const subjects = new Map<number, StatsSubject>()
+    const subjectMap = new Map<number, StatsSubject>();
     for (const cg of conceptGroups) {
       let [totalMastery, totalCount] = [0, 0];
       for (const c of cg.concepts) {
@@ -120,26 +119,27 @@ export class UserService {
         mastery: totalCount > 0 ? totalMastery / totalCount : 0,
       };
 
-      if (!categoryMap.has(cg.subject.category.id))
-        categoryMap.set(cg.subject.category.id, {
-          id: cg.subject.category.id,
-          name: cg.subject.category.name,
-          subjects: [],
-        });
-
-      const category = categoryMap.get(cg.subject.category.id)!;
-      let subject = category.subjects.find((s) => s.id === cg.subject.id);
-      if (!subject) {
-        subject = {
+      if (!subjectMap.has(cg.subject.id))
+        subjectMap.set(cg.subject.id, {
           id: cg.subject.id,
           name: cg.subject.name,
-          conceptGroups: [],
-        };
-        category.subjects.push(subject);
-      }
-      subject.conceptGroups.push(resultConceptGroup);
+          category: cg.subject.category,
+          conceptGroup: [],
+        });
+
+      const subject = subjectMap.get(cg.subject.id)!;
+      // let subject = category.subjects.find((s) => s.id === cg.subject.id);
+      // if (!subject) {
+      //   subject = {
+      //     id: cg.subject.id,
+      //     name: cg.subject.name,
+      //     conceptGroups: [],
+      //   };
+      //   category.subjects.push(subject);
+      // }
+      subject.conceptGroup.push(resultConceptGroup);
     }
 
-    return [...categoryMap.values()];
+    return [...subjectMap.values()];
   }
 }

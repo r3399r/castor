@@ -13,11 +13,13 @@ import {
   Rating,
   Select,
 } from '@mui/material';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useDispatch } from 'react-redux';
 import categoryEndpoint from 'src/api/categoryEndpoint';
 import questionEndpoint from 'src/api/questionEndpoint';
+import replyEndpoint from 'src/api/replyEndpoint';
 import subjectEndpoint from 'src/api/subjectEndpoint';
+import type { PostReplyResponse } from 'src/model/backend/api/Reply';
 import type { Category } from 'src/model/backend/entity/CategoryEntity';
 import type { ConceptGroup } from 'src/model/backend/entity/ConceptGroupEntity';
 import type { Exam } from 'src/model/backend/entity/ExamEntity';
@@ -40,6 +42,16 @@ const Adaptive = () => {
   const [tagList, setTagList] = useState<Tag[]>();
   const [adaptiveQuestion, setAdaptiveQuestion] = useState<Question>();
   const [repliedAnswer, setRepliedAnswer] = useState<Map<number, string>>(new Map());
+  const [replyResponse, setReplyResponse] = useState<PostReplyResponse>();
+  const [questionCount, setQuestionCount] = useState<number>(-1);
+
+  const canSubmit = useMemo(() => {
+    if (!adaptiveQuestion) return false;
+    if (adaptiveQuestion.type === 'GROUP') {
+      return repliedAnswer.size === adaptiveQuestion.children.length;
+    }
+    return repliedAnswer.size === 1;
+  }, [adaptiveQuestion, repliedAnswer]);
 
   useEffect(() => {
     categoryEndpoint.getCategory().then((res) => {
@@ -60,9 +72,9 @@ const Adaptive = () => {
 
   useEffect(() => {
     if (!selectedSubjectId) return;
-    setSelectedExamId(undefined);
-    setSelectedConceptIds([]);
-    setSelectedTagIds([]);
+    if (selectedExamId) setSelectedExamId(undefined);
+    if (selectedConceptIds.length > 0) setSelectedConceptIds([]);
+    if (selectedTagIds.length > 0) setSelectedTagIds([]);
     subjectEndpoint.getSubjectIdExam(selectedSubjectId).then((res) => {
       setExamList(res?.data);
     });
@@ -74,8 +86,27 @@ const Adaptive = () => {
     });
   }, [selectedSubjectId]);
 
+  useEffect(() => {
+    if (!selectedSubjectId) return;
+    setQuestionCount(-1);
+    questionEndpoint
+      .getQuestion({
+        subjectId: selectedSubjectId.toString(),
+        examId: selectedExamId?.toString(),
+        tagIds: selectedTagIds.length > 0 ? selectedTagIds.join(',') : undefined,
+        conceptIds: selectedConceptIds.length > 0 ? selectedConceptIds.join(',') : undefined,
+        limit: '1',
+      })
+      .then((res) => {
+        if (res) setQuestionCount(res.data.paginate.total);
+      });
+  }, [selectedSubjectId, selectedExamId, selectedConceptIds, selectedTagIds]);
+
   const onClickSearch = () => {
     if (!selectedSubjectId) return;
+    setAdaptiveQuestion(undefined);
+    setReplyResponse(undefined);
+    setRepliedAnswer(new Map());
     dispatch(startWaiting());
     questionEndpoint
       .getQuestionAdaptive({
@@ -86,6 +117,24 @@ const Adaptive = () => {
       })
       .then((res) => {
         setAdaptiveQuestion(res?.data);
+      })
+      .finally(() => {
+        dispatch(finishWaiting());
+      });
+  };
+
+  const onSubmit = () => {
+    if (!repliedAnswer) return;
+    dispatch(startWaiting());
+    replyEndpoint
+      .postReply(
+        [...repliedAnswer].map(([id, answer]) => ({
+          questionId: id,
+          repliedAnswer: answer,
+        })),
+      )
+      .then((res) => {
+        if (res) setReplyResponse(res.data);
       })
       .finally(() => {
         dispatch(finishWaiting());
@@ -180,7 +229,8 @@ const Adaptive = () => {
                   value={repliedAnswer.get(question.id)?.at(i) ?? ''}
                   onChange={(e) => {
                     const newRepliedAnswer = new Map(repliedAnswer);
-                    const prev = newRepliedAnswer.get(question.id) ?? '';
+                    const prev =
+                      newRepliedAnswer.get(question.id) ?? '@'.repeat(question.answer!.length);
                     const newValue = prev.substring(0, i) + e.target.value + prev.substring(i + 1);
                     newRepliedAnswer.set(question.id, newValue);
                     setRepliedAnswer(newRepliedAnswer);
@@ -278,14 +328,15 @@ const Adaptive = () => {
             </Select>
           </FormControl>
         )}
-        <div>
+        <div className="flex items-center gap-4">
           <Button
             variant="contained"
             onClick={onClickSearch}
-            disabled={!selectedSubjectId || !!adaptiveQuestion}
+            disabled={!selectedSubjectId || !!adaptiveQuestion || questionCount <= 0}
           >
             AI選題
           </Button>
+          {questionCount >= 0 && <div>共有 {questionCount} 題符合條件</div>}
         </div>
       </div>
       <hr className="my-4" />
@@ -315,16 +366,69 @@ const Adaptive = () => {
           </div>
           <div className="p-4">
             {adaptiveQuestion.content && (
-              <div dangerouslySetInnerHTML={{ __html: adaptiveQuestion.content }} />
+              <>
+                <div dangerouslySetInnerHTML={{ __html: adaptiveQuestion.content }} />
+                <Reply question={adaptiveQuestion} />
+                {replyResponse && replyResponse.at(0) && adaptiveQuestion.type !== 'GROUP' && (
+                  <div>
+                    <div>解答: {replyResponse.at(0)?.correctAnswer}</div>
+                    <div>得分: {replyResponse.at(0)?.score}</div>
+                  </div>
+                )}
+              </>
             )}
-            <Reply question={adaptiveQuestion} />
-            {adaptiveQuestion.children.map((c) => (
+            {adaptiveQuestion.children.map((c, i) => (
               <div key={c.id} className="mt-4">
                 <div dangerouslySetInnerHTML={{ __html: c.content ?? '' }} />
                 <Reply question={c} />
+                {replyResponse && replyResponse.at(i) && (
+                  <div>
+                    <div>解答: {replyResponse.at(i)?.correctAnswer}</div>
+                    <div>得分: {replyResponse.at(i)?.score}</div>
+                  </div>
+                )}
               </div>
             ))}
+            {replyResponse && replyResponse.at(0) && (
+              <div>
+                <a
+                  href={`https://facebook.com/${replyResponse?.at(0)?.fbPostId}`}
+                  target="_blank"
+                  className="text-blue-600 underline"
+                >
+                  討論區
+                </a>
+              </div>
+            )}
           </div>
+        </div>
+      )}
+      {adaptiveQuestion && !replyResponse && (
+        <div className="mt-4">
+          <Button variant="contained" disabled={!canSubmit} onClick={onSubmit}>
+            確認送出
+          </Button>
+        </div>
+      )}
+      {replyResponse && (
+        <div className="mt-4 flex gap-4">
+          <Button variant="contained" onClick={onClickSearch}>
+            用相同條件再選下一題
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={() => {
+              setAdaptiveQuestion(undefined);
+              setReplyResponse(undefined);
+              setRepliedAnswer(new Map());
+              setSelectedExamId(undefined);
+              setSelectedConceptIds([]);
+              setSelectedTagIds([]);
+            }}
+          >
+            清除篩選條件
+          </Button>
         </div>
       )}
     </>

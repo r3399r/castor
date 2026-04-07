@@ -1,16 +1,10 @@
 import http from 'src/api/http';
-import type {
-  GetUserDetailParams,
-  GetUserDetailResponse,
-  PostUserSyncResponse,
-} from 'src/model/backend/api/User';
+import type { GetUserStatsResponse, PostUserSyncResponse } from 'src/model/backend/api/User';
 import { alertError } from './errorHandler';
 
-const getUserDetail = async (params: GetUserDetailParams) => {
+const getUserStats = async () => {
   try {
-    return await http.get<GetUserDetailResponse, GetUserDetailParams>('user/detail', {
-      params,
-    });
+    return await http.get<GetUserStatsResponse>('user/stats');
   } catch (e) {
     alertError(e);
   }
@@ -25,6 +19,6 @@ const postUserSync = async () => {
 };
 
 export default {
-  getUserDetail,
+  getUserStats,
   postUserSync,
 };

@@ -26,7 +26,12 @@ export class CategoryService {
   public async getSubjectsByCategoryId(
     id: string
   ): Promise<GetCateogoryIdSubjectResponse> {
-    return await this.subjectAccess.find({ where: { categoryId: Number(id) } });
+    return await this.subjectAccess.find({
+      where: {
+        category: { id: Number(id) },
+      },
+      relations: { category: true },
+    });
   }
 
   public async createCategory(

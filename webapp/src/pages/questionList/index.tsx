@@ -242,7 +242,7 @@ const QuestionList = () => {
               <div className="p-4">
                 {item.content && <div dangerouslySetInnerHTML={{ __html: item.content }} />}
                 {item.answer && (
-                  <div className="mt-4 flex gap-2">
+                  <div className="mt-4">
                     <Button
                       variant="outlined"
                       size="small"
@@ -263,7 +263,7 @@ const QuestionList = () => {
                 {item.children.map((c) => (
                   <div key={c.id} className="mt-4">
                     <div dangerouslySetInnerHTML={{ __html: c.content ?? '' }} />
-                    <div className="mt-4 flex gap-2">
+                    <div className="mt-4">
                       <Button
                         variant="outlined"
                         size="small"
@@ -282,6 +282,15 @@ const QuestionList = () => {
                     </div>
                   </div>
                 ))}
+                <div className="mt-4">
+                  <a
+                    href={`https://facebook.com/${item.fbPostId}`}
+                    target="_blank"
+                    className="text-blue-600 underline"
+                  >
+                    討論區
+                  </a>
+                </div>
               </div>
             </div>
           ))}

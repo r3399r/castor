@@ -242,6 +242,7 @@ export class QuestionService {
 
     const subject = await this.subjectAccess.findOneOrFail({
       where: { id: data.subjectId },
+      relations: { category: true },
     });
 
     const exam = await this.examAccess.findOneOrFail({
@@ -279,7 +280,13 @@ export class QuestionService {
     }
     const fbPost = await this.postFb(
       data.imageUrl,
-      [subject.name, ...tags.map((t) => t.name), ...concepts.map((c) => c.name)]
+      [
+        ...subject.category.map((c) => c.name),
+        subject.name,
+        exam.name,
+        ...tags.map((t) => t.name),
+        ...concepts.map((c) => c.name),
+      ]
         .map((t) => `#${t}`)
         .join(' ')
     );

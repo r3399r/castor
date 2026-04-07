@@ -89,7 +89,7 @@ export class ReplyService {
       repliedAnswer,
       correctAnswer: question.answer ?? '',
       score,
-      fbPostId: question.fbPostId,
+      fbPostId: parentQuestion ? parentQuestion.fbPostId : question.fbPostId,
     };
 
     const replyEntity = new ReplyEntity();

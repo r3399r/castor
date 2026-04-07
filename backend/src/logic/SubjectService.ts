@@ -54,7 +54,6 @@ export class SubjectService {
     subject: PostSubjectRequest
   ): Promise<PostSubjectResponse> {
     const subjectEntity = new SubjectEntity();
-    subjectEntity.categoryId = subject.categoryId;
     subjectEntity.name = subject.name;
 
     return await this.subjectAccess.save(subjectEntity);

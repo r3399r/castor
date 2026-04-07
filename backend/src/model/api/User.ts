@@ -1,3 +1,4 @@
+import { Category } from 'src/model/entity/CategoryEntity';
 import { User } from 'src/model/entity/UserEntity';
 
 export type GetUserResponse = User | null;
@@ -11,15 +12,10 @@ export type StatsConceptGroup = {
 export type StatsSubject = {
   id: number;
   name: string;
-  conceptGroups: StatsConceptGroup[];
+  category: Category[];
+  conceptGroup: StatsConceptGroup[];
 };
 
-export type StatsCategory = {
-  id: number;
-  name: string;
-  subjects: StatsSubject[];
-};
-
-export type GetUserStatsResponse = StatsCategory[];
+export type GetUserStatsResponse = StatsSubject[];
 
 export type PostUserSyncResponse = User;
