@@ -49,7 +49,7 @@ export type PostQuestionCompleteResponse = ModifiedReply;
 
 export type GetQuestionParams = PaginationParams & {
   subjectId: string;
-  examId?: string;
+  examIds?: string;
   tagIds?: string;
   conceptIds?: string;
 };
@@ -60,7 +60,7 @@ export type GetQuestionTagResponse = { id: number; name: string }[];
 
 export type GetQuestionAdaptiveParams = {
   subjectId: string;
-  examId?: string;
+  examIds?: string;
   tagIds?: string;
   conceptIds?: string;
 };

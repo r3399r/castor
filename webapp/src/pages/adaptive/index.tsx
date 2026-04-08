@@ -32,7 +32,7 @@ const Adaptive = () => {
   const dispatch = useDispatch();
   const [selectedCategoryId, setSelectedCategoryId] = useState<number>();
   const [selectedSubjectId, setSelectedSubjectId] = useState<number>();
-  const [selectedExamId, setSelectedExamId] = useState<number>();
+  const [selectedExamIds, setSelectedExamIds] = useState<number[]>([]);
   const [selectedConceptIds, setSelectedConceptIds] = useState<number[]>([]);
   const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
   const [categoryList, setCategoryList] = useState<Category[]>();
@@ -62,7 +62,7 @@ const Adaptive = () => {
   useEffect(() => {
     if (!selectedCategoryId) return;
     setSelectedSubjectId(undefined);
-    setSelectedExamId(undefined);
+    setSelectedExamIds([]);
     setSelectedConceptIds([]);
     setSelectedTagIds([]);
     categoryEndpoint.getCategoryIdSubject(selectedCategoryId).then((res) => {
@@ -72,7 +72,7 @@ const Adaptive = () => {
 
   useEffect(() => {
     if (!selectedSubjectId) return;
-    if (selectedExamId) setSelectedExamId(undefined);
+    if (selectedExamIds) setSelectedExamIds([]);
     if (selectedConceptIds.length > 0) setSelectedConceptIds([]);
     if (selectedTagIds.length > 0) setSelectedTagIds([]);
     subjectEndpoint.getSubjectIdExam(selectedSubjectId).then((res) => {
@@ -92,7 +92,7 @@ const Adaptive = () => {
     questionEndpoint
       .getQuestion({
         subjectId: selectedSubjectId.toString(),
-        examId: selectedExamId?.toString(),
+        examIds: selectedExamIds.length > 0 ? selectedExamIds.join(',') : undefined,
         tagIds: selectedTagIds.length > 0 ? selectedTagIds.join(',') : undefined,
         conceptIds: selectedConceptIds.length > 0 ? selectedConceptIds.join(',') : undefined,
         limit: '1',
@@ -100,7 +100,7 @@ const Adaptive = () => {
       .then((res) => {
         if (res) setQuestionCount(res.data.paginate.total);
       });
-  }, [selectedSubjectId, selectedExamId, selectedConceptIds, selectedTagIds]);
+  }, [selectedSubjectId, selectedExamIds, selectedConceptIds, selectedTagIds]);
 
   const onClickSearch = () => {
     if (!selectedSubjectId) return;
@@ -111,7 +111,7 @@ const Adaptive = () => {
     questionEndpoint
       .getQuestionAdaptive({
         subjectId: selectedSubjectId.toString(),
-        examId: selectedExamId ? selectedExamId.toString() : undefined,
+        examIds: selectedExamIds.length > 0 ? selectedExamIds.join(',') : undefined,
         conceptIds: selectedConceptIds.length > 0 ? selectedConceptIds.join(',') : undefined,
         tagIds: selectedTagIds.length > 0 ? selectedTagIds.join(',') : undefined,
       })
@@ -280,14 +280,12 @@ const Adaptive = () => {
         <FormControl fullWidth>
           <InputLabel>選擇試卷 (非必填)</InputLabel>
           <Select
-            value={selectedExamId ?? ''}
+            value={selectedExamIds}
             label="exam"
-            onChange={(e) => setSelectedExamId(e.target.value)}
+            onChange={(e) => setSelectedExamIds(e.target.value as number[])}
             disabled={!selectedSubjectId || !!adaptiveQuestion}
+            multiple
           >
-            <MenuItem value="">
-              <em>無</em>
-            </MenuItem>
             {examList?.map((item) => (
               <MenuItem value={item.id}>{item.name}</MenuItem>
             ))}
@@ -422,7 +420,7 @@ const Adaptive = () => {
               setAdaptiveQuestion(undefined);
               setReplyResponse(undefined);
               setRepliedAnswer(new Map());
-              setSelectedExamId(undefined);
+              setSelectedExamIds([]);
               setSelectedConceptIds([]);
               setSelectedTagIds([]);
             }}

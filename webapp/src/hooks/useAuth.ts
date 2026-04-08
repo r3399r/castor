@@ -11,23 +11,29 @@ export const useAuth = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
+    let initialized = false;
     const unsubscribe = auth.onIdTokenChanged(async (user) => {
       if (user) {
-        const token = await user.getIdToken();
         setIsAuthenticated(true);
         dispatch(setIsLogin(true));
-        sessionStorage.setItem('idToken', token);
 
-        dispatch(startWaiting());
-        userEndpoint
-          .postUserSync()
-          .then((res) => {
-            if (res) dispatch(setUser(res.data));
-          })
-          .finally(() => {
-            dispatch(finishWaiting());
-          });
+        if (!initialized) {
+          initialized = true;
+          const token = await user.getIdToken();
+          sessionStorage.setItem('idToken', token);
+
+          dispatch(startWaiting());
+          userEndpoint
+            .postUserSync()
+            .then((res) => {
+              if (res) dispatch(setUser(res.data));
+            })
+            .finally(() => {
+              dispatch(finishWaiting());
+            });
+        }
       } else {
+        initialized = false;
         setIsAuthenticated(false);
         dispatch(setIsLogin(false));
         dispatch(setUser(null));

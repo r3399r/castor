@@ -24,7 +24,7 @@ import type { Tag } from 'src/model/backend/entity/TagEntity';
 const QuestionList = () => {
   const [selectedCategoryId, setSelectedCategoryId] = useState<number>();
   const [selectedSubjectId, setSelectedSubjectId] = useState<number>();
-  const [selectedExamId, setSelectedExamId] = useState<number>();
+  const [selectedExamIds, setSelectedExamIds] = useState<number[]>([]);
   const [selectedConceptIds, setSelectedConceptIds] = useState<number[]>([]);
   const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
   const [categoryList, setCategoryList] = useState<Category[]>();
@@ -44,7 +44,7 @@ const QuestionList = () => {
   useEffect(() => {
     if (!selectedCategoryId) return;
     setSelectedSubjectId(undefined);
-    setSelectedExamId(undefined);
+    setSelectedExamIds([]);
     setSelectedConceptIds([]);
     setSelectedTagIds([]);
     setResultQuestionList(undefined);
@@ -55,7 +55,7 @@ const QuestionList = () => {
 
   useEffect(() => {
     if (!selectedSubjectId) return;
-    setSelectedExamId(undefined);
+    setSelectedExamIds([]);
     setSelectedConceptIds([]);
     setSelectedTagIds([]);
     subjectEndpoint.getSubjectIdExam(selectedSubjectId).then((res) => {
@@ -74,7 +74,7 @@ const QuestionList = () => {
     questionEndpoint
       .getQuestion({
         subjectId: selectedSubjectId.toString(),
-        examId: selectedExamId ? selectedExamId.toString() : undefined,
+        examIds: selectedExamIds.length > 0 ? selectedExamIds.join(',') : undefined,
         conceptIds: selectedConceptIds.length > 0 ? selectedConceptIds.join(',') : undefined,
         tagIds: selectedTagIds.length > 0 ? selectedTagIds.join(',') : undefined,
       })
@@ -88,7 +88,7 @@ const QuestionList = () => {
     questionEndpoint
       .getQuestion({
         subjectId: selectedSubjectId.toString(),
-        examId: selectedExamId ? selectedExamId.toString() : undefined,
+        examIds: selectedExamIds.length > 0 ? selectedExamIds.join(',') : undefined,
         conceptIds: selectedConceptIds ? selectedConceptIds.join(',') : undefined,
         tagIds: selectedTagIds ? selectedTagIds.join(',') : undefined,
         offset: ((page - 1) * LIMIT).toString(),
@@ -156,14 +156,12 @@ const QuestionList = () => {
         <FormControl fullWidth>
           <InputLabel>選擇試卷 (非必填)</InputLabel>
           <Select
-            value={selectedExamId ?? ''}
+            value={selectedExamIds}
             label="exam"
-            onChange={(e) => setSelectedExamId(e.target.value)}
+            onChange={(e) => setSelectedExamIds(e.target.value as number[])}
             disabled={!selectedSubjectId}
+            multiple
           >
-            <MenuItem value="">
-              <em>無</em>
-            </MenuItem>
             {examList?.map((item) => (
               <MenuItem value={item.id}>{item.name}</MenuItem>
             ))}
@@ -217,26 +215,25 @@ const QuestionList = () => {
           {resultQuestionList.data.map((item) => (
             <div key={item.id} className="rounded-xl border">
               <div className="rounded-tl-xl rounded-tr-xl border-b bg-blue-100/80 p-2">
-                <div className="flex items-center justify-between gap-2">
-                  <div>{item.uuid.toUpperCase()}</div>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex flex-wrap gap-2">
+                    <Chip label={getTypeName(item.type)} size="small" />
+                    {item.exam.map((e) => (
+                      <Chip key={e.id} label={e.name} size="small" color="success" />
+                    ))}
+                    {item.concept.map((c) => (
+                      <Chip key={c.id} label={c.name} size="small" color="info" />
+                    ))}
+                    {item.tag.map((t) => (
+                      <Chip key={t.id} label={t.name} size="small" color="warning" />
+                    ))}
+                  </div>
                   <Rating
                     value={item.adjustedDifficulty / 2}
                     precision={0.1}
                     readOnly
                     size="small"
                   />
-                </div>
-                <div className="mt-1 flex flex-wrap gap-2">
-                  <Chip label={getTypeName(item.type)} size="small" />
-                  {item.exam.map((e) => (
-                    <Chip key={e.id} label={e.name} size="small" color="success" />
-                  ))}
-                  {item.concept.map((c) => (
-                    <Chip key={c.id} label={c.name} size="small" color="info" />
-                  ))}
-                  {item.tag.map((t) => (
-                    <Chip key={t.id} label={t.name} size="small" color="warning" />
-                  ))}
                 </div>
               </div>
               <div className="p-4">

@@ -136,7 +136,9 @@ export class QuestionService {
       mastery,
       subjectId: Number(params.subjectId),
       take: 20 + lastReplies.length,
-      examId: params.examId ? Number(params.examId) : undefined,
+      examIds: params.examIds
+        ? params.examIds.split(',').map((v) => Number(v))
+        : undefined,
       tagIds: params.tagIds
         ? params.tagIds.split(',').map((v) => Number(v))
         : undefined,
@@ -189,7 +191,9 @@ export class QuestionService {
       subjectId: Number(params.subjectId),
       take: limit,
       skip: offset,
-      examId: params.examId ? Number(params.examId) : undefined,
+      examIds: params.examIds
+        ? params.examIds.split(',').map((v) => Number(v))
+        : undefined,
       tagIds: params.tagIds
         ? params.tagIds.split(',').map((v) => Number(v))
         : undefined,

@@ -94,7 +94,7 @@ export class QuestionAccess {
     subjectId: number;
     take: number;
     skip: number;
-    examId?: number;
+    examIds?: number[];
     tagIds?: number[];
     conceptIds?: number[];
   }) {
@@ -110,17 +110,17 @@ export class QuestionAccess {
         subjectId: data.subjectId,
       });
 
-    if (data.examId !== undefined) {
-      const examId = data.examId;
+    if (data.examIds !== undefined && data.examIds.length > 0) {
+      const examIds = data.examIds;
 
       const subQuery = qb
         .subQuery()
         .select('qeFilter.question_id')
         .from('question_exam', 'qeFilter')
-        .where('qeFilter.exam_id = :examId', { examId })
+        .where('qeFilter.exam_id IN (:...examIds)', { examIds })
         .getQuery();
 
-      base.andWhere(`question.id IN ${subQuery}`, { examId });
+      base.andWhere(`question.id IN ${subQuery}`, { examIds });
     }
 
     if (data.tagIds !== undefined && data.tagIds.length > 0) {
@@ -174,7 +174,7 @@ export class QuestionAccess {
       mastery: number;
       subjectId: number;
       take: number;
-      examId?: number;
+      examIds?: number[];
       tagIds?: number[];
       conceptId: number;
     },
@@ -205,17 +205,17 @@ export class QuestionAccess {
         })
         .orderBy('question.adjustedDifficulty', 'ASC');
 
-    if (data.examId !== undefined) {
-      const examId = data.examId;
+    if (data.examIds !== undefined && data.examIds.length > 0) {
+      const examIds = data.examIds;
 
       const subQuery = qb
         .subQuery()
         .select('qeFilter.question_id')
         .from('question_exam', 'qeFilter')
-        .where('qeFilter.exam_id = :examId', { examId })
+        .where('qeFilter.exam_id IN (:...examIds)', { examIds })
         .getQuery();
 
-      base.andWhere(`question.id IN ${subQuery}`, { examId });
+      base.andWhere(`question.id IN ${subQuery}`, { examIds });
     }
 
     if (data.tagIds !== undefined && data.tagIds.length > 0) {
@@ -250,7 +250,7 @@ export class QuestionAccess {
     mastery: number;
     subjectId: number;
     take: number;
-    examId?: number;
+    examIds?: number[];
     tagIds?: number[];
     conceptId: number;
   }) {
