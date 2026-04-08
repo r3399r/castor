@@ -1,16 +1,13 @@
 import { useNavigate } from 'react-router-dom';
-import { useSelector } from 'react-redux';
-import type { RootState } from 'src/redux/store';
 import { useAuth } from 'src/hooks/useAuth';
 import { Button, Drawer, useMediaQuery } from '@mui/material';
 import { useState } from 'react';
 
 const Bar = () => {
   const navigate = useNavigate();
-  const { categoryId } = useSelector((rootState: RootState) => rootState.ui);
   const { isAuthenticated, login, logout } = useAuth();
   const [open, setOpen] = useState<boolean>(false);
-  const matches = useMediaQuery('(min-width:576px)');
+  const matches = useMediaQuery('(min-width:768px)');
 
   if (matches)
     return (
@@ -18,21 +15,22 @@ const Bar = () => {
         <div className="cursor-pointer font-bold text-blue-900" onClick={() => navigate('/')}>
           Practice Makes Perfect
         </div>
-        {!!categoryId && (
-          <>
-            <Button variant="contained" onClick={() => navigate(`/list?categoryId=${categoryId}`)}>
-              題目清單
-            </Button>
-            {isAuthenticated && (
-              <Button
-                variant="contained"
-                onClick={() => navigate(`/user?categoryId=${categoryId}`)}
-              >
-                答題記錄
-              </Button>
-            )}
-          </>
-        )}
+        <Button variant="contained" onClick={() => navigate('/question')}>
+          題庫
+        </Button>
+        <Button
+          variant="contained"
+          onClick={() => navigate('/adaptive')}
+          disabled={!isAuthenticated}
+        >
+          AI智慧配題
+        </Button>
+        <Button variant="contained" onClick={() => navigate('/user')} disabled={!isAuthenticated}>
+          學習分析
+        </Button>
+        <Button variant="contained" onClick={() => navigate('/reply')} disabled={!isAuthenticated}>
+          答題歷史
+        </Button>
         <div className="ml-auto">
           {!isAuthenticated ? (
             <Button variant="contained" onClick={login}>
@@ -59,30 +57,45 @@ const Bar = () => {
       </div>
       <Drawer open={open} onClose={() => setOpen(false)} anchor="right">
         <div className="flex w-50 flex-col gap-2 p-5">
-          {!!categoryId && (
-            <>
-              <Button
-                variant="contained"
-                onClick={() => {
-                  setOpen(false);
-                  navigate(`/list?categoryId=${categoryId}`);
-                }}
-              >
-                題目清單
-              </Button>
-              {isAuthenticated && (
-                <Button
-                  variant="contained"
-                  onClick={() => {
-                    setOpen(false);
-                    navigate(`/user?categoryId=${categoryId}`);
-                  }}
-                >
-                  答題記錄
-                </Button>
-              )}
-            </>
-          )}
+          <Button
+            variant="contained"
+            onClick={() => {
+              setOpen(false);
+              navigate('/question');
+            }}
+          >
+            題庫
+          </Button>
+          <Button
+            variant="contained"
+            onClick={() => {
+              setOpen(false);
+              navigate('/adaptive');
+            }}
+            disabled={!isAuthenticated}
+          >
+            AI智慧配題
+          </Button>
+          <Button
+            variant="contained"
+            onClick={() => {
+              setOpen(false);
+              navigate('/user');
+            }}
+            disabled={!isAuthenticated}
+          >
+            學習分析
+          </Button>
+          <Button
+            variant="contained"
+            onClick={() => {
+              setOpen(false);
+              navigate('/reply');
+            }}
+            disabled={!isAuthenticated}
+          >
+            答題歷史
+          </Button>
           {!isAuthenticated ? (
             <Button variant="contained" onClick={login}>
               Google 登入

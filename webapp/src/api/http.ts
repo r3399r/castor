@@ -27,7 +27,12 @@ const publicRequestConfig = async <D = unknown, P = any>(
   options?: Options<D, P>,
 ) => {
   const user = auth.currentUser;
-  const token = user ? await user.getIdToken(true) : null;
+  let token: string | null = null;
+  if (user) {
+    token = await user.getIdToken(true);
+  } else {
+    token = sessionStorage.getItem('idToken');
+  }
 
   return {
     ...defaultConfig,

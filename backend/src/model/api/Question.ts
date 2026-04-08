@@ -67,30 +67,6 @@ export type GetQuestionAdaptiveParams = {
 
 export type GetQuestionAdaptiveResponse = Question;
 
-// export type ModifiedQuestion = {
-//   uid: string;
-//   title: string;
-//   categoryId: number;
-//   category: Category;
-//   source: string | null;
-//   tag: Tag[];
-//   count: number;
-//   scoringRate: number | null;
-//   lastReply: Reply | null;
-// };
-
 export type GetQuestionResponse = Paginate<Question>;
 
 export type GetQuestionIdResponse = Question;
-// export type GetQuestionIdResponse = {
-//   uid: string;
-//   title: string;
-//   category: Category;
-//   content: string;
-//   source: string | null;
-//   minor: (QuestionMinor & { length: number | null })[];
-//   tag: Tag[];
-//   count: number;
-//   scoringRate: number | null;
-//   lastReply: ModifiedReply | null;
-// };

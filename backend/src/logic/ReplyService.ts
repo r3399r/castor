@@ -1,14 +1,21 @@
 import { differenceInDays } from 'date-fns';
 import { inject, injectable } from 'inversify';
 import { In } from 'typeorm';
+import { LIMIT, OFFSET } from 'src/constant/Pagination';
 import { QuestionAccess } from 'src/dao/QuestionAccess';
 import { ReplyAccess } from 'src/dao/ReplyAccess';
 import { UserConceptStatAccess } from 'src/dao/UserConceptStatAccess';
-import { PostReplyRequest, PostReplyResponse } from 'src/model/api/Reply';
+import {
+  GetReplyParams,
+  GetReplyResponse,
+  PostReplyRequest,
+  PostReplyResponse,
+} from 'src/model/api/Reply';
 import { Question } from 'src/model/entity/QuestionEntity';
 import { ReplyEntity } from 'src/model/entity/ReplyEntity';
 import { UserConceptStatEntity } from 'src/model/entity/UserConceptStatEntity';
 import { UnauthorizedError } from 'src/model/error';
+import { genPagination } from 'src/utils/paginator';
 import { UserService } from './UserService';
 
 /**
@@ -214,5 +221,32 @@ export class ReplyService {
     }
 
     return responses;
+  }
+
+  public async getReplyList(
+    params: GetReplyParams | null
+  ): Promise<GetReplyResponse> {
+    const user = await this.userService.getUser();
+    if (user === null) throw new UnauthorizedError('User not found');
+
+    const limit = params?.limit ? Number(params.limit) : LIMIT;
+    const offset = params?.offset ? Number(params.offset) : OFFSET;
+
+    const [replies, total] = await this.replyAccess.findAndCount({
+      where: { userId: user.id },
+      relations: {
+        question: true,
+        parent: true,
+        subject: true,
+      },
+      take: limit,
+      skip: offset,
+      order: { createdAt: 'DESC' },
+    });
+
+    return {
+      data: replies,
+      paginate: genPagination(total, limit, offset),
+    };
   }
 }

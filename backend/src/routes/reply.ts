@@ -1,6 +1,6 @@
 import { bindings } from 'src/bindings';
 import { ReplyService } from 'src/logic/ReplyService';
-import { PostReplyRequest } from 'src/model/api/Reply';
+import { GetReplyParams, PostReplyRequest } from 'src/model/api/Reply';
 import { BadRequestError } from 'src/model/error';
 import { LambdaEvent } from 'src/model/Lambda';
 
@@ -21,6 +21,10 @@ export default async (lambdaEvent: LambdaEvent) => {
 
 const replyDefault = async () => {
   switch (event.httpMethod) {
+    case 'GET':
+      return await service.getReplyList(
+        event.queryStringParameters as GetReplyParams | null
+      );
     case 'POST':
       if (event.body === null)
         throw new BadRequestError('body should not be empty');

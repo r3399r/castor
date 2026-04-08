@@ -900,9 +900,7 @@ Resources:
                   "passthroughBehavior": "when_no_match",
                   "contentHandling": "CONVERT_TO_TEXT"
                 }
-              }
-            },
-            "/api/user/stats": {
+              },
               "get": {
                 "parameters": [{
                   "name": "Authorization",
@@ -945,7 +943,7 @@ Resources:
                 }
               }
             },
-            "/api/user/reply": {
+            "/api/user/stats": {
               "get": {
                 "parameters": [{
                   "name": "Authorization",

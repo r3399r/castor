@@ -1,6 +1,11 @@
 import http from 'src/api/http';
 import { alertError } from './errorHandler';
-import type { PostReplyRequest, PostReplyResponse } from 'src/model/backend/api/Reply';
+import type {
+  GetReplyParams,
+  GetReplyResponse,
+  PostReplyRequest,
+  PostReplyResponse,
+} from 'src/model/backend/api/Reply';
 
 const postReply = async (data: PostReplyRequest) => {
   try {
@@ -10,6 +15,17 @@ const postReply = async (data: PostReplyRequest) => {
   }
 };
 
+const getReply = async (params?: GetReplyParams) => {
+  try {
+    return await http.get<GetReplyResponse, GetReplyParams>('reply', {
+      params,
+    });
+  } catch (e) {
+    alertError(e);
+  }
+};
+
 export default {
   postReply,
+  getReply,
 };

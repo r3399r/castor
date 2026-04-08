@@ -5,9 +5,10 @@ import AppLayout from './AppLayout';
 // Lazy-loaded components
 const Home = lazy(() => import('./pages/home'));
 const QuestionList = lazy(() => import('./pages/questionList'));
-const Question = lazy(() => import('./pages/question'));
 const Adaptive = lazy(() => import('./pages/adaptive'));
 const User = lazy(() => import('./pages/user'));
+const Reply = lazy(() => import('./pages/reply'));
+const Preview = lazy(() => import('./pages/preview'));
 
 const AppRoutes = () => {
   const router = createBrowserRouter([
@@ -15,9 +16,10 @@ const AppRoutes = () => {
       element: <AppLayout />,
       children: [
         { path: '/question', element: <QuestionList /> },
-        { path: '/question/:uuid', element: <Question /> },
         { path: '/adaptive', element: <Adaptive /> },
         { path: '/user', element: <User /> },
+        { path: '/reply', element: <Reply /> },
+        { path: '/preview', element: <Preview /> },
         { path: '/', element: <Home /> },
         { path: '/*', element: <Navigate to="/" /> },
       ],
