@@ -2,5 +2,5 @@ CREATE TABLE IF NOT EXISTS castor.subject (
     id INT UNSIGNED AUTO_INCREMENT,
     name VARCHAR(255) NOT NULL,
     created_at DATETIME(3) NULL,
-    PRIMARY KEY (id),
+    PRIMARY KEY (id)
 );

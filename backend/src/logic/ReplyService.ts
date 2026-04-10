@@ -86,7 +86,7 @@ export class ReplyService {
     const weight =
       question.attempCount > 1068 ? 1 : question.attempCount / 1068;
     question.adjustedDifficulty =
-      weight * (question.scoringTotal / question.attempCount) +
+      weight * (10 - question.scoringTotal / question.attempCount) +
       (1 - weight) * question.difficulty;
 
     await this.questionAccess.save(question);

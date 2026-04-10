@@ -53,6 +53,14 @@ const Adaptive = () => {
     return repliedAnswer.size === 1;
   }, [adaptiveQuestion, repliedAnswer]);
 
+  const showConceptGroupHeader = useMemo(() => {
+    if (!conceptGroupList) return false;
+    conceptGroupList.forEach((g) => {
+      if (g.concepts.length > 1) return true;
+    });
+    return false;
+  }, [conceptGroupList]);
+
   useEffect(() => {
     categoryEndpoint.getCategory().then((res) => {
       setCategoryList(res?.data);
@@ -300,14 +308,22 @@ const Adaptive = () => {
             disabled={!selectedSubjectId || !!adaptiveQuestion}
             multiple
           >
-            {conceptGroupList?.flatMap((item) => [
-              <ListSubheader key={`sub-${item.id}`}>{item.name}</ListSubheader>,
-              ...item.concepts.map((c) => (
-                <MenuItem key={c.id} value={c.id}>
-                  {c.name}
-                </MenuItem>
-              )),
-            ])}
+            {conceptGroupList?.flatMap((item) =>
+              showConceptGroupHeader
+                ? [
+                    <ListSubheader key={`sub-${item.id}`}>{item.name}</ListSubheader>,
+                    ...item.concepts.map((c) => (
+                      <MenuItem key={c.id} value={c.id}>
+                        {c.name}
+                      </MenuItem>
+                    )),
+                  ]
+                : item.concepts.map((c) => (
+                    <MenuItem key={c.id} value={c.id}>
+                      {c.name}
+                    </MenuItem>
+                  )),
+            )}
           </Select>
         </FormControl>
         {tagList && tagList.length > 0 && (
@@ -355,7 +371,11 @@ const Adaptive = () => {
                 ))}
               </div>
               <Rating
-                value={adaptiveQuestion.adjustedDifficulty / 2}
+                value={
+                  adaptiveQuestion.adjustedDifficulty / 2 < 0.5
+                    ? 0.5
+                    : adaptiveQuestion.adjustedDifficulty / 2
+                }
                 precision={0.1}
                 readOnly
                 size="small"

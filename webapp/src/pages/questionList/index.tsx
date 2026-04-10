@@ -9,7 +9,7 @@ import {
   Rating,
   Select,
 } from '@mui/material';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import categoryEndpoint from 'src/api/categoryEndpoint';
 import questionEndpoint from 'src/api/questionEndpoint';
 import subjectEndpoint from 'src/api/subjectEndpoint';
@@ -34,6 +34,14 @@ const QuestionList = () => {
   const [tagList, setTagList] = useState<Tag[]>();
   const [resultQuestionList, setResultQuestionList] = useState<GetQuestionResponse>();
   const [openSolutionIds, setOpenSolutionIds] = useState<Set<number>>(new Set());
+
+  const showConceptGroupHeader = useMemo(() => {
+    if (!conceptGroupList) return false;
+    conceptGroupList.forEach((g) => {
+      if (g.concepts.length > 1) return true;
+    });
+    return false;
+  }, [conceptGroupList]);
 
   useEffect(() => {
     categoryEndpoint.getCategory().then((res) => {
@@ -176,14 +184,22 @@ const QuestionList = () => {
             disabled={!selectedSubjectId}
             multiple
           >
-            {conceptGroupList?.flatMap((item) => [
-              <ListSubheader key={`sub-${item.id}`}>{item.name}</ListSubheader>,
-              ...item.concepts.map((c) => (
-                <MenuItem key={c.id} value={c.id}>
-                  {c.name}
-                </MenuItem>
-              )),
-            ])}
+            {conceptGroupList?.flatMap((item) =>
+              showConceptGroupHeader
+                ? [
+                    <ListSubheader key={`sub-${item.id}`}>{item.name}</ListSubheader>,
+                    ...item.concepts.map((c) => (
+                      <MenuItem key={c.id} value={c.id}>
+                        {c.name}
+                      </MenuItem>
+                    )),
+                  ]
+                : item.concepts.map((c) => (
+                    <MenuItem key={c.id} value={c.id}>
+                      {c.name}
+                    </MenuItem>
+                  )),
+            )}
           </Select>
         </FormControl>
         {tagList && tagList.length > 0 && (
@@ -229,7 +245,7 @@ const QuestionList = () => {
                     ))}
                   </div>
                   <Rating
-                    value={item.adjustedDifficulty / 2}
+                    value={item.adjustedDifficulty / 2 < 0.5 ? 0.5 : item.adjustedDifficulty / 2}
                     precision={0.1}
                     readOnly
                     size="small"
