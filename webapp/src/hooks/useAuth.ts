@@ -47,9 +47,10 @@ export const useAuth = () => {
   const login = async () => {
     try {
       if (isInAppBrowser()) {
-        alert('為了安全性，Google 登入不支援 App 內建瀏覽器。請改用系統瀏覽器後再試一次，如 Chrome 或 Safari');
-      }
-      else await signInWithPopup(auth, provider);
+        alert(
+          '為了安全性，Google 登入不支援 App 內建瀏覽器。請改用系統瀏覽器後再試一次，如 Chrome 或 Safari',
+        );
+      } else await signInWithPopup(auth, provider);
     } catch (error) {
       console.error('Login failed:', error);
     }

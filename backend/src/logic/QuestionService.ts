@@ -17,15 +17,10 @@ import {
   GetQuestionIdResponse,
   GetQuestionParams,
   GetQuestionResponse,
-  GetQuestionTagParams,
-  GetQuestionTagResponse,
   PostQuestionRequest,
   PostQuestionResponse,
-  PostQuestionStartRequest,
-  PostQuestionStartResponse,
 } from 'src/model/api/Question';
 import { QuestionEntity } from 'src/model/entity/QuestionEntity';
-import { ReplyEntity } from 'src/model/entity/ReplyEntity';
 import { Tag } from 'src/model/entity/TagEntity';
 import {
   BadRequestError,
@@ -170,15 +165,6 @@ export class QuestionService {
     };
   }
 
-  public async getAllTags(
-    params: GetQuestionTagParams | null
-  ): Promise<GetQuestionTagResponse> {
-    if (!params?.categoryId)
-      throw new BadRequestError('categoryId is required');
-
-    return await this.questionAccess.findTag(params.categoryId);
-  }
-
   public async getQuestionList(
     params: GetQuestionParams | null
   ): Promise<GetQuestionResponse> {
@@ -228,10 +214,10 @@ export class QuestionService {
     return res.data;
   }
 
-  private async commentFbPost(postId: string, questionUuid: string) {
+  private async commentFbPost(postId: string, solution: string) {
     const fbAccessToken = process.env.FB_ACCESS_TOKEN;
     await axios.post(`https://graph.facebook.com/${postId}/comments`, {
-      message: `https://pmp${process.env.ENVR === 'prod' ? '' : '-test'}.celestialstudio.net/q/${questionUuid}`,
+      message: solution,
       access_token: fbAccessToken,
     });
   }
@@ -314,7 +300,7 @@ export class QuestionService {
 
     const newQuestionEntity = await this.questionAccess.save(questionEntity);
 
-    await this.commentFbPost(fbPost.post_id, newQuestionEntity.uuid);
+    if (data.solution) await this.commentFbPost(fbPost.post_id, data.solution);
 
     const children: QuestionEntity[] = [];
     if (data.childQuestions !== undefined)
@@ -339,117 +325,4 @@ export class QuestionService {
 
     return [newQuestionEntity, ...children];
   }
-
-  // private calculateMultipleScore(
-  //   correct: string | null,
-  //   replied: string,
-  //   options: string | null
-  // ): number {
-  //   if (!correct || !options) return 1;
-  //   if (replied === '') return 0;
-
-  //   const answerSet = new Set(correct.split(','));
-  //   const repliedSet = new Set(replied.split(','));
-
-  //   const missing = [...answerSet].filter((o) => !repliedSet.has(o)).length;
-  //   const extra = [...repliedSet].filter((o) => !answerSet.has(o)).length;
-
-  //   const n = options.split(',').length;
-  //   const k = missing + extra;
-
-  //   return n - 2 * k <= 0
-  //     ? 0
-  //     : bn(n - 2 * k)
-  //       .div(n)
-  //       .dp(4, 7)
-  //       .toNumber();
-  // }
-
-  // private calculateFillScore(correct: string[], replied: string[]) {
-  //   if (correct.length !== replied.length) return 0;
-  //   for (let i = 0; i < correct.length; i++)
-  //     if (correct[i] !== replied[i]) return 0;
-
-  //   return 1;
-  // }
-
-  public async startQuestion(
-    data: PostQuestionStartRequest
-  ): Promise<PostQuestionStartResponse> {
-    const user = await this.userService.getUser();
-    if (user === null) throw new UnauthorizedError('User not found');
-
-    const replyEntity = new ReplyEntity();
-    replyEntity.userId = user.id;
-    replyEntity.questionId = data.id;
-    replyEntity.score = 0;
-    // replyEntity.complete = false;
-    // replyEntity.recordedAt = new Date().toISOString();
-
-    const newReply = await this.replyAccess.save(replyEntity);
-
-    return {
-      id: newReply.id,
-      questionId: newReply.questionId,
-      userId: newReply.userId,
-    };
-  }
-
-  // public async completeQuestion(
-  //   data: PostQuestionCompleteRequest
-  // ): Promise<PostQuestionCompleteResponse> {
-  //   const user = await this.userService.getUser();
-  //   if (user === null) throw new UnauthorizedError('User not found');
-
-  //   const reply = await this.replyAccess.findOne({
-  //     where: {
-  //       id: data.replyId,
-  //       userId: user.id,
-  //       questionId: data.id,
-  //       complete: false,
-  //     },
-  //   });
-  //   if (reply === null) throw new UnauthorizedError('Reply not found');
-
-  //   const question = await this.questionAccess.findOneOrFail({
-  //     where: { id: data.id },
-  //   });
-  //   if (data.replied.length !== question.minor.length)
-  //     throw new BadRequestError('The number of replied answers is not matched');
-  //   const totalScore = question.minor
-  //     .map((v) => {
-  //       if (v.type === 'SINGLE')
-  //         return data.replied.find((r) => r.id === v.id)?.answer === v.answer
-  //           ? 1
-  //           : 0;
-  //       else if (v.type === 'MULTIPLE')
-  //         return this.calculateMultipleScore(
-  //           v.answer,
-  //           data.replied.find((r) => r.id === v.id)?.answer ?? '',
-  //           v.options
-  //         );
-  //       else if (v.type === 'FILL')
-  //         return this.calculateFillScore(
-  //           v.answer?.split(',') ?? [],
-  //           data.replied.find((r) => r.id === v.id)?.answer.split(',') ?? []
-  //         );
-
-  //       return 0;
-  //     })
-  //     .reduce((prev, cur) => prev.plus(cur), bn(0));
-  //   const score = totalScore.div(question.minor.length).dp(4, 7).toNumber();
-
-  //   reply.score = score;
-  //   reply.repliedAnswer = data.replied.map((r) => r.answer).join('|');
-  //   reply.complete = true;
-  //   reply.recordedAt = new Date().toISOString();
-
-  //   const newReply = await this.replyAccess.save(reply);
-
-  //   return {
-  //     ...newReply,
-  //     actualAnswer: question.minor.map((m) => m.answer).join('|'),
-  //     fbPostId: question.fbPostId,
-  //   };
-  // }
 }

@@ -16,6 +16,7 @@ import { UserStatsAccess } from './dao/UserStatsAccess';
 import { CategoryService } from './logic/CategoryService';
 import { ConceptService } from './logic/ConceptService';
 import { ExamService } from './logic/ExamService';
+import { PreviewService } from './logic/PreviewService';
 import { QuestionService } from './logic/QuestionService';
 import { ReplyService } from './logic/ReplyService';
 import { StatsService } from './logic/StatsService';
@@ -85,6 +86,7 @@ container.bind(SubjectService).toSelf();
 container.bind(ConceptService).toSelf();
 container.bind(TagService).toSelf();
 container.bind(ReplyService).toSelf();
+container.bind(PreviewService).toSelf();
 
 // AWS
 container.bind(SQS).toDynamicValue(() => new SQS());

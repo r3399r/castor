@@ -55,43 +55,6 @@ Resources:
             "title": !Sub "${Project}-${TargetEnvr}-api"
           },
           "paths": {
-            "/api/intro": {
-              "get": {
-                "responses": {
-                  "200": {
-                    "description": "200 response",
-                    "headers": {
-                      "Access-Control-Allow-Origin": {
-                        "schema": {"type": "string"}
-                      }
-                    },
-                    "content": {
-                      "application/json": {
-                        "schema": {
-                          "$ref": "#/components/schemas/Empty"
-                        }
-                      }
-                    }
-                  }
-                },
-                "x-amazon-apigateway-request-validator": "Validate query string parameters and headers",
-                "x-amazon-apigateway-integration": {
-                  "type": "aws_proxy",
-                  "httpMethod": "POST",
-                  "uri": !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${Project}-${TargetEnvr}-api/invocations",
-                  "responses": {
-                    "default": {
-                      "statusCode": "200",
-                      "responseParameters": {
-                        "method.response.header.Access-Control-Allow-Origin": "'*'"
-                      }
-                    }
-                  },
-                  "passthroughBehavior": "when_no_match",
-                  "contentHandling": "CONVERT_TO_TEXT"
-                }
-              }
-            },
             "/api/category": {
               "get": {
                 "responses": {
@@ -368,43 +331,6 @@ Resources:
               }
             },
             "/api/subject/{id}/tag": {
-              "get": {
-                "responses": {
-                  "200": {
-                    "description": "200 response",
-                    "headers": {
-                      "Access-Control-Allow-Origin": {
-                        "schema": {"type": "string"}
-                      }
-                    },
-                    "content": {
-                      "application/json": {
-                        "schema": {
-                          "$ref": "#/components/schemas/Empty"
-                        }
-                      }
-                    }
-                  }
-                },
-                "x-amazon-apigateway-request-validator": "Validate query string parameters and headers",
-                "x-amazon-apigateway-integration": {
-                  "type": "aws_proxy",
-                  "httpMethod": "POST",
-                  "uri": !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${Project}-${TargetEnvr}-api/invocations",
-                  "responses": {
-                    "default": {
-                      "statusCode": "200",
-                      "responseParameters": {
-                        "method.response.header.Access-Control-Allow-Origin": "'*'"
-                      }
-                    }
-                  },
-                  "passthroughBehavior": "when_no_match",
-                  "contentHandling": "CONVERT_TO_TEXT"
-                }
-              }
-            },
-            "/api/subject/{id}/options": {
               "get": {
                 "responses": {
                   "200": {
@@ -806,49 +732,6 @@ Resources:
                 }
               }
             },
-            "/api/me": {
-              "get": {
-                "parameters": [{
-                  "name": "Authorization",
-                  "in": "header",
-                  "required": true,
-                  "schema": {"type": "string"}
-                }],
-                "responses": {
-                  "200": {
-                    "description": "200 response",
-                    "headers": {
-                      "Access-Control-Allow-Origin": {
-                        "schema": {"type": "string"}
-                      }
-                    },
-                    "content": {
-                      "application/json": {
-                        "schema": {
-                          "$ref": "#/components/schemas/Empty"
-                        }
-                      }
-                    }
-                  }
-                },
-                "x-amazon-apigateway-request-validator": "Validate query string parameters and headers",
-                "x-amazon-apigateway-integration": {
-                  "type": "aws_proxy",
-                  "httpMethod": "POST",
-                  "uri": !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${Project}-${TargetEnvr}-api/invocations",
-                  "responses": {
-                    "default": {
-                      "statusCode": "200",
-                      "responseParameters": {
-                        "method.response.header.Access-Control-Allow-Origin": "'*'"
-                      }
-                    }
-                  },
-                  "passthroughBehavior": "when_no_match",
-                  "contentHandling": "CONVERT_TO_TEXT"
-                }
-              }
-            },
             "/api/reply": {
               "post": {
                 "parameters": [{
@@ -1028,6 +911,59 @@ Resources:
                   "contentHandling": "CONVERT_TO_TEXT"
                 }
               }
+            },
+            "/api/preview": {
+              "post": {
+                "parameters": [{
+                  "name": "Authorization",
+                  "in": "header",
+                  "required": true,
+                  "schema": {"type": "string"}
+                }],
+                "requestBody": {
+                  "content": {
+                    "application/json": {
+                      "schema": {
+                        "$ref": "#/components/schemas/postPreview"
+                      }
+                    }
+                  },
+                  "required": true
+                },
+                "responses": {
+                  "200": {
+                    "description": "200 response",
+                    "headers": {
+                      "Access-Control-Allow-Origin": {
+                        "schema": {"type": "string"}
+                      }
+                    },
+                    "content": {
+                      "application/json": {
+                        "schema": {
+                          "$ref": "#/components/schemas/Empty"
+                        }
+                      }
+                    }
+                  }
+                },
+                "x-amazon-apigateway-request-validator": "Validate body, query string parameters, and headers",
+                "x-amazon-apigateway-integration": {
+                  "type": "aws_proxy",
+                  "httpMethod": "POST",
+                  "uri": !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${Project}-${TargetEnvr}-api/invocations",
+                  "responses": {
+                    "default": {
+                      "statusCode": "200",
+                      "responseParameters": {
+                        "method.response.header.Access-Control-Allow-Origin": "'*'"
+                      }
+                    }
+                  },
+                  "passthroughBehavior": "when_no_match",
+                  "contentHandling": "CONVERT_TO_TEXT"
+                }
+              }
             }
           },
           "definitions": {
@@ -1066,6 +1002,7 @@ Resources:
                 "content":{"type": "string"},
                 "options": {"type": "string",nullable: true},
                 "answer": {"type": "string",nullable: true},
+                "solution": {"type": "string",nullable: true},
                 "difficulty":{"type": "integer", "minimum": 1, "maximum": 10},
                 "examId":{"type": "number"},
                 "tagIds": {
@@ -1128,6 +1065,14 @@ Resources:
                 },
                 "required": ["questionId","repliedAnswer"]
               }
+            },
+            "postPreview": {
+              "type": "object",
+              "properties": {
+                "text":{"type": "string"},
+                "imageUrl":{"type": "string"}
+              },
+              "required": ["text","imageUrl"]
             }
           },
           "x-amazon-apigateway-request-validators" : {
@@ -1162,6 +1107,7 @@ Resources:
           FB_PAGE_ID: '352343371286540'
           FB_ACCESS_TOKEN: !Sub '{{resolve:ssm:${Project}-fb-access-token}}'
           FIREBAE_ADMIN_KEY: !Sub '{{resolve:ssm:${Project}-firebase-admin-key}}'
+          GOOGLE_GENAI_API_KEY: !Sub '{{resolve:ssm:${Project}-google-genai-api-key}}'
   InvokePermissionLambdaApi:
     Type: AWS::Lambda::Permission
     DependsOn: [ServerlessApi, LambdaApiFunction]
