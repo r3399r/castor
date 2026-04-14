@@ -3,12 +3,6 @@ import type {
   GetQuestionParams,
   GetQuestionResponse,
   GetQuestionIdResponse,
-  GetQuestionTagParams,
-  GetQuestionTagResponse,
-  PostQuestionCompleteRequest,
-  PostQuestionCompleteResponse,
-  PostQuestionStartRequest,
-  PostQuestionStartResponse,
   GetQuestionAdaptiveResponse,
   GetQuestionAdaptiveParams,
 } from 'src/model/backend/api/Question';
@@ -32,14 +26,6 @@ const getQuestionId = async (id: string) => {
   }
 };
 
-const getQuestionTag = async (params: GetQuestionTagParams) => {
-  try {
-    return await http.get<GetQuestionTagResponse>('question/tag', { params });
-  } catch (e) {
-    alertError(e);
-  }
-};
-
 const getQuestionAdaptive = async (params: GetQuestionAdaptiveParams) => {
   try {
     return await http.get<GetQuestionAdaptiveResponse, GetQuestionAdaptiveParams>(
@@ -51,34 +37,8 @@ const getQuestionAdaptive = async (params: GetQuestionAdaptiveParams) => {
   }
 };
 
-const postQuestionStart = async (data: PostQuestionStartRequest) => {
-  try {
-    return await http.post<PostQuestionStartResponse, PostQuestionStartRequest>(`question/start`, {
-      data,
-    });
-  } catch (e) {
-    alertError(e);
-  }
-};
-
-const postQuestionComplete = async (data: PostQuestionCompleteRequest) => {
-  try {
-    return await http.post<PostQuestionCompleteResponse, PostQuestionCompleteRequest>(
-      `question/complete`,
-      {
-        data,
-      },
-    );
-  } catch (e) {
-    alertError(e);
-  }
-};
-
 export default {
   getQuestion,
-  getQuestionTag,
   getQuestionAdaptive,
   getQuestionId,
-  postQuestionStart,
-  postQuestionComplete,
 };
