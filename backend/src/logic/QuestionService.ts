@@ -236,8 +236,11 @@ export class QuestionService {
     });
 
     const exam = await this.examAccess.findOneOrFail({
-      where: { id: data.examId, subjectId: data.subjectId },
+      where: { id: data.examId },
+      relations: { subject: true },
     });
+    if (!exam.subject.some((s) => s.id === subject.id))
+      throw new BadRequestError('Invalid exam for the specified subject');
 
     let tags: Tag[] = [];
     if (data.tagIds !== undefined && data.tagIds.length > 0) {

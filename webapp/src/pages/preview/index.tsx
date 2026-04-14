@@ -59,11 +59,13 @@ const Preview = () => {
       subjectList?.find((s) => s.id === selectedSubjectId)?.name +
       ' 的一道題目，請提供以下資訊: ';
     text += '(1) 轉換成 html with <br/> ';
-    text += '(2) 簡短的純文字詳解 ';
-    text += '(3) 難易度 (簡單,中等,困難) ';
+    text += '(2) 簡短的純文字詳解，註記此詳解為AI生成 ';
+    text += '(3) 難易度 (簡單=2,中等=5,困難=8) ';
     text +=
-      '(4) 從下述觀念清單中選擇至少一個: ' +
-      conceptGroupList?.flatMap((g) => g.concepts.map((c) => c.name)).join(', ');
+      '(4) 從下述觀念清單中選擇至少一個: (' +
+      conceptGroupList?.flatMap((g) => g.concepts.map((c) => c.name + '=' + c.id)).join(', ');
+    text +=
+      ')。以 json 格式回覆，格式如下: {"content": (1) in string, "solution": (2) in string, "difficulty": (3) in number, "conceptIds": (4) in number array} without markdown code block. 只回覆 json，不要其他文字說明。';
     return text;
   }, [conceptGroupList, subjectList, selectedSubjectId]);
 
@@ -75,7 +77,8 @@ const Preview = () => {
         imageUrl,
       })
       .then((res) => {
-        setGeminiOutput(res?.data ?? '');
+        const formattedOutput = JSON.stringify(res?.data, null, 2) ?? '';
+        setGeminiOutput(formattedOutput);
       })
       .finally(() => {
         dispatch(finishWaiting());
@@ -136,6 +139,20 @@ const Preview = () => {
       ),
     );
   }, [selectedSubjectId, imageUrl, selectedExamIds, selectedConceptIds, selectedTagIds]);
+
+  useEffect(() => {
+    try {
+      const parsedGeminiOutput = JSON.parse(geminiOutput);
+      const parsedQuestionInput = JSON.parse(questionInput);
+      const updatedQuestionInput = {
+        ...parsedQuestionInput,
+        ...parsedGeminiOutput,
+      };
+      setQuestionInput(JSON.stringify(updatedQuestionInput, null, 2));
+    } catch {
+      console.log('Invalid Gemini output, cannot update question input');
+    }
+  }, [geminiOutput]);
 
   return (
     <div>
@@ -254,7 +271,11 @@ const Preview = () => {
       </div>
       <div className="mt-4">
         <h2 className="mb-2 text-xl font-bold">Gemini Output:</h2>
-        <div>{geminiOutput.length === 0 ? 'No output available' : geminiOutput}</div>
+        <textarea
+          className="h-80 w-full border p-4"
+          value={geminiOutput}
+          onChange={(e) => setGeminiOutput(e.target.value)}
+        />
       </div>
       <hr className="my-4" />
       <h2 className="mb-2 text-xl font-bold">Input:</h2>

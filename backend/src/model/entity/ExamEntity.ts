@@ -2,16 +2,15 @@ import {
   BeforeInsert,
   Column,
   Entity,
-  JoinColumn,
-  ManyToOne,
+  JoinTable,
+  ManyToMany,
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { Subject, SubjectEntity } from './SubjectEntity';
 
 export type Exam = {
   id: number;
-  subjectId: number;
-  subject: Subject;
+  subject: Subject[];
   name: string;
   createdAt: string | null;
 };
@@ -21,18 +20,19 @@ export class ExamEntity implements Exam {
   @PrimaryGeneratedColumn({ type: 'int', unsigned: true })
   id!: number;
 
-  @Column({ type: 'int', unsigned: true, name: 'subject_id' })
-  subjectId!: number;
-
-  @ManyToOne(() => SubjectEntity)
-  @JoinColumn({ name: 'subject_id' })
-  subject!: Subject;
-
   @Column({ type: 'varchar', length: 255 })
   name!: string;
 
   @Column({ type: 'datetime', name: 'created_at', default: null })
   createdAt!: string;
+
+  @ManyToMany(() => SubjectEntity)
+  @JoinTable({
+    name: 'exam_subject',
+    joinColumn: { name: 'exam_id', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'subject_id', referencedColumnName: 'id' },
+  })
+  subject!: Subject[];
 
   @BeforeInsert()
   setDateCreated(): void {

@@ -13,7 +13,6 @@ export class ExamService {
 
   public async createExam(exam: PostExamRequest): Promise<PostExamResponse> {
     const examEntity = new ExamEntity();
-    examEntity.subjectId = exam.subjectId;
     examEntity.name = exam.name;
 
     return await this.examAccess.save(examEntity);

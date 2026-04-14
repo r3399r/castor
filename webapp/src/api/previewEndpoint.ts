@@ -1,10 +1,10 @@
 import http from 'src/api/http';
 import { alertError } from './errorHandler';
-import type { PostPreviewRequest } from 'src/model/backend/api/Preview';
+import type { PostPreviewRequest, PostPreviewResponse } from 'src/model/backend/api/Preview';
 
 const postPreview = async (data: PostPreviewRequest) => {
   try {
-    return await http.post<string, PostPreviewRequest>('preview', { data });
+    return await http.post<PostPreviewResponse, PostPreviewRequest>('preview', { data });
   } catch (e) {
     alertError(e);
   }

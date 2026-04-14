@@ -32,7 +32,9 @@ export class SubjectService {
   }
 
   public async getExamsById(id: string): Promise<GetSubjectIdExamResponse> {
-    return await this.examAccess.find({ where: { subjectId: Number(id) } });
+    return await this.examAccess.find({
+      where: { subject: { id: Number(id) } },
+    });
   }
 
   public async getConceptGroupsById(

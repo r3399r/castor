@@ -988,10 +988,9 @@ Resources:
             "postExam": {
               "type": "object",
               "properties": {
-                "subjectId":{"type": "number"},
                 "name":{"type": "string"}
               },
-              "required": ["subjectId","name"]
+              "required": ["name"]
             },
             "postQuestion": {
               "type": "object",
