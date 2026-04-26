@@ -24,4 +24,5 @@ dist-ssr
 *.sw?
 
 src/model/backend
+src/constant/backend
 .env

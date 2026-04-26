@@ -1,5 +1,5 @@
 import { inject, injectable } from 'inversify';
-import { FindOneOptions } from 'typeorm';
+import { FindManyOptions, FindOneOptions } from 'typeorm';
 import { Question, QuestionEntity } from 'src/model/entity/QuestionEntity';
 import { Database } from 'src/utils/Database';
 
@@ -19,15 +19,50 @@ export class QuestionAccess {
     return await qr.manager.save(entity);
   }
 
+  public async find(options?: FindManyOptions<Question>) {
+    const qr = await this.database.getQueryRunner();
+
+    return await qr.manager.find<Question>(QuestionEntity.name, {
+      ...options,
+    });
+  }
+
   public async findOneOrFail(options?: FindOneOptions<Question>) {
     const qr = await this.database.getQueryRunner();
 
     return await qr.manager.findOneOrFail<Question>(QuestionEntity.name, {
-      relations: {
-        minor: true,
-      },
       ...options,
     });
+  }
+
+  public async findOneOrFailById(id: number) {
+    const qb = await this.createQueryBuilder();
+    const question = await qb
+      .innerJoinAndSelect('question.subject', 'subject')
+      .leftJoinAndSelect('question.exam', 'exam')
+      .leftJoinAndSelect('question.tag', 'tag')
+      .leftJoinAndSelect('question.concept', 'concept')
+      .leftJoinAndSelect('question.children', 'children')
+      .andWhere('question.id = :id', { id })
+      .andWhere('question.parentId IS NULL')
+      .getOneOrFail();
+
+    return question as Question;
+  }
+
+  public async findOneOrFailByUuid(uuid: string) {
+    const qb = await this.createQueryBuilder();
+    const question = await qb
+      .innerJoinAndSelect('question.subject', 'subject')
+      .leftJoinAndSelect('question.exam', 'exam')
+      .leftJoinAndSelect('question.tag', 'tag')
+      .leftJoinAndSelect('question.concept', 'concept')
+      .leftJoinAndSelect('question.children', 'children')
+      .andWhere('question.uuid = :uuid', { uuid })
+      .andWhere('question.parentId IS NULL')
+      .getOneOrFail();
+
+    return question as Question;
   }
 
   private async createQueryBuilder() {
@@ -55,59 +90,41 @@ export class QuestionAccess {
     return raws.map((r: any) => ({ id: Number(r.id), name: String(r.name) }));
   }
 
-  public async findDetail(data: { id: number; userId: number }) {
-    const qb = await this.createQueryBuilder();
-
-    return (await qb
-      .leftJoinAndSelect('question.minor', 'minor')
-      .leftJoinAndSelect('question.reply', 'reply', 'reply.user_id = :userId', {
-        userId: data.userId,
-      })
-      .leftJoinAndSelect('question.tag', 'tag')
-      .leftJoinAndSelect('question.category', 'category')
-      .where('question.id = :id', { id: data.id })
-      .getOneOrFail()) as Question;
-  }
-
   public async findAndCount(data: {
-    categoryId: number;
-    userId: number;
+    subjectId: number;
     take: number;
     skip: number;
-    orderBy: string;
-    orderDirection: 'ASC' | 'DESC';
-    title?: string;
-    hasReply?: boolean;
-    tags?: number[];
-    source?: string;
+    examIds?: number[];
+    tagIds?: number[];
+    conceptIds?: number[];
   }) {
     const qb = await this.createQueryBuilder();
     const base = qb
-      .innerJoinAndSelect(
-        'question.category',
-        'category',
-        'category.id = :categoryId',
-        { categoryId: data.categoryId }
-      )
-      .leftJoinAndSelect('question.reply', 'reply', 'reply.user_id = :userId', {
-        userId: data.userId,
-      })
-      .leftJoinAndSelect('question.tag', 'tag');
-
-    if (data.title)
-      base.andWhere('question.title like :title', {
-        title: `%${data.title}%`,
+      .innerJoinAndSelect('question.subject', 'subject')
+      .leftJoinAndSelect('question.exam', 'exam')
+      .leftJoinAndSelect('question.tag', 'tag')
+      .leftJoinAndSelect('question.concept', 'concept')
+      .leftJoinAndSelect('question.children', 'children')
+      .andWhere('question.parentId IS NULL')
+      .andWhere('question.subjectId = :subjectId', {
+        subjectId: data.subjectId,
       });
-    if (data.source)
-      base.andWhere('question.source like :source', {
-        source: `%${data.source}%`,
-      });
-    if (data.hasReply === true) base.andWhere('reply.id IS NOT NULL');
 
-    if (data.hasReply === false) base.andWhere('reply.id IS NULL');
+    if (data.examIds !== undefined && data.examIds.length > 0) {
+      const examIds = data.examIds;
 
-    if (data.tags !== undefined && data.tags.length > 0) {
-      const tagIds = data.tags;
+      const subQuery = qb
+        .subQuery()
+        .select('qeFilter.question_id')
+        .from('question_exam', 'qeFilter')
+        .where('qeFilter.exam_id IN (:...examIds)', { examIds })
+        .getQuery();
+
+      base.andWhere(`question.id IN ${subQuery}`, { examIds });
+    }
+
+    if (data.tagIds !== undefined && data.tagIds.length > 0) {
+      const tagIds = data.tagIds;
       const tagCount = tagIds.length;
 
       const subQuery = qb
@@ -115,21 +132,133 @@ export class QuestionAccess {
         .select('qtFilter.question_id')
         .from('question_tag', 'qtFilter')
         .where('qtFilter.tag_id IN (:...tagIds)', { tagIds })
-        .groupBy('qtFilter.question_id')
-        .having('COUNT(DISTINCT qtFilter.tag_id) = :tagCount')
+        // .groupBy('qtFilter.question_id') // groupBy and having are for INTERSECTION, but we want UNION, so we don't use them
+        // .having('COUNT(DISTINCT qtFilter.tag_id) = :tagCount')
         .getQuery();
 
       base.andWhere(`question.id IN ${subQuery}`, { tagIds, tagCount });
     }
 
+    if (data.conceptIds !== undefined && data.conceptIds.length > 0) {
+      const conceptIds = data.conceptIds;
+      const conceptCount = conceptIds.length;
+
+      const subQuery = qb
+        .subQuery()
+        .select('qcFilter.question_id')
+        .from('question_concept', 'qcFilter')
+        .where('qcFilter.concept_id IN (:...conceptIds)', { conceptIds })
+        // .groupBy('qcFilter.question_id') // groupBy and having are for INTERSECTION, but we want UNION, so we don't use them
+        // .having('COUNT(DISTINCT qcFilter.concept_id) = :conceptCount')
+        .getQuery();
+
+      base.andWhere(`question.id IN ${subQuery}`, {
+        conceptIds,
+        conceptCount,
+      });
+    }
+
     return (await Promise.all([
       base
         .clone()
-        .orderBy(`question.${data.orderBy}`, data.orderDirection)
+        // .orderBy(`question.${data.orderBy}`, data.orderDirection)
         .skip(data.skip)
         .take(data.take)
         .getMany(),
       base.getCount(),
     ])) as [Question[], number];
+  }
+
+  private async getBaseAdaptiveQuery(
+    data: {
+      mastery: number;
+      subjectId: number;
+      take: number;
+      examIds?: number[];
+      tagIds?: number[];
+      conceptId: number;
+    },
+    direction: 'less' | 'greater'
+  ) {
+    const qb = await this.createQueryBuilder();
+    const base = qb
+      .innerJoinAndSelect('question.subject', 'subject')
+      .leftJoinAndSelect('question.exam', 'exam')
+      .leftJoinAndSelect('question.tag', 'tag')
+      .leftJoinAndSelect('question.concept', 'concept')
+      .leftJoinAndSelect('question.children', 'children')
+      .andWhere('question.parentId IS NULL')
+      .andWhere('question.subjectId = :subjectId', {
+        subjectId: data.subjectId,
+      });
+
+    if (direction === 'less')
+      base
+        .andWhere('question.adjustedDifficulty <= :mastery', {
+          mastery: data.mastery,
+        })
+        .orderBy('question.adjustedDifficulty', 'DESC');
+    else
+      base
+        .andWhere('question.adjustedDifficulty > :mastery', {
+          mastery: data.mastery,
+        })
+        .orderBy('question.adjustedDifficulty', 'ASC');
+
+    if (data.examIds !== undefined && data.examIds.length > 0) {
+      const examIds = data.examIds;
+
+      const subQuery = qb
+        .subQuery()
+        .select('qeFilter.question_id')
+        .from('question_exam', 'qeFilter')
+        .where('qeFilter.exam_id IN (:...examIds)', { examIds })
+        .getQuery();
+
+      base.andWhere(`question.id IN ${subQuery}`, { examIds });
+    }
+
+    if (data.tagIds !== undefined && data.tagIds.length > 0) {
+      const tagIds = data.tagIds;
+      const tagCount = tagIds.length;
+
+      const subQuery = qb
+        .subQuery()
+        .select('qtFilter.question_id')
+        .from('question_tag', 'qtFilter')
+        .where('qtFilter.tag_id IN (:...tagIds)', { tagIds })
+        // .groupBy('qtFilter.question_id') // groupBy and having are for INTERSECTION, but we want UNION, so we don't use them
+        // .having('COUNT(DISTINCT qtFilter.tag_id) = :tagCount')
+        .getQuery();
+
+      base.andWhere(`question.id IN ${subQuery}`, { tagIds, tagCount });
+    }
+
+    const subQueryConcept = qb
+      .subQuery()
+      .select('qcFilter.question_id')
+      .from('question_concept', 'qcFilter')
+      .where('qcFilter.concept_id = :conceptId', { conceptId: data.conceptId })
+      .getQuery();
+
+    base.andWhere(`question.id IN ${subQueryConcept}`);
+
+    return base.clone().take(data.take).getMany();
+  }
+
+  public async findAdaptive(data: {
+    mastery: number;
+    subjectId: number;
+    take: number;
+    examIds?: number[];
+    tagIds?: number[];
+    conceptId: number;
+  }) {
+    const [less, greater] = await Promise.all([
+      this.getBaseAdaptiveQuery(data, 'less'),
+      this.getBaseAdaptiveQuery(data, 'greater'),
+    ]);
+
+    return [...less, ...greater] as Question[];
   }
 }

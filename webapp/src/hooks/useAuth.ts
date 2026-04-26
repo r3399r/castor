@@ -3,31 +3,37 @@ import { auth, provider } from 'src/firebase/config';
 import { signInWithPopup, signOut } from 'firebase/auth';
 import { useDispatch } from 'react-redux';
 import { finishWaiting, setIsLogin, setUser, startWaiting } from 'src/redux/uiSlice';
-import userEndpoint from 'src/api/userEndpoint';
 import { isInAppBrowser } from 'src/util/isInAppBrowser';
+import userEndpoint from 'src/api/userEndpoint';
 
 export const useAuth = () => {
   const dispatch = useDispatch();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
+    let initialized = false;
     const unsubscribe = auth.onIdTokenChanged(async (user) => {
       if (user) {
-        const token = await user.getIdToken();
         setIsAuthenticated(true);
         dispatch(setIsLogin(true));
-        sessionStorage.setItem('idToken', token);
 
-        dispatch(startWaiting());
-        userEndpoint
-          .postUserSync()
-          .then((res) => {
-            if (res) dispatch(setUser(res.data));
-          })
-          .finally(() => {
-            dispatch(finishWaiting());
-          });
+        if (!initialized) {
+          initialized = true;
+          const token = await user.getIdToken();
+          sessionStorage.setItem('idToken', token);
+
+          dispatch(startWaiting());
+          userEndpoint
+            .postUserSync()
+            .then((res) => {
+              if (res) dispatch(setUser(res.data));
+            })
+            .finally(() => {
+              dispatch(finishWaiting());
+            });
+        }
       } else {
+        initialized = false;
         setIsAuthenticated(false);
         dispatch(setIsLogin(false));
         dispatch(setUser(null));
@@ -40,8 +46,11 @@ export const useAuth = () => {
 
   const login = async () => {
     try {
-      if (isInAppBrowser()) alert('請改用系統瀏覽器登入，如 Chrome 或 Safari');
-      else await signInWithPopup(auth, provider);
+      if (isInAppBrowser()) {
+        alert(
+          '為了安全性，Google 登入不支援 App 內建瀏覽器。請改用系統瀏覽器後再試一次，如 Chrome 或 Safari',
+        );
+      } else await signInWithPopup(auth, provider);
     } catch (error) {
       console.error('Login failed:', error);
     }

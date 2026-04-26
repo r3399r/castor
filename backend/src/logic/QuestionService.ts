@@ -1,32 +1,33 @@
 import axios from 'axios';
 import { inject, injectable } from 'inversify';
+import { In, MoreThan } from 'typeorm';
+import { v4 as uuidv4 } from 'uuid';
 import { LIMIT, OFFSET } from 'src/constant/Pagination';
-import { CategoryAccess } from 'src/dao/CategoryAccess';
+import { ConceptAccess } from 'src/dao/ConceptAccess';
+import { ConceptGroupAccess } from 'src/dao/ConceptGroupAccess';
+import { ExamAccess } from 'src/dao/ExamAccess';
 import { QuestionAccess } from 'src/dao/QuestionAccess';
-import { QuestionMinorAccess } from 'src/dao/QuestionMinorAccess';
 import { ReplyAccess } from 'src/dao/ReplyAccess';
+import { SubjectAccess } from 'src/dao/SubjectAccess';
 import { TagAccess } from 'src/dao/TagAccess';
+import { UserConceptStatAccess } from 'src/dao/UserConceptStatAccess';
 import {
+  GetQuestionAdaptiveParams,
+  GetQuestionAdaptiveResponse,
   GetQuestionIdResponse,
   GetQuestionParams,
   GetQuestionResponse,
-  GetQuestionTagParams,
-  GetQuestionTagResponse,
-  PostQuestionCompleteRequest,
-  PostQuestionCompleteResponse,
   PostQuestionRequest,
-  PostQuestionStartRequest,
-  PostQuestionStartResponse,
+  PostQuestionResponse,
 } from 'src/model/api/Question';
 import { QuestionEntity } from 'src/model/entity/QuestionEntity';
-import { QuestionMinorEntity } from 'src/model/entity/QuestionMinorEntity';
-import { ReplyEntity } from 'src/model/entity/ReplyEntity';
-import { Tag, TagEntity } from 'src/model/entity/TagEntity';
-import { BadRequestError, UnauthorizedError } from 'src/model/error';
-import { bn } from 'src/utils/bignumber';
-import { compare } from 'src/utils/compare';
+import { Tag } from 'src/model/entity/TagEntity';
+import {
+  BadRequestError,
+  NotFoundError,
+  UnauthorizedError,
+} from 'src/model/error';
 import { genPagination } from 'src/utils/paginator';
-import { randomBase36 } from 'src/utils/random';
 import { UserService } from './UserService';
 
 /**
@@ -36,120 +37,163 @@ import { UserService } from './UserService';
 export class QuestionService {
   @inject(QuestionAccess)
   private readonly questionAccess!: QuestionAccess;
-  @inject(QuestionMinorAccess)
-  private readonly questionMinorAccess!: QuestionMinorAccess;
   @inject(UserService)
   private readonly userService!: UserService;
   @inject(ReplyAccess)
   private readonly replyAccess!: ReplyAccess;
-  @inject(CategoryAccess)
-  private readonly categoryAccess!: CategoryAccess;
+  @inject(SubjectAccess)
+  private readonly subjectAccess!: SubjectAccess;
+  @inject(ExamAccess)
+  private readonly examAccess!: ExamAccess;
   @inject(TagAccess)
   private readonly tagAccess!: TagAccess;
+  @inject(ConceptAccess)
+  private readonly conceptAccess!: ConceptAccess;
+  @inject(UserConceptStatAccess)
+  private readonly userConceptStatAccess!: UserConceptStatAccess;
+  @inject(ConceptGroupAccess)
+  private readonly conceptGroupAccess!: ConceptGroupAccess;
 
-  public async getQuestionByUid(uid: string): Promise<GetQuestionIdResponse> {
-    const id = parseInt(uid.substring(3), 36);
-    const rid = uid.substring(0, 3).toUpperCase();
-
-    const user = await this.userService.getUser();
-
-    const question = await this.questionAccess.findDetail({
-      id,
-      userId: user?.id ?? -1,
-    });
-    if (question.rid !== rid) throw new BadRequestError('rid is not matched');
-
-    const lastReply =
-      question.reply.length > 0
-        ? question.reply.sort(compare('createdAt', 'desc'))[0]
-        : null;
-
-    return {
-      uid: question.rid + question.id.toString(36).toUpperCase(),
-      title: question.title,
-      category: question.category,
-      content: question.content,
-      source: question.source,
-      minor: question.minor.sort(compare('orderIndex', 'asc')).map((m) => ({
-        ...m,
-        answer: lastReply?.complete === true ? m.answer : null,
-        length:
-          m.answer && m.type === 'FILL' ? m.answer.split(',').length : null,
-      })),
-      tag: question.tag,
-      count: question.count,
-      scoringRate: question.scoringRate,
-      lastReply: lastReply
-        ? {
-            ...lastReply,
-            actualAnswer:
-              lastReply.complete === true
-                ? question.minor.map((m) => m.answer).join('|')
-                : null,
-            fbPostId: lastReply.complete === true ? question.fbPostId : null,
-          }
-        : null,
-    };
+  public async getQuestionByUuid(uuid: string): Promise<GetQuestionIdResponse> {
+    return await this.questionAccess.findOneOrFailByUuid(uuid);
   }
 
-  public async getAllTags(
-    params: GetQuestionTagParams | null
-  ): Promise<GetQuestionTagResponse> {
-    if (!params?.categoryId)
-      throw new BadRequestError('categoryId is required');
+  public async getAdaptiveQuestion(
+    params: GetQuestionAdaptiveParams | null
+  ): Promise<GetQuestionAdaptiveResponse> {
+    if (!params) throw new BadRequestError('query parameters are required');
 
-    return await this.questionAccess.findTag(params.categoryId);
+    // find last 7 days reply of the user for the subject
+    const user = await this.userService.getUser();
+    if (user === null) throw new UnauthorizedError('User not found');
+
+    // get candidate concepts and their numberOfQuestions
+    const conceptIds = new Map<number, number>();
+    if (params.conceptIds) {
+      const conceptList = await this.conceptAccess.find({
+        where: { id: In(params.conceptIds.split(',').map((v) => Number(v))) },
+      });
+      for (const concept of conceptList) {
+        if (concept.conceptGroup.subjectId !== Number(params.subjectId))
+          throw new BadRequestError(
+            'Invalid concept for the specified subject'
+          );
+        conceptIds.set(concept.id, concept.numberOfQuestions);
+      }
+    } else {
+      const conceptGroups = await this.conceptGroupAccess.find({
+        where: { subjectId: Number(params.subjectId) },
+        relations: {
+          concepts: true,
+        },
+      });
+      for (const group of conceptGroups)
+        for (const concept of group.concepts)
+          if (concept.numberOfQuestions > 0)
+            conceptIds.set(concept.id, concept.numberOfQuestions);
+    }
+
+    // random picking conceptId with weight of numberOfQuestions
+    const totalQuestions = Array.from(conceptIds.values()).reduce(
+      (a, b) => a + b,
+      0
+    );
+    let random = Math.random() * totalQuestions;
+    let selectedConceptId: number | null = null;
+    for (const [conceptId, numberOfQuestions] of conceptIds) {
+      random -= numberOfQuestions;
+      if (random <= 0) {
+        selectedConceptId = conceptId;
+        break;
+      }
+    }
+    if (selectedConceptId === null)
+      throw new BadRequestError('No concept found');
+
+    const interval = 7 * 24 * 60 * 60 * 1000;
+    const lastReplies = await this.replyAccess.find({
+      where: {
+        subjectId: Number(params.subjectId),
+        userId: user.id,
+        createdAt: MoreThan(new Date(Date.now() - interval).toISOString()),
+      },
+    });
+
+    const userConceptStat = await this.userConceptStatAccess.findOne({
+      where: {
+        userId: user.id,
+        conceptId: selectedConceptId,
+      },
+    });
+
+    const mastery = userConceptStat?.mastery ?? 0;
+    const questionList = await this.questionAccess.findAdaptive({
+      mastery,
+      subjectId: Number(params.subjectId),
+      take: 20 + lastReplies.length,
+      examIds: params.examIds
+        ? params.examIds.split(',').map((v) => Number(v))
+        : undefined,
+      tagIds: params.tagIds
+        ? params.tagIds.split(',').map((v) => Number(v))
+        : undefined,
+      conceptId: selectedConceptId,
+    });
+    if (questionList.length === 0) throw new NotFoundError('No question found');
+
+    // sort question list and exclude reason replied questions and pick top 20
+    const candidateList = questionList
+      .filter((q) => !lastReplies.some((r) => r.questionId === q.id))
+      .sort(
+        (a, b) =>
+          Math.abs(a.adjustedDifficulty - mastery) -
+          Math.abs(b.adjustedDifficulty - mastery)
+      )
+      .slice(0, 20);
+
+    // return randomly picked question
+    const question =
+      candidateList.length > 0
+        ? candidateList[Math.floor(Math.random() * candidateList.length)]
+        : questionList[Math.floor(Math.random() * questionList.length)];
+
+    return {
+      ...question,
+      children: question.children?.sort(
+        (a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)
+      ),
+    };
   }
 
   public async getQuestionList(
     params: GetQuestionParams | null
   ): Promise<GetQuestionResponse> {
-    if (!params?.categoryId)
-      throw new BadRequestError('categoryId is required');
-
-    const user = await this.userService.getUser();
+    if (!params) throw new BadRequestError('query parameters are required');
 
     const limit = params?.limit ? Number(params.limit) : LIMIT;
     const offset = params?.offset ? Number(params.offset) : OFFSET;
 
-    let orderDirection: 'ASC' | 'DESC' = 'ASC';
-    if (params.orderDirection === 'ASC' || params.orderDirection === 'DESC')
-      orderDirection = params.orderDirection;
-
-    let hasReply: boolean | undefined = undefined;
-    if (params.hasReply === 'true') hasReply = true;
-
-    if (params.hasReply === 'false') hasReply = false;
-
-    const [question, total] = await this.questionAccess.findAndCount({
-      categoryId: params.categoryId,
-      userId: user?.id ?? 0,
+    const [questions, total] = await this.questionAccess.findAndCount({
+      subjectId: Number(params.subjectId),
       take: limit,
       skip: offset,
-      orderBy: params.orderBy ?? 'id',
-      orderDirection,
-      title: params.title,
-      source: params.source,
-      hasReply,
-      tags: params.tags
-        ? params.tags.split(',').map((v) => Number(v))
+      examIds: params.examIds
+        ? params.examIds.split(',').map((v) => Number(v))
+        : undefined,
+      tagIds: params.tagIds
+        ? params.tagIds.split(',').map((v) => Number(v))
+        : undefined,
+      conceptIds: params.conceptIds
+        ? params.conceptIds.split(',').map((v) => Number(v))
         : undefined,
     });
 
     return {
-      data: question.map((v) => ({
-        uid: v.rid + v.id.toString(36).toUpperCase(),
-        title: v.title,
-        categoryId: v.categoryId,
-        category: v.category,
-        source: v.source,
-        tag: v.tag,
-        count: v.count,
-        scoringRate: v.scoringRate,
-        lastReply:
-          v.reply.length > 0
-            ? v.reply.sort(compare('createdAt', 'desc'))[0]
-            : null,
+      data: questions.map((q) => ({
+        ...q,
+        children: q.children?.sort(
+          (a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)
+        ),
       })),
       paginate: genPagination(total, limit, offset),
     };
@@ -170,181 +214,118 @@ export class QuestionService {
     return res.data;
   }
 
-  private async commentFbPost(postId: string, questionUid: string) {
+  private async commentFbPost(postId: string, solution: string) {
     const fbAccessToken = process.env.FB_ACCESS_TOKEN;
     await axios.post(`https://graph.facebook.com/${postId}/comments`, {
-      message: `https://pmp${process.env.ENVR === 'prod' ? '' : '-test'}.celestialstudio.net/q/${questionUid}`,
+      message: solution,
       access_token: fbAccessToken,
     });
   }
 
-  public async createQuestion(data: PostQuestionRequest) {
-    const category = await this.categoryAccess.findOneOrFail({
-      where: { name: data.category },
+  public async createQuestion(
+    data: PostQuestionRequest
+  ): Promise<PostQuestionResponse> {
+    if (data.conceptIds.length === 0)
+      throw new BadRequestError(
+        'At least one concept is required for a group question'
+      );
+
+    const subject = await this.subjectAccess.findOneOrFail({
+      where: { id: data.subjectId },
+      relations: { category: true },
     });
-    const tagEntities: Tag[] = [];
-    for (const t of data.tag) {
-      let tagEntity = await this.tagAccess.findOne({ where: { name: t } });
-      if (tagEntity === null) {
-        tagEntity = new TagEntity();
-        tagEntity.name = t;
-        tagEntity = await this.tagAccess.save(tagEntity);
-      }
-      tagEntities.push(tagEntity);
+
+    const exam = await this.examAccess.findOneOrFail({
+      where: { id: data.examId },
+      relations: { subject: true },
+    });
+    if (!exam.subject.some((s) => s.id === subject.id))
+      throw new BadRequestError('Invalid exam for the specified subject');
+
+    let tags: Tag[] = [];
+    if (data.tagIds !== undefined && data.tagIds.length > 0) {
+      const tagIdsSet = new Set(data.tagIds);
+      tags = await this.tagAccess.find({
+        where: { id: In([...tagIdsSet]) },
+      });
+      if (tags.length !== tagIdsSet.size)
+        throw new BadRequestError(
+          'Some tags are invalid for the specified subject'
+        );
+      for (const tag of tags)
+        if (tag.subjectId !== subject.id)
+          throw new BadRequestError('Invalid tag for the specified subject');
     }
 
+    const conceptIdsSet = new Set(data.conceptIds);
+    const concepts = await this.conceptAccess.find({
+      where: { id: In([...conceptIdsSet]) },
+    });
+    if (concepts.length !== conceptIdsSet.size)
+      throw new BadRequestError(
+        'Some concepts are invalid for the specified subject'
+      );
+    for (const concept of concepts) {
+      if (concept.conceptGroup.subjectId !== subject.id)
+        throw new BadRequestError('Invalid concept for the specified subject');
+      concept.numberOfQuestions += 1;
+      await this.conceptAccess.save(concept);
+    }
     const fbPost = await this.postFb(
       data.imageUrl,
-      `#${data.category} ` + data.tag.map((t) => `#${t}`).join(' ')
+      [
+        ...subject.category.map((c) => c.name),
+        subject.name,
+        exam.name,
+        ...tags.map((t) => t.name),
+        ...concepts.map((c) => c.name),
+      ]
+        .map((t) => `#${t}`)
+        .join(' ')
     );
 
     const questionEntity = new QuestionEntity();
-    questionEntity.rid = randomBase36(3);
-    questionEntity.categoryId = category.id;
-    questionEntity.title = data.title;
-    questionEntity.content = data.content;
-    questionEntity.source = data.source;
+    questionEntity.uuid = uuidv4();
+    questionEntity.subjectId = data.subjectId;
+    questionEntity.parentId = null;
     questionEntity.fbPostId = fbPost.post_id;
-    questionEntity.tag = tagEntities;
+    questionEntity.isGroup = data.type === 'GROUP';
+    questionEntity.type = data.type;
+    questionEntity.sortOrder = null;
+    questionEntity.content = data.content ?? null;
+    questionEntity.options = data.options ?? null;
+    questionEntity.answer = data.answer ?? null;
+    questionEntity.difficulty = data.difficulty;
+    questionEntity.adjustedDifficulty = data.difficulty;
+    questionEntity.exam = [exam];
+    questionEntity.tag = tags;
+    questionEntity.concept = concepts;
 
     const newQuestionEntity = await this.questionAccess.save(questionEntity);
 
-    await this.commentFbPost(
-      fbPost.post_id,
-      newQuestionEntity.rid + newQuestionEntity.id.toString(36).toUpperCase()
-    );
+    if (data.solution) await this.commentFbPost(fbPost.post_id, data.solution);
 
-    const minor: QuestionMinorEntity[] = [];
-    for (const m of data.minor) {
-      const questionMinorEntity = new QuestionMinorEntity();
-      questionMinorEntity.questionId = newQuestionEntity.id;
-      questionMinorEntity.type = m.type;
-      questionMinorEntity.orderIndex = m.orderIndex;
-      questionMinorEntity.content = m.content ?? null;
-      questionMinorEntity.options = m.options;
-      questionMinorEntity.answer = m.answer;
+    const children: QuestionEntity[] = [];
+    if (data.childQuestions !== undefined)
+      for (const child of data.childQuestions) {
+        const childEntity = new QuestionEntity();
+        childEntity.uuid = uuidv4();
+        childEntity.subjectId = data.subjectId;
+        childEntity.parentId = newQuestionEntity.id;
+        childEntity.fbPostId = null;
+        childEntity.isGroup = false;
+        childEntity.type = child.type;
+        childEntity.sortOrder = child.sortOrder;
+        childEntity.content = child.content;
+        childEntity.options = child.options;
+        childEntity.answer = child.answer;
+        childEntity.difficulty = data.difficulty;
+        childEntity.adjustedDifficulty = data.difficulty;
 
-      const minorEntity =
-        await this.questionMinorAccess.save(questionMinorEntity);
-      minor.push(minorEntity);
-    }
+        const tmpQuestion = await this.questionAccess.save(childEntity);
+        children.push(tmpQuestion);
+      }
 
-    return {
-      ...newQuestionEntity,
-      minor,
-    };
-  }
-
-  private calculateMultipleScore(
-    correct: string | null,
-    replied: string,
-    options: string | null
-  ): number {
-    if (!correct || !options) return 1;
-    if (replied === '') return 0;
-
-    const answerSet = new Set(correct.split(','));
-    const repliedSet = new Set(replied.split(','));
-
-    const missing = [...answerSet].filter((o) => !repliedSet.has(o)).length;
-    const extra = [...repliedSet].filter((o) => !answerSet.has(o)).length;
-
-    const n = options.split(',').length;
-    const k = missing + extra;
-
-    return n - 2 * k <= 0
-      ? 0
-      : bn(n - 2 * k)
-          .div(n)
-          .dp(4, 7)
-          .toNumber();
-  }
-
-  private calculateFillScore(correct: string[], replied: string[]) {
-    if (correct.length !== replied.length) return 0;
-    for (let i = 0; i < correct.length; i++)
-      if (correct[i] !== replied[i]) return 0;
-
-    return 1;
-  }
-
-  public async startQuestion(
-    data: PostQuestionStartRequest
-  ): Promise<PostQuestionStartResponse> {
-    const user = await this.userService.getUser();
-    if (user === null) throw new UnauthorizedError('User not found');
-
-    const replyEntity = new ReplyEntity();
-    replyEntity.userId = user.id;
-    replyEntity.questionId = data.id;
-    replyEntity.score = 0;
-    replyEntity.complete = false;
-    replyEntity.recordedAt = new Date().toISOString();
-
-    const newReply = await this.replyAccess.save(replyEntity);
-
-    return {
-      id: newReply.id,
-      questionId: newReply.questionId,
-      userId: newReply.userId,
-    };
-  }
-
-  public async completeQuestion(
-    data: PostQuestionCompleteRequest
-  ): Promise<PostQuestionCompleteResponse> {
-    const user = await this.userService.getUser();
-    if (user === null) throw new UnauthorizedError('User not found');
-
-    const reply = await this.replyAccess.findOne({
-      where: {
-        id: data.replyId,
-        userId: user.id,
-        questionId: data.id,
-        complete: false,
-      },
-    });
-    if (reply === null) throw new UnauthorizedError('Reply not found');
-
-    const question = await this.questionAccess.findOneOrFail({
-      where: { id: data.id },
-    });
-    if (data.replied.length !== question.minor.length)
-      throw new BadRequestError('The number of replied answers is not matched');
-    const totalScore = question.minor
-      .map((v) => {
-        if (v.type === 'SINGLE')
-          return data.replied.find((r) => r.id === v.id)?.answer === v.answer
-            ? 1
-            : 0;
-        else if (v.type === 'MULTIPLE')
-          return this.calculateMultipleScore(
-            v.answer,
-            data.replied.find((r) => r.id === v.id)?.answer ?? '',
-            v.options
-          );
-        else if (v.type === 'FILL')
-          return this.calculateFillScore(
-            v.answer?.split(',') ?? [],
-            data.replied.find((r) => r.id === v.id)?.answer.split(',') ?? []
-          );
-
-        return 0;
-      })
-      .reduce((prev, cur) => prev.plus(cur), bn(0));
-    const score = totalScore.div(question.minor.length).dp(4, 7).toNumber();
-
-    reply.score = score;
-    reply.repliedAnswer = data.replied.map((r) => r.answer).join('|');
-    reply.complete = true;
-    reply.recordedAt = new Date().toISOString();
-
-    const newReply = await this.replyAccess.save(reply);
-
-    return {
-      ...newReply,
-      actualAnswer: question.minor.map((m) => m.answer).join('|'),
-      fbPostId: question.fbPostId,
-    };
+    return [newQuestionEntity, ...children];
   }
 }

@@ -42,7 +42,7 @@
     "rootDir": ".",
     "sourceMap": false,
     "strict": true,
-    "target": "es2022"
+    "target": "ES6"
   },
   "include": [
     "src/**/*.ts",

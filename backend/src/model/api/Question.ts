@@ -1,84 +1,46 @@
-import { Category } from 'src/model/entity/CategoryEntity';
-import { QuestionMinor } from 'src/model/entity/QuestionMinorEntity';
-import { Reply } from 'src/model/entity/ReplyEntity';
-import { Tag } from 'src/model/entity/TagEntity';
+import { Question } from 'src/model/entity/QuestionEntity';
 import { Paginate, PaginationParams } from 'src/model/Pagination';
 
 export type PostQuestionRequest = {
-  category: string;
-  title: string;
-  content: string;
+  subjectId: number;
+  type: 'GROUP' | 'SINGLE' | 'MULTIPLE' | 'TRUE_FALSE' | 'FILL';
   imageUrl: string;
-  source: string;
-  tag: string[];
-  minor: {
-    type: 'SINGLE' | 'MULTIPLE' | 'FILL';
-    orderIndex: number;
-    content?: string;
+  content?: string;
+  options?: string;
+  answer?: string;
+  solution?: string;
+  difficulty: number;
+  examId: number;
+  tagIds?: number[];
+  conceptIds: number[];
+  childQuestions?: {
+    type: 'SINGLE' | 'MULTIPLE' | 'TRUE_FALSE' | 'FILL';
+    sortOrder: number;
+    content: string;
     options: string;
     answer: string;
+    difficulty: number;
   }[];
 };
 
-export type PostQuestionStartRequest = {
-  id: number;
-};
-
-export type PostQuestionStartResponse = Pick<
-  Reply,
-  'id' | 'questionId' | 'userId'
->;
-
-export type PostQuestionCompleteRequest = {
-  id: number;
-  replyId: number;
-  replied: { id: number; answer: string }[];
-};
-
-export type ModifiedReply = Reply & {
-  actualAnswer: string | null;
-  fbPostId: string | null;
-};
-
-export type PostQuestionCompleteResponse = ModifiedReply;
+export type PostQuestionResponse = Question[];
 
 export type GetQuestionParams = PaginationParams & {
-  categoryId: number;
-  orderBy?: string;
-  orderDirection?: string;
-  title?: string;
-  hasReply?: 'true' | 'false';
-  tags?: string;
-  source?: string;
+  subjectId: string;
+  examIds?: string;
+  tagIds?: string;
+  conceptIds?: string;
 };
 
-export type GetQuestionTagParams = { categoryId: number };
-
-export type GetQuestionTagResponse = { id: number; name: string }[];
-
-export type ModifiedQuestion = {
-  uid: string;
-  title: string;
-  categoryId: number;
-  category: Category;
-  source: string | null;
-  tag: Tag[];
-  count: number;
-  scoringRate: number | null;
-  lastReply: Reply | null;
+export type GetQuestionAdaptiveParams = {
+  subjectId: string;
+  examIds?: string;
+  tagIds?: string;
+  conceptIds?: string;
 };
 
-export type GetQuestionResponse = Paginate<ModifiedQuestion>;
+export type GetQuestionAdaptiveResponse = Question;
 
-export type GetQuestionIdResponse = {
-  uid: string;
-  title: string;
-  category: Category;
-  content: string;
-  source: string | null;
-  minor: (QuestionMinor & { length: number | null })[];
-  tag: Tag[];
-  count: number;
-  scoringRate: number | null;
-  lastReply: ModifiedReply | null;
-};
+export type GetQuestionResponse = Paginate<Question>;
+
+export type GetQuestionIdResponse = Question;

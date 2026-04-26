@@ -1,5 +1,8 @@
 import http from 'src/api/http';
-import type { GetCategoryResponse } from 'src/model/backend/api/Category';
+import type {
+  GetCategoryResponse,
+  GetCateogoryIdSubjectResponse,
+} from 'src/model/backend/api/Category';
 import { alertError } from './errorHandler';
 
 const getCategory = async () => {
@@ -10,6 +13,15 @@ const getCategory = async () => {
   }
 };
 
+const getCategoryIdSubject = async (id: number) => {
+  try {
+    return await http.get<GetCateogoryIdSubjectResponse>(`category/${id}/subject`);
+  } catch (e) {
+    alertError(e);
+  }
+};
+
 export default {
   getCategory,
+  getCategoryIdSubject,
 };

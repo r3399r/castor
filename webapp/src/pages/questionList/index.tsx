@@ -1,289 +1,318 @@
 import {
   Button,
+  Chip,
   FormControl,
   InputLabel,
+  ListSubheader,
   MenuItem,
   Pagination,
-  Paper,
+  Rating,
   Select,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  TextField,
 } from '@mui/material';
-import { useEffect, useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import categoryEndpoint from 'src/api/categoryEndpoint';
 import questionEndpoint from 'src/api/questionEndpoint';
-import type { GetQuestionTagResponse, ModifiedQuestion } from 'src/model/backend/api/Question';
-import {
-  finishWaiting,
-  setCategoryId as reduxSetCategoryId,
-  setTag,
-  startWaiting,
-} from 'src/redux/uiSlice';
-import { bn } from 'src/util/bignumber';
-import randomcolor from 'randomcolor';
-import type { RootState } from 'src/redux/store';
-
-const LIMIT = 100;
+import subjectEndpoint from 'src/api/subjectEndpoint';
+import { LIMIT } from 'src/constant/backend/Pagination';
+import type { GetQuestionResponse } from 'src/model/backend/api/Question';
+import type { Category } from 'src/model/backend/entity/CategoryEntity';
+import type { ConceptGroup } from 'src/model/backend/entity/ConceptGroupEntity';
+import type { Exam } from 'src/model/backend/entity/ExamEntity';
+import type { Subject } from 'src/model/backend/entity/SubjectEntity';
+import type { Tag } from 'src/model/backend/entity/TagEntity';
 
 const QuestionList = () => {
-  const dispatch = useDispatch();
-  const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const [list, setList] = useState<ModifiedQuestion[]>();
-  const [page, setPage] = useState<number>(1);
-  const [count, setCount] = useState<number>();
-  const [categoryId, setCategoryId] = useState<number>();
-  const [sourceQuery, setSourceQuery] = useState<string>();
-  const [sorting, setSorting] = useState<string>();
-  const [sortDirection, setSortDirection] = useState<'ASC' | 'DESC'>('DESC');
-  const [sortValue, setSortValue] = useState<number>(1);
-  const [showReply, setShowReply] = useState<'true' | 'false'>();
-  const [showReplyValue, setShowReplyValue] = useState<number>(1);
-  const [tagsFilter, setTagsFilter] = useState<string[]>();
-  const [allTags, setAllTags] = useState<GetQuestionTagResponse>();
-  const { tag, isLogin } = useSelector((rootState: RootState) => rootState.ui);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number>();
+  const [selectedSubjectId, setSelectedSubjectId] = useState<number>();
+  const [selectedExamIds, setSelectedExamIds] = useState<number[]>([]);
+  const [selectedConceptIds, setSelectedConceptIds] = useState<number[]>([]);
+  const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
+  const [categoryList, setCategoryList] = useState<Category[]>();
+  const [subjectList, setSubjectList] = useState<Subject[]>();
+  const [examList, setExamList] = useState<Exam[]>();
+  const [conceptGroupList, setConceptGroupList] = useState<ConceptGroup[]>();
+  const [tagList, setTagList] = useState<Tag[]>();
+  const [resultQuestionList, setResultQuestionList] = useState<GetQuestionResponse>();
+  const [openSolutionIds, setOpenSolutionIds] = useState<Set<number>>(new Set());
+
+  const showConceptGroupHeader = useMemo(() => {
+    if (!conceptGroupList) return false;
+    conceptGroupList.forEach((g) => {
+      if (g.concepts.length > 1) return true;
+    });
+    return false;
+  }, [conceptGroupList]);
 
   useEffect(() => {
-    const tmpCategoryId = searchParams.get('categoryId');
-    if (tmpCategoryId === null || isNaN(Number(tmpCategoryId))) {
-      navigate('/');
-      return;
-    }
-    setCategoryId(Number(tmpCategoryId));
-    dispatch(reduxSetCategoryId(Number(tmpCategoryId)));
-
-    const tmpSourceQuery = searchParams.get('source');
-    if (tmpSourceQuery !== null) setSourceQuery(tmpSourceQuery);
-
-    const tmpSorting = searchParams.get('sorting');
-    if (tmpSorting !== null) setSorting(tmpSorting);
-
-    const tmpSortDirection = searchParams.get('sortDirection');
-    if (tmpSortDirection !== null && (tmpSortDirection === 'ASC' || tmpSortDirection === 'DESC'))
-      setSortDirection(tmpSortDirection);
-
-    const tmpShowReply = searchParams.get('showReply');
-    if (tmpShowReply !== null && (tmpShowReply === 'true' || tmpShowReply === 'false'))
-      setShowReply(tmpShowReply);
-
-    const tmpTagsFilter = searchParams.get('tagsFilter');
-    if (tmpTagsFilter !== null) setTagsFilter(tmpTagsFilter.split(','));
-  }, [searchParams, dispatch, navigate]);
+    categoryEndpoint.getCategory().then((res) => {
+      setCategoryList(res?.data);
+    });
+  }, []);
 
   useEffect(() => {
-    if (!categoryId) return;
-    if (tag !== null && tag[categoryId] !== undefined) {
-      setAllTags(tag[categoryId]);
-      return;
-    }
-
-    dispatch(startWaiting());
-    questionEndpoint
-      .getQuestionTag({ categoryId })
-      .then((res) => {
-        if (!res) return;
-        setAllTags(res.data);
-        dispatch(setTag({ [categoryId]: res.data }));
-      })
-      .finally(() => {
-        dispatch(finishWaiting());
-      });
-  }, [categoryId]);
+    if (!selectedCategoryId) return;
+    setSelectedSubjectId(undefined);
+    setSelectedExamIds([]);
+    setSelectedConceptIds([]);
+    setSelectedTagIds([]);
+    setResultQuestionList(undefined);
+    categoryEndpoint.getCategoryIdSubject(selectedCategoryId).then((res) => {
+      setSubjectList(res?.data);
+    });
+  }, [selectedCategoryId]);
 
   useEffect(() => {
-    if (!categoryId) return;
+    if (!selectedSubjectId) return;
+    setSelectedExamIds([]);
+    setSelectedConceptIds([]);
+    setSelectedTagIds([]);
+    subjectEndpoint.getSubjectIdExam(selectedSubjectId).then((res) => {
+      setExamList(res?.data);
+    });
+    subjectEndpoint.getSubjectIdConceptGroup(selectedSubjectId).then((res) => {
+      setConceptGroupList(res?.data);
+    });
+    subjectEndpoint.getSubjectIdTag(selectedSubjectId).then((res) => {
+      setTagList(res?.data);
+    });
+  }, [selectedSubjectId]);
 
-    dispatch(startWaiting());
+  const onClickSearch = () => {
+    if (!selectedSubjectId) return;
     questionEndpoint
       .getQuestion({
-        limit: LIMIT.toString(),
-        offset: ((page - 1) * LIMIT).toString(),
-        categoryId,
-        orderBy: sorting,
-        orderDirection: sortDirection,
-        source: sourceQuery,
-        hasReply: showReply,
-        tags: tagsFilter ? tagsFilter.join() : undefined,
+        subjectId: selectedSubjectId.toString(),
+        examIds: selectedExamIds.length > 0 ? selectedExamIds.join(',') : undefined,
+        conceptIds: selectedConceptIds.length > 0 ? selectedConceptIds.join(',') : undefined,
+        tagIds: selectedTagIds.length > 0 ? selectedTagIds.join(',') : undefined,
       })
       .then((res) => {
-        setList(res?.data.data);
-        setCount(res?.data.paginate.totalPages);
-      })
-      .finally(() => {
-        dispatch(finishWaiting());
+        setResultQuestionList(res?.data);
       });
-  }, [page, categoryId, searchParams, isLogin]);
+  };
 
-  const applyFilters = (opts?: { replace?: boolean }) => {
-    const sp = new URLSearchParams();
-    if (categoryId) sp.set('categoryId', String(categoryId));
-    if (sourceQuery) sp.set('source', sourceQuery);
-    if (sorting) sp.set('sorting', sorting);
-    if (sortDirection === 'DESC') sp.set('sortDirection', 'DESC');
-    else sp.set('sortDirection', 'ASC');
-    if (showReply) sp.set('showReply', showReply);
-    if (tagsFilter && tagsFilter.length > 0) sp.set('tagsFilter', tagsFilter.join());
-    setSearchParams(sp, { replace: !!opts?.replace });
+  const onChangePage = (_event: React.ChangeEvent<unknown>, page: number) => {
+    if (!selectedSubjectId) return;
+    questionEndpoint
+      .getQuestion({
+        subjectId: selectedSubjectId.toString(),
+        examIds: selectedExamIds.length > 0 ? selectedExamIds.join(',') : undefined,
+        conceptIds: selectedConceptIds ? selectedConceptIds.join(',') : undefined,
+        tagIds: selectedTagIds ? selectedTagIds.join(',') : undefined,
+        offset: ((page - 1) * LIMIT).toString(),
+      })
+      .then((res) => {
+        setResultQuestionList(res?.data);
+      });
+  };
+
+  const onClickRevealSolution = (questionId: number) => {
+    if (openSolutionIds.has(questionId))
+      setOpenSolutionIds((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(questionId);
+        return newSet;
+      });
+    else setOpenSolutionIds((prev) => new Set(prev).add(questionId));
+  };
+
+  const getTypeName = (type: string) => {
+    switch (type) {
+      case 'SINGLE':
+        return '單選題';
+      case 'MULTIPLE':
+        return '多選題';
+      case 'TRUE_FALSE':
+        return '是非題';
+      case 'FILL':
+        return '選填題';
+      case 'GROUP':
+        return '題組';
+      default:
+        return type;
+    }
   };
 
   return (
-    <div>
-      <div className="text-2xl font-bold">
-        {list !== undefined && list.length > 0 ? `${list[0].category.name}` : '題目清單'}
-      </div>
-      <div className="my-3 flex flex-col flex-wrap gap-3 xs:flex-row xs:items-center">
-        <div className="xs:w-40">
-          <TextField
-            label="搜尋出處"
-            fullWidth
-            variant="standard"
-            size="small"
-            value={sourceQuery}
-            onChange={(e) => setSourceQuery(e.target.value)}
-          />
-        </div>
-        <div className="xs:w-40">
-          <FormControl fullWidth variant="standard">
-            <InputLabel>選擇標籤</InputLabel>
+    <>
+      <div className="flex flex-col gap-4">
+        <FormControl fullWidth>
+          <InputLabel>選擇類別</InputLabel>
+          <Select
+            value={selectedCategoryId ?? ''}
+            label="category"
+            onChange={(e) => setSelectedCategoryId(e.target.value)}
+          >
+            {categoryList?.map((item) => (
+              <MenuItem value={item.id}>{item.name}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        <FormControl fullWidth>
+          <InputLabel>選擇科目</InputLabel>
+          <Select
+            value={selectedSubjectId ?? ''}
+            label="subject"
+            onChange={(e) => setSelectedSubjectId(e.target.value)}
+            disabled={!selectedCategoryId}
+          >
+            {subjectList?.map((item) => (
+              <MenuItem value={item.id}>{item.name}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        <FormControl fullWidth>
+          <InputLabel>選擇試卷 (非必填)</InputLabel>
+          <Select
+            value={selectedExamIds}
+            label="exam"
+            onChange={(e) => setSelectedExamIds(e.target.value as number[])}
+            disabled={!selectedSubjectId}
+            multiple
+          >
+            {examList?.map((item) => (
+              <MenuItem value={item.id}>{item.name}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        <FormControl fullWidth>
+          <InputLabel>選擇觀念 (非必填)</InputLabel>
+          <Select
+            value={selectedConceptIds}
+            label="concept-group"
+            onChange={(e) => setSelectedConceptIds(e.target.value as number[])}
+            disabled={!selectedSubjectId}
+            multiple
+          >
+            {conceptGroupList?.flatMap((item) =>
+              showConceptGroupHeader
+                ? [
+                    <ListSubheader key={`sub-${item.id}`}>{item.name}</ListSubheader>,
+                    ...item.concepts.map((c) => (
+                      <MenuItem key={c.id} value={c.id}>
+                        {c.name}
+                      </MenuItem>
+                    )),
+                  ]
+                : item.concepts.map((c) => (
+                    <MenuItem key={c.id} value={c.id}>
+                      {c.name}
+                    </MenuItem>
+                  )),
+            )}
+          </Select>
+        </FormControl>
+        {tagList && tagList.length > 0 && (
+          <FormControl fullWidth>
+            <InputLabel>選擇標籤 (非必填)</InputLabel>
             <Select
-              size="small"
-              value={tagsFilter ?? []}
-              label="Tag"
+              value={selectedTagIds}
+              label="tag"
+              onChange={(e) => setSelectedTagIds(e.target.value as number[])}
+              disabled={!selectedSubjectId}
               multiple
-              onChange={(e) => {
-                const value = e.target.value;
-                setTagsFilter(typeof value === 'string' ? value.split(',') : value);
-              }}
             >
-              {allTags?.map((t) => (
-                <MenuItem value={t.id.toString()}>{t.name}</MenuItem>
+              {tagList?.map((item) => (
+                <MenuItem value={item.id}>{item.name}</MenuItem>
               ))}
             </Select>
           </FormControl>
+        )}
+        <div>
+          <Button variant="contained" onClick={onClickSearch} disabled={!selectedSubjectId}>
+            搜尋
+          </Button>
         </div>
-        <div className="xs:w-40">
-          <FormControl fullWidth variant="standard">
-            <InputLabel>排序方式</InputLabel>
-            <Select
-              size="small"
-              value={sortValue}
-              label="排序方式"
-              onChange={(e) => {
-                const value = e.target.value;
-                setSortValue(value);
-                if (value === 1) {
-                  setSorting(undefined);
-                  setSortDirection('DESC');
-                } else if (value === 2 || value === 3) {
-                  setSorting('title');
-                  setSortDirection(value === 2 ? 'ASC' : 'DESC');
-                } else if (value === 4 || value === 5) {
-                  setSorting('scoringRate');
-                  setSortDirection(value === 4 ? 'ASC' : 'DESC');
-                }
-              }}
-            >
-              <MenuItem value={1}>預設</MenuItem>
-              <MenuItem value={2}>題號(遞增)</MenuItem>
-              <MenuItem value={3}>題號(遞減)</MenuItem>
-              <MenuItem value={4}>答對率(遞增)</MenuItem>
-              <MenuItem value={5}>答對率(遞減)</MenuItem>
-            </Select>
-          </FormControl>
-        </div>
-        <div className="xs:w-40">
-          <FormControl fullWidth variant="standard">
-            <InputLabel>作答與否</InputLabel>
-            <Select
-              size="small"
-              value={showReplyValue}
-              label="作答與否"
-              onChange={(e) => {
-                const value = e.target.value;
-                setShowReplyValue(value);
-                if (value === 1) {
-                  setShowReply(undefined);
-                } else if (value === 2) {
-                  setShowReply('false');
-                } else if (value === 3) {
-                  setShowReply('true');
-                }
-              }}
-            >
-              <MenuItem value={1}>顯示全部</MenuItem>
-              <MenuItem value={2}>僅顯示未作答</MenuItem>
-              <MenuItem value={3}>僅顯示已作答</MenuItem>
-            </Select>
-          </FormControl>
-        </div>
-        <Button variant="contained" onClick={() => applyFilters()}>
-          搜尋
-        </Button>
       </div>
-      <TableContainer component={Paper}>
-        <Table sx={{ minWidth: 650 }} aria-label="simple table">
-          <TableHead>
-            <TableRow>
-              <TableCell>出處</TableCell>
-              <TableCell>題號</TableCell>
-              <TableCell>標籤</TableCell>
-              <TableCell>答對率</TableCell>
-              <TableCell>是否作答</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {list?.map((row) => (
-              <TableRow key={row.uid}>
-                <TableCell>{row.source ?? '-'}</TableCell>
-                <TableCell>
-                  <a
-                    onClick={(e) => {
-                      e.preventDefault();
-                      navigate(`/q/${row.uid}`);
-                    }}
-                    href={`/q/${row.uid}`}
-                    target="_self"
-                    className="text-blue-600 underline"
-                  >
-                    {row.title}
-                  </a>
-                </TableCell>
-                <TableCell>
-                  <div className="flex flex-wrap gap-1">
-                    {row.tag.map((t) => (
-                      <div
-                        key={t.id}
-                        className="rounded px-1"
-                        style={{
-                          background: randomcolor({ luminosity: 'light', seed: t.id }),
-                        }}
-                      >
-                        {t.name}
-                      </div>
+      <hr className="my-4" />
+      {resultQuestionList && resultQuestionList.data.length === 0 && <div>查無題目</div>}
+      {resultQuestionList && resultQuestionList.data.length > 0 && (
+        <div className="flex flex-col gap-4">
+          {resultQuestionList.data.map((item) => (
+            <div key={item.id} className="rounded-xl border">
+              <div className="rounded-tl-xl rounded-tr-xl border-b bg-blue-100/80 p-2">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex flex-wrap gap-2">
+                    <Chip label={getTypeName(item.type)} size="small" />
+                    {item.exam.map((e) => (
+                      <Chip key={e.id} label={e.name} size="small" color="success" />
+                    ))}
+                    {item.concept.map((c) => (
+                      <Chip key={c.id} label={c.name} size="small" color="info" />
+                    ))}
+                    {item.tag.map((t) => (
+                      <Chip key={t.id} label={t.name} size="small" color="warning" />
                     ))}
                   </div>
-                </TableCell>
-                <TableCell>
-                  {row.scoringRate !== null
-                    ? bn(row.scoringRate).times(100).dp(2).toFormat() + '%'
-                    : '-'}
-                </TableCell>
-                <TableCell>{row.lastReply?.complete === true ? '已作答' : '尚未作答'}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
-      <div className="mt-3 flex justify-center">
-        <Pagination count={count} page={page} onChange={(_e, v) => setPage(v)} />
-      </div>
-    </div>
+                  <Rating
+                    value={item.adjustedDifficulty / 2 < 0.5 ? 0.5 : item.adjustedDifficulty / 2}
+                    precision={0.1}
+                    readOnly
+                    size="small"
+                  />
+                </div>
+              </div>
+              <div className="p-4">
+                {item.content && <div dangerouslySetInnerHTML={{ __html: item.content }} />}
+                {item.answer && (
+                  <div className="mt-4">
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      onClick={() => onClickRevealSolution(item.id)}
+                    >
+                      看答案
+                    </Button>
+                  </div>
+                )}
+                <div>
+                  {openSolutionIds.has(item.id) && item.answer && (
+                    <div className="mt-4 rounded-lg border bg-green-100/80 p-4">
+                      <div className="font-bold">解答</div>
+                      <div dangerouslySetInnerHTML={{ __html: item.answer }} />
+                    </div>
+                  )}
+                </div>
+                {item.children.map((c) => (
+                  <div key={c.id} className="mt-4">
+                    <div dangerouslySetInnerHTML={{ __html: c.content ?? '' }} />
+                    <div className="mt-4">
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        onClick={() => onClickRevealSolution(c.id)}
+                      >
+                        看答案
+                      </Button>
+                    </div>
+                    <div>
+                      {openSolutionIds.has(c.id) && c.answer && (
+                        <div className="mt-4 rounded-lg border bg-green-100/80 p-4">
+                          <div className="font-bold">解答</div>
+                          <div dangerouslySetInnerHTML={{ __html: c.answer }} />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                <div className="mt-4">
+                  <a
+                    href={`https://m.facebook.com/${item?.fbPostId?.split('_')[0]}/posts/${item?.fbPostId?.split('_')[1]}`}
+                    target="_blank"
+                    className="text-blue-600 underline"
+                  >
+                    討論區
+                  </a>
+                </div>
+              </div>
+            </div>
+          ))}
+          <div className="flex justify-center">
+            <Pagination count={resultQuestionList.paginate.totalPages} onChange={onChangePage} />
+          </div>
+        </div>
+      )}
+    </>
   );
 };
 

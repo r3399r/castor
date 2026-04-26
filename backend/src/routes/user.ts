@@ -1,6 +1,5 @@
 import { bindings } from 'src/bindings';
 import { UserService } from 'src/logic/UserService';
-import { GetUserDetailParams } from 'src/model/api/User';
 import { BadRequestError } from 'src/model/error';
 import { LambdaEvent } from 'src/model/Lambda';
 
@@ -12,8 +11,8 @@ export default async (lambdaEvent: LambdaEvent) => {
   service = bindings.get(UserService);
 
   switch (event.resource) {
-    case '/api/user/detail':
-      return await userDetail();
+    case '/api/user/stats':
+      return await userStats();
     case '/api/user/sync':
       return await userSync();
   }
@@ -21,12 +20,10 @@ export default async (lambdaEvent: LambdaEvent) => {
   throw new BadRequestError('unexpected resource');
 };
 
-const userDetail = async () => {
+const userStats = async () => {
   switch (event.httpMethod) {
     case 'GET':
-      return await service.getUserDetail(
-        event.queryStringParameters as GetUserDetailParams | null
-      );
+      return await service.getUserStats();
   }
 
   throw new Error('unexpected httpMethod');

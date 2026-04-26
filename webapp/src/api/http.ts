@@ -1,4 +1,5 @@
 import axios, { type AxiosRequestConfig, type RawAxiosRequestHeaders } from 'axios';
+import { auth } from 'src/firebase/config';
 import packageJson from '../../package.json';
 
 // eslint-disable-next-line
@@ -20,12 +21,18 @@ const defaultHeader: RawAxiosRequestHeaders = {
 };
 
 // eslint-disable-next-line
-const publicRequestConfig = <D = unknown, P = any>(
+const publicRequestConfig = async <D = unknown, P = any>(
   method: string,
   url: string,
   options?: Options<D, P>,
 ) => {
-  const token = sessionStorage.getItem('idToken');
+  const user = auth.currentUser;
+  let token: string | null = null;
+  if (user) {
+    token = await user.getIdToken(true);
+  } else {
+    token = sessionStorage.getItem('idToken');
+  }
 
   return {
     ...defaultConfig,
@@ -42,20 +49,30 @@ const publicRequestConfig = <D = unknown, P = any>(
 };
 
 // eslint-disable-next-line
-const get = async <T, P = any>(url: string, options?: Options<any, P>) =>
-  await axios.request<T>(publicRequestConfig<unknown, P>('get', url, options));
+const get = async <T, P = any>(url: string, options?: Options<any, P>) => {
+  const config = await publicRequestConfig<unknown, P>('get', url, options);
+  return await axios.request<T>(config);
+};
 
-const post = async <T, D = unknown>(url: string, options?: Options<D>) =>
-  await axios.request<T>(publicRequestConfig<D>('post', url, options));
+const post = async <T, D = unknown>(url: string, options?: Options<D>) => {
+  const config = await publicRequestConfig<D>('post', url, options);
+  return await axios.request<T>(config);
+};
 
-const put = async <T, D = unknown>(url: string, options?: Options<D>) =>
-  await axios.request<T>(publicRequestConfig<D>('put', url, options));
+const put = async <T, D = unknown>(url: string, options?: Options<D>) => {
+  const config = await publicRequestConfig<D>('put', url, options);
+  return await axios.request<T>(config);
+};
 
-const patch = async <T, D = unknown>(url: string, options?: Options<D>) =>
-  await axios.request<T>(publicRequestConfig<D>('patch', url, options));
+const patch = async <T, D = unknown>(url: string, options?: Options<D>) => {
+  const config = await publicRequestConfig<D>('patch', url, options);
+  return await axios.request<T>(config);
+};
 
-const sendDelete = async <T, D = unknown>(url: string, options?: Options<D>) =>
-  await axios.request<T>(publicRequestConfig<D>('delete', url, options));
+const sendDelete = async <T, D = unknown>(url: string, options?: Options<D>) => {
+  const config = await publicRequestConfig<D>('delete', url, options);
+  return await axios.request<T>(config);
+};
 
 export default {
   get,

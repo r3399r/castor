@@ -1,15 +1,24 @@
 CREATE TABLE IF NOT EXISTS castor.question (
     id INT UNSIGNED AUTO_INCREMENT,
-    rid VARCHAR(16) NOT NULL,
-    title VARCHAR(255) NOT NULL,
-    category_id INT UNSIGNED NOT NULL,
-    content TEXT NOT NULL,
+    uuid VARCHAR(36) NOT NULL,
+    subject_id INT UNSIGNED NOT NULL,
+    parent_id INT UNSIGNED NULL,
     fb_post_id VARCHAR(255) NULL,
-    source VARCHAR(255) NULL,
-    count INT UNSIGNED NOT NULL DEFAULT 0,
-    scoring_rate DOUBLE NULL,
+    is_group TINYINT NOT NULL DEFAULT 0,
+    type VARCHAR(255) NOT NULL, -- GROUP, SINGLE, MULTIPLE, TRUE_FALSE, FILL
+    sort_order INT NULL, -- for GROUP
+    content TEXT NULL,
+    options VARCHAR(255) NULL, -- A|B|C|D or True|False or 0|1|2|3
+    answer VARCHAR(255) NULL, -- A or AC or True or 301
+    difficulty TINYINT UNSIGNED NOT NULL, -- 1~10
+    attemp_count INT UNSIGNED NOT NULL DEFAULT 0,
+    scoring_total DOUBLE NOT NULL DEFAULT 0, -- scoring_rate = scoring_total / attemp_count
+    adjusted_difficulty DOUBLE NOT NULL, -- difficulty adjusted by user reply
     created_at DATETIME(3) NULL,
     updated_at DATETIME(3) NULL,
     PRIMARY KEY (id),
-    FOREIGN KEY (category_id) REFERENCES category(id)
+    UNIQUE (uuid),
+    FOREIGN KEY (subject_id) REFERENCES castor.subject(id),
+    FOREIGN KEY (parent_id) REFERENCES castor.question(id),
+    INDEX idx_subject_difficulty (subject_id, adjusted_difficulty)
 );

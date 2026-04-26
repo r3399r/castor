@@ -4,7 +4,13 @@ import { DbAccess } from 'src/dao/DbAccess';
 import { GatewayTimeoutError } from 'src/model/error/5XX/GatewayTimeoutError';
 import { LambdaContext, LambdaEvent, LambdaOutput } from 'src/model/Lambda';
 import category from 'src/routes/category';
+import concept from 'src/routes/concept';
+import exam from 'src/routes/exam';
+import preview from 'src/routes/preview';
 import question from 'src/routes/question';
+import reply from 'src/routes/reply';
+import subject from 'src/routes/subject';
+import tag from 'src/routes/tag';
 import user from 'src/routes/user';
 import { errorOutput, initLambda, successOutput } from 'src/utils/LambdaHelper';
 
@@ -19,6 +25,18 @@ const apiProcess = async (event: LambdaEvent): Promise<LambdaOutput> => {
 
     const resource = event.resource.split('/')[2];
     switch (resource) {
+      case 'subject':
+        res = await subject(event);
+        break;
+      case 'exam':
+        res = await exam(event);
+        break;
+      case 'concept':
+        res = await concept(event);
+        break;
+      case 'tag':
+        res = await tag(event);
+        break;
       case 'question':
         res = await question(event);
         break;
@@ -28,6 +46,11 @@ const apiProcess = async (event: LambdaEvent): Promise<LambdaOutput> => {
       case 'category':
         res = await category(event);
         break;
+      case 'reply':
+        res = await reply(event);
+        break;
+      case 'preview':
+        res = await preview(event);
     }
 
     output = successOutput(res);
