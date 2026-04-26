@@ -6,6 +6,7 @@ import { LIMIT, OFFSET } from 'src/constant/Pagination';
 import { ConceptAccess } from 'src/dao/ConceptAccess';
 import { ConceptGroupAccess } from 'src/dao/ConceptGroupAccess';
 import { ExamAccess } from 'src/dao/ExamAccess';
+import { PendingReplyAccess } from 'src/dao/PendingReplyAccess';
 import { QuestionAccess } from 'src/dao/QuestionAccess';
 import { ReplyAccess } from 'src/dao/ReplyAccess';
 import { SubjectAccess } from 'src/dao/SubjectAccess';
@@ -20,7 +21,8 @@ import {
   PostQuestionRequest,
   PostQuestionResponse,
 } from 'src/model/api/Question';
-import { QuestionEntity } from 'src/model/entity/QuestionEntity';
+import { PendingReplyEntity } from 'src/model/entity/PendingReplyEntity';
+import { Question, QuestionEntity } from 'src/model/entity/QuestionEntity';
 import { Tag } from 'src/model/entity/TagEntity';
 import {
   BadRequestError,
@@ -53,9 +55,20 @@ export class QuestionService {
   private readonly userConceptStatAccess!: UserConceptStatAccess;
   @inject(ConceptGroupAccess)
   private readonly conceptGroupAccess!: ConceptGroupAccess;
+  @inject(PendingReplyAccess)
+  private readonly pendingReplyAccess!: PendingReplyAccess;
 
   public async getQuestionByUuid(uuid: string): Promise<GetQuestionIdResponse> {
     return await this.questionAccess.findOneOrFailByUuid(uuid);
+  }
+
+  private getQuestionSorting(question: Question): Question {
+    return {
+      ...question,
+      children: question.children?.sort(
+        (a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)
+      ),
+    };
   }
 
   public async getAdaptiveQuestion(
@@ -63,7 +76,6 @@ export class QuestionService {
   ): Promise<GetQuestionAdaptiveResponse> {
     if (!params) throw new BadRequestError('query parameters are required');
 
-    // find last 7 days reply of the user for the subject
     const user = await this.userService.getUser();
     if (user === null) throw new UnauthorizedError('User not found');
 
@@ -110,6 +122,7 @@ export class QuestionService {
     if (selectedConceptId === null)
       throw new BadRequestError('No concept found');
 
+    // find last 7 days reply of the user for the subject
     const interval = 7 * 24 * 60 * 60 * 1000;
     const lastReplies = await this.replyAccess.find({
       where: {
@@ -141,6 +154,18 @@ export class QuestionService {
     });
     if (questionList.length === 0) throw new NotFoundError('No question found');
 
+    const questionMap = new Map(questionList.map((q) => [q.id, q]));
+
+    const pendingReplyList = await this.pendingReplyAccess.find({
+      where: {
+        userId: user.id,
+      },
+    });
+    for (const pendingReply of pendingReplyList) {
+      const question = questionMap.get(pendingReply.questionId);
+      if (question) return this.getQuestionSorting(question);
+    }
+
     // sort question list and exclude reason replied questions and pick top 20
     const candidateList = questionList
       .filter((q) => !lastReplies.some((r) => r.questionId === q.id))
@@ -157,12 +182,12 @@ export class QuestionService {
         ? candidateList[Math.floor(Math.random() * candidateList.length)]
         : questionList[Math.floor(Math.random() * questionList.length)];
 
-    return {
-      ...question,
-      children: question.children?.sort(
-        (a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)
-      ),
-    };
+    const pendingReplyEntity = new PendingReplyEntity();
+    pendingReplyEntity.questionId = question.id;
+    pendingReplyEntity.userId = user.id;
+    await this.pendingReplyAccess.save(pendingReplyEntity);
+
+    return this.getQuestionSorting(question);
   }
 
   public async getQuestionList(
@@ -189,12 +214,7 @@ export class QuestionService {
     });
 
     return {
-      data: questions.map((q) => ({
-        ...q,
-        children: q.children?.sort(
-          (a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)
-        ),
-      })),
+      data: questions.map((q) => this.getQuestionSorting(q)),
       paginate: genPagination(total, limit, offset),
     };
   }

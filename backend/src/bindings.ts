@@ -27,6 +27,7 @@ import { CategoryEntity } from './model/entity/CategoryEntity';
 import { ConceptEntity } from './model/entity/ConceptEntity';
 import { ConceptGroupEntity } from './model/entity/ConceptGroupEntity';
 import { ExamEntity } from './model/entity/ExamEntity';
+import { PendingReplyEntity } from './model/entity/PendingReplyEntity';
 import { QuestionEntity } from './model/entity/QuestionEntity';
 import { QuestionMinorEntity } from './model/entity/QuestionMinorEntity';
 import { ReplyEntity } from './model/entity/ReplyEntity';
@@ -60,6 +61,9 @@ container.bind<Function>(dbEntitiesBindingId).toConstantValue(SubjectEntity);
 container
   .bind<Function>(dbEntitiesBindingId)
   .toConstantValue(UserConceptStatEntity);
+container
+  .bind<Function>(dbEntitiesBindingId)
+  .toConstantValue(PendingReplyEntity);
 
 // db access
 container.bind(DbAccess).toSelf();
