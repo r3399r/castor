@@ -16,7 +16,6 @@ const User = () => {
     <div className="flex flex-col gap-5">
       <div>
         {stats?.map((stat) => {
-          console.log(Math.max(...stat.conceptGroup.map((o) => o.name.length * 8)));
           return (
             <div key={stat.id}>
               <div>類別: {stat.category.map((c) => c.name).join(', ')}</div>
@@ -29,7 +28,7 @@ const User = () => {
                 yAxis={[
                   {
                     dataKey: 'name',
-                    width: Math.max(...stat.conceptGroup.map((o) => o.name.length * 14)),
+                    width: Math.max(...stat.conceptGroup.map((o) => o.name.length * 16)),
                   },
                 ]}
               ></BarChart>

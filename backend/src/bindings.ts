@@ -5,6 +5,7 @@ import { ConceptAccess } from './dao/ConceptAccess';
 import { ConceptGroupAccess } from './dao/ConceptGroupAccess';
 import { DbAccess } from './dao/DbAccess';
 import { ExamAccess } from './dao/ExamAccess';
+import { PendingReplyAccess } from './dao/PendingReplyAccess';
 import { QuestionAccess } from './dao/QuestionAccess';
 import { QuestionMinorAccess } from './dao/QuestionMinorAccess';
 import { ReplyAccess } from './dao/ReplyAccess';
@@ -79,6 +80,7 @@ container.bind(ConceptGroupAccess).toSelf();
 container.bind(ExamAccess).toSelf();
 container.bind(SubjectAccess).toSelf();
 container.bind(UserConceptStatAccess).toSelf();
+container.bind(PendingReplyAccess).toSelf();
 
 // service
 container.bind(QuestionService).toSelf();

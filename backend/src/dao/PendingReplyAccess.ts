@@ -33,6 +33,6 @@ export class PendingReplyAccess {
   public async delete(id: number) {
     const qr = await this.database.getQueryRunner();
 
-    return await qr.manager.remove(id);
+    return await qr.manager.delete(PendingReplyEntity, { id });
   }
 }

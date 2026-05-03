@@ -105,6 +105,29 @@ export class QuestionService {
             conceptIds.set(concept.id, concept.numberOfQuestions);
     }
 
+    const pendingReplyList = await this.pendingReplyAccess.find({
+      where: {
+        userId: user.id,
+      },
+      relations: {
+        question: {
+          subject: true,
+          exam: true,
+          tag: true,
+          concept: true,
+          children: true,
+        },
+      },
+      order: {
+        createdAt: 'desc',
+      },
+    });
+    if (pendingReplyList.length > 0)
+      for (const pendingReply of pendingReplyList)
+        for (const concept of pendingReply.question.concept)
+          if (conceptIds.has(concept.id))
+            return this.getQuestionSorting(pendingReply.question);
+
     // random picking conceptId with weight of numberOfQuestions
     const totalQuestions = Array.from(conceptIds.values()).reduce(
       (a, b) => a + b,
@@ -153,18 +176,6 @@ export class QuestionService {
       conceptId: selectedConceptId,
     });
     if (questionList.length === 0) throw new NotFoundError('No question found');
-
-    const questionMap = new Map(questionList.map((q) => [q.id, q]));
-
-    const pendingReplyList = await this.pendingReplyAccess.find({
-      where: {
-        userId: user.id,
-      },
-    });
-    for (const pendingReply of pendingReplyList) {
-      const question = questionMap.get(pendingReply.questionId);
-      if (question) return this.getQuestionSorting(question);
-    }
 
     // sort question list and exclude reason replied questions and pick top 20
     const candidateList = questionList
