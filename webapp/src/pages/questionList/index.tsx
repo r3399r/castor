@@ -37,9 +37,9 @@ const QuestionList = () => {
 
   const showConceptGroupHeader = useMemo(() => {
     if (!conceptGroupList) return false;
-    conceptGroupList.forEach((g) => {
-      if (g.concepts.length > 1) return true;
-    });
+    for (const cg of conceptGroupList) {
+      if (cg.concepts.length > 1) return true;
+    }
     return false;
   }, [conceptGroupList]);
 

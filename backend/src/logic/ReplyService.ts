@@ -2,6 +2,7 @@ import { differenceInDays } from 'date-fns';
 import { inject, injectable } from 'inversify';
 import { In } from 'typeorm';
 import { LIMIT, OFFSET } from 'src/constant/Pagination';
+import { PendingReplyAccess } from 'src/dao/PendingReplyAccess';
 import { QuestionAccess } from 'src/dao/QuestionAccess';
 import { ReplyAccess } from 'src/dao/ReplyAccess';
 import { UserConceptStatAccess } from 'src/dao/UserConceptStatAccess';
@@ -31,6 +32,8 @@ export class ReplyService {
   private readonly userService!: UserService;
   @inject(UserConceptStatAccess)
   private readonly userConceptStatAccess!: UserConceptStatAccess;
+  @inject(PendingReplyAccess)
+  private readonly pendingReplyAccess!: PendingReplyAccess;
 
   private calTrueFalseScore(replied: string, correct: string): number {
     return replied === correct ? 10 : 0;
@@ -191,6 +194,13 @@ export class ReplyService {
       });
       parentQuestions.forEach((q) => questionMap.set(q.id, q));
     }
+
+    const pendingReplies = await this.pendingReplyAccess.find({
+      where: { userId: user.id },
+    });
+    for (const pendingReply of pendingReplies)
+      if (questionMap.has(pendingReply.questionId))
+        await this.pendingReplyAccess.delete(pendingReply.id);
 
     const responses: PostReplyResponse = [];
     for (const d of data) {

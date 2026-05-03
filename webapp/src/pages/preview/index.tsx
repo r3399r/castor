@@ -1,5 +1,6 @@
 import {
   Button,
+  Checkbox,
   FormControl,
   InputLabel,
   ListSubheader,
@@ -36,6 +37,10 @@ const Preview = () => {
   const [imageUrl, setImageUrl] = useState<string>('');
   const [geminiOutput, setGeminiOutput] = useState<string>('');
   const [questionInput, setQuestionInput] = useState<string>('');
+  const [needSolution, setNeedSolution] = useState<boolean>(false);
+  const [containImage, setContainImage] = useState<boolean>(false);
+  const [needCss, setNeedCss] = useState<boolean>(false);
+  const [isGroup, setIsGroup] = useState<boolean>(false);
 
   const payload = useMemo(() => {
     try {
@@ -47,27 +52,47 @@ const Preview = () => {
 
   const showConceptGroupHeader = useMemo(() => {
     if (!conceptGroupList) return false;
-    conceptGroupList.forEach((g) => {
-      if (g.concepts.length > 1) return true;
-    });
+    for (const cg of conceptGroupList) {
+      if (cg.concepts.length > 1) return true;
+    }
     return false;
   }, [conceptGroupList]);
 
   const geminiInput = useMemo(() => {
     let text =
-      '圖片為科目: ' +
+      '圖片為 ' +
+      categoryList?.find((c) => c.id === selectedCategoryId)?.name +
+      ' ' +
       subjectList?.find((s) => s.id === selectedSubjectId)?.name +
       ' 的一道題目，請提供以下資訊: ';
-    text += '(1) 轉換成 html with <br/> ';
-    text += '(2) 簡短的純文字詳解，註記此詳解為AI生成 ';
-    text += '(3) 難易度 (簡單=2,中等=5,困難=8) ';
+    text += '- content: 轉換成 html，換行符號使用 <br/>，回傳內容不用無謂的空白鍵跟換行';
+    if (needCss) text += '，css直接寫入html inline style，不改變字體設定';
+    if (containImage)
+      text +=
+        '，請將圖片以 img 標籤的形式放在 content 中，並將圖片網址皆設為 https://to-do-url，考慮手機排版，當圖片佔一半時以上下排版。';
+    else text += '。';
+    if (needSolution) text += '- solution: 簡短的純文字詳解。';
+    text += '- difficulty: 難易度 (簡單=2,中等=5,困難=8)。';
     text +=
-      '(4) 從下述觀念清單中選擇至少一個: (' +
+      '- conceptIds: 從下述觀念清單中選擇至少一個: (' +
       conceptGroupList?.flatMap((g) => g.concepts.map((c) => c.name + '=' + c.id)).join(', ');
-    text +=
-      ')。以 json 格式回覆，格式如下: {"content": (1) in string, "solution": (2) in string, "difficulty": (3) in number, "conceptIds": (4) in number array} without markdown code block. 只回覆 json，不要其他文字說明。';
+    text += ')。以 json 格式回覆，格式如下: {"content": in string, ';
+    if (needSolution) text += '"solution": in string, ';
+    text += '"difficulty": in number, "conceptIds": in number array';
+    if (isGroup)
+      text +=
+        ', "childQuestions": [{"content": in string, "sortOrder": in number start from 0, "difficulty": in number}, ...]';
+    text += '} without markdown code block. 只回覆 json，不要其他文字說明。';
     return text;
-  }, [conceptGroupList, subjectList, selectedSubjectId]);
+  }, [
+    conceptGroupList,
+    subjectList,
+    selectedSubjectId,
+    needSolution,
+    containImage,
+    needCss,
+    isGroup,
+  ]);
 
   const onClickAskGemini = () => {
     dispatch(startWaiting());
@@ -128,7 +153,6 @@ const Preview = () => {
           content: 'xxx',
           options: 'A|B|C|D',
           answer: 'B',
-          solution: 'xxx',
           difficulty: -1,
           examId: selectedExamIds.length > 0 ? selectedExamIds[0] : undefined,
           tagIds: selectedTagIds.length > 0 ? selectedTagIds : undefined,
@@ -251,15 +275,31 @@ const Preview = () => {
       <div>
         Selected Tag IDs: {selectedTagIds.length === 0 ? 'None' : selectedTagIds.join(', ')}
       </div>
-      <hr className="my-4" />
-      <h2 className="mb-2 text-xl font-bold">Gemini Input:</h2>
-      <div>{geminiInput}</div>
       <TextField
         label="Image URL"
         fullWidth
         value={imageUrl}
         onChange={(e) => setImageUrl(e.target.value)}
       />
+      <div className="flex items-center">
+        <Checkbox onChange={(e) => setNeedSolution(e.target.checked)} checked={needSolution} />
+        <div>need solution?</div>
+      </div>
+      <div className="flex items-center">
+        <Checkbox onChange={(e) => setNeedCss(e.target.checked)} checked={needCss} />
+        <div>need css?</div>
+      </div>
+      <div className="flex items-center">
+        <Checkbox onChange={(e) => setContainImage(e.target.checked)} checked={containImage} />
+        <div>contain image?</div>
+      </div>
+      <div className="flex items-center">
+        <Checkbox onChange={(e) => setIsGroup(e.target.checked)} checked={isGroup} />
+        <div>is group?</div>
+      </div>
+      <hr className="my-4" />
+      <h2 className="mb-2 text-xl font-bold">Gemini Input:</h2>
+      <div>{geminiInput}</div>
       <div className="mt-2">
         <Button
           variant="contained"
