@@ -20,16 +20,10 @@ aws cloudformation package --template-file aws/cloudformation/template.yaml --ou
 aws cloudformation deploy --template-file packaged.yaml --stack-name $project-$env-stack --parameter-overrides TargetEnvr=$env Project=$project SubDomain=$subDomain Domain=$domain --no-fail-on-empty-changeset --s3-bucket y-cf-midway-ap-east-2 --capabilities CAPABILITY_NAMED_IAM
 echo ====================================================================================
 
-echo prepare frontend files...
-rm -rf ../webapp/src/model/backend
-rm -rf ../webapp/src/constant/backend
-cp -R lib/src/model ../webapp/src/model/backend
-cp -R src/constant ../webapp/src/constant/backend
-echo ====================================================================================
-
-echo deploy frontend to S3...
+echo deploy webapp SSG to S3...
 cd ../webapp
 npm i
 npm run build
-aws s3 sync ./dist s3://$project-$env-y --delete --cache-control no-cache
+aws s3 sync ./out s3://$project-$env-y --delete --cache-control "no-cache"
+aws s3 sync ./out/_next/static s3://$project-$env-y/_next/static --cache-control "public, max-age=31536000, immutable"
 echo ====================================================================================
