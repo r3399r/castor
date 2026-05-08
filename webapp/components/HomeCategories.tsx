@@ -1,0 +1,64 @@
+const categories = [
+  {
+    title: '高等考試',
+    color: 'bg-[#D6E4F7]',
+    items: ['114年考古題', '113年模擬試卷', '110年重點整理', '常考題型', '限時練習'],
+  },
+  {
+    title: '高中數學',
+    color: 'bg-[#FAE3C6]',
+    items: ['114年考古題', '113年歷屆試題', '公式速記', '圖形選擇題', '證明題練習'],
+  },
+  {
+    title: '高中英文',
+    color: 'bg-[#E0D5F5]',
+    items: ['114年會考題', '113年指考題', '閱讀測驗', '文法填空', '聽力模擬'],
+  },
+]
+
+export default function HomeCategories() {
+  return (
+    <section className="space-y-8">
+      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div className="space-y-3">
+          <p className="text-sm font-bold tracking-[0.12em] text-[#2547C5] uppercase">熱門分類</p>
+          <h2 className="text-3xl font-bold text-[#2547C5] sm:text-4xl">熱門考試 / 科目</h2>
+        </div>
+        <a
+          href="/question"
+          className="inline-flex items-center gap-2 rounded-full border-b border-[#625D5A] px-4 py-2 text-sm font-bold text-[#625D5A] transition hover:text-[#2547C5]"
+        >
+          <span>看全部科目</span>
+          <span aria-hidden="true">→</span>
+        </a>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+        {categories.map((category) => (
+          <article key={category.title} className={`${category.color} rounded-[32px] p-6 shadow-sm`}>
+            <h3 className="text-[28px] font-bold text-[#302B28]">{category.title}</h3>
+            <div className="mt-6 space-y-3">
+              {category.items.map((item) => (
+                <div
+                  key={item}
+                  className="flex items-center justify-between border-b border-[#B2ADAA] py-2"
+                >
+                  <p className="text-base text-[#302B28]">{item}</p>
+                </div>
+              ))}
+            </div>
+            <div className="mt-6 flex justify-end">
+              <a
+                href="/question"
+                className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-bold text-[#625D5A] shadow-sm transition hover:bg-[#F3EEEA]"
+              >
+                更多
+                <span aria-hidden="true">→</span>
+              </a>
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
+  )
+}
