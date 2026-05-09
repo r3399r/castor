@@ -1,6 +1,7 @@
+import { Reply } from '@castor/shared';
 import { inject, injectable } from 'inversify';
 import { FindManyOptions, FindOneOptions } from 'typeorm';
-import { Reply, ReplyEntity } from 'src/model/entity/ReplyEntity';
+import { ReplyEntity } from 'src/model/entity/ReplyEntity';
 import { Database } from 'src/utils/Database';
 
 /**

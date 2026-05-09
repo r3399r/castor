@@ -1,11 +1,5 @@
+import { Tag } from '@castor/shared';
 import { BeforeInsert, Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
-
-export type Tag = {
-  id: number;
-  name: string;
-  subjectId: number;
-  createdAt: string | null;
-};
 
 @Entity({ name: 'tag' })
 export class TagEntity implements Tag {

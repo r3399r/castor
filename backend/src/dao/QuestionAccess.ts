@@ -1,6 +1,7 @@
+import { Question } from '@castor/shared';
 import { inject, injectable } from 'inversify';
 import { FindManyOptions, FindOneOptions } from 'typeorm';
-import { Question, QuestionEntity } from 'src/model/entity/QuestionEntity';
+import { QuestionEntity } from 'src/model/entity/QuestionEntity';
 import { Database } from 'src/utils/Database';
 
 /**

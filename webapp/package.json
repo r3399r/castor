@@ -8,6 +8,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@castor/shared": "*",
     "firebase": "^11.0.0",
     "next": "^15.3.2",
     "react": "^19.0.0",

@@ -1,3 +1,4 @@
+import { Concept, ConceptGroup } from '@castor/shared';
 import {
   BeforeInsert,
   Column,
@@ -6,16 +7,7 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
-import { ConceptGroup, ConceptGroupEntity } from './ConceptGroupEntity';
-
-export type Concept = {
-  id: number;
-  name: string;
-  conceptGroupId: number;
-  conceptGroup: ConceptGroup;
-  numberOfQuestions: number;
-  createdAt: string | null;
-};
+import { ConceptGroupEntity } from './ConceptGroupEntity';
 
 @Entity({ name: 'concept' })
 export class ConceptEntity implements Concept {

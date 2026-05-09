@@ -1,3 +1,4 @@
+import { Concept, ConceptGroup, Subject } from '@castor/shared';
 import {
   BeforeInsert,
   Column,
@@ -7,17 +8,8 @@ import {
   OneToMany,
   PrimaryGeneratedColumn,
 } from 'typeorm';
-import { Concept, ConceptEntity } from './ConceptEntity';
-import { Subject, SubjectEntity } from './SubjectEntity';
-
-export type ConceptGroup = {
-  id: number;
-  name: string;
-  subjectId: number;
-  subject: Subject;
-  concepts: Concept[];
-  createdAt: string | null;
-};
+import { ConceptEntity } from './ConceptEntity';
+import { SubjectEntity } from './SubjectEntity';
 
 @Entity({ name: 'concept_group' })
 export class ConceptGroupEntity implements ConceptGroup {

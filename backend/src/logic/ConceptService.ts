@@ -1,12 +1,12 @@
-import { inject, injectable } from 'inversify';
-import { ConceptAccess } from 'src/dao/ConceptAccess';
-import { ConceptGroupAccess } from 'src/dao/ConceptGroupAccess';
 import {
   PostConceptGroupRequest,
   PostConceptGroupResponse,
   PostConceptRequest,
   PostConceptResponse,
-} from 'src/model/api/Concept';
+} from '@castor/shared';
+import { inject, injectable } from 'inversify';
+import { ConceptAccess } from 'src/dao/ConceptAccess';
+import { ConceptGroupAccess } from 'src/dao/ConceptGroupAccess';
 import { ConceptEntity } from 'src/model/entity/ConceptEntity';
 import { ConceptGroupEntity } from 'src/model/entity/ConceptGroupEntity';
 

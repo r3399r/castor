@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { apiFetch, LIMIT } from '@/lib/api'
-import type { GetReplyResponse, ReplyItem } from '@/types/api'
+import type { GetReplyResponse, Reply } from '@/types/api'
 
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return '—'
@@ -11,7 +11,7 @@ function formatDate(dateStr: string | null): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
 
-function ReplyRow({ item }: { item: ReplyItem }) {
+function ReplyRow({ item }: { item: Reply }) {
   const fbPostId = item.parent === null ? item.question.fbPostId : item.parent.fbPostId
   return (
     <div className="rounded-[20px] border border-[#C5B3A7] bg-white p-4">

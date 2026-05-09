@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { apiFetch } from '@/lib/api'
-import type { GetUserStatsResponse, UserSubjectStat } from '@/types/api'
+import type { GetUserStatsResponse, StatsSubject } from '@/types/api'
 
 function MasteryBar({ value, max = 10 }: { value: number; max?: number }) {
   const pct = Math.min(100, Math.round((value / max) * 100))
@@ -16,7 +16,7 @@ function MasteryBar({ value, max = 10 }: { value: number; max?: number }) {
   )
 }
 
-function SubjectCard({ stat }: { stat: UserSubjectStat }) {
+function SubjectCard({ stat }: { stat: StatsSubject }) {
   return (
     <div className="rounded-[24px] border border-[#C5B3A7] bg-white p-6">
       <div className="mb-1 text-xs font-medium text-[#625D5A]">

@@ -1,3 +1,14 @@
+import {
+  GetQuestionAdaptiveParams,
+  GetQuestionAdaptiveResponse,
+  GetQuestionIdResponse,
+  GetQuestionParams,
+  GetQuestionResponse,
+  PostQuestionRequest,
+  PostQuestionResponse,
+  Question,
+  Tag,
+} from '@castor/shared';
 import axios from 'axios';
 import { inject, injectable } from 'inversify';
 import { In, MoreThan } from 'typeorm';
@@ -12,18 +23,8 @@ import { ReplyAccess } from 'src/dao/ReplyAccess';
 import { SubjectAccess } from 'src/dao/SubjectAccess';
 import { TagAccess } from 'src/dao/TagAccess';
 import { UserConceptStatAccess } from 'src/dao/UserConceptStatAccess';
-import {
-  GetQuestionAdaptiveParams,
-  GetQuestionAdaptiveResponse,
-  GetQuestionIdResponse,
-  GetQuestionParams,
-  GetQuestionResponse,
-  PostQuestionRequest,
-  PostQuestionResponse,
-} from 'src/model/api/Question';
 import { PendingReplyEntity } from 'src/model/entity/PendingReplyEntity';
-import { Question, QuestionEntity } from 'src/model/entity/QuestionEntity';
-import { Tag } from 'src/model/entity/TagEntity';
+import { QuestionEntity } from 'src/model/entity/QuestionEntity';
 import {
   BadRequestError,
   NotFoundError,

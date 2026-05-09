@@ -1,6 +1,6 @@
+import { PostTagRequest, PostTagResponse } from '@castor/shared';
 import { inject, injectable } from 'inversify';
 import { TagAccess } from 'src/dao/TagAccess';
-import { PostTagRequest, PostTagResponse } from 'src/model/api/Tag';
 import { TagEntity } from 'src/model/entity/TagEntity';
 
 /**

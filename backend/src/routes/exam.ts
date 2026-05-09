@@ -1,6 +1,6 @@
+import { PostExamRequest } from '@castor/shared';
 import { bindings } from 'src/bindings';
 import { ExamService } from 'src/logic/ExamService';
-import { PostExamRequest } from 'src/model/api/Exam';
 import { BadRequestError } from 'src/model/error';
 import { LambdaEvent } from 'src/model/Lambda';
 

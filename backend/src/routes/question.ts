@@ -1,10 +1,10 @@
-import { bindings } from 'src/bindings';
-import { QuestionService } from 'src/logic/QuestionService';
 import {
   GetQuestionAdaptiveParams,
   GetQuestionParams,
   PostQuestionRequest,
-} from 'src/model/api/Question';
+} from '@castor/shared';
+import { bindings } from 'src/bindings';
+import { QuestionService } from 'src/logic/QuestionService';
 import { BadRequestError } from 'src/model/error';
 import { LambdaEvent } from 'src/model/Lambda';
 

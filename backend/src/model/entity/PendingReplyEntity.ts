@@ -1,3 +1,4 @@
+import { PendingReply, Question } from '@castor/shared';
 import {
   BeforeInsert,
   BeforeUpdate,
@@ -7,16 +8,7 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
-import { Question, QuestionEntity } from './QuestionEntity';
-
-export type PendingReply = {
-  id: number;
-  questionId: number;
-  question: Question;
-  userId: number;
-  createdAt: string | null;
-  updatedAt: string | null;
-};
+import { QuestionEntity } from './QuestionEntity';
 
 @Entity({ name: 'pending_reply' })
 export class PendingReplyEntity implements PendingReply {

@@ -1,9 +1,6 @@
+import { PostConceptGroupRequest, PostConceptRequest } from '@castor/shared';
 import { bindings } from 'src/bindings';
 import { ConceptService } from 'src/logic/ConceptService';
-import {
-  PostConceptGroupRequest,
-  PostConceptRequest,
-} from 'src/model/api/Concept';
 import { BadRequestError } from 'src/model/error';
 import { LambdaEvent } from 'src/model/Lambda';
 

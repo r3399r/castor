@@ -1,6 +1,6 @@
+import { PostExamRequest, PostExamResponse } from '@castor/shared';
 import { inject, injectable } from 'inversify';
 import { ExamAccess } from 'src/dao/ExamAccess';
-import { PostExamRequest, PostExamResponse } from 'src/model/api/Exam';
 import { ExamEntity } from 'src/model/entity/ExamEntity';
 
 /**

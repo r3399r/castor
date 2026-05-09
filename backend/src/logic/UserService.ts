@@ -1,15 +1,15 @@
+import {
+  GetUserResponse,
+  GetUserStatsResponse,
+  PostUserSyncResponse,
+  StatsSubject,
+} from '@castor/shared';
 import admin from 'firebase-admin';
 import { inject, injectable } from 'inversify';
 import { In } from 'typeorm';
 import { ConceptGroupAccess } from 'src/dao/ConceptGroupAccess';
 import { UserAccess } from 'src/dao/UserAccess';
 import { UserConceptStatAccess } from 'src/dao/UserConceptStatAccess';
-import {
-  GetUserResponse,
-  GetUserStatsResponse,
-  PostUserSyncResponse,
-  StatsSubject,
-} from 'src/model/api/User';
 import { UserEntity } from 'src/model/entity/UserEntity';
 import { UnauthorizedError } from 'src/model/error';
 import { authorizationSymbol } from 'src/utils/LambdaHelper';

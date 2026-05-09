@@ -1,6 +1,6 @@
+import { PostCategoryRequest } from '@castor/shared';
 import { bindings } from 'src/bindings';
 import { CategoryService } from 'src/logic/CategoryService';
-import { PostCategoryRequest } from 'src/model/api/Category';
 import { BadRequestError } from 'src/model/error';
 import { LambdaEvent } from 'src/model/Lambda';
 

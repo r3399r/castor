@@ -1,6 +1,6 @@
+import { GetReplyParams, PostReplyRequest } from '@castor/shared';
 import { bindings } from 'src/bindings';
 import { ReplyService } from 'src/logic/ReplyService';
-import { GetReplyParams, PostReplyRequest } from 'src/model/api/Reply';
 import { BadRequestError } from 'src/model/error';
 import { LambdaEvent } from 'src/model/Lambda';
 

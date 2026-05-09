@@ -1,9 +1,7 @@
+import { PendingReply } from '@castor/shared';
 import { inject, injectable } from 'inversify';
 import { FindManyOptions } from 'typeorm';
-import {
-  PendingReply,
-  PendingReplyEntity,
-} from 'src/model/entity/PendingReplyEntity';
+import { PendingReplyEntity } from 'src/model/entity/PendingReplyEntity';
 import { Database } from 'src/utils/Database';
 
 /**

@@ -1,9 +1,7 @@
+import { UserConceptStat } from '@castor/shared';
 import { inject, injectable } from 'inversify';
 import { FindManyOptions, FindOneOptions } from 'typeorm';
-import {
-  UserConceptStat,
-  UserConceptStatEntity,
-} from 'src/model/entity/UserConceptStatEntity';
+import { UserConceptStatEntity } from 'src/model/entity/UserConceptStatEntity';
 import { Database } from 'src/utils/Database';
 
 /**

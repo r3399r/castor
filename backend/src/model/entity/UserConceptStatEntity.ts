@@ -1,3 +1,4 @@
+import { Concept, UserConceptStat } from '@castor/shared';
 import {
   BeforeInsert,
   BeforeUpdate,
@@ -7,22 +8,7 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
-import { Concept, ConceptEntity } from './ConceptEntity';
-
-export type UserConceptStat = {
-  id: number;
-  userId: number;
-  conceptId: number;
-  concept: Concept;
-  mastery: number | null;
-  attemptCount: number;
-  scoringTotal: number;
-  lastAttemptAt: string | null;
-  weightedSum: number;
-  decaySum: number;
-  createdAt: string | null;
-  updatedAt: string | null;
-};
+import { ConceptEntity } from './ConceptEntity';
 
 @Entity({ name: 'user_concept_stat' })
 export class UserConceptStatEntity implements UserConceptStat {

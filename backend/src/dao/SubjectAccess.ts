@@ -1,6 +1,7 @@
+import { Subject } from '@castor/shared';
 import { inject, injectable } from 'inversify';
 import { FindManyOptions, FindOneOptions } from 'typeorm';
-import { Subject, SubjectEntity } from 'src/model/entity/SubjectEntity';
+import { SubjectEntity } from 'src/model/entity/SubjectEntity';
 import { Database } from 'src/utils/Database';
 
 /**

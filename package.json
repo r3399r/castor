@@ -1,0 +1,9 @@
+{
+  "name": "castor",
+  "private": true,
+  "workspaces": [
+    "webapp",
+    "backend",
+    "packages/*"
+  ]
+}

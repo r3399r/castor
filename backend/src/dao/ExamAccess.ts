@@ -1,6 +1,7 @@
+import { Exam } from '@castor/shared';
 import { inject, injectable } from 'inversify';
 import { FindManyOptions, FindOneOptions } from 'typeorm';
-import { Exam, ExamEntity } from 'src/model/entity/ExamEntity';
+import { ExamEntity } from 'src/model/entity/ExamEntity';
 import { Database } from 'src/utils/Database';
 
 /**

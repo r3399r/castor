@@ -1,3 +1,4 @@
+import { User } from '@castor/shared';
 import {
   BeforeInsert,
   BeforeUpdate,
@@ -5,17 +6,6 @@ import {
   Entity,
   PrimaryGeneratedColumn,
 } from 'typeorm';
-
-export type User = {
-  id: number;
-  firebaseUid: string;
-  email: string | null;
-  name: string | null;
-  avatar: string | null;
-  lastLoginAt: string | null;
-  createdAt: string | null;
-  updatedAt: string | null;
-};
 
 @Entity({ name: 'user' })
 export class UserEntity implements User {

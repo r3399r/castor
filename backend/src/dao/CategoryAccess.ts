@@ -1,6 +1,7 @@
+import { Category } from '@castor/shared';
 import { inject, injectable } from 'inversify';
 import { FindManyOptions } from 'typeorm';
-import { Category, CategoryEntity } from 'src/model/entity/CategoryEntity';
+import { CategoryEntity } from 'src/model/entity/CategoryEntity';
 import { Database } from 'src/utils/Database';
 
 /**

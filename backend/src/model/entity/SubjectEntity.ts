@@ -1,3 +1,4 @@
+import { Category, Subject } from '@castor/shared';
 import {
   BeforeInsert,
   Column,
@@ -6,14 +7,7 @@ import {
   ManyToMany,
   PrimaryGeneratedColumn,
 } from 'typeorm';
-import { Category, CategoryEntity } from './CategoryEntity';
-
-export type Subject = {
-  id: number;
-  category: Category[];
-  name: string;
-  createdAt: string | null;
-};
+import { CategoryEntity } from './CategoryEntity';
 
 @Entity({ name: 'subject' })
 export class SubjectEntity implements Subject {

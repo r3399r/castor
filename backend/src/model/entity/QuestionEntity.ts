@@ -1,3 +1,4 @@
+import { Concept, Exam, Question, Subject, Tag } from '@castor/shared';
 import {
   BeforeInsert,
   BeforeUpdate,
@@ -10,35 +11,10 @@ import {
   OneToMany,
   PrimaryGeneratedColumn,
 } from 'typeorm';
-import { Concept, ConceptEntity } from './ConceptEntity';
-import { Exam, ExamEntity } from './ExamEntity';
-import { Subject, SubjectEntity } from './SubjectEntity';
-import { Tag, TagEntity } from './TagEntity';
-
-export type Question = {
-  id: number;
-  uuid: string;
-  subjectId: number;
-  subject: Subject;
-  parentId: number | null;
-  fbPostId: string | null;
-  isGroup: boolean;
-  type: 'GROUP' | 'SINGLE' | 'MULTIPLE' | 'TRUE_FALSE' | 'FILL';
-  sortOrder: number | null;
-  content: string | null;
-  options: string | null;
-  answer: string | null;
-  difficulty: number;
-  attempCount: number;
-  scoringTotal: number;
-  adjustedDifficulty: number;
-  children: Question[];
-  exam: Exam[];
-  tag: Tag[];
-  concept: Concept[];
-  createdAt: string | null;
-  updatedAt: string | null;
-};
+import { ConceptEntity } from './ConceptEntity';
+import { ExamEntity } from './ExamEntity';
+import { SubjectEntity } from './SubjectEntity';
+import { TagEntity } from './TagEntity';
 
 @Entity({ name: 'question' })
 export class QuestionEntity implements Question {

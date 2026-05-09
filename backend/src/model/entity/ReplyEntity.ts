@@ -1,3 +1,4 @@
+import { Question, Reply, Subject } from '@castor/shared';
 import {
   BeforeInsert,
   BeforeUpdate,
@@ -7,23 +8,8 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
-import { Question, QuestionEntity } from './QuestionEntity';
-import { Subject, SubjectEntity } from './SubjectEntity';
-
-export type Reply = {
-  id: number;
-  questionId: number;
-  question: Question;
-  subjectId: number;
-  subject: Subject;
-  userId: number;
-  parentId: number | null;
-  parent: Question | null;
-  score: number;
-  repliedAnswer: string | null;
-  createdAt: string | null;
-  updatedAt: string | null;
-};
+import { QuestionEntity } from './QuestionEntity';
+import { SubjectEntity } from './SubjectEntity';
 
 @Entity({ name: 'reply' })
 export class ReplyEntity implements Reply {

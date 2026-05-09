@@ -1,6 +1,6 @@
+import { PostSubjectRequest } from '@castor/shared';
 import { bindings } from 'src/bindings';
 import { SubjectService } from 'src/logic/SubjectService';
-import { PostSubjectRequest } from 'src/model/api/Subject';
 import { BadRequestError } from 'src/model/error';
 import { LambdaEvent } from 'src/model/Lambda';
 

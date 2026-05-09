@@ -1,9 +1,7 @@
+import { ConceptGroup } from '@castor/shared';
 import { inject, injectable } from 'inversify';
 import { FindManyOptions } from 'typeorm';
-import {
-  ConceptGroup,
-  ConceptGroupEntity,
-} from 'src/model/entity/ConceptGroupEntity';
+import { ConceptGroupEntity } from 'src/model/entity/ConceptGroupEntity';
 import { Database } from 'src/utils/Database';
 
 /**

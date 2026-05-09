@@ -1,6 +1,5 @@
 {
   "compilerOptions": {
-    "baseUrl": ".",
     "declaration": true,
     "emitDecoratorMetadata": true,
     "esModuleInterop": true,
@@ -14,7 +13,6 @@
       "scripthost"
     ],
     "module": "commonjs",
-    "moduleResolution": "node",
     "noEmitOnError": true,
     "noFallthroughCasesInSwitch": true,
     "noImplicitReturns": true,
@@ -23,11 +21,14 @@
     "outDir": "lib",
     "resolveJsonModule": true,
     "paths": {
+      "@castor/shared": [
+        "../packages/shared/src/index.ts"
+      ],
       "src/*": [
-        "src/*"
+        "./src/*"
       ],
       "test/*": [
-        "test/*"
+        "./test/*"
       ]
     },
     "plugins": [
@@ -39,7 +40,7 @@
         "afterDeclarations": true
       }
     ],
-    "rootDir": ".",
+    "rootDir": "..",
     "sourceMap": false,
     "strict": true,
     "target": "ES6"

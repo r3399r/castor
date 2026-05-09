@@ -5,6 +5,7 @@ const isDev = process.env.NODE_ENV !== 'production'
 const nextConfig: NextConfig = {
   output: isDev ? undefined : 'export',
   trailingSlash: true,
+  transpilePackages: ['@castor/shared'],
 }
 
 if (isDev) {

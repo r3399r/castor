@@ -1,6 +1,7 @@
+import { Tag } from '@castor/shared';
 import { inject, injectable } from 'inversify';
 import { FindManyOptions, FindOneOptions } from 'typeorm';
-import { Tag, TagEntity } from 'src/model/entity/TagEntity';
+import { TagEntity } from 'src/model/entity/TagEntity';
 import { Database } from 'src/utils/Database';
 
 /**

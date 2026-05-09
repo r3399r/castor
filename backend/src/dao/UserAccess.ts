@@ -1,6 +1,7 @@
+import { User } from '@castor/shared';
 import { inject, injectable } from 'inversify';
 import { FindOneOptions } from 'typeorm';
-import { User, UserEntity } from 'src/model/entity/UserEntity';
+import { UserEntity } from 'src/model/entity/UserEntity';
 import { Database } from 'src/utils/Database';
 
 /**

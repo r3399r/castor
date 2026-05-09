@@ -1,6 +1,7 @@
+import { Concept } from '@castor/shared';
 import { inject, injectable } from 'inversify';
 import { FindManyOptions, FindOneOptions } from 'typeorm';
-import { Concept, ConceptEntity } from 'src/model/entity/ConceptEntity';
+import { ConceptEntity } from 'src/model/entity/ConceptEntity';
 import { Database } from 'src/utils/Database';
 
 /**

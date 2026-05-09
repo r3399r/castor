@@ -1,6 +1,6 @@
+import { PostTagRequest } from '@castor/shared';
 import { bindings } from 'src/bindings';
 import { TagService } from 'src/logic/TagService';
-import { PostTagRequest } from 'src/model/api/Tag';
 import { BadRequestError } from 'src/model/error';
 import { LambdaEvent } from 'src/model/Lambda';
 

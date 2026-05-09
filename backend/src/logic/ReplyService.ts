@@ -1,3 +1,10 @@
+import {
+  GetReplyParams,
+  GetReplyResponse,
+  PostReplyRequest,
+  PostReplyResponse,
+  Question,
+} from '@castor/shared';
 import { differenceInDays } from 'date-fns';
 import { inject, injectable } from 'inversify';
 import { In } from 'typeorm';
@@ -6,13 +13,6 @@ import { PendingReplyAccess } from 'src/dao/PendingReplyAccess';
 import { QuestionAccess } from 'src/dao/QuestionAccess';
 import { ReplyAccess } from 'src/dao/ReplyAccess';
 import { UserConceptStatAccess } from 'src/dao/UserConceptStatAccess';
-import {
-  GetReplyParams,
-  GetReplyResponse,
-  PostReplyRequest,
-  PostReplyResponse,
-} from 'src/model/api/Reply';
-import { Question } from 'src/model/entity/QuestionEntity';
 import { ReplyEntity } from 'src/model/entity/ReplyEntity';
 import { UserConceptStatEntity } from 'src/model/entity/UserConceptStatEntity';
 import { UnauthorizedError } from 'src/model/error';

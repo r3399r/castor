@@ -1,16 +1,16 @@
+import {
+  GetSubjectConceptGroupResponse,
+  GetSubjectExamResponse,
+  GetSubjectResponse,
+  GetSubjectTagResponse,
+  PostSubjectRequest,
+  PostSubjectResponse,
+} from '@castor/shared';
 import { inject, injectable } from 'inversify';
 import { ConceptGroupAccess } from 'src/dao/ConceptGroupAccess';
 import { ExamAccess } from 'src/dao/ExamAccess';
 import { SubjectAccess } from 'src/dao/SubjectAccess';
 import { TagAccess } from 'src/dao/TagAccess';
-import {
-  GetSubjectIdConceptGroupResponse,
-  GetSubjectIdExamResponse,
-  GetSubjectIdTagResponse,
-  GetSubjectResponse,
-  PostSubjectRequest,
-  PostSubjectResponse,
-} from 'src/model/api/Subject';
 import { SubjectEntity } from 'src/model/entity/SubjectEntity';
 
 /**
@@ -31,7 +31,7 @@ export class SubjectService {
     return await this.subjectAccess.find();
   }
 
-  public async getExamsById(id: string): Promise<GetSubjectIdExamResponse> {
+  public async getExamsById(id: string): Promise<GetSubjectExamResponse> {
     return await this.examAccess.find({
       where: { subject: { id: Number(id) } },
     });
@@ -39,7 +39,7 @@ export class SubjectService {
 
   public async getConceptGroupsById(
     id: string
-  ): Promise<GetSubjectIdConceptGroupResponse> {
+  ): Promise<GetSubjectConceptGroupResponse> {
     return await this.conceptGroupAccess.find({
       where: { subjectId: Number(id) },
       relations: {
@@ -48,7 +48,7 @@ export class SubjectService {
     });
   }
 
-  public async getTagsById(id: string): Promise<GetSubjectIdTagResponse> {
+  public async getTagsById(id: string): Promise<GetSubjectTagResponse> {
     return await this.tagAccess.find({ where: { subjectId: Number(id) } });
   }
 

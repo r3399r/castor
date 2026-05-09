@@ -1,10 +1,5 @@
+import { Category } from '@castor/shared';
 import { BeforeInsert, Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
-
-export type Category = {
-  id: number;
-  name: string;
-  createdAt: string | null;
-};
 
 @Entity({ name: 'category' })
 export class CategoryEntity implements Category {

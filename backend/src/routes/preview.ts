@@ -1,6 +1,6 @@
+import { PostPreviewRequest } from '@castor/shared';
 import { bindings } from 'src/bindings';
 import { PreviewService } from 'src/logic/PreviewService';
-import { PostPreviewRequest } from 'src/model/api/Preview';
 import { BadRequestError } from 'src/model/error';
 import { LambdaEvent } from 'src/model/Lambda';
 

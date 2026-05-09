@@ -15,6 +15,7 @@
   "author": "Yue Chang",
   "license": "ISC",
   "dependencies": {
+    "@castor/shared": "*",
     "@google/genai": "^1.49.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "aws-sdk": "^2.1693.0",

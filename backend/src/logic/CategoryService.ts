@@ -1,12 +1,12 @@
+import {
+  GetCategoryResponse,
+  GetCategorySubjectResponse,
+  PostCategoryRequest,
+  PostCategoryResponse,
+} from '@castor/shared';
 import { inject, injectable } from 'inversify';
 import { CategoryAccess } from 'src/dao/CategoryAccess';
 import { SubjectAccess } from 'src/dao/SubjectAccess';
-import {
-  GetCategoryResponse,
-  GetCateogoryIdSubjectResponse,
-  PostCategoryRequest,
-  PostCategoryResponse,
-} from 'src/model/api/Category';
 import { CategoryEntity } from 'src/model/entity/CategoryEntity';
 
 /**
@@ -25,7 +25,7 @@ export class CategoryService {
 
   public async getSubjectsByCategoryId(
     id: string
-  ): Promise<GetCateogoryIdSubjectResponse> {
+  ): Promise<GetCategorySubjectResponse> {
     return await this.subjectAccess.find({
       where: {
         category: { id: Number(id) },

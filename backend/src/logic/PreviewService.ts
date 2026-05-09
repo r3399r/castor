@@ -1,6 +1,6 @@
+import { PostPreviewRequest } from '@castor/shared';
 import { GoogleGenAI } from '@google/genai';
 import { inject, injectable } from 'inversify';
-import { PostPreviewRequest } from 'src/model/api/Preview';
 import { UnauthorizedError } from 'src/model/error';
 import { UserService } from './UserService';
 
