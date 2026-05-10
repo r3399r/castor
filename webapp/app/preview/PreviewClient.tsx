@@ -75,7 +75,6 @@ export default function PreviewClient() {
   const [needSolution, setNeedSolution] = useState(false)
   const [containImage, setContainImage] = useState(false)
   const [needCss, setNeedCss] = useState(false)
-  const [isGroup, setIsGroup] = useState(false)
   const [loading, setLoading] = useState(false)
   const [createLoading, setCreateLoading] = useState(false)
   const [createResult, setCreateResult] = useState<string | null>(null)
@@ -112,7 +111,7 @@ export default function PreviewClient() {
       ')。以 json 格式回覆，格式如下: {"content": in string, '
     if (needSolution) text += '"solution": in string, '
     text += '"answer" in string, "difficulty": in number, "conceptIds": in number array'
-    if (isGroup)
+    if (selectedType === 'GROUP')
       text +=
         ', "childQuestions": [{"type": in string, "content": in string, "sortOrder": in number start from 0, "difficulty": in number, "options": in string, "answer": in string}, ...]'
     text += '} without markdown code block. 只回覆 json，不要其他文字說明。'
@@ -126,7 +125,6 @@ export default function PreviewClient() {
     needSolution,
     containImage,
     needCss,
-    isGroup,
     selectedType,
   ])
 
@@ -343,7 +341,6 @@ export default function PreviewClient() {
           <CheckboxField label="need solution?" checked={needSolution} onChange={setNeedSolution} />
           <CheckboxField label="need css?" checked={needCss} onChange={setNeedCss} />
           <CheckboxField label="contain image?" checked={containImage} onChange={setContainImage} />
-          <CheckboxField label="is group?" checked={isGroup} onChange={setIsGroup} />
         </div>
       </div>
 
