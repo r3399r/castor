@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS castor.question (
     sort_order INT NULL, -- for GROUP
     content TEXT NULL,
     options VARCHAR(255) NULL, -- A|B|C|D or True|False or 0|1|2|3
-    answer VARCHAR(255) NULL, -- A or AC or True or 301
+    answer VARCHAR(255) NULL, -- A or OXOX or True or 301
     difficulty TINYINT UNSIGNED NOT NULL, -- 1~10
     attemp_count INT UNSIGNED NOT NULL DEFAULT 0,
     scoring_total DOUBLE NOT NULL DEFAULT 0, -- scoring_rate = scoring_total / attemp_count

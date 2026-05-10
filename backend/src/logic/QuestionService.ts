@@ -257,6 +257,11 @@ export class QuestionService {
   public async createQuestion(
     data: PostQuestionRequest
   ): Promise<PostQuestionResponse> {
+    const user = await this.userService.getUser();
+    if (user === null) throw new UnauthorizedError('User not found');
+    if (user.email !== 'lamplighter.planet@gmail.com')
+      throw new UnauthorizedError('Unauthorized user');
+    
     if (data.conceptIds.length === 0)
       throw new BadRequestError(
         'At least one concept is required for a group question'

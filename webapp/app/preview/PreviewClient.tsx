@@ -16,6 +16,7 @@ import type {
   PostPreviewRequest,
   PostPreviewResponse,
   PostQuestionRequest,
+  PostQuestionResponse,
   Subject,
   Tag,
 } from '@/types/api'
@@ -56,14 +57,28 @@ export default function PreviewClient() {
   const [conceptGroupList, setConceptGroupList] = useState<ConceptGroup[]>([])
   const [tagList, setTagList] = useState<Tag[]>([])
 
+  const [selectedType, setSelectedType] = useState('')
   const [imageUrl, setImageUrl] = useState('')
   const [geminiOutput, setGeminiOutput] = useState('')
-  const [questionInput, setQuestionInput] = useState('')
+  const [questionInput, setQuestionInput] = useState(
+    JSON.stringify(
+      {
+        type: 'SINGLE',
+        content: 'xxx',
+        options: 'A|B|C|D',
+        answer: 'B',
+        difficulty: -1,
+      },
+      null,
+      2,
+    ),)
   const [needSolution, setNeedSolution] = useState(false)
   const [containImage, setContainImage] = useState(false)
   const [needCss, setNeedCss] = useState(false)
   const [isGroup, setIsGroup] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [createLoading, setCreateLoading] = useState(false)
+  const [createResult, setCreateResult] = useState<string | null>(null)
 
   const showConceptGroupHeader = useMemo(
     () => conceptGroupList.some((cg) => cg.concepts.length > 1),
@@ -89,16 +104,17 @@ export default function PreviewClient() {
         '，請將圖片以 img 標籤的形式放在 content 中，並將圖片網址皆設為 https://to-do-url，考慮手機排版，當圖片佔一半時以上下排版。'
     else text += '。'
     if (needSolution) text += '- solution: 簡短的純文字詳解。'
+    text += '- answer: 正確選項的字面值，單選題與是非題為一個選項，多選題為多個選項以OX表示如答案AC為OXOX，選填題依序填入答案如301。'
     text += '- difficulty: 難易度 (簡單=2,中等=5,困難=8)。'
     text +=
       '- conceptIds: 從下述觀念清單中選擇至少一個: (' +
       conceptGroupList.flatMap((g) => g.concepts.map((c) => `${c.name}=${c.id}`)).join(', ') +
       ')。以 json 格式回覆，格式如下: {"content": in string, '
     if (needSolution) text += '"solution": in string, '
-    text += '"difficulty": in number, "conceptIds": in number array'
+    text += '"answer" in string, "difficulty": in number, "conceptIds": in number array'
     if (isGroup)
       text +=
-        ', "childQuestions": [{"content": in string, "sortOrder": in number start from 0, "difficulty": in number}, ...]'
+        ', "childQuestions": [{"type": in string, "content": in string, "sortOrder": in number start from 0, "difficulty": in number, "options": in string, "answer": in string}, ...]'
     text += '} without markdown code block. 只回覆 json，不要其他文字說明。'
     return text
   }, [
@@ -111,6 +127,7 @@ export default function PreviewClient() {
     containImage,
     needCss,
     isGroup,
+    selectedType,
   ])
 
   useEffect(() => {
@@ -147,16 +164,30 @@ export default function PreviewClient() {
   }, [selectedSubjectId])
 
   useEffect(() => {
+    const current = JSON.parse(questionInput)
+    let options
+    switch (selectedType) {
+      case 'SINGLE':
+        options = 'A|B|C|D'
+        break;
+      case 'MULTIPLE':
+        options = 'A|B|C|D|E'
+        break;
+      case 'TRUE_FALSE':
+        options = 'True|False'
+        break;
+      case 'FILL':
+        options = '1|2|3|4|5|6|7|8|9|0|-|±'
+        break;
+    }
     setQuestionInput(
       JSON.stringify(
         {
+          ...current,
+          type: selectedType,
           subjectId: selectedSubjectId ? Number(selectedSubjectId) : undefined,
-          type: 'SINGLE',
           imageUrl: imageUrl || undefined,
-          content: 'xxx',
-          options: 'A|B|C|D',
-          answer: 'B',
-          difficulty: -1,
+          options,
           examId:
             selectedExamIds.length > 0 ? Number(selectedExamIds[0]) : undefined,
           tagIds: selectedTagIds.length > 0 ? selectedTagIds.map(Number) : undefined,
@@ -167,7 +198,7 @@ export default function PreviewClient() {
         2,
       ),
     )
-  }, [selectedSubjectId, imageUrl, selectedExamIds, selectedConceptIds, selectedTagIds])
+  }, [selectedSubjectId, imageUrl, selectedExamIds, selectedConceptIds, selectedTagIds, selectedType])
 
   useEffect(() => {
     if (!geminiOutput) return
@@ -179,6 +210,20 @@ export default function PreviewClient() {
       // invalid JSON — skip merge
     }
   }, [geminiOutput])
+
+  const onCreateQuestion = async () => {
+    if (!payload) return
+    setCreateLoading(true)
+    setCreateResult(null)
+    try {
+      const res = await apiPost<PostQuestionResponse, PostQuestionRequest>('question', payload as PostQuestionRequest)
+      setCreateResult(`成功建立 ${res.length} 題`)
+    } catch (e) {
+      setCreateResult(`錯誤: ${e instanceof Error ? e.message : String(e)}`)
+    } finally {
+      setCreateLoading(false)
+    }
+  }
 
   const onAskGemini = async () => {
     if (!imageUrl || !selectedSubjectId) return
@@ -239,12 +284,12 @@ export default function PreviewClient() {
           options={
             showConceptGroupHeader
               ? conceptGroupList.map((cg) => ({
-                  groupLabel: cg.name,
-                  options: cg.concepts.map((c) => ({ value: String(c.id), label: c.name })),
-                }))
+                groupLabel: cg.name,
+                options: cg.concepts.map((c) => ({ value: String(c.id), label: c.name })),
+              }))
               : conceptGroupList.flatMap((cg) =>
-                  cg.concepts.map((c) => ({ value: String(c.id), label: c.name })),
-                )
+                cg.concepts.map((c) => ({ value: String(c.id), label: c.name })),
+              )
           }
           value={selectedConceptIds}
           onChange={setSelectedConceptIds}
@@ -260,6 +305,28 @@ export default function PreviewClient() {
             disabled={!selectedSubjectId}
           />
         )}
+
+        <SelectField
+          label="選擇題型"
+          value={selectedType}
+          onChange={setSelectedType}
+        >
+          <option value='SINGLE'>
+            單選題
+          </option>
+          <option value='MULTIPLE'>
+            多選題
+          </option>
+          <option value='TRUE_FALSE'>
+            是非題
+          </option>
+          <option value='FILL'>
+            選填題
+          </option>
+          <option value='GROUP'>
+            題組
+          </option>
+        </SelectField>
 
         <div>
           <label className="mb-1 block text-sm font-medium text-[#4E4946]">Image URL</label>
@@ -289,7 +356,7 @@ export default function PreviewClient() {
         </div>
         <button
           onClick={onAskGemini}
-          disabled={!imageUrl || !selectedSubjectId || loading}
+          disabled={!imageUrl || !selectedSubjectId || loading || !selectedType}
           className="rounded-md bg-[#2547C5] px-6 py-2.5 text-sm font-bold text-white transition hover:bg-[#1f3ea3] disabled:cursor-not-allowed disabled:opacity-50"
         >
           {loading ? '請求中…' : 'Ask Gemini'}
@@ -386,6 +453,24 @@ export default function PreviewClient() {
             </>
           ) : (
             <p className="text-sm text-[#B2ADAA]">請在 Input JSON 中填入 content 以預覽</p>
+          )}
+        </div>
+      </section>
+
+      <section className="mt-6 space-y-2">
+        <h2 className="text-lg font-bold text-[#302B28]">Create Question</h2>
+        <div className="flex items-center gap-4">
+          <button
+            onClick={onCreateQuestion}
+            disabled={!payload || createLoading}
+            className="rounded-md bg-[#2547C5] px-6 py-2.5 text-sm font-bold text-white transition hover:bg-[#1f3ea3] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {createLoading ? '建立中…' : '建立題目'}
+          </button>
+          {createResult && (
+            <span className={`text-sm font-medium ${createResult.startsWith('錯誤') ? 'text-red-500' : 'text-green-600'}`}>
+              {createResult}
+            </span>
           )}
         </div>
       </section>
