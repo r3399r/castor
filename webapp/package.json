@@ -10,9 +10,13 @@
   "dependencies": {
     "@castor/shared": "*",
     "firebase": "^11.0.0",
+    "lightningcss": "^1.32.0",
     "next": "^15.3.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
+  },
+  "optionalDependencies": {
+    "@tailwindcss/oxide-darwin-x64": "^4.2.4"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.0.0",
