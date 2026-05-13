@@ -1,6 +1,6 @@
 import { Reply } from '@castor/shared';
 import { inject, injectable } from 'inversify';
-import { FindManyOptions, FindOneOptions } from 'typeorm';
+import { FindManyOptions, FindOneOptions, LessThan } from 'typeorm';
 import { ReplyEntity } from 'src/model/entity/ReplyEntity';
 import { Database } from 'src/utils/Database';
 
@@ -49,6 +49,14 @@ export class ReplyAccess {
 
     return await qr.manager.findOne<Reply>(ReplyEntity.name, {
       ...options,
+    });
+  }
+
+  public async deleteOlderThan(date: Date) {
+    const qr = await this.database.getQueryRunner();
+
+    return await qr.manager.delete(ReplyEntity, {
+      createdAt: LessThan(date.toISOString()),
     });
   }
 

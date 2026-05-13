@@ -1115,34 +1115,32 @@ Resources:
       Action: 'lambda:InvokeFunction'
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ServerlessApi}/*
-  # LambdaStatsLoader:
-  #   Type: AWS::Serverless::Function
-  #   Properties:
-  #     Architectures: [arm64]
-  #     Handler: index.statsLoader
-  #     Runtime: nodejs22.x
-  #     FunctionName: !Sub ${Project}-${TargetEnvr}-stats-loader
-  #     Role: !GetAtt ExecutionRole.Arn
-  #     CodeUri: ../../dist
-  #     MemorySize: 512
-  #     Timeout: 30
-  #     Environment:
-  #       Variables:
-  #         PROJECT: !Sub ${Project}
-  #         ENVR: !Sub ${TargetEnvr}
-  #         DB_HOST:
-  #           Fn::ImportValue: !Sub celestial-studio-${TargetEnvr}-db-endpoint
-  #         DB_PWD: !Sub '{{resolve:ssm:mysql-${TargetEnvr}-${Project}-pwd}}'
-  #         INTERVAL_EXPRESSION: '65 minute'
-  #         FIREBAE_ADMIN_KEY: !Sub '{{resolve:ssm:${Project}-firebase-admin-key}}'
-  # InvokePermissionStatsLoader:
-  #   Type: AWS::Lambda::Permission
-  #   DependsOn: [LambdaStatsLoader]
-  #   Properties:
-  #     FunctionName: !Sub ${Project}-${TargetEnvr}-stats-loader
-  #     Action: 'lambda:InvokeFunction'
-  #     Principal: events.amazonaws.com
-  #     SourceArn: !GetAtt EventBridgeStatsLoader.Arn
+  LambdaHousekeep:
+    Type: AWS::Serverless::Function
+    Properties:
+      Architectures: [arm64]
+      Handler: index.housekeep
+      Runtime: nodejs22.x
+      FunctionName: !Sub ${Project}-${TargetEnvr}-housekeep
+      Role: !GetAtt ExecutionRole.Arn
+      CodeUri: ../../dist
+      MemorySize: 512
+      Timeout: 30
+      Environment:
+        Variables:
+          PROJECT: !Sub ${Project}
+          ENVR: !Sub ${TargetEnvr}
+          DB_HOST:
+            Fn::ImportValue: !Sub celestial-studio-${TargetEnvr}-db-endpoint
+          DB_PWD: !Sub '{{resolve:ssm:mysql-${TargetEnvr}-${Project}-pwd}}'
+  InvokePermissionHousekeep:
+    Type: AWS::Lambda::Permission
+    DependsOn: [LambdaHousekeep]
+    Properties:
+      FunctionName: !Sub ${Project}-${TargetEnvr}-housekeep
+      Action: 'lambda:InvokeFunction'
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt EventBridgeHousekeep.Arn
   #########################################
   ##### Cloudfront and Route53 config #####
   #########################################
@@ -1246,13 +1244,13 @@ Resources:
   #######################
   ##### EventBridge #####
   #######################
-  # EventBridgeStatsLoader:
-  #   Type: AWS::Events::Rule
-  #   DependsOn: [LambdaStatsLoader]
-  #   Properties:
-  #     Name: !Sub ${Project}-${TargetEnvr}-stats-loader
-  #     ScheduleExpression: cron(5 * * * ? *)
-  #     State: ENABLED
-  #     Targets:
-  #       - Arn: !GetAtt LambdaStatsLoader.Arn
-  #         Id: !Sub ${Project}-${TargetEnvr}-stats-loader
+  EventBridgeHousekeep:
+    Type: AWS::Events::Rule
+    DependsOn: [LambdaHousekeep]
+    Properties:
+      Name: !Sub ${Project}-${TargetEnvr}-housekeep
+      ScheduleExpression: cron(5 20 * * ? *)
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt LambdaHousekeep.Arn
+          Id: !Sub ${Project}-${TargetEnvr}-housekeep

@@ -1,15 +1,15 @@
 import { bindings } from 'src/bindings';
 import { DbAccess } from 'src/dao/DbAccess';
-import { StatsService } from 'src/logic/StatsService';
+import { HousekeepService } from 'src/logic/HousekeepService';
 import { initLambda } from 'src/utils/LambdaHelper';
 
-export async function statsLoader(_event: unknown, _context: unknown) {
+export async function housekeep(_event: unknown, _context: unknown) {
   const db = bindings.get(DbAccess);
   await db.startTransaction();
   initLambda();
-  const service = bindings.get(StatsService);
+  const service = bindings.get(HousekeepService);
   try {
-    await service.processStats();
+    await service.dataClean();
     await db.commitTransaction();
   } catch (e) {
     console.log(e);
