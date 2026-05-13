@@ -14,19 +14,19 @@ function formatDate(dateStr: string | null): string {
 function ReplyRow({ item }: { item: Reply }) {
   const fbPostId = item.parent === null ? item.question.fbPostId : item.parent.fbPostId
   return (
-    <div className="rounded-[20px] border border-[#C5B3A7] bg-white p-4">
+    <div className="rounded-[20px] border border-brown-300 bg-white p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="space-y-1">
-          <div className="text-xs text-[#B2ADAA]">{formatDate(item.createdAt)}</div>
-          <div className="font-medium text-[#302B28]">{item.subject.name}</div>
+          <div className="text-xs text-black-200">{formatDate(item.createdAt)}</div>
+          <div className="font-medium text-black-900">{item.subject.name}</div>
         </div>
         <div className="flex items-center gap-4 text-sm">
           <div>
-            <span className="text-[#625D5A]">作答：</span>
-            <span className="font-medium text-[#302B28]">{item.repliedAnswer ?? '—'}</span>
+            <span className="text-black-500">作答：</span>
+            <span className="font-medium text-black-900">{item.repliedAnswer ?? '—'}</span>
           </div>
           <div>
-            <span className="text-[#625D5A]">得分：</span>
+            <span className="text-black-500">得分：</span>
             <span
               className={`font-bold ${item.score > 0 ? 'text-green-600' : 'text-red-500'}`}
             >
@@ -78,7 +78,7 @@ export default function ReplyClient() {
   if (loading && !replyList) {
     return (
       <div className="flex h-48 items-center justify-center">
-        <span className="text-sm text-[#625D5A]">載入中…</span>
+        <span className="text-sm text-black-500">載入中…</span>
       </div>
     )
   }
@@ -89,7 +89,7 @@ export default function ReplyClient() {
         <p className="text-sm text-red-600">{error}</p>
         <a
           href="/"
-          className="mt-4 inline-block text-sm text-[#2547C5] underline hover:text-[#1f3ea3]"
+          className="mt-4 inline-block text-sm text-blue-700 underline hover:text-[#1f3ea3]"
         >
           回首頁登入
         </a>
@@ -99,11 +99,11 @@ export default function ReplyClient() {
 
   if (!replyList || replyList.data.length === 0) {
     return (
-      <div className="rounded-[24px] border border-[#C5B3A7] bg-white p-8 text-center">
-        <p className="text-sm text-[#625D5A]">尚無答題紀錄</p>
+      <div className="rounded-[24px] border border-brown-300 bg-white p-8 text-center">
+        <p className="text-sm text-black-500">尚無答題紀錄</p>
         <a
           href="/adaptive"
-          className="mt-4 inline-block rounded-md bg-[#2547C5] px-6 py-2.5 text-sm font-bold text-white hover:bg-[#1f3ea3]"
+          className="mt-4 inline-block rounded-md bg-blue-700 px-6 py-2.5 text-sm font-bold text-white hover:bg-[#1f3ea3]"
         >
           開始智慧練習
         </a>
@@ -113,7 +113,7 @@ export default function ReplyClient() {
 
   return (
     <div>
-      <h1 className="mb-6 text-2xl font-bold text-[#2547C5]">作答記錄</h1>
+      <h1 className="mb-6 text-2xl font-bold text-blue-700">作答記錄</h1>
 
       <div className="flex flex-col gap-3">
         {replyList.data.map((item) => (
@@ -126,17 +126,17 @@ export default function ReplyClient() {
           <button
             onClick={() => fetchPage(page - 1)}
             disabled={page === 1 || loading}
-            className="rounded-md border border-[#C5B3A7] px-4 py-2 text-sm disabled:opacity-40"
+            className="rounded-md border border-brown-300 px-4 py-2 text-sm disabled:opacity-40"
           >
             ← 上一頁
           </button>
-          <span className="text-sm text-[#625D5A]">
+          <span className="text-sm text-black-500">
             第 {page} / {replyList.paginate.totalPages} 頁
           </span>
           <button
             onClick={() => fetchPage(page + 1)}
             disabled={page === replyList.paginate.totalPages || loading}
-            className="rounded-md border border-[#C5B3A7] px-4 py-2 text-sm disabled:opacity-40"
+            className="rounded-md border border-brown-300 px-4 py-2 text-sm disabled:opacity-40"
           >
             下一頁 →
           </button>

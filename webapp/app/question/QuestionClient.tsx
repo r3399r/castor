@@ -117,9 +117,9 @@ export default function QuestionClient() {
 
   return (
     <div>
-      <h1 className="mb-6 text-2xl font-bold text-[#2547C5]">題庫搜尋</h1>
+      <h1 className="mb-6 text-2xl font-bold text-blue-700">題庫搜尋</h1>
 
-      <div className="flex flex-col gap-4 rounded-[24px] border border-[#C5B3A7] bg-white p-6">
+      <div className="flex flex-col gap-4 rounded-[24px] border border-brown-300 bg-white p-6">
         <SelectField
           label="選擇類別"
           value={selectedCategoryId}
@@ -187,24 +187,24 @@ export default function QuestionClient() {
               fetchQuestions(0)
             }}
             disabled={!selectedSubjectId || loading}
-            className="rounded-md bg-[#2547C5] px-6 py-2.5 text-sm font-bold text-white transition hover:bg-[#1f3ea3] disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-md bg-blue-700 px-6 py-2.5 text-sm font-bold text-white transition hover:bg-[#1f3ea3] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {loading ? '搜尋中…' : '搜尋'}
           </button>
         </div>
       </div>
 
-      <hr className="my-6 border-[#C5B3A7]" />
+      <hr className="my-6 border-brown-300" />
 
       {result && result.data.length === 0 && (
-        <p className="text-center text-[#625D5A]">查無題目</p>
+        <p className="text-center text-black-500">查無題目</p>
       )}
 
       {result && result.data.length > 0 && (
         <div className="flex flex-col gap-4">
           {result.data.map((item) => (
-            <div key={item.id} className="overflow-hidden rounded-xl border border-[#C5B3A7]">
-              <div className="flex items-start justify-between gap-2 border-b border-[#C5B3A7] bg-blue-50 p-3">
+            <div key={item.id} className="overflow-hidden rounded-xl border border-brown-300">
+              <div className="flex items-start justify-between gap-2 border-b border-brown-300 bg-blue-50 p-3">
                 <div className="flex flex-wrap gap-2">
                   <Chip label={questionTypeLabel[item.type] ?? item.type} />
                   {item.exam.map((e) => (
@@ -232,7 +232,7 @@ export default function QuestionClient() {
                   <div className="mt-4">
                     <button
                       onClick={() => toggleSolution(item.id)}
-                      className="rounded-md border border-[#2547C5] px-4 py-1.5 text-sm font-medium text-[#2547C5] transition hover:bg-[#2547C5]/5"
+                      className="rounded-md border border-blue-700 px-4 py-1.5 text-sm font-medium text-blue-700 transition hover:bg-blue-700/5"
                     >
                       {openSolutionIds.has(item.id) ? '收起答案' : '看答案'}
                     </button>
@@ -260,7 +260,7 @@ export default function QuestionClient() {
                       <div className="mt-3">
                         <button
                           onClick={() => toggleSolution(child.id)}
-                          className="rounded-md border border-[#2547C5] px-4 py-1.5 text-sm font-medium text-[#2547C5] transition hover:bg-[#2547C5]/5"
+                          className="rounded-md border border-blue-700 px-4 py-1.5 text-sm font-medium text-blue-700 transition hover:bg-blue-700/5"
                         >
                           {openSolutionIds.has(child.id) ? '收起答案' : '看答案'}
                         </button>
@@ -303,11 +303,11 @@ export default function QuestionClient() {
                   fetchQuestions((prev - 1) * LIMIT)
                 }}
                 disabled={page === 1}
-                className="rounded-md border border-[#C5B3A7] px-3 py-1.5 text-sm disabled:opacity-40"
+                className="rounded-md border border-brown-300 px-3 py-1.5 text-sm disabled:opacity-40"
               >
                 ←
               </button>
-              <span className="text-sm text-[#625D5A]">
+              <span className="text-sm text-black-500">
                 第 {page} / {result.paginate.totalPages} 頁
               </span>
               <button
@@ -317,7 +317,7 @@ export default function QuestionClient() {
                   fetchQuestions((next - 1) * LIMIT)
                 }}
                 disabled={page === result.paginate.totalPages}
-                className="rounded-md border border-[#C5B3A7] px-3 py-1.5 text-sm disabled:opacity-40"
+                className="rounded-md border border-brown-300 px-3 py-1.5 text-sm disabled:opacity-40"
               >
                 →
               </button>

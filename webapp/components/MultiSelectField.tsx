@@ -36,16 +36,16 @@ function OptionRow({
     <button
       type="button"
       onClick={() => onToggle(opt.value)}
-      className={`flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors hover:bg-[#FCF9F5] ${checked ? 'bg-blue-50' : ''}`}
+      className={`flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors hover:bg-beige-100 ${checked ? 'bg-blue-50' : ''}`}
     >
       <span
         className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${
-          checked ? 'border-[#2547C5] bg-[#2547C5]' : 'border-[#C5B3A7] bg-white'
+          checked ? 'border-blue-700 bg-blue-700' : 'border-brown-300 bg-white'
         }`}
       >
         {checked && <CheckIcon />}
       </span>
-      <span className={checked ? 'font-medium text-[#2547C5]' : 'text-[#302B28]'}>{opt.label}</span>
+      <span className={checked ? 'font-medium text-blue-700' : 'text-black-900'}>{opt.label}</span>
     </button>
   )
 }
@@ -94,28 +94,28 @@ export default function MultiSelectField({
 
   return (
     <div className="relative flex flex-col gap-1" ref={ref}>
-      <label className="text-sm font-medium text-[#4E4946]">{label}</label>
+      <label className="text-sm font-medium text-black-700">{label}</label>
       <button
         type="button"
         onClick={() => !disabled && setOpen((o) => !o)}
         disabled={disabled}
         className={`flex items-center justify-between rounded-lg border bg-white px-3 py-2.5 text-left text-sm transition disabled:cursor-not-allowed disabled:opacity-50 ${
-          open ? 'border-[#2547C5] ring-1 ring-[#2547C5]' : 'border-[#C5B3A7]'
+          open ? 'border-blue-700 ring-1 ring-blue-700' : 'border-brown-300'
         }`}
       >
-        <span className={`truncate ${selectedLabels.length === 0 ? 'text-[#B2ADAA]' : 'text-[#302B28]'}`}>
+        <span className={`truncate ${selectedLabels.length === 0 ? 'text-black-200' : 'text-black-900'}`}>
           {triggerText}
         </span>
-        <span className="ml-2 shrink-0 text-xs text-[#625D5A]">{open ? '▲' : '▼'}</span>
+        <span className="ml-2 shrink-0 text-xs text-black-500">{open ? '▲' : '▼'}</span>
       </button>
 
       {open && (
-        <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-60 overflow-y-auto rounded-lg border border-[#C5B3A7] bg-white shadow-lg">
+        <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-60 overflow-y-auto rounded-lg border border-brown-300 bg-white shadow-lg">
           {value.length > 0 && (
             <button
               type="button"
               onClick={() => onChange([])}
-              className="w-full border-b border-[#E5E0DC] px-3 py-2 text-left text-xs text-[#625D5A] hover:bg-[#FCF9F5]"
+              className="w-full border-b border-[#E5E0DC] px-3 py-2 text-left text-xs text-black-500 hover:bg-beige-100"
             >
               清除全部選擇
             </button>
@@ -123,7 +123,7 @@ export default function MultiSelectField({
           {isGrouped(options)
             ? options.map((group) => (
                 <div key={group.groupLabel}>
-                  <div className="bg-[#FAF7F4] px-3 py-1.5 text-xs font-semibold text-[#625D5A]">
+                  <div className="bg-[#FAF7F4] px-3 py-1.5 text-xs font-semibold text-black-500">
                     {group.groupLabel}
                   </div>
                   {group.options.map((opt) => (

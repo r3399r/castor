@@ -21,12 +21,12 @@ export default function HomeCategories() {
     <section className="space-y-8">
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div className="space-y-3">
-          <p className="text-sm font-bold tracking-[0.12em] text-[#2547C5] uppercase">熱門分類</p>
-          <h2 className="text-3xl font-bold text-[#2547C5] sm:text-4xl">熱門考試 / 科目</h2>
+          <p className="text-sm font-bold tracking-[0.12em] text-blue-700 uppercase">熱門分類</p>
+          <h2 className="text-3xl font-bold text-blue-700 sm:text-4xl">熱門考試 / 科目</h2>
         </div>
         <a
           href="/question"
-          className="inline-flex items-center gap-2 rounded-full border-b border-[#625D5A] px-4 py-2 text-sm font-bold text-[#625D5A] transition hover:text-[#2547C5]"
+          className="inline-flex items-center gap-2 rounded-full border-b border-black-500 px-4 py-2 text-sm font-bold text-black-500 transition hover:text-blue-700"
         >
           <span>看全部科目</span>
           <span aria-hidden="true">→</span>
@@ -36,21 +36,21 @@ export default function HomeCategories() {
       <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
         {categories.map((category) => (
           <article key={category.title} className={`${category.color} rounded-[32px] p-6 shadow-sm`}>
-            <h3 className="text-[28px] font-bold text-[#302B28]">{category.title}</h3>
+            <h3 className="text-[28px] font-bold text-black-900">{category.title}</h3>
             <div className="mt-6 space-y-3">
               {category.items.map((item) => (
                 <div
                   key={item}
-                  className="flex items-center justify-between border-b border-[#B2ADAA] py-2"
+                  className="flex items-center justify-between border-b border-black-200 py-2"
                 >
-                  <p className="text-base text-[#302B28]">{item}</p>
+                  <p className="text-base text-black-900">{item}</p>
                 </div>
               ))}
             </div>
             <div className="mt-6 flex justify-end">
               <a
                 href="/question"
-                className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-bold text-[#625D5A] shadow-sm transition hover:bg-[#F3EEEA]"
+                className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-bold text-black-500 shadow-sm transition hover:bg-beige-200"
               >
                 更多
                 <span aria-hidden="true">→</span>

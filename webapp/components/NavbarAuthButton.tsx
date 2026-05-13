@@ -6,7 +6,7 @@ export default function NavbarAuthButton() {
   const { user, loading, login, logout } = useAuth()
 
   if (loading) {
-    return <div className="h-9 w-24 rounded-md border border-[#C5B3A7] bg-white" />
+    return <div className="h-9 w-24 rounded-md border border-brown-300 bg-white" />
   }
 
   if (user) {
@@ -14,7 +14,7 @@ export default function NavbarAuthButton() {
       <div className="flex items-center gap-2">
         <button
           onClick={logout}
-          className="rounded-md border border-[#C5B3A7] bg-white px-5 py-2.5 text-sm text-[#302B28] transition hover:bg-[#FCF9F5]"
+          className="rounded-md border border-brown-300 bg-white px-5 py-2.5 text-sm text-black-900 transition hover:bg-beige-100"
         >
           登出
         </button>
@@ -25,7 +25,7 @@ export default function NavbarAuthButton() {
   return (
     <button
       onClick={login}
-      className="rounded-md border border-[#C5B3A7] bg-white px-5 py-2.5 text-sm text-[#302B28] transition hover:bg-[#FCF9F5]"
+      className="rounded-md border border-brown-300 bg-white px-5 py-2.5 text-sm text-black-900 transition hover:bg-beige-100"
     >
       Google 登入
     </button>

@@ -59,7 +59,7 @@ function AnswerInput({
               checked={answer === val}
               onChange={() => onAnswer(val)}
               disabled={disabled}
-              className="accent-[#2547C5]"
+              className="accent-blue-700"
             />
             <span className="text-sm">{val === 'True' ? '是' : '非'}</span>
           </label>
@@ -80,7 +80,7 @@ function AnswerInput({
               checked={answer === opt}
               onChange={() => onAnswer(opt)}
               disabled={disabled}
-              className="accent-[#2547C5]"
+              className="accent-blue-700"
             />
             <span className="text-sm">{opt}</span>
           </label>
@@ -104,7 +104,7 @@ function AnswerInput({
                 onAnswer(next)
               }}
               disabled={disabled}
-              className="accent-[#2547C5]"
+              className="accent-blue-700"
             />
             <span className="text-sm">{opt}</span>
           </label>
@@ -120,7 +120,7 @@ function AnswerInput({
       <div className="mt-3 flex flex-col gap-3">
         {Array.from({ length: blanks }).map((_, i) => (
           <div key={i} className="flex flex-wrap items-center gap-3">
-            <span className="text-sm font-medium text-[#4E4946]">{i + 1}.</span>
+            <span className="text-sm font-medium text-black-700">{i + 1}.</span>
             {options.map((opt) => (
               <label key={opt} className="flex cursor-pointer items-center gap-1.5">
                 <input
@@ -133,7 +133,7 @@ function AnswerInput({
                     onAnswer(next)
                   }}
                   disabled={disabled}
-                  className="accent-[#2547C5]"
+                  className="accent-blue-700"
                 />
                 <span className="text-sm">{opt}</span>
               </label>
@@ -276,9 +276,9 @@ export default function AdaptiveClient() {
 
   return (
     <div>
-      <h1 className="mb-6 text-2xl font-bold text-[#2547C5]">智慧練習</h1>
+      <h1 className="mb-6 text-2xl font-bold text-blue-700">智慧練習</h1>
 
-      <div className="flex flex-col gap-4 rounded-[24px] border border-[#C5B3A7] bg-white p-6">
+      <div className="flex flex-col gap-4 rounded-[24px] border border-brown-300 bg-white p-6">
         <SelectField
           label="選擇類別"
           value={selectedCategoryId}
@@ -344,21 +344,21 @@ export default function AdaptiveClient() {
           <button
             onClick={fetchAdaptive}
             disabled={!selectedSubjectId || filtersLocked || questionCount <= 0 || loading}
-            className="rounded-md bg-[#2547C5] px-6 py-2.5 text-sm font-bold text-white transition hover:bg-[#1f3ea3] disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-md bg-blue-700 px-6 py-2.5 text-sm font-bold text-white transition hover:bg-[#1f3ea3] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {loading && !adaptiveQuestion ? '選題中…' : 'AI 選題'}
           </button>
           {questionCount >= 0 && (
-            <span className="text-sm text-[#625D5A]">共有 {questionCount} 題符合條件</span>
+            <span className="text-sm text-black-500">共有 {questionCount} 題符合條件</span>
           )}
         </div>
       </div>
 
-      <hr className="my-6 border-[#C5B3A7]" />
+      <hr className="my-6 border-brown-300" />
 
       {adaptiveQuestion && (
-        <div className="overflow-hidden rounded-xl border border-[#C5B3A7]">
-          <div className="flex items-start justify-between gap-2 border-b border-[#C5B3A7] bg-blue-50 p-3">
+        <div className="overflow-hidden rounded-xl border border-brown-300">
+          <div className="flex items-start justify-between gap-2 border-b border-brown-300 bg-blue-50 p-3">
             <div className="flex flex-wrap gap-2">
               <Chip label={typeLabel[adaptiveQuestion.type] ?? adaptiveQuestion.type} />
               {adaptiveQuestion.exam.map((e) => (
@@ -445,7 +445,7 @@ export default function AdaptiveClient() {
           <button
             onClick={onSubmit}
             disabled={!canSubmit || loading}
-            className="rounded-md bg-[#2547C5] px-6 py-2.5 text-sm font-bold text-white transition hover:bg-[#1f3ea3] disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-md bg-blue-700 px-6 py-2.5 text-sm font-bold text-white transition hover:bg-[#1f3ea3] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {loading ? '送出中…' : '確認送出'}
           </button>
@@ -457,7 +457,7 @@ export default function AdaptiveClient() {
           <button
             onClick={fetchAdaptive}
             disabled={loading}
-            className="rounded-md bg-[#2547C5] px-6 py-2.5 text-sm font-bold text-white transition hover:bg-[#1f3ea3] disabled:opacity-50"
+            className="rounded-md bg-blue-700 px-6 py-2.5 text-sm font-bold text-white transition hover:bg-[#1f3ea3] disabled:opacity-50"
           >
             用相同條件再選下一題
           </button>

@@ -37,9 +37,9 @@ function CheckboxField({
         type="checkbox"
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
-        className="accent-[#2547C5]"
+        className="accent-blue-700"
       />
-      <span className="text-sm text-[#4E4946]">{label}</span>
+      <span className="text-sm text-black-700">{label}</span>
     </label>
   )
 }
@@ -241,9 +241,9 @@ export default function PreviewClient() {
 
   return (
     <div>
-      <h1 className="mb-6 text-2xl font-bold text-[#2547C5]">題目預覽</h1>
+      <h1 className="mb-6 text-2xl font-bold text-blue-700">題目預覽</h1>
 
-      <div className="flex flex-col gap-4 rounded-[24px] border border-[#C5B3A7] bg-white p-6">
+      <div className="flex flex-col gap-4 rounded-[24px] border border-brown-300 bg-white p-6">
         <SelectField
           label="選擇類別"
           value={selectedCategoryId}
@@ -327,13 +327,13 @@ export default function PreviewClient() {
         </SelectField>
 
         <div>
-          <label className="mb-1 block text-sm font-medium text-[#4E4946]">Image URL</label>
+          <label className="mb-1 block text-sm font-medium text-black-700">Image URL</label>
           <input
             type="text"
             value={imageUrl}
             onChange={(e) => setImageUrl(e.target.value)}
             placeholder="https://..."
-            className="w-full rounded-lg border border-[#C5B3A7] bg-white px-3 py-2.5 text-sm text-[#302B28]"
+            className="w-full rounded-lg border border-brown-300 bg-white px-3 py-2.5 text-sm text-black-900"
           />
         </div>
 
@@ -344,38 +344,38 @@ export default function PreviewClient() {
         </div>
       </div>
 
-      <hr className="my-6 border-[#C5B3A7]" />
+      <hr className="my-6 border-brown-300" />
 
       <section className="space-y-2">
-        <h2 className="text-lg font-bold text-[#302B28]">Gemini Input</h2>
-        <div className="rounded-lg border border-[#C5B3A7] bg-[#F9F5F1] p-4 text-sm whitespace-pre-wrap text-[#4E4946]">
+        <h2 className="text-lg font-bold text-black-900">Gemini Input</h2>
+        <div className="rounded-lg border border-brown-300 bg-[#F9F5F1] p-4 text-sm whitespace-pre-wrap text-black-700">
           {geminiInput}
         </div>
         <button
           onClick={onAskGemini}
           disabled={!imageUrl || !selectedSubjectId || loading || !selectedType}
-          className="rounded-md bg-[#2547C5] px-6 py-2.5 text-sm font-bold text-white transition hover:bg-[#1f3ea3] disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-md bg-blue-700 px-6 py-2.5 text-sm font-bold text-white transition hover:bg-[#1f3ea3] disabled:cursor-not-allowed disabled:opacity-50"
         >
           {loading ? '請求中…' : 'Ask Gemini'}
         </button>
       </section>
 
       <section className="mt-6 space-y-2">
-        <h2 className="text-lg font-bold text-[#302B28]">Gemini Output</h2>
+        <h2 className="text-lg font-bold text-black-900">Gemini Output</h2>
         <textarea
-          className="h-48 w-full rounded-lg border border-[#C5B3A7] p-3 font-mono text-sm"
+          className="h-48 w-full rounded-lg border border-brown-300 p-3 font-mono text-sm"
           value={geminiOutput}
           onChange={(e) => setGeminiOutput(e.target.value)}
           placeholder="Gemini JSON 輸出會自動填入…"
         />
       </section>
 
-      <hr className="my-6 border-[#C5B3A7]" />
+      <hr className="my-6 border-brown-300" />
 
       <section className="space-y-2">
-        <h2 className="text-lg font-bold text-[#302B28]">Input JSON</h2>
+        <h2 className="text-lg font-bold text-black-900">Input JSON</h2>
         <textarea
-          className="h-64 w-full rounded-lg border border-[#C5B3A7] p-3 font-mono text-sm"
+          className="h-64 w-full rounded-lg border border-brown-300 p-3 font-mono text-sm"
           value={questionInput}
           onChange={(e) => setQuestionInput(e.target.value)}
           placeholder="題目 JSON"
@@ -383,8 +383,8 @@ export default function PreviewClient() {
       </section>
 
       {payload && (
-        <section className="mt-4 space-y-1 rounded-[24px] border border-[#C5B3A7] bg-white p-6">
-          <h2 className="mb-3 text-lg font-bold text-[#302B28]">Parsed Fields</h2>
+        <section className="mt-4 space-y-1 rounded-[24px] border border-brown-300 bg-white p-6">
+          <h2 className="mb-3 text-lg font-bold text-black-900">Parsed Fields</h2>
           {(
             [
               ['subjectId', payload.subjectId],
@@ -401,8 +401,8 @@ export default function PreviewClient() {
             ] as [string, unknown][]
           ).map(([key, val]) => (
             <div key={key} className="flex gap-2 text-sm">
-              <span className="w-28 shrink-0 font-medium text-[#625D5A]">{key}:</span>
-              <span className="text-[#302B28]">{val !== undefined ? String(val) : '—'}</span>
+              <span className="w-28 shrink-0 font-medium text-black-500">{key}:</span>
+              <span className="text-black-900">{val !== undefined ? String(val) : '—'}</span>
             </div>
           ))}
           {payload.type === 'GROUP' && payload.childQuestions?.length === 0 && (
@@ -410,7 +410,7 @@ export default function PreviewClient() {
           )}
           {payload.childQuestions?.map((child, i) => (
             <div key={i} className="mt-3 rounded-lg border border-[#E5E0DC] p-3">
-              <p className="mb-1 font-medium text-[#302B28]">子題 {i + 1}</p>
+              <p className="mb-1 font-medium text-black-900">子題 {i + 1}</p>
               {(
                 [
                   ['type', child.type],
@@ -422,8 +422,8 @@ export default function PreviewClient() {
                 ] as [string, unknown][]
               ).map(([key, val]) => (
                 <div key={key} className="flex gap-2 text-sm">
-                  <span className="w-24 shrink-0 font-medium text-[#625D5A]">{key}:</span>
-                  <span className="text-[#302B28]">{val !== undefined ? String(val) : '—'}</span>
+                  <span className="w-24 shrink-0 font-medium text-black-500">{key}:</span>
+                  <span className="text-black-900">{val !== undefined ? String(val) : '—'}</span>
                 </div>
               ))}
             </div>
@@ -432,8 +432,8 @@ export default function PreviewClient() {
       )}
 
       <section className="mt-6 space-y-2">
-        <h2 className="text-lg font-bold text-[#302B28]">Preview</h2>
-        <div className="min-h-[120px] rounded-[24px] border border-[#C5B3A7] bg-white p-6">
+        <h2 className="text-lg font-bold text-black-900">Preview</h2>
+        <div className="min-h-[120px] rounded-[24px] border border-brown-300 bg-white p-6">
           {payload?.content ? (
             <>
               <div
@@ -449,18 +449,18 @@ export default function PreviewClient() {
               ))}
             </>
           ) : (
-            <p className="text-sm text-[#B2ADAA]">請在 Input JSON 中填入 content 以預覽</p>
+            <p className="text-sm text-black-200">請在 Input JSON 中填入 content 以預覽</p>
           )}
         </div>
       </section>
 
       <section className="mt-6 space-y-2">
-        <h2 className="text-lg font-bold text-[#302B28]">Create Question</h2>
+        <h2 className="text-lg font-bold text-black-900">Create Question</h2>
         <div className="flex items-center gap-4">
           <button
             onClick={onCreateQuestion}
             disabled={!payload || createLoading}
-            className="rounded-md bg-[#2547C5] px-6 py-2.5 text-sm font-bold text-white transition hover:bg-[#1f3ea3] disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-md bg-blue-700 px-6 py-2.5 text-sm font-bold text-white transition hover:bg-[#1f3ea3] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {createLoading ? '建立中…' : '建立題目'}
           </button>
