@@ -1,6 +1,6 @@
 import { PendingReply } from '@castor/shared';
 import { inject, injectable } from 'inversify';
-import { FindManyOptions } from 'typeorm';
+import { FindManyOptions, LessThan } from 'typeorm';
 import { PendingReplyEntity } from 'src/model/entity/PendingReplyEntity';
 import { Database } from 'src/utils/Database';
 
@@ -32,5 +32,13 @@ export class PendingReplyAccess {
     const qr = await this.database.getQueryRunner();
 
     return await qr.manager.delete(PendingReplyEntity, { id });
+  }
+
+  public async deleteOlderThan(date: Date) {
+    const qr = await this.database.getQueryRunner();
+
+    return await qr.manager.delete(PendingReplyEntity, {
+      createdAt: LessThan(date.toISOString()),
+    });
   }
 }

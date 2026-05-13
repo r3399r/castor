@@ -1,2 +1,2 @@
 export { api } from './lambda/api';
-export { statsLoader } from './lambda/statsLoader';
+export { housekeep } from './lambda/housekeep';

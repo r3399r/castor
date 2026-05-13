@@ -14,15 +14,6 @@ import { UserEntity } from 'src/model/entity/UserEntity';
 import { UnauthorizedError } from 'src/model/error';
 import { authorizationSymbol } from 'src/utils/LambdaHelper';
 
-admin.initializeApp({
-  credential: admin.credential.cert(
-    JSON.parse(process.env.FIREBAE_ADMIN_KEY ?? '{}')
-  ),
-});
-
-/**
- * Service class for User
- */
 @injectable()
 export class UserService {
   @inject(UserAccess)
@@ -33,6 +24,15 @@ export class UserService {
   private readonly conceptGroupAccess!: ConceptGroupAccess;
   @inject(authorizationSymbol)
   private readonly token!: string;
+
+  constructor() {
+    if (admin.apps.length === 0)
+      admin.initializeApp({
+        credential: admin.credential.cert(
+          JSON.parse(process.env.FIREBASE_ADMIN_KEY ?? '{}')
+        ),
+      });
+  }
 
   private async verifyFirebaseToken() {
     try {
