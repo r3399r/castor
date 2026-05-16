@@ -115,7 +115,7 @@ export class QuestionService {
           subject: true,
           exam: true,
           tag: true,
-          concept: true,
+          concept: { conceptGroup: true },
           children: true,
         },
       },

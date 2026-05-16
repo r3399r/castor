@@ -20,6 +20,7 @@ import type {
   Subject,
   Tag,
 } from '@/types/api'
+import { MathJax } from 'better-react-mathjax'
 
 
 function CheckboxField({
@@ -75,6 +76,7 @@ export default function PreviewClient() {
   const [needSolution, setNeedSolution] = useState(false)
   const [containImage, setContainImage] = useState(false)
   const [needCss, setNeedCss] = useState(false)
+  const [containMathjax, setContainMathjax] = useState(false)
   const [loading, setLoading] = useState(false)
   const [createLoading, setCreateLoading] = useState(false)
   const [createResult, setCreateResult] = useState<string | null>(null)
@@ -97,6 +99,7 @@ export default function PreviewClient() {
     const subjectName = subjectList.find((s) => String(s.id) === selectedSubjectId)?.name ?? ''
     let text = `圖片為 ${categoryName} ${subjectName} 的一道題目，請提供以下資訊: `
     text += '- content: 轉換成 html，換行符號使用 <br/>，回傳內容不用無謂的空白鍵跟換行'
+    if(containMathjax) text += '，數學式請使用 MathJax 語法'
     if (needCss) text += '，css直接寫入html inline style，不改變字體設定'
     if (containImage)
       text +=
@@ -126,6 +129,7 @@ export default function PreviewClient() {
     containImage,
     needCss,
     selectedType,
+    containMathjax
   ])
 
   useEffect(() => {
@@ -341,6 +345,7 @@ export default function PreviewClient() {
           <CheckboxField label="need solution?" checked={needSolution} onChange={setNeedSolution} />
           <CheckboxField label="need css?" checked={needCss} onChange={setNeedCss} />
           <CheckboxField label="contain image?" checked={containImage} onChange={setContainImage} />
+          <CheckboxField label="contain mathjax?" checked={containMathjax} onChange={setContainMathjax} />
         </div>
       </div>
 
@@ -436,16 +441,20 @@ export default function PreviewClient() {
         <div className="min-h-[120px] rounded-[24px] border border-brown-300 bg-white p-6">
           {payload?.content ? (
             <>
-              <div
-                dangerouslySetInnerHTML={{ __html: payload.content }}
-                className="prose prose-sm max-w-none"
-              />
-              {payload.childQuestions?.map((child, i) => (
+              <MathJax>
                 <div
-                  key={i}
-                  dangerouslySetInnerHTML={{ __html: child.content ?? '' }}
-                  className="prose prose-sm mt-4 max-w-none border-t border-[#E5E0DC] pt-4"
+                  dangerouslySetInnerHTML={{ __html: payload.content }}
+                  className="prose prose-sm max-w-none"
                 />
+              </MathJax>
+              {payload.childQuestions?.map((child, i) => (
+                <MathJax>
+                  <div
+                    key={i}
+                    dangerouslySetInnerHTML={{ __html: child.content ?? '' }}
+                    className="prose prose-sm mt-4 max-w-none border-t border-[#E5E0DC] pt-4"
+                  />
+                </MathJax>
               ))}
             </>
           ) : (

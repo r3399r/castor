@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { AuthProvider } from '@/contexts/AuthContext'
+import MathJaxProvider from '@/components/MathJaxProvider'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -12,7 +13,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="zh-TW">
       <body className="bg-beige-100">
-        <AuthProvider>{children}</AuthProvider>
+        <MathJaxProvider>
+          <AuthProvider>{children}</AuthProvider>
+        </MathJaxProvider>
       </body>
     </html>
   )

@@ -23,6 +23,7 @@ import type {
   Subject,
   Tag,
 } from '@/types/api'
+import { MathJax } from 'better-react-mathjax'
 
 const typeLabel: Record<string, string> = {
   SINGLE: '單選題',
@@ -318,12 +319,12 @@ export default function AdaptiveClient() {
           options={
             showConceptGroupHeader
               ? conceptGroupList.map((cg) => ({
-                  groupLabel: cg.name,
-                  options: cg.concepts.map((c) => ({ value: String(c.id), label: c.name })),
-                }))
+                groupLabel: cg.name,
+                options: cg.concepts.map((c) => ({ value: String(c.id), label: c.name })),
+              }))
               : conceptGroupList.flatMap((cg) =>
-                  cg.concepts.map((c) => ({ value: String(c.id), label: c.name })),
-                )
+                cg.concepts.map((c) => ({ value: String(c.id), label: c.name })),
+              )
           }
           value={selectedConceptIds}
           onChange={setSelectedConceptIds}
@@ -365,7 +366,7 @@ export default function AdaptiveClient() {
                 <Chip key={e.id} label={e.name} color={tagColors.exam} />
               ))}
               {adaptiveQuestion.concept.map((c) => (
-                <Chip key={c.id} label={c.name} color={tagColors.concept} />
+                <Chip key={c.id} label={c.conceptGroup.name === c.name ? c.name : c.conceptGroup.name + '-' + c.name} color={tagColors.concept} />
               ))}
               {adaptiveQuestion.tag.map((t) => (
                 <Chip key={t.id} label={t.name} color={tagColors.tag} />
@@ -377,10 +378,12 @@ export default function AdaptiveClient() {
           <div className="p-4">
             {adaptiveQuestion.type !== 'GROUP' && adaptiveQuestion.content && (
               <>
-                <div
-                  dangerouslySetInnerHTML={{ __html: adaptiveQuestion.content }}
-                  className="prose prose-sm max-w-none"
-                />
+                <MathJax>
+                  <div
+                    dangerouslySetInnerHTML={{ __html: adaptiveQuestion.content }}
+                    className="prose prose-sm max-w-none"
+                  />
+                </MathJax>
                 <AnswerInput
                   question={adaptiveQuestion}
                   answer={repliedAnswer.get(adaptiveQuestion.id) ?? ''}
@@ -402,10 +405,12 @@ export default function AdaptiveClient() {
               adaptiveQuestion.children.map((child, i) => (
                 <div key={child.id} className={i > 0 ? 'mt-4 border-t border-[#E5E0DC] pt-4' : ''}>
                   {child.content && (
-                    <div
-                      dangerouslySetInnerHTML={{ __html: child.content }}
-                      className="prose prose-sm max-w-none"
-                    />
+                    <MathJax>
+                      <div
+                        dangerouslySetInnerHTML={{ __html: child.content }}
+                        className="prose prose-sm max-w-none"
+                      />
+                    </MathJax>
                   )}
                   <AnswerInput
                     question={child}

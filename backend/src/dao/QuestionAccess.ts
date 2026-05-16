@@ -105,6 +105,7 @@ export class QuestionAccess {
       .leftJoinAndSelect('question.exam', 'exam')
       .leftJoinAndSelect('question.tag', 'tag')
       .leftJoinAndSelect('question.concept', 'concept')
+      .leftJoinAndSelect('concept.conceptGroup', 'conceptGroup')
       .leftJoinAndSelect('question.children', 'children')
       .andWhere('question.parentId IS NULL')
       .andWhere('question.subjectId = :subjectId', {
@@ -187,6 +188,7 @@ export class QuestionAccess {
       .leftJoinAndSelect('question.exam', 'exam')
       .leftJoinAndSelect('question.tag', 'tag')
       .leftJoinAndSelect('question.concept', 'concept')
+      .leftJoinAndSelect('concept.conceptGroup', 'conceptGroup')
       .leftJoinAndSelect('question.children', 'children')
       .andWhere('question.parentId IS NULL')
       .andWhere('question.subjectId = :subjectId', {

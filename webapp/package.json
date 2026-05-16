@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@castor/shared": "*",
+    "better-react-mathjax": "^3.0.1",
     "firebase": "^11.0.0",
     "lightningcss": "^1.32.0",
     "next": "^15.3.2",

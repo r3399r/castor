@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { MathJax } from 'better-react-mathjax'
 import { apiFetch, LIMIT } from '@/lib/api'
 import MultiSelectField from '@/components/MultiSelectField'
 import SelectField from '@/components/SelectField'
@@ -158,12 +159,12 @@ export default function QuestionClient() {
           options={
             showConceptGroupHeader
               ? conceptGroupList.map((cg) => ({
-                  groupLabel: cg.name,
-                  options: cg.concepts.map((c) => ({ value: String(c.id), label: c.name })),
-                }))
+                groupLabel: cg.name,
+                options: cg.concepts.map((c) => ({ value: String(c.id), label: c.name })),
+              }))
               : conceptGroupList.flatMap((cg) =>
-                  cg.concepts.map((c) => ({ value: String(c.id), label: c.name })),
-                )
+                cg.concepts.map((c) => ({ value: String(c.id), label: c.name })),
+              )
           }
           value={selectedConceptIds}
           onChange={setSelectedConceptIds}
@@ -211,7 +212,7 @@ export default function QuestionClient() {
                     <Chip key={e.id} label={e.name} color={tagColors.exam} />
                   ))}
                   {item.concept.map((c) => (
-                    <Chip key={c.id} label={c.name} color={tagColors.concept} />
+                    <Chip key={c.id} label={c.conceptGroup.name === c.name ? c.name : c.conceptGroup.name + '-' + c.name} color={tagColors.concept} />
                   ))}
                   {item.tag.map((t) => (
                     <Chip key={t.id} label={t.name} color={tagColors.tag} />
@@ -222,10 +223,12 @@ export default function QuestionClient() {
 
               <div className="p-4">
                 {item.content && (
-                  <div
-                    dangerouslySetInnerHTML={{ __html: item.content }}
-                    className="prose prose-sm max-w-none"
-                  />
+                  <MathJax>
+                    <div
+                      dangerouslySetInnerHTML={{ __html: item.content }}
+                      className="prose prose-sm max-w-none"
+                    />
+                  </MathJax>
                 )}
 
                 {item.answer && (
@@ -239,10 +242,12 @@ export default function QuestionClient() {
                     {openSolutionIds.has(item.id) && (
                       <div className="mt-3 rounded-lg border border-green-200 bg-green-50 p-4">
                         <p className="mb-2 font-bold text-green-800">解答</p>
-                        <div
-                          dangerouslySetInnerHTML={{ __html: item.answer }}
-                          className="prose prose-sm max-w-none"
-                        />
+                        <MathJax>
+                          <div
+                            dangerouslySetInnerHTML={{ __html: item.answer }}
+                            className="prose prose-sm max-w-none"
+                          />
+                        </MathJax>
                       </div>
                     )}
                   </div>
@@ -251,10 +256,12 @@ export default function QuestionClient() {
                 {item.children.map((child) => (
                   <div key={child.id} className="mt-4 border-t border-[#E5E0DC] pt-4">
                     {child.content && (
-                      <div
-                        dangerouslySetInnerHTML={{ __html: child.content }}
-                        className="prose prose-sm max-w-none"
-                      />
+                      <MathJax>
+                        <div
+                          dangerouslySetInnerHTML={{ __html: child.content }}
+                          className="prose prose-sm max-w-none"
+                        />
+                      </MathJax>
                     )}
                     {child.answer && (
                       <div className="mt-3">
@@ -267,10 +274,12 @@ export default function QuestionClient() {
                         {openSolutionIds.has(child.id) && (
                           <div className="mt-3 rounded-lg border border-green-200 bg-green-50 p-4">
                             <p className="mb-2 font-bold text-green-800">解答</p>
-                            <div
-                              dangerouslySetInnerHTML={{ __html: child.answer }}
-                              className="prose prose-sm max-w-none"
-                            />
+                            <MathJax>
+                              <div
+                                dangerouslySetInnerHTML={{ __html: child.answer }}
+                                className="prose prose-sm max-w-none"
+                              />
+                            </MathJax>
                           </div>
                         )}
                       </div>
