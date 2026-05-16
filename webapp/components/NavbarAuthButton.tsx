@@ -2,31 +2,25 @@
 
 import { useAuth } from '@/hooks/useAuth'
 
-export default function NavbarAuthButton() {
+export default function NavbarAuthButton({ fullWidth = false }: { fullWidth?: boolean }) {
   const { user, loading, login, logout } = useAuth()
 
+  const btnClass = `rounded-md border border-brown-300 py-2.5 text-sm text-black-900 transition hover:bg-beige-200 ${fullWidth ? 'w-full px-4' : 'px-5'}`
+
   if (loading) {
-    return <div className="h-9 w-24 rounded-md border border-brown-300 bg-white" />
+    return <div className={`h-9 rounded-md border border-brown-300 ${fullWidth ? 'w-full' : 'w-24'}`} />
   }
 
   if (user) {
     return (
-      <div className="flex items-center gap-2">
-        <button
-          onClick={logout}
-          className="rounded-md border border-brown-300 bg-white px-5 py-2.5 text-sm text-black-900 transition hover:bg-beige-100"
-        >
-          登出
-        </button>
-      </div>
+      <button onClick={logout} className={btnClass}>
+        登出
+      </button>
     )
   }
 
   return (
-    <button
-      onClick={login}
-      className="rounded-md border border-brown-300 bg-white px-5 py-2.5 text-sm text-black-900 transition hover:bg-beige-100"
-    >
+    <button onClick={login} className={btnClass}>
       Google 登入
     </button>
   )
