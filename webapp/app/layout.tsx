@@ -1,7 +1,14 @@
 import type { Metadata } from 'next'
+import { Inter } from 'next/font/google'
 import { AuthProvider } from '@/contexts/AuthContext'
 import MathJaxProvider from '@/components/MathJaxProvider'
 import './globals.css'
+
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-inter',
+  display: 'swap',
+})
 
 export const metadata: Metadata = {
   title: 'PMP - 考試題庫與練習平台',
@@ -11,7 +18,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="zh-TW">
+    <html lang="zh-TW" className={inter.variable}>
       <body className="bg-beige-100">
         <MathJaxProvider>
           <AuthProvider>{children}</AuthProvider>
