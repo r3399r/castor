@@ -376,14 +376,16 @@ export default function AdaptiveClient() {
           </div>
 
           <div className="p-4">
-            {adaptiveQuestion.type !== 'GROUP' && adaptiveQuestion.content && (
+            {adaptiveQuestion.content && (
+              <MathJax>
+                <div
+                  dangerouslySetInnerHTML={{ __html: adaptiveQuestion.content }}
+                  className="prose prose-sm max-w-none"
+                />
+              </MathJax>
+            )}
+            {adaptiveQuestion.answer && (
               <>
-                <MathJax>
-                  <div
-                    dangerouslySetInnerHTML={{ __html: adaptiveQuestion.content }}
-                    className="prose prose-sm max-w-none"
-                  />
-                </MathJax>
                 <AnswerInput
                   question={adaptiveQuestion}
                   answer={repliedAnswer.get(adaptiveQuestion.id) ?? ''}
@@ -403,7 +405,7 @@ export default function AdaptiveClient() {
 
             {adaptiveQuestion.type === 'GROUP' &&
               adaptiveQuestion.children.map((child, i) => (
-                <div key={child.id} className={i > 0 ? 'mt-4 border-t border-[#E5E0DC] pt-4' : ''}>
+                <div key={child.id} className={'mt-4 border-t border-[#E5E0DC] pt-4'}>
                   {child.content && (
                     <MathJax>
                       <div
