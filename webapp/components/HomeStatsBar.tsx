@@ -11,7 +11,7 @@ export default function HomeStatsBar() {
     <section>
 
       {/* Mobile: 單欄，水平線內縮 16px，無豎線 */}
-      <div className="md:hidden mx-4 border-t border-b border-brown-700">
+      <div className="md:hidden border-t border-b border-brown-700">
         <div className="flex flex-col py-6">
           {stats.map((stat) => (
             <div key={stat.label} className="flex flex-col items-center py-6">
