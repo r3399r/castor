@@ -41,7 +41,7 @@ export default function HomeCategories() {
               {category.items.map((item) => (
                 <div
                   key={item}
-                  className="flex items-center justify-between border-b border-black-200 py-2"
+                  className="flex items-center justify-between border-b border-black-200 px-1 py-2 transition-colors duration-150 active:bg-black/10 xl:active:bg-transparent"
                 >
                   <a href="/question" className="block w-full text-base text-black-700 transition-colors hover:text-blue-700">
                     {item}
