@@ -244,9 +244,10 @@ export type GetQuestionAdaptiveParams = {
   examIds?: string;
   tagIds?: string;
   conceptIds?: string;
+  count?: string;
 };
 
-export type GetQuestionAdaptiveResponse = Question;
+export type GetQuestionAdaptiveResponse = Question[];
 
 export type GetQuestionResponse = Paginate<Question>;
 

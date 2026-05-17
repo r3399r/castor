@@ -25,11 +25,7 @@ import { TagAccess } from 'src/dao/TagAccess';
 import { UserConceptStatAccess } from 'src/dao/UserConceptStatAccess';
 import { PendingReplyEntity } from 'src/model/entity/PendingReplyEntity';
 import { QuestionEntity } from 'src/model/entity/QuestionEntity';
-import {
-  BadRequestError,
-  NotFoundError,
-  UnauthorizedError,
-} from 'src/model/error';
+import { BadRequestError, UnauthorizedError } from 'src/model/error';
 import { genPagination } from 'src/utils/paginator';
 import { UserService } from './UserService';
 
@@ -76,11 +72,14 @@ export class QuestionService {
     params: GetQuestionAdaptiveParams | null
   ): Promise<GetQuestionAdaptiveResponse> {
     if (!params) throw new BadRequestError('query parameters are required');
+    console.log('Adaptive question params:', params);
 
+    const requiredCount = params.count ? Number(params.count) : 1;
     const user = await this.userService.getUser();
     if (user === null) throw new UnauthorizedError('User not found');
 
     // get candidate concepts and their numberOfQuestions
+    console.log('Getting candidate concepts for subjectId:', params.subjectId);
     const conceptIds = new Map<number, number>();
     if (params.conceptIds) {
       const conceptList = await this.conceptAccess.find({
@@ -105,7 +104,16 @@ export class QuestionService {
           if (concept.numberOfQuestions > 0)
             conceptIds.set(concept.id, concept.numberOfQuestions);
     }
+    console.log('Candidate concepts:', conceptIds);
+    const totalQuestions = Array.from(conceptIds.values()).reduce(
+      (a, b) => a + b,
+      0
+    );
+    console.log('Total questions for candidate concepts:', totalQuestions);
 
+    const response: Map<number, Question> = new Map();
+
+    console.log('Getting pending replies for userId:', user.id);
     const pendingReplyList = await this.pendingReplyAccess.find({
       where: {
         userId: user.id,
@@ -123,28 +131,29 @@ export class QuestionService {
         createdAt: 'desc',
       },
     });
+    console.log('Found pending replies:', pendingReplyList.length);
     if (pendingReplyList.length > 0)
       for (const pendingReply of pendingReplyList)
         for (const concept of pendingReply.question.concept)
-          if (conceptIds.has(concept.id))
-            return this.getQuestionSorting(pendingReply.question);
+          if (conceptIds.has(concept.id)) {
+            console.log(
+              'Adding pending reply question to response, questionId:',
+              pendingReply.questionId
+            );
+            response.set(
+              pendingReply.questionId,
+              this.getQuestionSorting(pendingReply.question)
+            );
+            break;
+          }
 
-    // random picking conceptId with weight of numberOfQuestions
-    const totalQuestions = Array.from(conceptIds.values()).reduce(
-      (a, b) => a + b,
-      0
-    );
-    let random = Math.random() * totalQuestions;
-    let selectedConceptId: number | null = null;
-    for (const [conceptId, numberOfQuestions] of conceptIds) {
-      random -= numberOfQuestions;
-      if (random <= 0) {
-        selectedConceptId = conceptId;
-        break;
-      }
+    if (response.size >= requiredCount) {
+      console.log(
+        'pending replies fulfill required count, returning pending reply questions'
+      );
+
+      return Array.from(response.values()).slice(0, requiredCount);
     }
-    if (selectedConceptId === null)
-      throw new BadRequestError('No concept found');
 
     // find last 7 days reply of the user for the subject
     const interval = 7 * 24 * 60 * 60 * 1000;
@@ -154,52 +163,142 @@ export class QuestionService {
         userId: user.id,
         createdAt: MoreThan(new Date(Date.now() - interval).toISOString()),
       },
-    });
-
-    const userConceptStat = await this.userConceptStatAccess.findOne({
-      where: {
-        userId: user.id,
-        conceptId: selectedConceptId,
+      relations: {
+        question: true,
       },
     });
+    const lastReplyQuestionIds = new Set<number>();
+    for (const reply of lastReplies)
+      if (reply.parentId === null) lastReplyQuestionIds.add(reply.questionId);
+      else lastReplyQuestionIds.add(reply.parentId);
 
-    const mastery = userConceptStat?.mastery ?? 0;
-    const questionList = await this.questionAccess.findAdaptive({
-      mastery,
-      subjectId: Number(params.subjectId),
-      take: 20 + lastReplies.length,
-      examIds: params.examIds
-        ? params.examIds.split(',').map((v) => Number(v))
-        : undefined,
-      tagIds: params.tagIds
-        ? params.tagIds.split(',').map((v) => Number(v))
-        : undefined,
-      conceptId: selectedConceptId,
-    });
-    if (questionList.length === 0) throw new NotFoundError('No question found');
+    console.log(
+      'Found recent replies in last 7 days:',
+      lastReplyQuestionIds.size
+    );
 
-    // sort question list and exclude reason replied questions and pick top 20
-    const candidateList = questionList
-      .filter((q) => !lastReplies.some((r) => r.questionId === q.id))
-      .sort(
-        (a, b) =>
-          Math.abs(a.adjustedDifficulty - mastery) -
-          Math.abs(b.adjustedDifficulty - mastery)
-      )
-      .slice(0, 20);
+    const baseCandidateTake =
+      conceptIds.size * (5 + Math.ceil(lastReplyQuestionIds.size / 2));
+    console.log('base candidate take:', baseCandidateTake);
 
-    // return randomly picked question
-    const question =
-      candidateList.length > 0
-        ? candidateList[Math.floor(Math.random() * candidateList.length)]
-        : questionList[Math.floor(Math.random() * questionList.length)];
+    const candidateQuestionMap = new Map<number, Question>();
+    const lastReplyQuestionMap = new Map<number, Question>();
+    for (const conceptId of conceptIds.keys()) {
+      const userConceptStat = await this.userConceptStatAccess.findOne({
+        where: {
+          userId: user.id,
+          conceptId,
+        },
+      });
+      const mastery = userConceptStat?.mastery ?? 0;
+      console.log(
+        `Getting candidate questions for conceptId ${conceptId} with mastery ${mastery}`
+      );
 
-    const pendingReplyEntity = new PendingReplyEntity();
-    pendingReplyEntity.questionId = question.id;
-    pendingReplyEntity.userId = user.id;
-    await this.pendingReplyAccess.save(pendingReplyEntity);
+      const weightedCandidateTake = Math.ceil(
+        baseCandidateTake * (conceptIds.get(conceptId) ?? 1 / totalQuestions)
+      );
+      const questionList = await this.questionAccess.findAdaptive({
+        mastery,
+        subjectId: Number(params.subjectId),
+        take: weightedCandidateTake,
+        examIds: params.examIds
+          ? params.examIds.split(',').map((v) => Number(v))
+          : undefined,
+        tagIds: params.tagIds
+          ? params.tagIds.split(',').map((v) => Number(v))
+          : undefined,
+        conceptId,
+      });
+      console.log(
+        `Found ${questionList.length} candidate questions for conceptId ${conceptId}`
+      );
 
-    return this.getQuestionSorting(question);
+      for (const question of questionList) {
+        if (lastReplyQuestionIds.has(question.id)) {
+          console.log(
+            'Skipping questionId',
+            question.id,
+            'because it was replied recently'
+          );
+          lastReplyQuestionMap.set(question.id, question);
+          continue;
+        }
+        if (pendingReplyList.some((pr) => pr.questionId === question.id)) {
+          console.log(
+            'Skipping questionId',
+            question.id,
+            'because it is in pending reply'
+          );
+          continue;
+        }
+        if (!candidateQuestionMap.has(question.id)) {
+          console.log(
+            'Adding candidate questionId to candidateQuestionMap:',
+            question.id
+          );
+          candidateQuestionMap.set(question.id, question);
+        }
+      }
+    }
+    console.log(
+      'Total candidate questions after filtering:',
+      candidateQuestionMap.size
+    );
+
+    const remaingCount = requiredCount - response.size;
+    console.log(
+      'Remaining slots to fill after adding pending replies:',
+      remaingCount
+    );
+    for (let i = 0; i < remaingCount; i++)
+      if (candidateQuestionMap.size > 0) {
+        const randomIndex = Math.floor(
+          Math.random() * candidateQuestionMap.size
+        );
+        const question = Array.from(candidateQuestionMap.values())[randomIndex];
+        console.log(
+          'Adding candidate question to response, questionId:',
+          question.id
+        );
+        response.set(question.id, this.getQuestionSorting(question));
+        candidateQuestionMap.delete(question.id);
+      } else if (lastReplyQuestionMap.size > 0) {
+        console.log(
+          'No more candidate questions available to fill the response. Pick from last replies'
+        );
+        const randomIndex = Math.floor(
+          Math.random() * lastReplyQuestionMap.size
+        );
+        const question = Array.from(lastReplyQuestionMap.values())[randomIndex];
+        console.log(
+          'Adding last reply question to response, questionId:',
+          question.id
+        );
+        response.set(question.id, this.getQuestionSorting(question));
+        lastReplyQuestionMap.delete(question.id);
+      }
+
+    for (const question of response.values()) {
+      if (pendingReplyList.some((pr) => pr.questionId === question.id)) {
+        console.log(
+          'QuestionId',
+          question.id,
+          'is already in pending replies, skipping adding to pending replies again'
+        );
+        continue;
+      }
+      console.log(
+        'Adding questionId to pending replies, questionId:',
+        question.id
+      );
+      const pendingReplyEntity = new PendingReplyEntity();
+      pendingReplyEntity.questionId = question.id;
+      pendingReplyEntity.userId = user.id;
+      await this.pendingReplyAccess.save(pendingReplyEntity);
+    }
+
+    return Array.from(response.values());
   }
 
   public async getQuestionList(

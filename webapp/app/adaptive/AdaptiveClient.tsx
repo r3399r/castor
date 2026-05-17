@@ -161,8 +161,11 @@ export default function AdaptiveClient() {
   const [conceptGroupList, setConceptGroupList] = useState<ConceptGroup[]>([])
   const [tagList, setTagList] = useState<Tag[]>([])
 
+  const [numQuestionsTarget, setNumQuestionsTarget] = useState(5)
   const [questionCount, setQuestionCount] = useState(-1)
-  const [adaptiveQuestion, setAdaptiveQuestion] = useState<Question | null>(null)
+  const [adaptiveQuestion, setAdaptiveQuestion] = useState<Question[]>([])
+  // responseOffsets[i] = starting index in replyResponse for question i
+  const [responseOffsets, setResponseOffsets] = useState<number[]>([])
   const [repliedAnswer, setRepliedAnswer] = useState<Map<number, string>>(new Map())
   const [replyResponse, setReplyResponse] = useState<PostReplyResponse | null>(null)
   const [loading, setLoading] = useState(false)
@@ -173,10 +176,11 @@ export default function AdaptiveClient() {
   )
 
   const canSubmit = useMemo(() => {
-    if (!adaptiveQuestion) return false
-    if (adaptiveQuestion.type === 'GROUP')
-      return repliedAnswer.size === adaptiveQuestion.children.length
-    return repliedAnswer.size === 1
+    if (!adaptiveQuestion.length) return false
+    return adaptiveQuestion.every((q) => {
+      if (q.type === 'GROUP') return q.children.every((c) => repliedAnswer.has(c.id))
+      return repliedAnswer.has(q.id)
+    })
   }, [adaptiveQuestion, repliedAnswer])
 
   useEffect(() => {
@@ -228,18 +232,20 @@ export default function AdaptiveClient() {
 
   const fetchAdaptive = async () => {
     if (!selectedSubjectId) return
-    setAdaptiveQuestion(null)
+    setAdaptiveQuestion([])
     setReplyResponse(null)
+    setResponseOffsets([])
     setRepliedAnswer(new Map())
     setLoading(true)
     try {
-      const q = await apiFetch<GetQuestionAdaptiveResponse>('question/adaptive', {
+      const results = await apiFetch<GetQuestionAdaptiveResponse>('question/adaptive', {
         subjectId: selectedSubjectId,
         examIds: selectedExamIds.length ? selectedExamIds.join(',') : undefined,
         conceptIds: selectedConceptIds.length ? selectedConceptIds.join(',') : undefined,
         tagIds: selectedTagIds.length ? selectedTagIds.join(',') : undefined,
+        count: String(numQuestionsTarget),
       })
-      setAdaptiveQuestion(q)
+      setAdaptiveQuestion(results)
     } catch (e) {
       console.error(e)
     } finally {
@@ -248,15 +254,24 @@ export default function AdaptiveClient() {
   }
 
   const onSubmit = async () => {
-    if (!repliedAnswer.size) return
+    if (!canSubmit) return
     setLoading(true)
     try {
-      const payload: PostReplyRequest = [...repliedAnswer].map(([id, answer]) => ({
-        questionId: id,
-        repliedAnswer: answer,
-      }))
+      const payload: PostReplyRequest = []
+      const offsets: number[] = []
+      for (const q of adaptiveQuestion) {
+        offsets.push(payload.length)
+        if (q.type === 'GROUP') {
+          for (const child of q.children) {
+            payload.push({ questionId: child.id, repliedAnswer: repliedAnswer.get(child.id) ?? '' })
+          }
+        } else {
+          payload.push({ questionId: q.id, repliedAnswer: repliedAnswer.get(q.id) ?? '' })
+        }
+      }
       const res = await apiPost<PostReplyResponse, PostReplyRequest>('reply', payload)
       setReplyResponse(res)
+      setResponseOffsets(offsets)
     } catch (e) {
       console.error(e)
     } finally {
@@ -265,15 +280,16 @@ export default function AdaptiveClient() {
   }
 
   const onReset = () => {
-    setAdaptiveQuestion(null)
+    setAdaptiveQuestion([])
     setReplyResponse(null)
+    setResponseOffsets([])
     setRepliedAnswer(new Map())
     setSelectedExamIds([])
     setSelectedConceptIds([])
     setSelectedTagIds([])
   }
 
-  const filtersLocked = !!adaptiveQuestion
+  const filtersLocked = adaptiveQuestion.length > 0
 
   return (
     <div>
@@ -341,13 +357,32 @@ export default function AdaptiveClient() {
           />
         )}
 
+        <div className="flex items-center gap-3">
+          <span className="text-sm font-medium text-black-700">練習題數</span>
+          <div className="flex gap-2">
+            {[1, 2, 5, 10].map((n) => (
+              <button
+                key={n}
+                onClick={() => setNumQuestionsTarget(n)}
+                disabled={filtersLocked}
+                className={`rounded-md px-4 py-1.5 text-sm font-medium transition ${numQuestionsTarget === n
+                    ? 'bg-blue-700 text-white'
+                    : 'border border-brown-300 bg-white text-black-700 hover:bg-blue-50'
+                  } disabled:cursor-not-allowed disabled:opacity-50`}
+              >
+                {n}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="flex items-center gap-4">
           <button
             onClick={fetchAdaptive}
             disabled={!selectedSubjectId || filtersLocked || questionCount <= 0 || loading}
             className="rounded-md bg-blue-700 px-6 py-2.5 text-sm font-bold text-white transition hover:bg-[#1f3ea3] disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {loading && !adaptiveQuestion ? '選題中…' : 'AI 選題'}
+            {loading ? '選題中…' : 'AI 選題'}
           </button>
           {questionCount >= 0 && (
             <span className="text-sm text-black-500">共有 {questionCount} 題符合條件</span>
@@ -357,98 +392,116 @@ export default function AdaptiveClient() {
 
       <hr className="my-6 border-brown-300" />
 
-      {adaptiveQuestion && (
-        <div className="overflow-hidden rounded-xl border border-brown-300">
-          <div className="flex items-start justify-between gap-2 border-b border-brown-300 bg-blue-50 p-3">
-            <div className="flex flex-wrap gap-2">
-              <Chip label={typeLabel[adaptiveQuestion.type] ?? adaptiveQuestion.type} />
-              {adaptiveQuestion.exam.map((e) => (
-                <Chip key={e.id} label={e.name} color={tagColors.exam} />
-              ))}
-              {adaptiveQuestion.concept.map((c) => (
-                <Chip key={c.id} label={c.conceptGroup.name === c.name ? c.name : c.conceptGroup.name + '-' + c.name} color={tagColors.concept} />
-              ))}
-              {adaptiveQuestion.tag.map((t) => (
-                <Chip key={t.id} label={t.name} color={tagColors.tag} />
-              ))}
-            </div>
-            <DifficultyStars value={adaptiveQuestion.adjustedDifficulty} />
-          </div>
-
-          <div className="p-4">
-            {adaptiveQuestion.content && (
-              <MathJax>
-                <div
-                  dangerouslySetInnerHTML={{ __html: adaptiveQuestion.content }}
-                  className="prose prose-sm max-w-none"
-                />
-              </MathJax>
-            )}
-            {adaptiveQuestion.answer && (
-              <>
-                <AnswerInput
-                  question={adaptiveQuestion}
-                  answer={repliedAnswer.get(adaptiveQuestion.id) ?? ''}
-                  onAnswer={(val) =>
-                    setRepliedAnswer((prev) => new Map(prev).set(adaptiveQuestion.id, val))
-                  }
-                  disabled={!!replyResponse}
-                />
-                {replyResponse?.[0] && (
-                  <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm">
-                    <div>解答：{replyResponse[0].correctAnswer}</div>
-                    <div>得分：{replyResponse[0].score}</div>
+      {adaptiveQuestion.length > 0 && (
+        <div className="flex flex-col gap-6">
+          {adaptiveQuestion.map((question, qi) => {
+            const offset = responseOffsets[qi] ?? 0
+            return (
+              <div key={question.id} className="overflow-hidden rounded-xl border border-brown-300">
+                <div className="flex items-start justify-between gap-2 border-b border-brown-300 bg-blue-50 p-3">
+                  <div className="flex flex-wrap gap-2">
+                    <span className="text-xs font-semibold text-blue-700">
+                      第 {qi + 1} / {numQuestionsTarget} 題
+                    </span>
+                    <Chip label={typeLabel[question.type] ?? question.type} />
+                    {question.exam.map((e) => (
+                      <Chip key={e.id} label={e.name} color={tagColors.exam} />
+                    ))}
+                    {question.concept.map((c) => (
+                      <Chip
+                        key={c.id}
+                        label={
+                          c.conceptGroup.name === c.name
+                            ? c.name
+                            : c.conceptGroup.name + '-' + c.name
+                        }
+                        color={tagColors.concept}
+                      />
+                    ))}
+                    {question.tag.map((t) => (
+                      <Chip key={t.id} label={t.name} color={tagColors.tag} />
+                    ))}
                   </div>
-                )}
-              </>
-            )}
+                  <DifficultyStars value={question.adjustedDifficulty} />
+                </div>
 
-            {adaptiveQuestion.type === 'GROUP' &&
-              adaptiveQuestion.children.map((child, i) => (
-                <div key={child.id} className={'mt-4 border-t border-[#E5E0DC] pt-4'}>
-                  {child.content && (
+                <div className="p-4">
+                  {question.content && (
                     <MathJax>
                       <div
-                        dangerouslySetInnerHTML={{ __html: child.content }}
+                        dangerouslySetInnerHTML={{ __html: question.content }}
                         className="prose prose-sm max-w-none"
                       />
                     </MathJax>
                   )}
-                  <AnswerInput
-                    question={child}
-                    answer={repliedAnswer.get(child.id) ?? ''}
-                    onAnswer={(val) =>
-                      setRepliedAnswer((prev) => new Map(prev).set(child.id, val))
-                    }
-                    disabled={!!replyResponse}
-                  />
-                  {replyResponse?.[i] && (
-                    <div className="mt-3 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm">
-                      <div>解答：{replyResponse[i].correctAnswer}</div>
-                      <div>得分：{replyResponse[i].score}</div>
+                  {question.answer && (
+                    <>
+                      <AnswerInput
+                        question={question}
+                        answer={repliedAnswer.get(question.id) ?? ''}
+                        onAnswer={(val) =>
+                          setRepliedAnswer((prev) => new Map(prev).set(question.id, val))
+                        }
+                        disabled={!!replyResponse}
+                      />
+                      {replyResponse?.[offset] && (
+                        <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm">
+                          <div>解答：{replyResponse[offset].correctAnswer}</div>
+                          <div>得分：{replyResponse[offset].score}</div>
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  {question.type === 'GROUP' &&
+                    question.children.map((child, i) => (
+                      <div key={child.id} className="mt-4 border-t border-[#E5E0DC] pt-4">
+                        {child.content && (
+                          <MathJax>
+                            <div
+                              dangerouslySetInnerHTML={{ __html: child.content }}
+                              className="prose prose-sm max-w-none"
+                            />
+                          </MathJax>
+                        )}
+                        <AnswerInput
+                          question={child}
+                          answer={repliedAnswer.get(child.id) ?? ''}
+                          onAnswer={(val) =>
+                            setRepliedAnswer((prev) => new Map(prev).set(child.id, val))
+                          }
+                          disabled={!!replyResponse}
+                        />
+                        {replyResponse?.[offset + i] && (
+                          <div className="mt-3 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm">
+                            <div>解答：{replyResponse[offset + i].correctAnswer}</div>
+                            <div>得分：{replyResponse[offset + i].score}</div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+
+                  {replyResponse?.[offset]?.fbPostId && (
+                    <div className="mt-4">
+                      <a
+                        href={`https://m.facebook.com/${replyResponse[offset].fbPostId!.split('_')[0]}/posts/${replyResponse[offset].fbPostId!.split('_')[1]}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-blue-600 underline hover:text-blue-800"
+                      >
+                        討論區
+                      </a>
                     </div>
                   )}
                 </div>
-              ))}
-
-            {replyResponse?.[0]?.fbPostId && (
-              <div className="mt-4">
-                <a
-                  href={`https://m.facebook.com/${replyResponse[0].fbPostId.split('_')[0]}/posts/${replyResponse[0].fbPostId.split('_')[1]}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm text-blue-600 underline hover:text-blue-800"
-                >
-                  討論區
-                </a>
               </div>
-            )}
-          </div>
+            )
+          })}
         </div>
       )}
 
-      {adaptiveQuestion && !replyResponse && (
-        <div className="mt-4">
+      {adaptiveQuestion.length > 0 && !replyResponse && (
+        <div className="mt-6">
           <button
             onClick={onSubmit}
             disabled={!canSubmit || loading}
@@ -460,13 +513,13 @@ export default function AdaptiveClient() {
       )}
 
       {replyResponse && (
-        <div className="mt-4 flex flex-wrap gap-3">
+        <div className="mt-6 flex flex-wrap gap-3">
           <button
             onClick={fetchAdaptive}
             disabled={loading}
             className="rounded-md bg-blue-700 px-6 py-2.5 text-sm font-bold text-white transition hover:bg-[#1f3ea3] disabled:opacity-50"
           >
-            用相同條件再選下一題
+            用相同條件再練一組
           </button>
           <button
             onClick={onReset}
