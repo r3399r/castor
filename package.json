@@ -5,5 +5,8 @@
     "webapp",
     "backend",
     "packages/*"
-  ]
+  ],
+  "scripts": {
+    "dev": "next dev webapp"
+  }
 }

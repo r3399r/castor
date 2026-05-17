@@ -8,20 +8,63 @@ const stats = [
 
 export default function HomeStatsBar() {
   return (
-    <section className="rounded-[32px] border border-brown-700 bg-beige-100 p-4 sm:p-6">
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        {stats.map((stat) => (
-          <div
-            key={stat.label}
-            className="flex min-h-[130px] flex-col items-start justify-center rounded-[28px] border border-brown-700 bg-white p-5"
-          >
-            <p className="text-[42px] leading-none font-bold text-blue-700 sm:text-[48px]">
-              {stat.value}
-            </p>
-            <p className="mt-2 text-sm text-black-500">{stat.label}</p>
-          </div>
-        ))}
+    <section>
+
+      {/* Mobile: 單欄，水平線內縮 16px，無豎線 */}
+      <div className="md:hidden mx-4 border-t border-b border-brown-700">
+        <div className="flex flex-col py-6">
+          {stats.map((stat) => (
+            <div key={stat.label} className="flex flex-col items-center py-6">
+              <p className="text-[42px] leading-none font-bold text-blue-700">{stat.value}</p>
+              <p className="mt-2 text-sm text-black-500">{stat.label}</p>
+            </div>
+          ))}
+        </div>
       </div>
+
+      {/* Tablet: 上3下2，下排靠左 */}
+      <div className="hidden md:block xl:hidden border-t border-b border-brown-700">
+        <div className="flex flex-col py-6">
+          <div className="flex">
+            {stats.slice(0, 3).map((stat, i) => (
+              <div
+                key={stat.label}
+                className={`flex w-1/3 flex-col items-center justify-center py-4${i > 0 ? ' border-l border-brown-700' : ''}`}
+              >
+                <p className="text-[42px] leading-none font-bold text-blue-700">{stat.value}</p>
+                <p className="mt-2 text-sm text-black-500">{stat.label}</p>
+              </div>
+            ))}
+          </div>
+          <div className="flex">
+            {stats.slice(3).map((stat, i) => (
+              <div
+                key={stat.label}
+                className={`flex w-1/3 flex-col items-center justify-center py-4${i === 1 ? ' border-l border-r border-brown-700' : ''}`}
+              >
+                <p className="text-[42px] leading-none font-bold text-blue-700">{stat.value}</p>
+                <p className="mt-2 text-sm text-black-500">{stat.label}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Desktop: 單排 5 欄 */}
+      <div className="hidden xl:block border-t border-b border-brown-700">
+        <div className="flex justify-center py-6">
+          {stats.map((stat, i) => (
+            <div
+              key={stat.label}
+              className={`flex w-[196px] flex-col items-center justify-center py-4 border-l border-brown-700${i === stats.length - 1 ? ' border-r' : ''}`}
+            >
+              <p className="text-[42px] leading-none font-bold text-blue-700">{stat.value}</p>
+              <p className="mt-2 text-sm text-black-500">{stat.label}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
     </section>
   )
 }
