@@ -99,7 +99,7 @@ export default function PreviewClient() {
     const subjectName = subjectList.find((s) => String(s.id) === selectedSubjectId)?.name ?? ''
     let text = `圖片為 ${categoryName} ${subjectName} 的一道題目，請提供以下資訊: `
     text += '- content: 轉換成 html，換行符號使用 <br/>，回傳內容不用無謂的空白鍵跟換行'
-    if(containMathjax) text += '，數學式請使用 MathJax 語法'
+    if(containMathjax) text += '，數學式請使用 MathJax 語法，跳脫字元使用雙斜線（例如 \\frac{1}{2}）'
     if (needCss) text += '，css直接寫入html inline style，不改變字體設定'
     if (containImage)
       text +=
