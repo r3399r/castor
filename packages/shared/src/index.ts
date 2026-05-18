@@ -271,3 +271,11 @@ export type StatsSubject = {
 export type GetUserStatsResponse = StatsSubject[];
 
 export type PostUserSyncResponse = User;
+
+export type GetInfoResponse = {
+  categoryCount: number;
+  subjectCount: number;
+  examCount: number;
+  questionCount: number;
+  userCount: number;
+}

@@ -1,6 +1,6 @@
 import { User } from '@castor/shared';
 import { inject, injectable } from 'inversify';
-import { FindOneOptions } from 'typeorm';
+import { FindManyOptions, FindOneOptions } from 'typeorm';
 import { UserEntity } from 'src/model/entity/UserEntity';
 import { Database } from 'src/utils/Database';
 
@@ -28,11 +28,11 @@ export class UserAccess {
     });
   }
 
-  public async delete(data: User) {
+  public async count(options?: FindManyOptions<User>) {
     const qr = await this.database.getQueryRunner();
-    const entity = new UserEntity();
-    Object.assign(entity, data);
 
-    return await qr.manager.remove(data);
+    return await qr.manager.count<User>(UserEntity.name, {
+      ...options,
+    });
   }
 }

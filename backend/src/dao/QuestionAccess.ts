@@ -28,6 +28,14 @@ export class QuestionAccess {
     });
   }
 
+  public async count(options?: FindManyOptions<Question>) {
+    const qr = await this.database.getQueryRunner();
+
+    return await qr.manager.count<Question>(QuestionEntity.name, {
+      ...options,
+    });
+  }
+
   public async findOneOrFail(options?: FindOneOptions<Question>) {
     const qr = await this.database.getQueryRunner();
 

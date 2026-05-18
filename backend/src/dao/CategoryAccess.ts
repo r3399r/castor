@@ -27,4 +27,12 @@ export class CategoryAccess {
 
     return await qr.manager.save(entity);
   }
+
+  public async count(options?: FindManyOptions<Category>) {
+    const qr = await this.database.getQueryRunner();
+
+    return await qr.manager.count<Category>(CategoryEntity.name, {
+      ...options,
+    });
+  }
 }

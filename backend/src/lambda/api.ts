@@ -6,6 +6,7 @@ import { LambdaContext, LambdaEvent, LambdaOutput } from 'src/model/Lambda';
 import category from 'src/routes/category';
 import concept from 'src/routes/concept';
 import exam from 'src/routes/exam';
+import info from 'src/routes/info';
 import preview from 'src/routes/preview';
 import question from 'src/routes/question';
 import reply from 'src/routes/reply';
@@ -51,6 +52,9 @@ const apiProcess = async (event: LambdaEvent): Promise<LambdaOutput> => {
         break;
       case 'preview':
         res = await preview(event);
+        break;
+      case 'info':
+        res = await info(event);
     }
 
     output = successOutput(res);

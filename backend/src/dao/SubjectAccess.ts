@@ -35,4 +35,12 @@ export class SubjectAccess {
 
     return await qr.manager.save(entity);
   }
+
+  public async count(options?: FindManyOptions<Subject>) {
+    const qr = await this.database.getQueryRunner();
+
+    return await qr.manager.count<Subject>(SubjectEntity.name, {
+      ...options,
+    });
+  }
 }

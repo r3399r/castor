@@ -16,6 +16,7 @@ import { CategoryService } from './logic/CategoryService';
 import { ConceptService } from './logic/ConceptService';
 import { ExamService } from './logic/ExamService';
 import { HousekeepService } from './logic/HousekeepService';
+import { InfoService } from './logic/InfoService';
 import { PreviewService } from './logic/PreviewService';
 import { QuestionService } from './logic/QuestionService';
 import { ReplyService } from './logic/ReplyService';
@@ -83,6 +84,7 @@ container.bind(ConceptService).toSelf();
 container.bind(TagService).toSelf();
 container.bind(ReplyService).toSelf();
 container.bind(PreviewService).toSelf();
+container.bind(InfoService).toSelf();
 
 // AWS
 container.bind(SQS).toDynamicValue(() => new SQS());
