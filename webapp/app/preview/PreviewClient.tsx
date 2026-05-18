@@ -441,14 +441,14 @@ export default function PreviewClient() {
         <div className="min-h-[120px] rounded-[24px] border border-brown-300 bg-white p-6">
           {payload?.content ? (
             <>
-              <MathJax>
+              <MathJax dynamic>
                 <div
                   dangerouslySetInnerHTML={{ __html: payload.content }}
                   className="prose prose-sm max-w-none"
                 />
               </MathJax>
               {payload.childQuestions?.map((child, i) => (
-                <MathJax>
+                <MathJax dynamic key={i}>
                   <div
                     key={i}
                     dangerouslySetInnerHTML={{ __html: child.content ?? '' }}
