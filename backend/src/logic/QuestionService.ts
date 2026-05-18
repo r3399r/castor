@@ -163,9 +163,6 @@ export class QuestionService {
         userId: user.id,
         createdAt: MoreThan(new Date(Date.now() - interval).toISOString()),
       },
-      relations: {
-        question: true,
-      },
     });
     const lastReplyQuestionIds = new Set<number>();
     for (const reply of lastReplies)
