@@ -427,7 +427,7 @@ export default function AdaptiveClient() {
 
                 <div className="p-4">
                   {question.content && (
-                    <MathJax dynamic>
+                    <MathJax>
                       <div
                         dangerouslySetInnerHTML={{ __html: question.content }}
                         className="prose prose-sm max-w-none"
@@ -457,7 +457,7 @@ export default function AdaptiveClient() {
                     question.children.map((child, i) => (
                       <div key={child.id} className="mt-4 border-t border-[#E5E0DC] pt-4">
                         {child.content && (
-                          <MathJax dynamic>
+                          <MathJax>
                             <div
                               dangerouslySetInnerHTML={{ __html: child.content }}
                               className="prose prose-sm max-w-none"
