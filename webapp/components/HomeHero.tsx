@@ -1,6 +1,7 @@
 export default function HomeHero() {
   return (
-    <section className="-mx-4 grid items-center gap-10 px-4 py-[60px] sm:-mx-6 md:px-10 lg:grid-cols-2 lg:px-[70px]">
+    <section className="py-[60px]">
+      <div className="mx-auto w-full max-w-[1120px] grid items-center gap-10 px-4 lg:grid-cols-2 lg:px-[46px]">
       <div className="space-y-8">
         <div className="max-w-2xl space-y-4">
           <p className="text-sm font-bold tracking-[0.12em] text-blue-700 uppercase">
@@ -31,6 +32,7 @@ export default function HomeHero() {
 
       <div className="order-first flex items-center justify-center lg:order-last">
         <img src="/hero.svg" alt="hero" className="w-full max-w-[540px]" />
+      </div>
       </div>
     </section>
   )

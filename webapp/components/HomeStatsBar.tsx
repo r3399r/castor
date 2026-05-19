@@ -12,10 +12,10 @@ export default function HomeStatsBar() {
 
       {/* Mobile: 單欄，水平線內縮 16px，無豎線 */}
       <div className="md:hidden border-t border-b border-brown-700">
-        <div className="flex flex-col py-6">
+        <div className="flex flex-col py-10">
           {stats.map((stat) => (
-            <div key={stat.label} className="flex flex-col items-center py-6">
-              <p className="text-[42px] leading-none font-bold text-blue-700">{stat.value}</p>
+            <div key={stat.label} className="flex flex-col items-center py-10">
+              <p className="text-[56px] leading-none font-semibold font-[var(--font-inter)] text-blue-700">{stat.value}</p>
               <p className="mt-2 text-sm text-black-500">{stat.label}</p>
             </div>
           ))}
@@ -24,14 +24,14 @@ export default function HomeStatsBar() {
 
       {/* Tablet: 上3下2，下排靠左 */}
       <div className="hidden md:block xl:hidden border-t border-b border-brown-700">
-        <div className="flex flex-col py-6">
+        <div className="flex flex-col py-10">
           <div className="flex">
             {stats.slice(0, 3).map((stat, i) => (
               <div
                 key={stat.label}
                 className={`flex w-1/3 flex-col items-center justify-center py-4${i > 0 ? ' border-l border-brown-700' : ''}`}
               >
-                <p className="text-[42px] leading-none font-bold text-blue-700">{stat.value}</p>
+                <p className="text-[56px] leading-none font-semibold font-[var(--font-inter)] text-blue-700">{stat.value}</p>
                 <p className="mt-2 text-sm text-black-500">{stat.label}</p>
               </div>
             ))}
@@ -42,7 +42,7 @@ export default function HomeStatsBar() {
                 key={stat.label}
                 className={`flex w-1/3 flex-col items-center justify-center py-4${i === 1 ? ' border-l border-r border-brown-700' : ''}`}
               >
-                <p className="text-[42px] leading-none font-bold text-blue-700">{stat.value}</p>
+                <p className="text-[56px] leading-none font-semibold font-[var(--font-inter)] text-blue-700">{stat.value}</p>
                 <p className="mt-2 text-sm text-black-500">{stat.label}</p>
               </div>
             ))}
@@ -52,13 +52,13 @@ export default function HomeStatsBar() {
 
       {/* Desktop: 單排 5 欄 */}
       <div className="hidden xl:block border-t border-b border-brown-700">
-        <div className="flex justify-center py-6">
+        <div className="flex justify-center py-10">
           {stats.map((stat, i) => (
             <div
               key={stat.label}
               className={`flex w-[196px] flex-col items-center justify-center py-4 border-l border-brown-700${i === stats.length - 1 ? ' border-r' : ''}`}
             >
-              <p className="text-[42px] leading-none font-bold text-blue-700">{stat.value}</p>
+              <p className="text-[56px] leading-none font-semibold font-[var(--font-inter)] text-blue-700">{stat.value}</p>
               <p className="mt-2 text-sm text-black-500">{stat.label}</p>
             </div>
           ))}
