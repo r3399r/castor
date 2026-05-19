@@ -203,101 +203,101 @@ export default function QuestionClient() {
 
       {result && result.data.length > 0 && (
         <div className="flex flex-col gap-4">
-          {result.data.map((item) => (
-            <div key={item.id} className="overflow-hidden rounded-xl border border-brown-300">
-              <div className="flex items-start justify-between gap-2 border-b border-brown-300 bg-blue-50 p-3">
-                <div className="flex flex-wrap gap-2">
-                  <Chip label={questionTypeLabel[item.type] ?? item.type} />
-                  {item.exam.map((e) => (
-                    <Chip key={e.id} label={e.name} color={tagColors.exam} />
-                  ))}
-                  {item.concept.map((c) => (
-                    <Chip key={c.id} label={c.conceptGroup.name === c.name ? c.name : c.conceptGroup.name + '-' + c.name} color={tagColors.concept} />
-                  ))}
-                  {item.tag.map((t) => (
-                    <Chip key={t.id} label={t.name} color={tagColors.tag} />
-                  ))}
+          <MathJax>
+            {result.data.map((item) => (
+              <div key={item.id} className="overflow-hidden rounded-xl border border-brown-300">
+                <div className="flex items-start justify-between gap-2 border-b border-brown-300 bg-blue-50 p-3">
+                  <div className="flex flex-wrap gap-2">
+                    <Chip label={questionTypeLabel[item.type] ?? item.type} />
+                    {item.exam.map((e) => (
+                      <Chip key={e.id} label={e.name} color={tagColors.exam} />
+                    ))}
+                    {item.concept.map((c) => (
+                      <Chip key={c.id} label={c.conceptGroup.name === c.name ? c.name : c.conceptGroup.name + '-' + c.name} color={tagColors.concept} />
+                    ))}
+                    {item.tag.map((t) => (
+                      <Chip key={t.id} label={t.name} color={tagColors.tag} />
+                    ))}
+                  </div>
+                  <DifficultyStars value={item.adjustedDifficulty} />
                 </div>
-                <DifficultyStars value={item.adjustedDifficulty} />
-              </div>
 
-              <div className="p-4">
-                {item.content && (
-                  <MathJax>
+                <div className="p-4">
+                  {item.content && (
                     <div
                       dangerouslySetInnerHTML={{ __html: item.content }}
                       className="prose prose-sm max-w-none"
                     />
-                  </MathJax>
-                )}
+                  )}
 
-                {item.answer && (
-                  <div className="mt-4">
-                    <button
-                      onClick={() => toggleSolution(item.id)}
-                      className="rounded-md border border-blue-700 px-4 py-1.5 text-sm font-medium text-blue-700 transition hover:bg-blue-700/5"
-                    >
-                      {openSolutionIds.has(item.id) ? '收起答案' : '看答案'}
-                    </button>
-                    {openSolutionIds.has(item.id) && (
-                      <div className="mt-3 rounded-lg border border-green-200 bg-green-50 p-4">
-                        <p className="mb-2 font-bold text-green-800">解答</p>
-                        <div
-                          dangerouslySetInnerHTML={{ __html: item.answer }}
-                          className="prose prose-sm max-w-none"
-                        />
-                      </div>
-                    )}
-                  </div>
-                )}
+                  {item.answer && (
+                    <div className="mt-4">
+                      <button
+                        onClick={() => toggleSolution(item.id)}
+                        className="rounded-md border border-blue-700 px-4 py-1.5 text-sm font-medium text-blue-700 transition hover:bg-blue-700/5"
+                      >
+                        {openSolutionIds.has(item.id) ? '收起答案' : '看答案'}
+                      </button>
+                      {openSolutionIds.has(item.id) && (
+                        <div className="mt-3 rounded-lg border border-green-200 bg-green-50 p-4">
+                          <p className="mb-2 font-bold text-green-800">解答</p>
+                          <div
+                            dangerouslySetInnerHTML={{ __html: item.answer }}
+                            className="prose prose-sm max-w-none"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
 
-                {item.children.map((child) => (
-                  <div key={child.id} className="mt-4 border-t border-[#E5E0DC] pt-4">
-                    {child.content && (
-                      <MathJax>
-                        <div
-                          dangerouslySetInnerHTML={{ __html: child.content }}
-                          className="prose prose-sm max-w-none"
-                        />
-                      </MathJax>
-                    )}
-                    {child.answer && (
-                      <div className="mt-3">
-                        <button
-                          onClick={() => toggleSolution(child.id)}
-                          className="rounded-md border border-blue-700 px-4 py-1.5 text-sm font-medium text-blue-700 transition hover:bg-blue-700/5"
-                        >
-                          {openSolutionIds.has(child.id) ? '收起答案' : '看答案'}
-                        </button>
-                        {openSolutionIds.has(child.id) && (
-                          <div className="mt-3 rounded-lg border border-green-200 bg-green-50 p-4">
-                            <p className="mb-2 font-bold text-green-800">解答</p>
-                            <div
-                              dangerouslySetInnerHTML={{ __html: child.answer }}
-                              className="prose prose-sm max-w-none"
-                            />
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ))}
+                  {item.children.map((child) => (
+                    <div key={child.id} className="mt-4 border-t border-[#E5E0DC] pt-4">
+                      {child.content && (
+                        <MathJax>
+                          <div
+                            dangerouslySetInnerHTML={{ __html: child.content }}
+                            className="prose prose-sm max-w-none"
+                          />
+                        </MathJax>
+                      )}
+                      {child.answer && (
+                        <div className="mt-3">
+                          <button
+                            onClick={() => toggleSolution(child.id)}
+                            className="rounded-md border border-blue-700 px-4 py-1.5 text-sm font-medium text-blue-700 transition hover:bg-blue-700/5"
+                          >
+                            {openSolutionIds.has(child.id) ? '收起答案' : '看答案'}
+                          </button>
+                          {openSolutionIds.has(child.id) && (
+                            <div className="mt-3 rounded-lg border border-green-200 bg-green-50 p-4">
+                              <p className="mb-2 font-bold text-green-800">解答</p>
+                              <div
+                                dangerouslySetInnerHTML={{ __html: child.answer }}
+                                className="prose prose-sm max-w-none"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
 
-                {item.fbPostId && (
-                  <div className="mt-4">
-                    <a
-                      href={`https://m.facebook.com/${item.fbPostId.split('_')[0]}/posts/${item.fbPostId.split('_')[1]}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm text-blue-600 underline hover:text-blue-800"
-                    >
-                      討論區
-                    </a>
-                  </div>
-                )}
+                  {item.fbPostId && (
+                    <div className="mt-4">
+                      <a
+                        href={`https://m.facebook.com/${item.fbPostId.split('_')[0]}/posts/${item.fbPostId.split('_')[1]}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-blue-600 underline hover:text-blue-800"
+                      >
+                        討論區
+                      </a>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </MathJax>
 
           {result.paginate.totalPages > 1 && (
             <div className="mt-4 flex items-center justify-center gap-2">

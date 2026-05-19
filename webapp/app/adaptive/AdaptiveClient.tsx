@@ -366,8 +366,8 @@ export default function AdaptiveClient() {
                 onClick={() => setNumQuestionsTarget(n)}
                 disabled={filtersLocked}
                 className={`rounded-md px-4 py-1.5 text-sm font-medium transition ${numQuestionsTarget === n
-                    ? 'bg-blue-700 text-white'
-                    : 'border border-brown-300 bg-white text-black-700 hover:bg-blue-50'
+                  ? 'bg-blue-700 text-white'
+                  : 'border border-brown-300 bg-white text-black-700 hover:bg-blue-50'
                   } disabled:cursor-not-allowed disabled:opacity-50`}
               >
                 {n}
@@ -394,109 +394,107 @@ export default function AdaptiveClient() {
 
       {adaptiveQuestion.length > 0 && (
         <div className="flex flex-col gap-6">
-          {adaptiveQuestion.map((question, qi) => {
-            const offset = responseOffsets[qi] ?? 0
-            return (
-              <div key={question.id} className="overflow-hidden rounded-xl border border-brown-300">
-                <div className="flex items-start justify-between gap-2 border-b border-brown-300 bg-blue-50 p-3">
-                  <div className="flex flex-wrap gap-2">
-                    <span className="text-xs font-semibold text-blue-700">
-                      第 {qi + 1} / {numQuestionsTarget} 題
-                    </span>
-                    <Chip label={typeLabel[question.type] ?? question.type} />
-                    {question.exam.map((e) => (
-                      <Chip key={e.id} label={e.name} color={tagColors.exam} />
-                    ))}
-                    {question.concept.map((c) => (
-                      <Chip
-                        key={c.id}
-                        label={
-                          c.conceptGroup.name === c.name
-                            ? c.name
-                            : c.conceptGroup.name + '-' + c.name
-                        }
-                        color={tagColors.concept}
-                      />
-                    ))}
-                    {question.tag.map((t) => (
-                      <Chip key={t.id} label={t.name} color={tagColors.tag} />
-                    ))}
+          <MathJax>
+            {adaptiveQuestion.map((question, qi) => {
+              const offset = responseOffsets[qi] ?? 0
+              return (
+                <div key={question.id} className="overflow-hidden rounded-xl border border-brown-300">
+                  <div className="flex items-start justify-between gap-2 border-b border-brown-300 bg-blue-50 p-3">
+                    <div className="flex flex-wrap gap-2">
+                      <span className="text-xs font-semibold text-blue-700">
+                        第 {qi + 1} / {numQuestionsTarget} 題
+                      </span>
+                      <Chip label={typeLabel[question.type] ?? question.type} />
+                      {question.exam.map((e) => (
+                        <Chip key={e.id} label={e.name} color={tagColors.exam} />
+                      ))}
+                      {question.concept.map((c) => (
+                        <Chip
+                          key={c.id}
+                          label={
+                            c.conceptGroup.name === c.name
+                              ? c.name
+                              : c.conceptGroup.name + '-' + c.name
+                          }
+                          color={tagColors.concept}
+                        />
+                      ))}
+                      {question.tag.map((t) => (
+                        <Chip key={t.id} label={t.name} color={tagColors.tag} />
+                      ))}
+                    </div>
+                    <DifficultyStars value={question.adjustedDifficulty} />
                   </div>
-                  <DifficultyStars value={question.adjustedDifficulty} />
-                </div>
 
-                <div className="p-4">
-                  {question.content && (
-                    <MathJax>
+                  <div className="p-4">
+                    {question.content && (
                       <div
                         dangerouslySetInnerHTML={{ __html: question.content }}
                         className="prose prose-sm max-w-none"
                       />
-                    </MathJax>
-                  )}
-                  {question.answer && (
-                    <>
-                      <AnswerInput
-                        question={question}
-                        answer={repliedAnswer.get(question.id) ?? ''}
-                        onAnswer={(val) =>
-                          setRepliedAnswer((prev) => new Map(prev).set(question.id, val))
-                        }
-                        disabled={!!replyResponse}
-                      />
-                      {replyResponse?.[offset] && (
-                        <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm">
-                          <div>解答：{replyResponse[offset].correctAnswer}</div>
-                          <div>得分：{replyResponse[offset].score}</div>
-                        </div>
-                      )}
-                    </>
-                  )}
+                    )}
+                    {question.answer && (
+                      <>
+                        <AnswerInput
+                          question={question}
+                          answer={repliedAnswer.get(question.id) ?? ''}
+                          onAnswer={(val) =>
+                            setRepliedAnswer((prev) => new Map(prev).set(question.id, val))
+                          }
+                          disabled={!!replyResponse}
+                        />
+                        {replyResponse?.[offset] && (
+                          <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm">
+                            <div>解答：{replyResponse[offset].correctAnswer}</div>
+                            <div>得分：{replyResponse[offset].score}</div>
+                          </div>
+                        )}
+                      </>
+                    )}
 
-                  {question.type === 'GROUP' &&
-                    question.children.map((child, i) => (
-                      <div key={child.id} className="mt-4 border-t border-[#E5E0DC] pt-4">
-                        {child.content && (
-                          <MathJax>
+                    {question.type === 'GROUP' &&
+                      question.children.map((child, i) => (
+                        <div key={child.id} className="mt-4 border-t border-[#E5E0DC] pt-4">
+                          {child.content && (
                             <div
                               dangerouslySetInnerHTML={{ __html: child.content }}
                               className="prose prose-sm max-w-none"
                             />
-                          </MathJax>
-                        )}
-                        <AnswerInput
-                          question={child}
-                          answer={repliedAnswer.get(child.id) ?? ''}
-                          onAnswer={(val) =>
-                            setRepliedAnswer((prev) => new Map(prev).set(child.id, val))
-                          }
-                          disabled={!!replyResponse}
-                        />
-                        {replyResponse?.[offset + i] && (
-                          <div className="mt-3 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm">
-                            <div>解答：{replyResponse[offset + i].correctAnswer}</div>
-                            <div>得分：{replyResponse[offset + i].score}</div>
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                          )}
+                          <AnswerInput
+                            question={child}
+                            answer={repliedAnswer.get(child.id) ?? ''}
+                            onAnswer={(val) =>
+                              setRepliedAnswer((prev) => new Map(prev).set(child.id, val))
+                            }
+                            disabled={!!replyResponse}
+                          />
+                          {replyResponse?.[offset + i] && (
+                            <div className="mt-3 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm">
+                              <div>解答：{replyResponse[offset + i].correctAnswer}</div>
+                              <div>得分：{replyResponse[offset + i].score}</div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
 
-                  {replyResponse?.[offset]?.fbPostId && (
-                    <div className="mt-4">
-                      <a
-                        href={`https://m.facebook.com/${replyResponse[offset].fbPostId!.split('_')[0]}/posts/${replyResponse[offset].fbPostId!.split('_')[1]}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm text-blue-600 underline hover:text-blue-800"
-                      >
-                        討論區
-                      </a>
-                    </div>
-                  )}
+                    {replyResponse?.[offset]?.fbPostId && (
+                      <div className="mt-4">
+                        <a
+                          href={`https://m.facebook.com/${replyResponse[offset].fbPostId!.split('_')[0]}/posts/${replyResponse[offset].fbPostId!.split('_')[1]}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-blue-600 underline hover:text-blue-800"
+                        >
+                          討論區
+                        </a>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            )
-          })}
+              )
+            })}
+          </MathJax>
         </div>
       )}
 

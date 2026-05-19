@@ -105,7 +105,8 @@ export default function PreviewClient() {
       text +=
         '，請將圖片以 img 標籤的形式放在 content 中，並將圖片網址皆設為 https://to-do-url，考慮手機排版，當圖片佔一半時以上下排版。'
     else text += '。'
-    if (needSolution) text += '- solution: 簡短的純文字詳解。'
+    if (needSolution && containMathjax) text += '- solution: 簡短的純文字詳解，標註為AI生成，請勿使用 MathJax 語法與 html code number。'
+    else if(needSolution) text += '- solution: 簡短的純文字詳解，標註為AI生成，請勿使用 html code number。'
     text += '- answer: 正確選項的字面值，單選題與是非題為一個選項，多選題為多個選項以OX表示如答案AC為OXOX，選填題依序填入答案如301。'
     text += '- difficulty: 難易度 (簡單=2,中等=5,困難=8)。'
     text +=
