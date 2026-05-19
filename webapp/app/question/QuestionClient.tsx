@@ -223,7 +223,7 @@ export default function QuestionClient() {
 
               <div className="p-4">
                 {item.content && (
-                  <MathJax dynamic>
+                  <MathJax>
                     <div
                       dangerouslySetInnerHTML={{ __html: item.content }}
                       className="prose prose-sm max-w-none"
@@ -242,12 +242,10 @@ export default function QuestionClient() {
                     {openSolutionIds.has(item.id) && (
                       <div className="mt-3 rounded-lg border border-green-200 bg-green-50 p-4">
                         <p className="mb-2 font-bold text-green-800">解答</p>
-                        <MathJax dynamic>
-                          <div
-                            dangerouslySetInnerHTML={{ __html: item.answer }}
-                            className="prose prose-sm max-w-none"
-                          />
-                        </MathJax>
+                        <div
+                          dangerouslySetInnerHTML={{ __html: item.answer }}
+                          className="prose prose-sm max-w-none"
+                        />
                       </div>
                     )}
                   </div>
@@ -256,7 +254,7 @@ export default function QuestionClient() {
                 {item.children.map((child) => (
                   <div key={child.id} className="mt-4 border-t border-[#E5E0DC] pt-4">
                     {child.content && (
-                      <MathJax dynamic>
+                      <MathJax>
                         <div
                           dangerouslySetInnerHTML={{ __html: child.content }}
                           className="prose prose-sm max-w-none"
@@ -274,12 +272,10 @@ export default function QuestionClient() {
                         {openSolutionIds.has(child.id) && (
                           <div className="mt-3 rounded-lg border border-green-200 bg-green-50 p-4">
                             <p className="mb-2 font-bold text-green-800">解答</p>
-                            <MathJax dynamic>
-                              <div
-                                dangerouslySetInnerHTML={{ __html: child.answer }}
-                                className="prose prose-sm max-w-none"
-                              />
-                            </MathJax>
+                            <div
+                              dangerouslySetInnerHTML={{ __html: child.answer }}
+                              className="prose prose-sm max-w-none"
+                            />
                           </div>
                         )}
                       </div>
