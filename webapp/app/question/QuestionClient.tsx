@@ -203,7 +203,7 @@ export default function QuestionClient() {
 
       {result && result.data.length > 0 && (
         <div className="flex flex-col gap-4">
-          <MathJax>
+          <MathJax dynamic>
             {result.data.map((item) => (
               <div key={item.id} className="overflow-hidden rounded-xl border border-brown-300">
                 <div className="flex items-start justify-between gap-2 border-b border-brown-300 bg-blue-50 p-3">

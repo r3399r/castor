@@ -394,7 +394,7 @@ export default function AdaptiveClient() {
 
       {adaptiveQuestion.length > 0 && (
         <div className="flex flex-col gap-6">
-          <MathJax>
+          <MathJax dynamic>
             {adaptiveQuestion.map((question, qi) => {
               const offset = responseOffsets[qi] ?? 0
               return (
