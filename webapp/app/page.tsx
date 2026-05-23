@@ -1,4 +1,5 @@
 import HomeCategories from '@/components/HomeCategories'
+import HomeFeature from '@/components/HomeFeature'
 import HomeHero from '@/components/HomeHero'
 import Navbar from '@/components/Navbar'
 import HomeStatsBar from '@/components/HomeStatsBar'
@@ -12,6 +13,7 @@ export default function Home() {
             <HomeHero />
             <HomeStatsBar />
             <HomeCategories />
+            <HomeFeature />
           </main>
         </div>
       </div>
