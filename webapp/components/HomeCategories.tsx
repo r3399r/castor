@@ -23,7 +23,7 @@ export default function HomeCategories() {
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div className="space-y-3">
           <p className="text-sm font-bold tracking-[0.12em] text-blue-700 uppercase">熱門分類</p>
-          <h2 className="text-3xl font-bold text-blue-700 sm:text-4xl">熱門考試 / 科目</h2>
+          <h2 className="text-[40px] font-bold text-blue-700">熱門考試 / 科目</h2>
         </div>
         <a
           href="/question"
