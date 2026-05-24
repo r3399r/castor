@@ -1,6 +1,6 @@
 export default function HomeCTA() {
   return (
-    <section className="noise -mx-4 bg-blue-700 py-[60px] sm:-mx-6 xl:py-[96px]">
+    <section className="noise -mx-4 bg-blue-700 py-[48px] sm:-mx-6 xl:py-[72px]">
       <div className="mx-auto w-full max-w-[1120px] px-4 md:px-[40px] xl:px-[70px]">
         <div className="mx-auto max-w-[640px] text-center">
           <h2 className="mb-4 text-[40px] font-bold leading-tight text-beige-100">

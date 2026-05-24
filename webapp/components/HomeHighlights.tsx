@@ -26,7 +26,7 @@ const highlights = [
 
 export default function HomeHighlights() {
   return (
-    <section className="py-[60px] xl:py-[96px]">
+    <section className="py-[48px] xl:py-[72px]">
       <div className="mx-auto w-full max-w-[1120px] px-4 md:px-[40px] xl:px-[70px]">
         <div className="flex flex-col gap-10 xl:flex-row xl:gap-0 xl:divide-x xl:divide-black-200">
           {/* Left: heading */}
