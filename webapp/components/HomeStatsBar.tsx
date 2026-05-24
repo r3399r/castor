@@ -1,3 +1,5 @@
+import SlotNumber from '@/components/SlotNumber'
+
 const stats = [
   { value: '5', label: '種類別' },
   { value: '10', label: '種科目' },
@@ -15,7 +17,7 @@ export default function HomeStatsBar() {
         <div className="flex flex-col py-10">
           {stats.map((stat) => (
             <div key={stat.label} className="flex flex-col items-center py-10">
-              <p className="text-[56px] leading-none font-semibold font-[var(--font-inter)] text-blue-700">{stat.value}</p>
+              <SlotNumber value={stat.value} />
               <p className="mt-2 text-sm text-black-500">{stat.label}</p>
             </div>
           ))}
@@ -31,7 +33,7 @@ export default function HomeStatsBar() {
                 key={stat.label}
                 className={`flex w-1/3 flex-col items-center justify-center py-4${i > 0 ? ' border-l border-brown-700' : ''}`}
               >
-                <p className="text-[56px] leading-none font-semibold font-[var(--font-inter)] text-blue-700">{stat.value}</p>
+                <SlotNumber value={stat.value} />
                 <p className="mt-2 text-sm text-black-500">{stat.label}</p>
               </div>
             ))}
@@ -42,7 +44,7 @@ export default function HomeStatsBar() {
                 key={stat.label}
                 className={`flex w-1/3 flex-col items-center justify-center py-4${i === 1 ? ' border-l border-r border-brown-700' : ''}`}
               >
-                <p className="text-[56px] leading-none font-semibold font-[var(--font-inter)] text-blue-700">{stat.value}</p>
+                <SlotNumber value={stat.value} />
                 <p className="mt-2 text-sm text-black-500">{stat.label}</p>
               </div>
             ))}
@@ -58,7 +60,7 @@ export default function HomeStatsBar() {
               key={stat.label}
               className={`flex w-[196px] flex-col items-center justify-center py-4 border-l border-brown-700${i === stats.length - 1 ? ' border-r' : ''}`}
             >
-              <p className="text-[56px] leading-none font-semibold font-[var(--font-inter)] text-blue-700">{stat.value}</p>
+              <SlotNumber value={stat.value} />
               <p className="mt-2 text-sm text-black-500">{stat.label}</p>
             </div>
           ))}
