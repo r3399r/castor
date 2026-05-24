@@ -1,7 +1,7 @@
 export default function Footer() {
   return (
     <footer className="noise -mx-4 bg-blue-700 pb-8 pt-0 text-center sm:-mx-6">
-      <div className="mx-6 border-t border-blue-400 mb-8" />
+      <div className="mx-6 border-t border-beige-100/25 mb-8" />
       <nav className="flex items-center justify-center gap-8">
         <a href="#" className="text-sm text-blue-100 transition hover:text-white">
           聯絡我們
