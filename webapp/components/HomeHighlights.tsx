@@ -20,7 +20,7 @@ const highlights = [
   {
     icon: '/socialnetwork.svg',
     title: '社群解析',
-    description: '與其他考友在社群討論疑難，共享備考心得與資源。',
+    description: '與其他考友在社群討論不會的題目、分享解題思路、交換學習資源，備考的路上不孤單。',
   },
 ]
 
