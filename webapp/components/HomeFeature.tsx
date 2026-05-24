@@ -25,7 +25,7 @@ export default function HomeFeature() {
             掌握每個觀念的學習狀態
           </h2>
           <p className="text-base leading-7 text-black-500">
-            依據作答紀錄分析各觀念熟悉度，以等級呈現強弱分布，並串聯智慧練習，精準補強需要加強的重點。
+            每次作答後，系統都會自動分析，為你找出需要加強的觀念。
           </p>
         </header>
 
