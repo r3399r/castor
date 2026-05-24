@@ -1,4 +1,5 @@
 import HomeCategories from '@/components/HomeCategories'
+import HomeCTA from '@/components/HomeCTA'
 import HomeFeature from '@/components/HomeFeature'
 import HomeHighlights from '@/components/HomeHighlights'
 import HomeHero from '@/components/HomeHero'
@@ -16,6 +17,7 @@ export default function Home() {
             <HomeCategories />
             <HomeFeature />
             <HomeHighlights />
+            <HomeCTA />
           </main>
         </div>
       </div>
