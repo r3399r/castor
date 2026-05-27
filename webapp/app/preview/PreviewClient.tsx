@@ -189,7 +189,6 @@ export default function PreviewClient() {
           ...current,
           type: selectedType,
           subjectId: selectedSubjectId ? Number(selectedSubjectId) : undefined,
-          imageUrl: imageUrl || undefined,
           options,
           examId:
             selectedExamIds.length > 0 ? Number(selectedExamIds[0]) : undefined,
@@ -395,7 +394,6 @@ export default function PreviewClient() {
             [
               ['subjectId', payload.subjectId],
               ['type', payload.type],
-              ['imageUrl', payload.imageUrl],
               ['content', payload.content],
               ['options', payload.options],
               ['answer', payload.answer],

@@ -5,14 +5,14 @@ import {
   GetQuestionParams,
   GetQuestionResponse,
   PostQuestionRequest,
-  PostQuestionResponse,
+  // PostQuestionResponse,
   Question,
   Tag,
 } from '@castor/shared';
 import axios from 'axios';
 import { inject, injectable } from 'inversify';
 import { In, MoreThan } from 'typeorm';
-import { v4 as uuidv4 } from 'uuid';
+// import { v4 as uuidv4 } from 'uuid';
 import { LIMIT, OFFSET } from 'src/constant/Pagination';
 import { ConceptAccess } from 'src/dao/ConceptAccess';
 import { ConceptGroupAccess } from 'src/dao/ConceptGroupAccess';
@@ -24,8 +24,9 @@ import { SubjectAccess } from 'src/dao/SubjectAccess';
 import { TagAccess } from 'src/dao/TagAccess';
 import { UserConceptStatAccess } from 'src/dao/UserConceptStatAccess';
 import { PendingReplyEntity } from 'src/model/entity/PendingReplyEntity';
-import { QuestionEntity } from 'src/model/entity/QuestionEntity';
+// import { QuestionEntity } from 'src/model/entity/QuestionEntity';
 import { BadRequestError, UnauthorizedError } from 'src/model/error';
+import { htmlToS3Url } from 'src/utils/htmlSnapshot';
 import { genPagination } from 'src/utils/paginator';
 import { UserService } from './UserService';
 
@@ -342,17 +343,17 @@ export class QuestionService {
     return res.data;
   }
 
-  private async commentFbPost(postId: string, solution: string) {
-    const fbAccessToken = process.env.FB_ACCESS_TOKEN;
-    await axios.post(`https://graph.facebook.com/${postId}/comments`, {
-      message: solution,
-      access_token: fbAccessToken,
-    });
-  }
+  // private async commentFbPost(postId: string, solution: string) {
+  //   const fbAccessToken = process.env.FB_ACCESS_TOKEN;
+  //   await axios.post(`https://graph.facebook.com/${postId}/comments`, {
+  //     message: solution,
+  //     access_token: fbAccessToken,
+  //   });
+  // }
 
   public async createQuestion(
     data: PostQuestionRequest
-  ): Promise<PostQuestionResponse> {
+  ) {
     const user = await this.userService.getUser();
     if (user === null) throw new UnauthorizedError('User not found');
     if (user.email !== 'lamplighter.planet@gmail.com')
@@ -404,61 +405,64 @@ export class QuestionService {
       concept.numberOfQuestions += 1;
       await this.conceptAccess.save(concept);
     }
-    const fbPost = await this.postFb(
-      data.imageUrl,
-      [
-        ...subject.category.map((c) => c.name),
-        subject.name,
-        exam.name,
-        ...tags.map((t) => t.name),
-        ...concepts.map((c) => c.name),
-      ]
-        .map((t) => `#${t}`)
-        .join(' ')
-    );
+    const caption = [
+      ...subject.category.map((c) => c.name),
+      subject.name,
+      exam.name,
+      ...tags.map((t) => t.name),
+      ...concepts.map((c) => c.name),
+    ]
+      .map((t) => `#${t}`)
+      .join(' ');
 
-    const questionEntity = new QuestionEntity();
-    questionEntity.uuid = uuidv4();
-    questionEntity.subjectId = data.subjectId;
-    questionEntity.parentId = null;
-    questionEntity.fbPostId = fbPost.post_id;
-    questionEntity.isGroup = data.type === 'GROUP';
-    questionEntity.type = data.type;
-    questionEntity.sortOrder = null;
-    questionEntity.content = data.content ?? null;
-    questionEntity.options = data.options ?? null;
-    questionEntity.answer = data.answer ?? null;
-    questionEntity.difficulty = data.difficulty;
-    questionEntity.adjustedDifficulty = data.difficulty;
-    questionEntity.exam = [exam];
-    questionEntity.tag = tags;
-    questionEntity.concept = concepts;
+    if (data.content) {
+      const { url, key:_key } = await htmlToS3Url(data.content);
+      await this.postFb(url, caption);
+      // await deleteS3File(key);
+    }
 
-    const newQuestionEntity = await this.questionAccess.save(questionEntity);
+    // const questionEntity = new QuestionEntity();
+    // questionEntity.uuid = uuidv4();
+    // questionEntity.subjectId = data.subjectId;
+    // questionEntity.parentId = null;
+    // questionEntity.fbPostId = fbPostId;
+    // questionEntity.isGroup = data.type === 'GROUP';
+    // questionEntity.type = data.type;
+    // questionEntity.sortOrder = null;
+    // questionEntity.content = data.content ?? null;
+    // questionEntity.options = data.options ?? null;
+    // questionEntity.answer = data.answer ?? null;
+    // questionEntity.difficulty = data.difficulty;
+    // questionEntity.adjustedDifficulty = data.difficulty;
+    // questionEntity.exam = [exam];
+    // questionEntity.tag = tags;
+    // questionEntity.concept = concepts;
 
-    if (data.solution) await this.commentFbPost(fbPost.post_id, data.solution);
+    // const newQuestionEntity = await this.questionAccess.save(questionEntity);
 
-    const children: QuestionEntity[] = [];
-    if (data.childQuestions !== undefined)
-      for (const child of data.childQuestions) {
-        const childEntity = new QuestionEntity();
-        childEntity.uuid = uuidv4();
-        childEntity.subjectId = data.subjectId;
-        childEntity.parentId = newQuestionEntity.id;
-        childEntity.fbPostId = null;
-        childEntity.isGroup = false;
-        childEntity.type = child.type;
-        childEntity.sortOrder = child.sortOrder;
-        childEntity.content = child.content;
-        childEntity.options = child.options;
-        childEntity.answer = child.answer;
-        childEntity.difficulty = data.difficulty;
-        childEntity.adjustedDifficulty = data.difficulty;
+    // if (fbPostId && data.solution) await this.commentFbPost(fbPostId, data.solution);
 
-        const tmpQuestion = await this.questionAccess.save(childEntity);
-        children.push(tmpQuestion);
-      }
+    // const children: QuestionEntity[] = [];
+    // if (data.childQuestions !== undefined)
+    //   for (const child of data.childQuestions) {
+    //     const childEntity = new QuestionEntity();
+    //     childEntity.uuid = uuidv4();
+    //     childEntity.subjectId = data.subjectId;
+    //     childEntity.parentId = newQuestionEntity.id;
+    //     childEntity.fbPostId = null;
+    //     childEntity.isGroup = false;
+    //     childEntity.type = child.type;
+    //     childEntity.sortOrder = child.sortOrder;
+    //     childEntity.content = child.content;
+    //     childEntity.options = child.options;
+    //     childEntity.answer = child.answer;
+    //     childEntity.difficulty = data.difficulty;
+    //     childEntity.adjustedDifficulty = data.difficulty;
 
-    return [newQuestionEntity, ...children];
+    //     const tmpQuestion = await this.questionAccess.save(childEntity);
+    //     children.push(tmpQuestion);
+    //   }
+
+    // return [newQuestionEntity, ...children];
   }
 }

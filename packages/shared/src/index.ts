@@ -241,7 +241,6 @@ export type PostPreviewResponse = {
 export type PostQuestionRequest = {
   subjectId: number;
   type: 'GROUP' | 'SINGLE' | 'MULTIPLE' | 'TRUE_FALSE' | 'FILL';
-  imageUrl: string;
   content?: string;
   options?: string;
   answer?: string;

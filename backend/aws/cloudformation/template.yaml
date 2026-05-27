@@ -19,6 +19,19 @@ Parameters:
 Conditions: 
   IsProd: !Equals [ !Ref TargetEnvr, prod ]
 Resources:
+  #################################
+  ##### Chromium Lambda Layer #####
+  #################################
+  ChromiumLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: !Sub ${Project}-${TargetEnvr}-chromium
+      ContentUri: ../../chromium-arm64.zip
+      CompatibleRuntimes:
+        - nodejs22.x
+      CompatibleArchitectures:
+        - arm64
+      RetentionPolicy: Delete
   ##########################################
   ##### AWS IAM Role to execute lambda #####
   ##########################################
@@ -40,6 +53,7 @@ Resources:
         - arn:aws:iam::aws:policy/AWSLambda_FullAccess
         - arn:aws:iam::aws:policy/AmazonAPIGatewayInvokeFullAccess
         - arn:aws:iam::aws:policy/AmazonSQSFullAccess
+        - arn:aws:iam::aws:policy/AmazonS3FullAccess
   ##############################################
   ##### API Gateway and associated Lambdas #####
   ##############################################
@@ -1034,7 +1048,6 @@ Resources:
               "properties": {
                 "subjectId":{"type": "number"},
                 "type":{"type": "string", "enum": ["GROUP","SINGLE","MULTIPLE","TRUE_FALSE","FILL"]},
-                "imageUrl":{"type": "string"},
                 "content":{"type": "string"},
                 "options": {"type": "string",nullable: true},
                 "answer": {"type": "string",nullable: true},
@@ -1065,7 +1078,7 @@ Resources:
                   }
                 }
               },
-              "required": ["subjectId","type","imageUrl","difficulty","examId","conceptIds"]
+              "required": ["subjectId","type","difficulty","examId","conceptIds"]
             },
             "postConceptGroup": {
               "type": "object",
@@ -1131,11 +1144,15 @@ Resources:
       FunctionName: !Sub ${Project}-${TargetEnvr}-api
       Role: !GetAtt ExecutionRole.Arn
       CodeUri: ../../dist
-      MemorySize: 512
+      MemorySize: 1024
+      Timeout: 60
+      Layers:
+        - !Ref ChromiumLayer
       Environment:
         Variables:
           ENVR: !Sub ${TargetEnvr}
           PROJECT: !Sub ${Project}
+          S3_BUCKET: !Sub ${Project}-public-bucket
           DB_HOST:
             Fn::ImportValue: !Sub celestial-studio-${TargetEnvr}-db-endpoint
           DB_PWD: !Sub '{{resolve:ssm:mysql-${TargetEnvr}-${Project}-pwd}}'
