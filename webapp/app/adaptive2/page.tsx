@@ -1,0 +1,16 @@
+import AuthGuard from '@/components/AuthGuard'
+import Navbar from '@/components/Navbar'
+import AdaptiveClient from './AdaptiveClient'
+
+export default function AdaptivePage() {
+  return (
+    <div className="min-h-screen bg-beige-100 py-6">
+      <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
+        <Navbar />
+        <AuthGuard>
+          <AdaptiveClient />
+        </AuthGuard>
+      </div>
+    </div>
+  )
+}

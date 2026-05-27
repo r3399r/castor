@@ -5,10 +5,10 @@ export default function HomeHero() {
       <div className="space-y-8">
         <div className="max-w-2xl space-y-4">
           <p className="text-sm font-bold tracking-[0.12em] text-blue-700 uppercase">
-            一站式學習平台
+            PMP - Practice Makes Perfect
           </p>
           <h1 className="text-[40px] font-bold text-blue-700 sm:text-5xl lg:text-6xl">
-            考試題庫練習站
+            個人化智慧題庫
           </h1>
           <p className="max-w-xl text-base leading-7 text-black-700 sm:text-lg">
             涵蓋高中／大學／公職／證照考試，透過智慧出題與個人化練習，幫助你精準掌握重點，穩定提升解題能力與每一次考試表現。
