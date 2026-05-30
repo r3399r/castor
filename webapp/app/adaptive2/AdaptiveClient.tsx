@@ -23,6 +23,10 @@ import type {
 } from '@/types/api'
 import { MathJax } from 'better-react-mathjax'
 
+const categoryLabel: Record<string, string> = {
+  '國中': '國中會考',
+}
+
 const typeLabel: Record<string, string> = {
   SINGLE: '單選題',
   MULTIPLE: '多選題',
@@ -119,7 +123,7 @@ function AnswerInput({
       <div className="mt-3 flex flex-col gap-3">
         {Array.from({ length: blanks }).map((_, i) => (
           <div key={i} className="flex flex-wrap items-center gap-3">
-            <span className="text-sm font-medium text-black-700">{i + 1}.</span>
+            <span className="text-base font-bold text-black-700">{i + 1}.</span>
             {options.map((opt) => (
               <label key={opt} className="flex cursor-pointer items-center gap-1.5">
                 <input
@@ -291,37 +295,73 @@ export default function AdaptiveClient() {
 
   return (
     <div>
-      <h1 className="mb-6 text-2xl font-bold text-blue-700">智慧練習</h1>
+      <h1 className="mt-[60px] mb-2 text-3xl font-bold text-blue-700">智慧練習</h1>
+      <p className="mb-10 text-sm text-black-500">制定今天的學習計畫，我們幫你挑出最適合的練習題目。</p>
 
-      <div className="flex flex-col gap-4 rounded-[24px] border border-brown-300 bg-white p-6">
-        <div className="flex flex-col gap-2">
-          <span className="text-sm font-medium text-black-700">選擇類別</span>
-          <div className={`flex flex-wrap gap-2 ${filtersLocked ? 'pointer-events-none opacity-50' : ''}`}>
-            {categoryList.map((c) => (
-              <button
-                key={c.id}
-                onClick={() => setSelectedCategoryId(String(c.id))}
-                className={`rounded-lg border px-4 py-2 text-sm font-medium transition ${
-                  selectedCategoryId === String(c.id)
-                    ? 'border-blue-700 bg-blue-700 text-white'
-                    : 'border-brown-300 bg-white text-black-900 hover:bg-blue-50'
-                }`}
-              >
-                {c.name}
-              </button>
-            ))}
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-3">
+          <span className="text-base font-bold text-black-700">考試類別</span>
+          <div className={`grid grid-cols-1 md:grid-cols-3 border-t border-brown-700 divide-y md:divide-y-0 divide-x-0 md:divide-x divide-brown-700 ${filtersLocked ? 'pointer-events-none opacity-50' : ''}`}>
+            {/* 入學考試 */}
+            <div className="flex flex-col gap-3 py-4 md:py-0 md:pr-6">
+              <span className="border-b border-brown-700 pt-2 pb-2 text-xs font-semibold text-black-700 uppercase tracking-wide">入學考試</span>
+              <div className="mt-2 grid grid-cols-2 md:grid-cols-1 lg:grid-cols-2 gap-3">
+                {categoryList.map((c) => (
+                  <button
+                    key={c.id}
+                    onClick={() => setSelectedCategoryId(String(c.id))}
+                    className={`rounded-lg px-4 py-3 text-sm font-medium transition text-left ${
+                      selectedCategoryId === String(c.id)
+                        ? 'border-2 border-brown-700 bg-beige-200 text-black-900'
+                        : 'border border-brown-300 bg-beige-100 text-black-900 hover:bg-beige-200'
+                    }`}
+                  >
+                    {categoryLabel[c.name] ?? c.name}
+                  </button>
+                ))}
+                {['分科'].map((name) => (
+                  <button key={name} disabled className="rounded-lg border border-brown-300 bg-beige-100 px-4 py-3 text-sm font-medium text-black-300 cursor-not-allowed text-left">
+                    {name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 國家考試 */}
+            <div className="flex flex-col gap-3 py-4 md:py-0 md:px-6">
+              <span className="border-b border-brown-700 pt-2 pb-2 text-xs font-semibold text-black-700 uppercase tracking-wide">國家考試</span>
+              <div className="mt-2 grid grid-cols-2 md:grid-cols-1 lg:grid-cols-2 gap-3">
+                {['公務員高考三級', '公務員普考', '初等考試', '司法特考', '地方特考'].map((name) => (
+                  <button key={name} disabled className="rounded-lg border border-brown-300 bg-beige-100 px-4 py-3 text-sm font-medium text-black-300 cursor-not-allowed text-left">
+                    {name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 專技證照 */}
+            <div className="flex flex-col gap-3 py-4 md:py-0 md:pl-6">
+              <span className="border-b border-brown-700 pt-2 pb-2 text-xs font-semibold text-black-700 uppercase tracking-wide">專技證照</span>
+              <div className="mt-2 grid grid-cols-2 md:grid-cols-1 lg:grid-cols-2 gap-3">
+                {['護理師執照', '律師執照', '會計師執照'].map((name) => (
+                  <button key={name} disabled className="rounded-lg border border-brown-300 bg-beige-100 px-4 py-3 text-sm font-medium text-black-300 cursor-not-allowed text-left">
+                    {name}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
 
         {selectedCategoryId && subjectList.length > 0 && (
           <div className="flex flex-col gap-2">
-            <span className="text-sm font-medium text-black-700">選擇科目</span>
+            <span className="text-base font-bold text-black-700">選擇科目</span>
             <div className={`flex flex-wrap gap-2 ${filtersLocked ? 'pointer-events-none opacity-50' : ''}`}>
               {subjectList.map((s) => (
                 <button
                   key={s.id}
                   onClick={() => setSelectedSubjectId(String(s.id))}
-                  className={`rounded-lg border px-4 py-2 text-sm font-medium transition ${
+                  className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
                     selectedSubjectId === String(s.id)
                       ? 'border-blue-700 bg-blue-700 text-white'
                       : 'border-brown-300 bg-white text-black-900 hover:bg-blue-50'
@@ -336,7 +376,7 @@ export default function AdaptiveClient() {
 
         {selectedSubjectId && examList.length > 0 && (
           <div className="flex flex-col gap-2">
-            <span className="text-sm font-medium text-black-700">選擇試卷（可複選）</span>
+            <span className="text-base font-bold text-black-700">選擇試卷（可複選）</span>
             <div className={`flex flex-wrap gap-2 ${filtersLocked ? 'pointer-events-none opacity-50' : ''}`}>
               {examList.map((e) => {
                 const checked = selectedExamIds.includes(String(e.id))
@@ -348,7 +388,7 @@ export default function AdaptiveClient() {
                         checked ? prev.filter((x) => x !== String(e.id)) : [...prev, String(e.id)],
                       )
                     }
-                    className={`rounded-lg border px-4 py-2 text-sm font-medium transition ${
+                    className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
                       checked
                         ? 'border-blue-700 bg-blue-700 text-white'
                         : 'border-brown-300 bg-white text-black-900 hover:bg-blue-50'
@@ -364,7 +404,7 @@ export default function AdaptiveClient() {
 
         {selectedSubjectId && conceptGroupList.length > 0 && (
           <div className="flex flex-col gap-2">
-            <span className="text-sm font-medium text-black-700">選擇觀念（可複選）</span>
+            <span className="text-base font-bold text-black-700">選擇觀念（可複選）</span>
             <div className={`flex flex-col gap-3 ${filtersLocked ? 'pointer-events-none opacity-50' : ''}`}>
               {showConceptGroupHeader
                 ? conceptGroupList.map((cg) => (
@@ -383,7 +423,7 @@ export default function AdaptiveClient() {
                                     : [...prev, String(c.id)],
                                 )
                               }
-                              className={`rounded-lg border px-4 py-2 text-sm font-medium transition ${
+                              className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
                                 checked
                                   ? 'border-blue-700 bg-blue-700 text-white'
                                   : 'border-brown-300 bg-white text-black-900 hover:bg-blue-50'
@@ -411,7 +451,7 @@ export default function AdaptiveClient() {
                                     : [...prev, String(c.id)],
                                 )
                               }
-                              className={`rounded-lg border px-4 py-2 text-sm font-medium transition ${
+                              className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
                                 checked
                                   ? 'border-blue-700 bg-blue-700 text-white'
                                   : 'border-brown-300 bg-white text-black-900 hover:bg-blue-50'
@@ -430,7 +470,7 @@ export default function AdaptiveClient() {
 
         {selectedSubjectId && tagList.length > 0 && (
           <div className="flex flex-col gap-2">
-            <span className="text-sm font-medium text-black-700">選擇標籤（可複選）</span>
+            <span className="text-base font-bold text-black-700">選擇標籤（可複選）</span>
             <div className={`flex flex-wrap gap-2 ${filtersLocked ? 'pointer-events-none opacity-50' : ''}`}>
               {tagList.map((t) => {
                 const checked = selectedTagIds.includes(String(t.id))
@@ -442,7 +482,7 @@ export default function AdaptiveClient() {
                         checked ? prev.filter((x) => x !== String(t.id)) : [...prev, String(t.id)],
                       )
                     }
-                    className={`rounded-lg border px-4 py-2 text-sm font-medium transition ${
+                    className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
                       checked
                         ? 'border-blue-700 bg-blue-700 text-white'
                         : 'border-brown-300 bg-white text-black-900 hover:bg-blue-50'
@@ -457,7 +497,7 @@ export default function AdaptiveClient() {
         )}
 
         <div className="flex items-center gap-3">
-          <span className="text-sm font-medium text-black-700">練習題數</span>
+          <span className="text-base font-bold text-black-700">練習題數</span>
           <div className="flex gap-2">
             {[1, 2, 5, 10].map((n) => (
               <button
