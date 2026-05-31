@@ -301,7 +301,8 @@ export default function AdaptiveClient() {
       <div className="flex flex-col gap-4">
         <div className="flex flex-col gap-3">
           <span className="text-base font-bold text-black-700">考試類別</span>
-          <div className={`grid grid-cols-1 md:grid-cols-3 border-t border-brown-700 divide-y md:divide-y-0 divide-x-0 md:divide-x divide-brown-700 ${filtersLocked ? 'pointer-events-none opacity-50' : ''}`}>
+          <div className={`rounded-lg border border-brown-700 overflow-hidden px-6 pb-6 ${filtersLocked ? 'pointer-events-none opacity-50' : ''}`}>
+          <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 divide-x-0 md:divide-x divide-brown-700">
             {/* 入學考試 */}
             <div className="flex flex-col gap-3 py-4 md:py-0 md:pr-6">
               <span className="border-b border-brown-700 pt-2 pb-2 text-xs font-semibold text-black-700 uppercase tracking-wide">入學考試</span>
@@ -312,15 +313,15 @@ export default function AdaptiveClient() {
                     onClick={() => setSelectedCategoryId(String(c.id))}
                     className={`rounded-lg px-4 py-3 text-sm font-medium transition text-left ${
                       selectedCategoryId === String(c.id)
-                        ? 'border-2 border-brown-700 bg-beige-200 text-black-900'
-                        : 'border border-brown-300 bg-beige-100 text-black-900 hover:bg-beige-200'
+                        ? 'border-2 border-blue-700 bg-blue-700/10 text-blue-700'
+                        : 'border border-brown-300 bg-beige-200 text-black-900 hover:border-brown-700 active:scale-[0.97]'
                     }`}
                   >
                     {categoryLabel[c.name] ?? c.name}
                   </button>
                 ))}
                 {['分科'].map((name) => (
-                  <button key={name} disabled className="rounded-lg border border-brown-300 bg-beige-100 px-4 py-3 text-sm font-medium text-black-300 cursor-not-allowed text-left">
+                  <button key={name} disabled className="rounded-lg border border-brown-300 bg-beige-200 px-4 py-3 text-sm font-medium text-black-300 cursor-not-allowed text-left">
                     {name}
                   </button>
                 ))}
@@ -332,7 +333,7 @@ export default function AdaptiveClient() {
               <span className="border-b border-brown-700 pt-2 pb-2 text-xs font-semibold text-black-700 uppercase tracking-wide">國家考試</span>
               <div className="mt-2 grid grid-cols-2 md:grid-cols-1 lg:grid-cols-2 gap-3">
                 {['公務員高考三級', '公務員普考', '初等考試', '司法特考', '地方特考'].map((name) => (
-                  <button key={name} disabled className="rounded-lg border border-brown-300 bg-beige-100 px-4 py-3 text-sm font-medium text-black-300 cursor-not-allowed text-left">
+                  <button key={name} disabled className="rounded-lg border border-brown-300 bg-beige-200 px-4 py-3 text-sm font-medium text-black-300 cursor-not-allowed text-left">
                     {name}
                   </button>
                 ))}
@@ -344,12 +345,13 @@ export default function AdaptiveClient() {
               <span className="border-b border-brown-700 pt-2 pb-2 text-xs font-semibold text-black-700 uppercase tracking-wide">專技證照</span>
               <div className="mt-2 grid grid-cols-2 md:grid-cols-1 lg:grid-cols-2 gap-3">
                 {['護理師執照', '律師執照', '會計師執照'].map((name) => (
-                  <button key={name} disabled className="rounded-lg border border-brown-300 bg-beige-100 px-4 py-3 text-sm font-medium text-black-300 cursor-not-allowed text-left">
+                  <button key={name} disabled className="rounded-lg border border-brown-300 bg-beige-200 px-4 py-3 text-sm font-medium text-black-300 cursor-not-allowed text-left">
                     {name}
                   </button>
                 ))}
               </div>
             </div>
+          </div>
           </div>
         </div>
 
