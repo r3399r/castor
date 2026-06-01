@@ -6,7 +6,6 @@ import NavbarAuthButton from './NavbarAuthButton'
 const navItems = [
   // { label: '題庫', href: '/question' },
   { label: '智慧練習', href: '/adaptive' },
-  { label: '智慧練習2', href: '/adaptive2' },
   { label: '作答記錄', href: '/reply' },
   { label: '學習分析', href: '/user' },
 ]

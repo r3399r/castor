@@ -4,12 +4,16 @@ import AdaptiveClient from './AdaptiveClient'
 
 export default function AdaptivePage() {
   return (
-    <div className="min-h-screen bg-beige-100 py-6">
-      <div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
+    <div className="m-[10px] min-h-[calc(100vh-20px)] border border-brown-700 bg-beige-100">
+      <div className="px-4 sm:px-6">
         <Navbar />
-        <AuthGuard>
-          <AdaptiveClient />
-        </AuthGuard>
+      </div>
+      <div className="px-4 md:px-10 lg:px-[70px]">
+        <div className="mx-auto max-w-[1120px]">
+          <AuthGuard>
+            <AdaptiveClient />
+          </AuthGuard>
+        </div>
       </div>
     </div>
   )
