@@ -296,10 +296,24 @@ export default function AdaptiveClient() {
 
   return (
     <div>
-      <h1 className="mt-[60px] mb-2 text-3xl font-bold text-blue-700">智慧練習</h1>
-      <p className="mb-10 text-sm text-black-500">制定今天的學習計畫，我們幫你挑出最適合的練習題目。</p>
+      {adaptiveQuestion.length === 0 && !loading ? (
+        <>
+          <h1 className="mt-[60px] mb-2 text-3xl font-bold text-blue-700">智慧練習</h1>
+          <p className="mb-10 text-sm text-black-500">制定今天的學習計畫，我們幫你挑出最適合的練習題目。</p>
+        </>
+      ) : (
+        <button
+          onClick={onReset}
+          className="mt-[60px] mb-8 flex items-center gap-2 rounded-lg px-3 py-1.5 text-lg font-bold text-black-700 hover:bg-beige-200 hover:text-black-900 transition cursor-pointer"
+        >
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M16 10H4M4 10L9 5M4 10L9 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          返回
+        </button>
+      )}
 
-      <div className="flex flex-col gap-4">
+      {adaptiveQuestion.length === 0 && !loading && <div className="flex flex-col gap-4">
         <div className="flex flex-col gap-3">
           <span className="text-base font-bold text-black-700">考試類別</span>
           <div className={`rounded-lg border border-brown-700 overflow-hidden ${filtersLocked ? 'pointer-events-none opacity-50' : ''}`}>
@@ -323,7 +337,7 @@ export default function AdaptiveClient() {
           <div className="grid grid-cols-1 md:grid-cols-3 md:divide-x divide-brown-700">
             {/* 入學考試 */}
             <div className={`${activeTab !== '入學考試' ? 'hidden md:flex' : 'flex'} flex-col gap-3 py-4 md:py-0 md:pr-6`}>
-              <span className="border-b border-brown-700 pt-2 pb-2 text-xs font-semibold text-black-700 uppercase tracking-wide hidden md:block">入學考試</span>
+              <span className="border-b border-brown-700 pt-2 pb-2 text-sm font-semibold text-black-700 uppercase tracking-wide hidden md:block">入學考試</span>
               <div className="mt-2 grid grid-cols-2 md:grid-cols-1 lg:grid-cols-2 gap-3">
                 {categoryList.map((c) => (
                   <button
@@ -348,7 +362,7 @@ export default function AdaptiveClient() {
 
             {/* 國家考試 */}
             <div className={`${activeTab !== '國家考試' ? 'hidden md:flex' : 'flex'} flex-col gap-3 py-4 md:py-0 md:px-6`}>
-              <span className="border-b border-brown-700 pt-2 pb-2 text-xs font-semibold text-black-700 uppercase tracking-wide hidden md:block">國家考試</span>
+              <span className="border-b border-brown-700 pt-2 pb-2 text-sm font-semibold text-black-700 uppercase tracking-wide hidden md:block">國家考試</span>
               <div className="mt-2 grid grid-cols-2 md:grid-cols-1 lg:grid-cols-2 gap-3">
                 {['公務員高考三級', '公務員普考', '初等考試', '司法特考', '地方特考'].map((name) => (
                   <button key={name} disabled className="rounded-lg border border-brown-300 bg-beige-200 px-4 py-3 text-sm font-medium text-black-300 cursor-not-allowed text-left">
@@ -360,7 +374,7 @@ export default function AdaptiveClient() {
 
             {/* 專技證照 */}
             <div className={`${activeTab !== '專技證照' ? 'hidden md:flex' : 'flex'} flex-col gap-3 py-4 md:py-0 md:pl-6`}>
-              <span className="border-b border-brown-700 pt-2 pb-2 text-xs font-semibold text-black-700 uppercase tracking-wide hidden md:block">專技證照</span>
+              <span className="border-b border-brown-700 pt-2 pb-2 text-sm font-semibold text-black-700 uppercase tracking-wide hidden md:block">專技證照</span>
               <div className="mt-2 grid grid-cols-2 md:grid-cols-1 lg:grid-cols-2 gap-3">
                 {['護理師執照', '律師執照', '會計師執照'].map((name) => (
                   <button key={name} disabled className="rounded-lg border border-brown-300 bg-beige-200 px-4 py-3 text-sm font-medium text-black-300 cursor-not-allowed text-left">
@@ -397,15 +411,28 @@ export default function AdaptiveClient() {
           </div>
         )}
 
-        {selectedSubjectId && (examList.length > 0 || conceptGroupList.length > 0) && (
+        {selectedSubjectId && (examList.length > 0 || conceptGroupList.length > 0 || tagList.length > 0) && (
           <div className="flex flex-col gap-2 mt-4">
-            <span className="text-base font-bold text-black-700">進階篩選</span>
+            <div className="flex items-center gap-3">
+              <span className="text-base font-bold text-black-700">進階篩選</span>
+              {(selectedExamIds.length > 0 || selectedConceptIds.length > 0 || selectedTagIds.length > 0) && !filtersLocked && (
+                <button
+                  onClick={() => { setSelectedExamIds([]); setSelectedConceptIds([]); setSelectedTagIds([]) }}
+                  className="flex items-center gap-1 rounded-md border border-brown-300 px-2.5 py-1 text-sm text-black-500 hover:bg-beige-200 transition"
+                >
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M11 3L3 11M3 3L11 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                  </svg>
+                  清空
+                </button>
+              )}
+            </div>
             <div className={`rounded-lg border border-brown-700 ${filtersLocked ? 'pointer-events-none opacity-50' : ''}`}>
 
               {/* 選擇試卷 */}
               {examList.length > 0 && (
                 <div className="px-6 py-4">
-                  <span className="mb-3 block text-base font-bold text-black-700">選擇試卷（可複選）</span>
+                  <span className="mb-3 block text-sm font-bold text-black-700">選擇試卷（可複選）</span>
                   <div className="flex flex-wrap gap-2">
                     {examList.map((e) => {
                       const checked = selectedExamIds.includes(String(e.id))
@@ -439,7 +466,7 @@ export default function AdaptiveClient() {
               {/* 選擇觀念 */}
               {conceptGroupList.length > 0 && (
                 <div className="px-6 py-4">
-                  <span className="mb-3 block text-base font-bold text-black-700">選擇觀念（可複選）</span>
+                  <span className="mb-3 block text-sm font-bold text-black-700">選擇觀念（可複選）</span>
                   <div className="flex flex-col gap-6">
                     {showConceptGroupHeader
                       ? conceptGroupList.map((cg) => (
@@ -503,34 +530,40 @@ export default function AdaptiveClient() {
                 </div>
               )}
 
-            </div>
-          </div>
-        )}
+              {/* 分隔線 */}
+              {(examList.length > 0 || conceptGroupList.length > 0) && tagList.length > 0 && (
+                <hr className="border-brown-300" />
+              )}
 
-        {selectedSubjectId && tagList.length > 0 && (
-          <div className="flex flex-col gap-2">
-            <span className="text-base font-bold text-black-700">選擇標籤（可複選）</span>
-            <div className={`flex flex-wrap gap-2 ${filtersLocked ? 'pointer-events-none opacity-50' : ''}`}>
-              {tagList.map((t) => {
-                const checked = selectedTagIds.includes(String(t.id))
-                return (
-                  <button
-                    key={t.id}
-                    onClick={() =>
-                      setSelectedTagIds((prev) =>
-                        checked ? prev.filter((x) => x !== String(t.id)) : [...prev, String(t.id)],
+              {/* 選擇標籤 */}
+              {tagList.length > 0 && (
+                <div className="px-6 py-4">
+                  <span className="mb-3 block text-sm font-bold text-black-700">選擇標籤（可複選）</span>
+                  <div className="flex flex-wrap gap-2">
+                    {tagList.map((t) => {
+                      const checked = selectedTagIds.includes(String(t.id))
+                      return (
+                        <button
+                          key={t.id}
+                          onClick={() =>
+                            setSelectedTagIds((prev) =>
+                              checked ? prev.filter((x) => x !== String(t.id)) : [...prev, String(t.id)],
+                            )
+                          }
+                          className={`rounded-lg px-4 py-1 text-sm font-medium transition ${
+                            checked
+                              ? 'border-2 border-blue-700 bg-blue-700/10 text-blue-700'
+                              : 'border border-brown-300 bg-beige-200 text-black-900 hover:border-brown-700 active:scale-[0.97]'
+                          }`}
+                        >
+                          {t.name}
+                        </button>
                       )
-                    }
-                    className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
-                      checked
-                        ? 'border-blue-700 bg-blue-700 text-white'
-                        : 'border-brown-300 bg-white text-black-900 hover:bg-blue-50'
-                    }`}
-                  >
-                    {t.name}
-                  </button>
-                )
-              })}
+                    })}
+                  </div>
+                </div>
+              )}
+
             </div>
           </div>
         )}
@@ -578,8 +611,11 @@ export default function AdaptiveClient() {
             </button>
           </div>
         </div>
-      </div>
+      </div>}
 
+      {loading && adaptiveQuestion.length === 0 && (
+        <div className="flex items-center justify-center py-20 text-sm text-black-500">選題中…</div>
+      )}
 
       {adaptiveQuestion.length > 0 && (
         <div className="flex flex-col gap-6">
