@@ -27,6 +27,8 @@ import { CategoryEntity } from './model/entity/CategoryEntity';
 import { ConceptEntity } from './model/entity/ConceptEntity';
 import { ConceptGroupEntity } from './model/entity/ConceptGroupEntity';
 import { ExamEntity } from './model/entity/ExamEntity';
+import { FilterDimensionEntity } from './model/entity/FilterDimensionEntity';
+import { FilterOptionEntity } from './model/entity/FilterOptionEntity';
 import { PendingReplyEntity } from './model/entity/PendingReplyEntity';
 import { QuestionEntity } from './model/entity/QuestionEntity';
 import { ReplyEntity } from './model/entity/ReplyEntity';
@@ -52,6 +54,12 @@ container
   .toConstantValue(ConceptGroupEntity);
 container.bind<Function>(dbEntitiesBindingId).toConstantValue(ExamEntity);
 container.bind<Function>(dbEntitiesBindingId).toConstantValue(SubjectEntity);
+container
+  .bind<Function>(dbEntitiesBindingId)
+  .toConstantValue(FilterDimensionEntity);
+container
+  .bind<Function>(dbEntitiesBindingId)
+  .toConstantValue(FilterOptionEntity);
 container
   .bind<Function>(dbEntitiesBindingId)
   .toConstantValue(UserConceptStatEntity);

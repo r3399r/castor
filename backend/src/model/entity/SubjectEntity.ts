@@ -1,4 +1,4 @@
-import { Category, Subject } from '@castor/shared';
+import { Category, FilterOption, Subject } from '@castor/shared';
 import {
   BeforeInsert,
   Column,
@@ -8,6 +8,7 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { CategoryEntity } from './CategoryEntity';
+import { FilterOptionEntity } from './FilterOptionEntity';
 
 @Entity({ name: 'subject' })
 export class SubjectEntity implements Subject {
@@ -27,6 +28,14 @@ export class SubjectEntity implements Subject {
     inverseJoinColumn: { name: 'category_id', referencedColumnName: 'id' },
   })
   category!: Category[];
+
+  @ManyToMany(() => FilterOptionEntity)
+  @JoinTable({
+    name: 'filter_subject_option',
+    joinColumn: { name: 'subject_id', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'option_id', referencedColumnName: 'id' },
+  })
+  filterOptions!: FilterOption[];
 
   @BeforeInsert()
   setDateCreated(): void {

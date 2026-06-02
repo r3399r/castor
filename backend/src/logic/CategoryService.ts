@@ -30,7 +30,12 @@ export class CategoryService {
       where: {
         category: { id: Number(id) },
       },
-      relations: { category: true },
+      relations: {
+        category: true,
+        filterOptions: {
+          dimension: true,
+        },
+      },
     });
   }
 

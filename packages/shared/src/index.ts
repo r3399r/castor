@@ -7,6 +7,7 @@ export type Category = {
 export type Subject = {
   id: number;
   category: Category[];
+  filterOptions: FilterOption[];
   name: string;
   createdAt: string | null;
 };
@@ -132,6 +133,20 @@ export type Paginate<T> = {
     limit: number;
     totalPages: number;
   };
+};
+
+export type FilterDimension = {
+  id: number;
+  categoryId: number;
+  name: string;
+  sortOrder: number;
+};
+
+export type FilterOption = {
+  id: number;
+  dimension: FilterDimension;
+  parentId: number | null;
+  name: string;
 };
 
 export type GetCategoryResponse = Category[]

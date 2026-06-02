@@ -28,7 +28,13 @@ export class SubjectService {
   private readonly tagAccess!: TagAccess;
 
   public async getSubjects(): Promise<GetSubjectResponse> {
-    return await this.subjectAccess.find();
+    return await this.subjectAccess.find({
+      relations: {
+        filterOptions: {
+          dimension: true,
+        },
+      },
+    });
   }
 
   public async getExamsById(id: string): Promise<GetSubjectExamResponse> {
