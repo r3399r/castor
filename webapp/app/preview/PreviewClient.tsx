@@ -53,7 +53,7 @@ export default function PreviewClient() {
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
 
   const [categoryList, setCategoryList] = useState<Category[]>([])
-  const [subjectList, setSubjectList] = useState<Subject[]>([])
+  const [subjectList, setSubjectList] = useState<GetCategorySubjectResponse['subjects']>([])
   const [examList, setExamList] = useState<Exam[]>([])
   const [conceptGroupList, setConceptGroupList] = useState<ConceptGroup[]>([])
   const [tagList, setTagList] = useState<Tag[]>([])
@@ -144,7 +144,7 @@ export default function PreviewClient() {
     setSelectedConceptIds([])
     setSelectedTagIds([])
     apiFetch<GetCategorySubjectResponse>(`category/${selectedCategoryId}/subject`)
-      .then(setSubjectList)
+      .then((res) => setSubjectList(res.subjects))
       .catch(console.error)
   }, [selectedCategoryId])
 
