@@ -26,17 +26,52 @@ export class CategoryService {
   public async getSubjectsByCategoryId(
     id: string
   ): Promise<GetCategorySubjectResponse> {
-    return await this.subjectAccess.find({
+    const subjects = await this.subjectAccess.find({
       where: {
         category: { id: Number(id) },
       },
+      order: { sortOrder: 'ASC' },
       relations: {
-        category: true,
         filterOptions: {
           dimension: true,
         },
       },
     });
+
+    const dimensionMap = new Map<
+      number,
+      GetCategorySubjectResponse['filterDimensions'][0]
+    >();
+
+    for (const subject of subjects)
+      for (const option of subject.filterOptions) {
+        const { dimension } = option;
+        if (!dimensionMap.has(dimension.id))
+          dimensionMap.set(dimension.id, { ...dimension, options: [] });
+
+        const dim = dimensionMap.get(dimension.id)!;
+        let opt = dim.options.find((o) => o.id === option.id);
+        if (!opt) {
+          opt = {
+            id: option.id,
+            parentId: option.parentId,
+            name: option.name,
+            subjectIds: [],
+          };
+          dim.options.push(opt);
+        }
+        opt.subjectIds.push(subject.id);
+      }
+
+    return {
+      subjects: subjects.map(({ id, name, sortOrder, createdAt }) => ({
+        id,
+        name,
+        sortOrder,
+        createdAt,
+      })),
+      filterDimensions: Array.from(dimensionMap.values()),
+    };
   }
 
   public async createCategory(

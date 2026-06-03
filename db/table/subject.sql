@@ -1,6 +1,7 @@
 CREATE TABLE IF NOT EXISTS castor.subject (
     id INT UNSIGNED AUTO_INCREMENT,
     name VARCHAR(255) NOT NULL,
+    sort_order TINYINT UNSIGNED NOT NULL DEFAULT 0,
     created_at DATETIME(3) NULL,
     PRIMARY KEY (id)
 );

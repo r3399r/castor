@@ -63,6 +63,7 @@ export class SubjectService {
   ): Promise<PostSubjectResponse> {
     const subjectEntity = new SubjectEntity();
     subjectEntity.name = subject.name;
+    subjectEntity.sortOrder = 0;
 
     return await this.subjectAccess.save(subjectEntity);
   }

@@ -9,6 +9,7 @@ export type Subject = {
   category: Category[];
   filterOptions: FilterOption[];
   name: string;
+  sortOrder: number;
   createdAt: string | null;
 };
 
@@ -151,7 +152,17 @@ export type FilterOption = {
 
 export type GetCategoryResponse = Category[]
 
-export type GetCategorySubjectResponse = Subject[]
+export type GetCategorySubjectResponse = {
+  subjects: Omit<Subject, 'category' | 'filterOptions'>[],
+  filterDimensions: (FilterDimension & {
+    options: {
+      id: number;
+      parentId: number | null;
+      name: string;
+      subjectIds: number[];
+    }[]
+  })[]
+}
 
 export type PostCategoryRequest = {
   name: string;

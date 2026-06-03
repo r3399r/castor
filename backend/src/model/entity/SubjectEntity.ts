@@ -18,6 +18,9 @@ export class SubjectEntity implements Subject {
   @Column({ type: 'varchar', length: 255 })
   name!: string;
 
+  @Column({ type: 'tinyint', unsigned: true, name: 'sort_order', default: 0 })
+  sortOrder!: number;
+
   @Column({ type: 'datetime', name: 'created_at', default: null })
   createdAt!: string;
 

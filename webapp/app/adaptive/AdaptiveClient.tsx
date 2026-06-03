@@ -23,10 +23,6 @@ import type {
 } from '@/types/api'
 import { MathJax } from 'better-react-mathjax'
 
-const categoryLabel: Record<string, string> = {
-  '國中': '國中會考',
-}
-
 const typeLabel: Record<string, string> = {
   SINGLE: '單選題',
   MULTIPLE: '多選題',
@@ -159,7 +155,7 @@ export default function AdaptiveClient() {
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
 
   const [categoryList, setCategoryList] = useState<Category[]>([])
-  const [subjectList, setSubjectList] = useState<Subject[]>([])
+  const [subjectList, setSubjectList] = useState<GetCategorySubjectResponse['subjects']>([])
   const [examList, setExamList] = useState<Exam[]>([])
   const [conceptGroupList, setConceptGroupList] = useState<ConceptGroup[]>([])
   const [tagList, setTagList] = useState<Tag[]>([])
@@ -197,7 +193,7 @@ export default function AdaptiveClient() {
     setSelectedConceptIds([])
     setSelectedTagIds([])
     apiFetch<GetCategorySubjectResponse>(`category/${selectedCategoryId}/subject`)
-      .then(setSubjectList)
+      .then((res)=>setSubjectList(res.subjects))
       .catch(console.error)
   }, [selectedCategoryId])
 
@@ -349,7 +345,7 @@ export default function AdaptiveClient() {
                         : 'border border-brown-300 bg-beige-200 text-black-900 hover:border-brown-700 active:scale-[0.97]'
                     }`}
                   >
-                    {categoryLabel[c.name] ?? c.name}
+                    {c.name}
                   </button>
                 ))}
                 {['分科'].map((name) => (
