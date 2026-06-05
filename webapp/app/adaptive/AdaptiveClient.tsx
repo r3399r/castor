@@ -12,15 +12,13 @@ import type {
   GetCategorySubjectResponse,
   GetQuestionAdaptiveResponse,
   GetQuestionResponse,
-  GetSubjectConceptGroupResponse,
-  GetSubjectExamResponse,
-  GetSubjectTagResponse,
   PostReplyRequest,
   PostReplyResponse,
   Question,
-  Subject,
   Tag,
 } from '@/types/api'
+
+type FilterDimensionWithOptions = GetCategorySubjectResponse['filterDimensions'][number]
 import { MathJax } from 'better-react-mathjax'
 
 const typeLabel: Record<string, string> = {
@@ -154,8 +152,11 @@ export default function AdaptiveClient() {
   const [selectedConceptIds, setSelectedConceptIds] = useState<string[]>([])
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
 
+  const [selectedFilterOptionByDim, setSelectedFilterOptionByDim] = useState<Record<number, number>>({})
+
   const [categoryList, setCategoryList] = useState<Category[]>([])
   const [subjectList, setSubjectList] = useState<GetCategorySubjectResponse['subjects']>([])
+  const [filterDimensions, setFilterDimensions] = useState<FilterDimensionWithOptions[]>([])
   const [examList, setExamList] = useState<Exam[]>([])
   const [conceptGroupList, setConceptGroupList] = useState<ConceptGroup[]>([])
   const [tagList, setTagList] = useState<Tag[]>([])
@@ -189,13 +190,44 @@ export default function AdaptiveClient() {
   useEffect(() => {
     if (!selectedCategoryId) return
     setSelectedSubjectId('')
+    setSelectedFilterOptionByDim({})
     setSelectedExamIds([])
     setSelectedConceptIds([])
     setSelectedTagIds([])
     apiFetch<GetCategorySubjectResponse>(`category/${selectedCategoryId}/subject`)
-      .then((res)=>setSubjectList(res.subjects))
+      .then((res) => {
+        setSubjectList(res.subjects)
+        setFilterDimensions(res.filterDimensions)
+      })
       .catch(console.error)
   }, [selectedCategoryId])
+
+  const { filteredSubjectList, visibleOptionsByDim } = useMemo(() => {
+    const sortedDims = [...filterDimensions].sort((a, b) => a.sortOrder - b.sortOrder)
+    const visibleOptionsByDim: Record<number, FilterDimensionWithOptions['options']> = {}
+
+    // cascade display: track which parentIds are valid for the next dimension
+    let validParentIds: Set<number | null> = new Set([null])
+    for (const dim of sortedDims) {
+      visibleOptionsByDim[dim.id] = dim.options.filter((o) => validParentIds.has(o.parentId))
+      const selectedOptId = selectedFilterOptionByDim[dim.id]
+      validParentIds = selectedOptId !== undefined
+        ? new Set([selectedOptId])
+        : new Set(visibleOptionsByDim[dim.id].map((o) => o.id))
+    }
+
+    // filter subjects: intersect selected options' subjectIds across all dims
+    let currentIds = new Set(subjectList.map((s) => s.id))
+    for (const dim of sortedDims) {
+      const selectedOptId = selectedFilterOptionByDim[dim.id]
+      if (selectedOptId !== undefined) {
+        const opt = dim.options.find((o) => o.id === selectedOptId)
+        if (opt) currentIds = new Set(opt.subjectIds.filter((id) => currentIds.has(id)))
+      }
+    }
+
+    return { filteredSubjectList: subjectList.filter((s) => currentIds.has(s.id)), visibleOptionsByDim }
+  }, [subjectList, filterDimensions, selectedFilterOptionByDim])
 
   useEffect(() => {
     if (!selectedSubjectId) return
@@ -270,11 +302,33 @@ export default function AdaptiveClient() {
     }
   }
 
+  useEffect(() => {
+    if (!selectedSubjectId) return
+    if (!filteredSubjectList.some((s) => String(s.id) === selectedSubjectId))
+      setSelectedSubjectId('')
+  }, [filteredSubjectList])
+
+  useEffect(() => {
+    setSelectedFilterOptionByDim((prev) => {
+      const next = { ...prev }
+      let changed = false
+      for (const [dimId, optId] of Object.entries(prev)) {
+        const visible = visibleOptionsByDim[Number(dimId)]
+        if (visible && !visible.some((o) => o.id === optId)) {
+          delete next[Number(dimId)]
+          changed = true
+        }
+      }
+      return changed ? next : prev
+    })
+  }, [visibleOptionsByDim])
+
   const onReset = () => {
     setAdaptiveQuestion([])
     setReplyResponse(null)
     setResponseOffsets([])
     setRepliedAnswer(new Map())
+    setSelectedFilterOptionByDim({})
     setSelectedExamIds([])
     setSelectedConceptIds([])
     setSelectedTagIds([])
@@ -376,12 +430,49 @@ export default function AdaptiveClient() {
           </div>
         </div>
 
-        {selectedCategoryId && subjectList.length > 0 && (
+        {selectedCategoryId && filterDimensions.length > 0 && (
+          <div className="flex flex-col gap-2 mt-4">
+            <span className="text-base font-bold text-black-700">篩選條件</span>
+            <div className={`rounded-lg border border-brown-700 divide-y divide-brown-300 ${filtersLocked ? 'pointer-events-none opacity-50' : ''}`}>
+              {filterDimensions.map((dim) => (
+                <div key={dim.id} className="px-6 py-4">
+                  <span className="mb-3 block text-sm font-bold text-black-700">{dim.name}</span>
+                  <div className="flex flex-wrap gap-2">
+                    {(visibleOptionsByDim[dim.id] ?? dim.options).map((opt) => {
+                      const checked = selectedFilterOptionByDim[dim.id] === opt.id
+                      return (
+                        <button
+                          key={opt.id}
+                          onClick={() =>
+                            setSelectedFilterOptionByDim((prev) =>
+                              checked
+                                ? (({ [dim.id]: _, ...rest }) => rest)(prev)
+                                : { ...prev, [dim.id]: opt.id },
+                            )
+                          }
+                          className={`rounded-lg px-4 py-1 text-sm font-medium transition text-left ${
+                            checked
+                              ? 'border-2 border-teal-700 bg-teal-700/10 text-teal-700'
+                              : 'border border-brown-300 bg-beige-200 text-black-900 hover:border-brown-700 active:scale-[0.97]'
+                          }`}
+                        >
+                          {opt.name}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {selectedCategoryId && filteredSubjectList.length > 0 && (
           <div className="flex flex-col gap-2 mt-4">
             <span className="text-base font-bold text-black-700">選擇科目</span>
             <div className={`rounded-lg border border-brown-700 px-6 py-4 ${filtersLocked ? 'pointer-events-none opacity-50' : ''}`}>
               <div className="flex flex-wrap gap-2">
-                {subjectList.map((s) => (
+                {filteredSubjectList.map((s) => (
                   <button
                     key={s.id}
                     onClick={() => setSelectedSubjectId(String(s.id))}

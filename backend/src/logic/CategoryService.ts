@@ -78,7 +78,9 @@ export class CategoryService {
           tags,
         })
       ),
-      filterDimensions: Array.from(dimensionMap.values()),
+      filterDimensions: Array.from(dimensionMap.values()).sort(
+        (a, b) => a.sortOrder - b.sortOrder
+      ),
     };
   }
 
