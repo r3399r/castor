@@ -35,6 +35,9 @@ export class CategoryService {
         filterOptions: {
           dimension: true,
         },
+        exams: true,
+        conceptGroups: { concepts: true },
+        tags: true,
       },
     });
 
@@ -64,12 +67,17 @@ export class CategoryService {
       }
 
     return {
-      subjects: subjects.map(({ id, name, sortOrder, createdAt }) => ({
-        id,
-        name,
-        sortOrder,
-        createdAt,
-      })),
+      subjects: subjects.map(
+        ({ id, name, sortOrder, createdAt, exams, conceptGroups, tags }) => ({
+          id,
+          name,
+          sortOrder,
+          createdAt,
+          exams,
+          conceptGroups,
+          tags,
+        })
+      ),
       filterDimensions: Array.from(dimensionMap.values()),
     };
   }

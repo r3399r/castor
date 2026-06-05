@@ -202,17 +202,9 @@ export default function AdaptiveClient() {
     setSelectedExamIds([])
     setSelectedConceptIds([])
     setSelectedTagIds([])
-    Promise.all([
-      apiFetch<GetSubjectExamResponse>(`subject/${selectedSubjectId}/exam`),
-      apiFetch<GetSubjectConceptGroupResponse>(`subject/${selectedSubjectId}/concept-group`),
-      apiFetch<GetSubjectTagResponse>(`subject/${selectedSubjectId}/tag`),
-    ])
-      .then(([exams, conceptGroups, tags]) => {
-        setExamList(exams)
-        setConceptGroupList(conceptGroups)
-        setTagList(tags)
-      })
-      .catch(console.error)
+    setExamList(subjectList.find((s) => String(s.id) === selectedSubjectId)?.exams ?? [])
+    setConceptGroupList(subjectList.find((s) => String(s.id) === selectedSubjectId)?.conceptGroups ?? [])
+    setTagList(subjectList.find((s) => String(s.id) === selectedSubjectId)?.tags ?? [])
   }, [selectedSubjectId])
 
   useEffect(() => {

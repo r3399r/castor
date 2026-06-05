@@ -1,14 +1,25 @@
-import { Category, FilterOption, Subject } from '@castor/shared';
+import {
+  Category,
+  ConceptGroup,
+  Exam,
+  FilterOption,
+  Subject,
+  Tag,
+} from '@castor/shared';
 import {
   BeforeInsert,
   Column,
   Entity,
   JoinTable,
   ManyToMany,
+  OneToMany,
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { CategoryEntity } from './CategoryEntity';
+import { ConceptGroupEntity } from './ConceptGroupEntity';
+import { ExamEntity } from './ExamEntity';
 import { FilterOptionEntity } from './FilterOptionEntity';
+import { TagEntity } from './TagEntity';
 
 @Entity({ name: 'subject' })
 export class SubjectEntity implements Subject {
@@ -39,6 +50,20 @@ export class SubjectEntity implements Subject {
     inverseJoinColumn: { name: 'option_id', referencedColumnName: 'id' },
   })
   filterOptions!: FilterOption[];
+
+  @ManyToMany(() => ExamEntity, (exam) => exam.subject)
+  @JoinTable({
+    name: 'exam_subject',
+    joinColumn: { name: 'subject_id', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'exam_id', referencedColumnName: 'id' },
+  })
+  exams!: Exam[];
+
+  @OneToMany(() => ConceptGroupEntity, (conceptGroup) => conceptGroup.subject)
+  conceptGroups!: ConceptGroup[];
+
+  @OneToMany(() => TagEntity, (tag) => tag.subject)
+  tags!: Tag[];
 
   @BeforeInsert()
   setDateCreated(): void {

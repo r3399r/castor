@@ -8,6 +8,9 @@ export type Subject = {
   id: number;
   category: Category[];
   filterOptions: FilterOption[];
+  exams: Exam[];
+  conceptGroups: ConceptGroup[];
+  tags: Tag[];
   name: string;
   sortOrder: number;
   createdAt: string | null;
@@ -42,6 +45,7 @@ export type Tag = {
   id: number;
   name: string;
   subjectId: number;
+  subject: Subject;
   createdAt: string | null;
 };
 
