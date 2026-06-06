@@ -68,41 +68,87 @@ function ResultBox({ result }: { result: { correctAnswer: string; score: number 
   )
 }
 
+const CorrectIcon = () => (
+  <span className="ml-auto flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-green-600">
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+      <path d="M2 6L5 9L10 3" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  </span>
+)
+
+const WrongIcon = () => (
+  <span className="ml-auto flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-red-700">
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+      <path d="M3 3L9 9M9 3L3 9" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+    </svg>
+  </span>
+)
+
 function AnswerInput({
   question,
   answer,
   onAnswer,
   disabled,
+  correctAnswer,
 }: {
   question: Question
   answer: string
   onAnswer: (val: string) => void
   disabled: boolean
+  correctAnswer?: string
 }) {
   const options = question.options?.split('|') ?? []
+  const submitted = !!correctAnswer
 
-  const optionBtn = (isSelected: boolean) =>
-    `flex flex-1 cursor-pointer items-center rounded-lg border px-4 py-2.5 text-[20px] font-bold transition select-none ${
-      isSelected
+  const getOptClass = (opt: string) => {
+    const base = 'flex flex-1 items-center rounded-md border px-4 py-2.5 text-[20px] font-bold select-none transition'
+    if (submitted) {
+      const isCorrect = opt === correctAnswer
+      const isWrongSelected = opt === answer && opt !== correctAnswer
+      if (isCorrect) return `${base} cursor-default border-2 border-green-600 bg-green-600/10 text-green-600`
+      if (isWrongSelected) return `${base} cursor-default border-2 border-red-700 bg-red-700/10 text-red-700`
+      return `${base} cursor-default border-brown-300 bg-beige-200 text-black-400 opacity-40`
+    }
+    return `${base} cursor-pointer ${
+      opt === answer
         ? 'border-2 border-blue-700 bg-blue-700/20 text-blue-700'
         : 'border-brown-300 bg-beige-200 text-black-700 hover:border-brown-700 active:scale-[0.97]'
     } ${disabled ? 'cursor-not-allowed opacity-60' : ''}`
+  }
+
+  const getTFClass = (val: string) => {
+    const base = 'flex flex-1 items-center rounded-md border px-4 py-2.5 text-[20px] font-bold select-none transition'
+    if (submitted) {
+      const isCorrect = val === correctAnswer
+      const isWrongSelected = val === answer && val !== correctAnswer
+      if (isCorrect) return `${base} cursor-default border-2 border-green-600 bg-green-600/10 text-green-600`
+      if (isWrongSelected) return `${base} cursor-default border-2 border-red-700 bg-red-700/10 text-red-700`
+      return `${base} cursor-default border-brown-300 bg-beige-200 text-black-400 opacity-40`
+    }
+    return `${base} cursor-pointer ${
+      val === answer
+        ? 'border-2 border-blue-700 bg-blue-700/20 text-blue-700'
+        : 'border-brown-300 bg-beige-200 text-black-700 hover:border-brown-700 active:scale-[0.97]'
+    } ${disabled ? 'cursor-not-allowed opacity-60' : ''}`
+  }
 
   if (question.type === 'TRUE_FALSE') {
     return (
       <div className="flex gap-2">
         {['True', 'False'].map((val) => (
-          <label key={val} className={optionBtn(answer === val)}>
+          <label key={val} className={getTFClass(val)}>
             <input
               type="radio"
               name={`q-${question.id}`}
               value={val}
               checked={answer === val}
-              onChange={() => onAnswer(val)}
+              onChange={() => !submitted && onAnswer(val)}
               disabled={disabled}
               className="sr-only"
             />
             {val === 'True' ? '是' : '非'}
+            {submitted && val === correctAnswer && <CorrectIcon />}
+            {submitted && val === answer && val !== correctAnswer && <WrongIcon />}
           </label>
         ))}
       </div>
@@ -113,17 +159,19 @@ function AnswerInput({
     return (
       <div className="flex gap-2">
         {options.map((opt) => (
-          <label key={opt} className={optionBtn(answer === opt)}>
+          <label key={opt} className={getOptClass(opt)}>
             <input
               type="radio"
               name={`q-${question.id}`}
               value={opt}
               checked={answer === opt}
-              onChange={() => onAnswer(opt)}
+              onChange={() => !submitted && onAnswer(opt)}
               disabled={disabled}
               className="sr-only"
             />
             {opt}
+            {submitted && opt === correctAnswer && <CorrectIcon />}
+            {submitted && opt === answer && opt !== correctAnswer && <WrongIcon />}
           </label>
         ))}
       </div>
@@ -135,11 +183,12 @@ function AnswerInput({
     return (
       <div className="flex gap-2">
         {options.map((opt, i) => (
-          <label key={opt} className={optionBtn(base[i] === 'O')}>
+          <label key={opt} className={getOptClass(opt)}>
             <input
               type="checkbox"
               checked={base[i] === 'O'}
               onChange={(e) => {
+                if (submitted) return
                 const next =
                   base.substring(0, i) + (e.target.checked ? 'O' : 'X') + base.substring(i + 1)
                 onAnswer(next)
@@ -148,6 +197,8 @@ function AnswerInput({
               className="sr-only"
             />
             {opt}
+            {submitted && opt === correctAnswer && <CorrectIcon />}
+            {submitted && opt === answer && opt !== correctAnswer && <WrongIcon />}
           </label>
         ))}
       </div>
@@ -163,7 +214,7 @@ function AnswerInput({
           <div key={i} className="flex flex-wrap items-center gap-2">
             <span className="text-sm font-bold text-black-700">{i + 1}.</span>
             {options.map((opt) => (
-              <label key={opt} className={optionBtn(base[i] === opt)}>
+              <label key={opt} className={getOptClass(opt)}>
                 <input
                   type="radio"
                   name={`q-${question.id}-blank-${i}`}
@@ -747,7 +798,7 @@ export default function AdaptiveClient() {
             {adaptiveQuestion.map((question, qi) => {
               const offset = responseOffsets[qi] ?? 0
               return (
-                <div key={question.id} className="overflow-hidden rounded-lg border border-[#E3D1C5]">
+                <div key={question.id} className="overflow-hidden rounded-lg border border-brown-700">
                   <div className="flex items-center justify-between gap-3 border-b border-[#E3D1C5] px-5 pt-3 pb-2">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="shrink-0 font-bold text-blue-700">
@@ -776,7 +827,7 @@ export default function AdaptiveClient() {
                     <DifficultyStars value={question.adjustedDifficulty} />
                   </div>
 
-                  <div className="flex flex-col gap-4 p-5">
+                  <div className="flex flex-col gap-4 px-5 py-5 lg:px-[40px]">
                     {question.content && (
                       <div
                         dangerouslySetInnerHTML={{ __html: question.content }}
@@ -792,6 +843,7 @@ export default function AdaptiveClient() {
                             setRepliedAnswer((prev) => new Map(prev).set(question.id, val))
                           }
                           disabled={!!replyResponse}
+                          correctAnswer={replyResponse?.[offset]?.correctAnswer}
                         />
                         {replyResponse?.[offset] && (
                           <ResultBox result={replyResponse[offset]} />
@@ -815,6 +867,7 @@ export default function AdaptiveClient() {
                               setRepliedAnswer((prev) => new Map(prev).set(child.id, val))
                             }
                             disabled={!!replyResponse}
+                            correctAnswer={replyResponse?.[offset + i]?.correctAnswer}
                           />
                           {replyResponse?.[offset + i] && (
                             <ResultBox result={replyResponse[offset + i]} />
