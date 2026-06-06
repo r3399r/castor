@@ -31,6 +31,43 @@ const typeLabel: Record<string, string> = {
 
 
 
+function ResultBox({ result }: { result: { correctAnswer: string; score: number } }) {
+  const correct = result.score > 0
+  return (
+    <div
+      className={`mt-4 rounded-xl border p-4 ${
+        correct ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'
+      }`}
+    >
+      <div
+        className={`mb-2 flex items-center gap-1.5 text-sm font-semibold ${
+          correct ? 'text-green-700' : 'text-red-700'
+        }`}
+      >
+        {correct ? (
+          <>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M3 8.5L6.5 12L13 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            答對了！
+          </>
+        ) : (
+          <>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M4 4L12 12M12 4L4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+            答錯了
+          </>
+        )}
+      </div>
+      <div className="text-xs text-black-700">
+        正確答案：<span className="font-semibold">{result.correctAnswer}</span>
+      </div>
+      <div className="mt-0.5 text-xs text-black-500">得分：{result.score}</div>
+    </div>
+  )
+}
+
 function AnswerInput({
   question,
   answer,
@@ -44,11 +81,18 @@ function AnswerInput({
 }) {
   const options = question.options?.split('|') ?? []
 
+  const optionBtn = (isSelected: boolean) =>
+    `flex flex-1 cursor-pointer items-center rounded-lg border px-4 py-2.5 text-[20px] font-bold transition select-none ${
+      isSelected
+        ? 'border-2 border-blue-700 bg-blue-700/20 text-blue-700'
+        : 'border-brown-300 bg-beige-200 text-black-700 hover:border-brown-700 active:scale-[0.97]'
+    } ${disabled ? 'cursor-not-allowed opacity-60' : ''}`
+
   if (question.type === 'TRUE_FALSE') {
     return (
-      <div className="mt-3 flex gap-6">
+      <div className="flex gap-2">
         {['True', 'False'].map((val) => (
-          <label key={val} className="flex cursor-pointer items-center gap-2">
+          <label key={val} className={optionBtn(answer === val)}>
             <input
               type="radio"
               name={`q-${question.id}`}
@@ -56,9 +100,9 @@ function AnswerInput({
               checked={answer === val}
               onChange={() => onAnswer(val)}
               disabled={disabled}
-              className="accent-blue-700"
+              className="sr-only"
             />
-            <span className="text-sm">{val === 'True' ? '是' : '非'}</span>
+            {val === 'True' ? '是' : '非'}
           </label>
         ))}
       </div>
@@ -67,9 +111,9 @@ function AnswerInput({
 
   if (question.type === 'SINGLE') {
     return (
-      <div className="mt-3 flex flex-wrap gap-4">
+      <div className="flex gap-2">
         {options.map((opt) => (
-          <label key={opt} className="flex cursor-pointer items-center gap-2">
+          <label key={opt} className={optionBtn(answer === opt)}>
             <input
               type="radio"
               name={`q-${question.id}`}
@@ -77,9 +121,9 @@ function AnswerInput({
               checked={answer === opt}
               onChange={() => onAnswer(opt)}
               disabled={disabled}
-              className="accent-blue-700"
+              className="sr-only"
             />
-            <span className="text-sm">{opt}</span>
+            {opt}
           </label>
         ))}
       </div>
@@ -89,9 +133,9 @@ function AnswerInput({
   if (question.type === 'MULTIPLE') {
     const base = answer || 'X'.repeat(options.length)
     return (
-      <div className="mt-3 flex flex-wrap gap-4">
+      <div className="flex gap-2">
         {options.map((opt, i) => (
-          <label key={opt} className="flex cursor-pointer items-center gap-2">
+          <label key={opt} className={optionBtn(base[i] === 'O')}>
             <input
               type="checkbox"
               checked={base[i] === 'O'}
@@ -101,9 +145,9 @@ function AnswerInput({
                 onAnswer(next)
               }}
               disabled={disabled}
-              className="accent-blue-700"
+              className="sr-only"
             />
-            <span className="text-sm">{opt}</span>
+            {opt}
           </label>
         ))}
       </div>
@@ -114,12 +158,12 @@ function AnswerInput({
     const blanks = question.answer?.length ?? 0
     const base = answer || '@'.repeat(blanks)
     return (
-      <div className="mt-3 flex flex-col gap-3">
+      <div className="flex flex-col gap-4">
         {Array.from({ length: blanks }).map((_, i) => (
-          <div key={i} className="flex flex-wrap items-center gap-3">
-            <span className="text-base font-bold text-black-700">{i + 1}.</span>
+          <div key={i} className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-bold text-black-700">{i + 1}.</span>
             {options.map((opt) => (
-              <label key={opt} className="flex cursor-pointer items-center gap-1.5">
+              <label key={opt} className={optionBtn(base[i] === opt)}>
                 <input
                   type="radio"
                   name={`q-${question.id}-blank-${i}`}
@@ -130,9 +174,9 @@ function AnswerInput({
                     onAnswer(next)
                   }}
                   disabled={disabled}
-                  className="accent-blue-700"
+                  className="sr-only"
                 />
-                <span className="text-sm">{opt}</span>
+                {opt}
               </label>
             ))}
           </div>
@@ -346,7 +390,7 @@ export default function AdaptiveClient() {
       ) : (
         <button
           onClick={onReset}
-          className="mt-[60px] mb-8 flex items-center gap-2 rounded-lg px-3 py-1.5 text-lg font-bold text-black-700 hover:bg-beige-200 hover:text-black-900 transition cursor-pointer"
+          className="mt-[60px] mb-6 flex items-center gap-2 rounded-lg px-3 py-1.5 text-lg font-bold text-black-700 hover:bg-beige-200 hover:text-black-900 transition cursor-pointer"
         >
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M16 10H4M4 10L9 5M4 10L9 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -697,16 +741,18 @@ export default function AdaptiveClient() {
       )}
 
       {adaptiveQuestion.length > 0 && (
-        <div className="flex flex-col gap-6">
+        <div>
           <MathJax dynamic>
+            <div className="flex flex-col gap-[40px]">
             {adaptiveQuestion.map((question, qi) => {
               const offset = responseOffsets[qi] ?? 0
               return (
-                <div key={question.id} className="overflow-hidden rounded-xl border border-brown-300">
-                  <div className="flex items-start justify-between gap-2 border-b border-brown-300 bg-blue-50 p-3">
-                    <div className="flex flex-wrap gap-2">
-                      <span className="text-xs font-semibold text-blue-700">
-                        第 {qi + 1} / {numQuestionsTarget} 題
+                <div key={question.id} className="overflow-hidden rounded-lg border border-[#E3D1C5]">
+                  <div className="flex items-center justify-between gap-3 border-b border-[#E3D1C5] px-5 pt-3 pb-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="shrink-0 font-bold text-blue-700">
+                        <span className="text-[20px]">Q{qi + 1}</span>
+                        <span className="text-base"> / {numQuestionsTarget}</span>
                       </span>
                       <Chip label={typeLabel[question.type] ?? question.type} />
                       {question.exam.map((e) => (
@@ -730,11 +776,11 @@ export default function AdaptiveClient() {
                     <DifficultyStars value={question.adjustedDifficulty} />
                   </div>
 
-                  <div className="p-4">
+                  <div className="flex flex-col gap-4 p-5">
                     {question.content && (
                       <div
                         dangerouslySetInnerHTML={{ __html: question.content }}
-                        className="prose prose-sm max-w-none"
+                        className="prose max-w-none text-[18px] text-black-700 [&>*:last-child]:mb-0"
                       />
                     )}
                     {question.answer && (
@@ -748,17 +794,14 @@ export default function AdaptiveClient() {
                           disabled={!!replyResponse}
                         />
                         {replyResponse?.[offset] && (
-                          <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm">
-                            <div>解答：{replyResponse[offset].correctAnswer}</div>
-                            <div>得分：{replyResponse[offset].score}</div>
-                          </div>
+                          <ResultBox result={replyResponse[offset]} />
                         )}
                       </>
                     )}
 
                     {question.type === 'GROUP' &&
                       question.children.map((child, i) => (
-                        <div key={child.id} className="mt-4 border-t border-[#E5E0DC] pt-4">
+                        <div key={child.id} className="mt-5 border-t border-brown-300 pt-5">
                           {child.content && (
                             <div
                               dangerouslySetInnerHTML={{ __html: child.content }}
@@ -774,10 +817,7 @@ export default function AdaptiveClient() {
                             disabled={!!replyResponse}
                           />
                           {replyResponse?.[offset + i] && (
-                            <div className="mt-3 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm">
-                              <div>解答：{replyResponse[offset + i].correctAnswer}</div>
-                              <div>得分：{replyResponse[offset + i].score}</div>
-                            </div>
+                            <ResultBox result={replyResponse[offset + i]} />
                           )}
                         </div>
                       ))}
@@ -788,7 +828,7 @@ export default function AdaptiveClient() {
                           href={`https://m.facebook.com/${replyResponse[offset].fbPostId!.split('_')[0]}/posts/${replyResponse[offset].fbPostId!.split('_')[1]}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-sm text-blue-600 underline hover:text-blue-800"
+                          className="mt-4 inline-flex items-center gap-1 text-sm text-blue-600 underline hover:text-blue-800"
                         >
                           討論區
                         </a>
@@ -798,18 +838,26 @@ export default function AdaptiveClient() {
                 </div>
               )
             })}
+            </div>
           </MathJax>
         </div>
       )}
 
       {adaptiveQuestion.length > 0 && !replyResponse && (
-        <div className="mt-6">
+        <div className="mt-[40px] mb-[70px] flex lg:justify-end">
           <button
             onClick={onSubmit}
             disabled={!canSubmit || loading}
-            className="rounded-md bg-blue-700 px-6 py-2.5 text-sm font-bold text-white transition hover:bg-[#1f3ea3] disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex w-full items-center justify-center gap-3 rounded-md bg-blue-700 px-6 py-3.5 text-base font-bold text-white transition hover:bg-[#1f3ea3] disabled:cursor-not-allowed disabled:opacity-50 lg:w-[320px]"
           >
-            {loading ? '送出中…' : '確認送出'}
+            {loading ? '送出中…' : (
+              <>
+                確認送出
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                  <path d="M5 12H19M19 12L13 6M19 12L13 18" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </>
+            )}
           </button>
         </div>
       )}
