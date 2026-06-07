@@ -27,7 +27,9 @@ const wrapHtml = (content: string) => `<!DOCTYPE html>
 <body>${content}</body>
 </html>`;
 
-export async function htmlToS3Url(html: string): Promise<{ url: string; key: string }> {
+export async function htmlToS3Url(
+  html: string
+): Promise<{ url: string; key: string }> {
   const browser = await puppeteer.launch({
     args: chromium.args,
     executablePath: await chromium.executablePath(),
@@ -38,7 +40,10 @@ export async function htmlToS3Url(html: string): Promise<{ url: string; key: str
     const page = await browser.newPage();
     await page.setViewport({ width: 560, height: 600, deviceScaleFactor: 2 });
     // 'load' waits for the <script> tags (including MathJax CDN) to finish executing
-    await page.setContent(wrapHtml(html), { waitUntil: 'load', timeout: 20000 });
+    await page.setContent(wrapHtml(html), {
+      waitUntil: 'load',
+      timeout: 20000,
+    });
     // MathJax typesetting is async internally; wait for startup.promise to resolve
     await page.evaluate(async () => {
       type Win = { MathJax?: { startup?: { promise?: Promise<void> } } };
@@ -48,10 +53,16 @@ export async function htmlToS3Url(html: string): Promise<{ url: string; key: str
       ]);
     });
     // Clip to actual content size to avoid blank right/bottom padding
-    const { contentWidth, contentHeight } = await page.evaluate(() => ({
-      contentWidth: document.documentElement.scrollWidth,
-      contentHeight: document.documentElement.scrollHeight,
-    }));
+    const { contentWidth, contentHeight } = await page.evaluate(() => {
+      const style = window.getComputedStyle(document.body);
+      const marginBottom = parseFloat(style.marginBottom);
+
+      return {
+        contentWidth: document.documentElement.scrollWidth,
+        contentHeight:
+          document.body.getBoundingClientRect().bottom + marginBottom,
+      };
+    });
     const buffer = (await page.screenshot({
       type: 'png',
       clip: { x: 0, y: 0, width: contentWidth, height: contentHeight },
@@ -68,8 +79,12 @@ export async function htmlToS3Url(html: string): Promise<{ url: string; key: str
       })
       .promise();
 
-    const region = process.env.AWS_REGION ?? 'ap-east-1';
-    return { url: `https://${process.env.S3_BUCKET}.s3.${region}.amazonaws.com/${key}`, key };
+    const region = process.env.AWS_REGION ?? 'ap-east-2';
+
+    return {
+      url: `https://${process.env.S3_BUCKET}.s3.${region}.amazonaws.com/${key}`,
+      key,
+    };
   } finally {
     await browser.close();
   }

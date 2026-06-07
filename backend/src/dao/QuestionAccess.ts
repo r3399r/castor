@@ -74,6 +74,24 @@ export class QuestionAccess {
     return question as Question;
   }
 
+  public async findNextUnposted(): Promise<Question | null> {
+    const qb = await this.createQueryBuilder();
+    const question = await qb
+      .innerJoinAndSelect('question.subject', 'subject')
+      .leftJoinAndSelect('subject.category', 'category')
+      .leftJoinAndSelect('question.exam', 'exam')
+      .leftJoinAndSelect('question.tag', 'tag')
+      .leftJoinAndSelect('question.concept', 'concept')
+      .leftJoinAndSelect('question.children', 'children')
+      .where('question.parentId IS NULL')
+      .andWhere('question.fbPostId IS NULL')
+      .andWhere('question.content IS NOT NULL')
+      .orderBy('question.id', 'ASC')
+      .getOne();
+
+    return question as Question | null;
+  }
+
   private async createQueryBuilder() {
     const qr = await this.database.getQueryRunner();
 
