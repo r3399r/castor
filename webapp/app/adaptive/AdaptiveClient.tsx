@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { apiFetch, apiPost } from '@/lib/api'
 import Chip, { tagColors } from '@/components/Chip'
 import DifficultyStars from '@/components/DifficultyStars'
@@ -31,45 +31,69 @@ const typeLabel: Record<string, string> = {
 
 
 
-function ResultBox({ result }: { result: { correctAnswer: string; score: number } }) {
+function ResultBox({ result }: { result: { correctAnswer: string; score: number; fbPostId?: string | null } }) {
   const correct = result.score > 0
+  const fbUrl = result.fbPostId
+    ? `https://m.facebook.com/${result.fbPostId.split('_')[0]}/posts/${result.fbPostId.split('_')[1]}`
+    : null
   return (
     <div
-      className={`mt-4 rounded-xl border p-4 ${
-        correct ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'
+      className={`border-t px-5 py-4 ${
+        correct ? 'border-green-700/30 bg-green-700/10' : 'border-red-600/30 bg-red-600/10'
       }`}
     >
-      <div
-        className={`mb-2 flex items-center gap-1.5 text-sm font-semibold ${
-          correct ? 'text-green-700' : 'text-red-700'
-        }`}
-      >
-        {correct ? (
-          <>
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path d="M3 8.5L6.5 12L13 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <div className="flex flex-col gap-y-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4 sm:gap-y-1">
+        <div
+          className={`flex items-center gap-1.5 text-[18px] font-semibold ${
+            correct ? 'text-green-700' : 'text-red-700'
+          }`}
+        >
+          {correct ? (
+            <>
+              <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-green-700">
+                <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+                  <path d="M2 6L5 9L10 3" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </span>
+              答對了！
+            </>
+          ) : (
+            <>
+              <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-red-600">
+                <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+                  <path d="M3 3L9 9M9 3L3 9" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
+              </span>
+              答錯了
+            </>
+          )}
+        </div>
+        <div className="flex items-center gap-4 sm:contents">
+          <div className="text-base text-black-700">
+            正確答案：<span className={`inline-block rounded border bg-white/80 px-2 py-0.5 font-semibold ${correct ? 'border-green-700/30' : 'border-red-600/30'}`}>{result.correctAnswer}</span>
+          </div>
+          <div className="text-base text-black-500">得分：<span className={`inline-block rounded border bg-white/80 px-2 py-0.5 font-semibold ${correct ? 'border-green-700/30' : 'border-red-600/30'}`}>{result.score}</span></div>
+        </div>
+        {fbUrl && (
+          <a
+            href={fbUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-md border border-brown-900 px-3 py-1.5 text-sm font-medium text-brown-900 transition hover:bg-brown-900/10 sm:mt-0 sm:ml-auto sm:w-auto sm:justify-start"
+          >
+            討論區
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M5.5 2.5H2.5C1.95 2.5 1.5 2.95 1.5 3.5V11.5C1.5 12.05 1.95 12.5 2.5 12.5H10.5C11.05 12.5 11.5 12.05 11.5 11.5V8.5M8.5 1.5H12.5M12.5 1.5V5.5M12.5 1.5L6 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
-            答對了！
-          </>
-        ) : (
-          <>
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path d="M4 4L12 12M12 4L4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-            </svg>
-            答錯了
-          </>
+          </a>
         )}
       </div>
-      <div className="text-xs text-black-700">
-        正確答案：<span className="font-semibold">{result.correctAnswer}</span>
-      </div>
-      <div className="mt-0.5 text-xs text-black-500">得分：{result.score}</div>
     </div>
   )
 }
 
 const CorrectIcon = () => (
-  <span className="ml-auto flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-green-600">
+  <span className="absolute -top-1 -right-1 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-green-700 sm:relative sm:inset-auto sm:ml-auto sm:h-6 sm:w-6">
     <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
       <path d="M2 6L5 9L10 3" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
@@ -77,7 +101,7 @@ const CorrectIcon = () => (
 )
 
 const WrongIcon = () => (
-  <span className="ml-auto flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-red-700">
+  <span className="absolute -top-1 -right-1 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-red-600 sm:relative sm:inset-auto sm:ml-auto sm:h-6 sm:w-6">
     <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
       <path d="M3 3L9 9M9 3L3 9" stroke="white" strokeWidth="2" strokeLinecap="round"/>
     </svg>
@@ -101,34 +125,34 @@ function AnswerInput({
   const submitted = !!correctAnswer
 
   const getOptClass = (opt: string) => {
-    const base = 'flex flex-1 items-center rounded-md border px-4 py-2.5 text-[20px] font-bold select-none transition'
+    const base = 'relative flex flex-1 items-center justify-center rounded-md border-2 p-1 text-[20px] font-bold select-none transition sm:justify-start sm:px-4 sm:py-2.5'
     if (submitted) {
       const isCorrect = opt === correctAnswer
       const isWrongSelected = opt === answer && opt !== correctAnswer
-      if (isCorrect) return `${base} cursor-default border-2 border-green-600 bg-green-600/10 text-green-600`
-      if (isWrongSelected) return `${base} cursor-default border-2 border-red-700 bg-red-700/10 text-red-700`
+      if (isCorrect) return `${base} cursor-default border-2 border-green-700 bg-green-700/10 text-green-700`
+      if (isWrongSelected) return `${base} cursor-default border-2 border-red-600/60 bg-red-600/10 text-red-600`
       return `${base} cursor-default border-brown-300 bg-beige-200 text-black-400 opacity-40`
     }
     return `${base} cursor-pointer ${
       opt === answer
         ? 'border-2 border-blue-700 bg-blue-700/20 text-blue-700'
-        : 'border-brown-300 bg-beige-200 text-black-700 hover:border-brown-700 active:scale-[0.97]'
+        : 'border-[#E3D1C5] bg-beige-100 text-black-700 hover:border-brown-700 active:scale-[0.97]'
     } ${disabled ? 'cursor-not-allowed opacity-60' : ''}`
   }
 
   const getTFClass = (val: string) => {
-    const base = 'flex flex-1 items-center rounded-md border px-4 py-2.5 text-[20px] font-bold select-none transition'
+    const base = 'relative flex flex-1 items-center justify-center rounded-md border-2 p-1 text-[20px] font-bold select-none transition sm:justify-start sm:px-4 sm:py-2.5'
     if (submitted) {
       const isCorrect = val === correctAnswer
       const isWrongSelected = val === answer && val !== correctAnswer
-      if (isCorrect) return `${base} cursor-default border-2 border-green-600 bg-green-600/10 text-green-600`
-      if (isWrongSelected) return `${base} cursor-default border-2 border-red-700 bg-red-700/10 text-red-700`
+      if (isCorrect) return `${base} cursor-default border-2 border-green-700 bg-green-700/10 text-green-700`
+      if (isWrongSelected) return `${base} cursor-default border-2 border-red-600/60 bg-red-600/10 text-red-600`
       return `${base} cursor-default border-brown-300 bg-beige-200 text-black-400 opacity-40`
     }
     return `${base} cursor-pointer ${
       val === answer
         ? 'border-2 border-blue-700 bg-blue-700/20 text-blue-700'
-        : 'border-brown-300 bg-beige-200 text-black-700 hover:border-brown-700 active:scale-[0.97]'
+        : 'border-[#E3D1C5] bg-beige-100 text-black-700 hover:border-brown-700 active:scale-[0.97]'
     } ${disabled ? 'cursor-not-allowed opacity-60' : ''}`
   }
 
@@ -794,17 +818,22 @@ export default function AdaptiveClient() {
       {adaptiveQuestion.length > 0 && (
         <div>
           <MathJax dynamic>
-            <div className="flex flex-col gap-[40px]">
+            <div className="flex flex-col gap-6">
             {adaptiveQuestion.map((question, qi) => {
               const offset = responseOffsets[qi] ?? 0
               return (
-                <div key={question.id} className="overflow-hidden rounded-lg border border-brown-700">
-                  <div className="flex items-center justify-between gap-3 border-b border-[#E3D1C5] px-5 pt-3 pb-2">
-                    <div className="flex flex-wrap items-center gap-2">
+                <div key={question.id} className="overflow-hidden rounded-lg border border-brown-700 bg-white/80">
+                  <div className="border-b border-[#E3D1C5] px-5 pt-3 pb-2">
+                    {/* 題號 + 難易度（同一行）*/}
+                    <div className="flex items-center justify-between gap-3 sm:hidden">
                       <span className="shrink-0 font-bold text-blue-700">
                         <span className="text-[20px]">Q{qi + 1}</span>
                         <span className="text-base"> / {numQuestionsTarget}</span>
                       </span>
+                      <DifficultyStars value={question.adjustedDifficulty} />
+                    </div>
+                    {/* 標籤（第二行，mobile only）*/}
+                    <div className="mt-1.5 flex flex-wrap gap-2 sm:hidden">
                       <Chip label={typeLabel[question.type] ?? question.type} />
                       {question.exam.map((e) => (
                         <Chip key={e.id} label={e.name} color={tagColors.exam} />
@@ -812,11 +841,7 @@ export default function AdaptiveClient() {
                       {question.concept.map((c) => (
                         <Chip
                           key={c.id}
-                          label={
-                            c.conceptGroup.name === c.name
-                              ? c.name
-                              : c.conceptGroup.name + '-' + c.name
-                          }
+                          label={c.conceptGroup.name === c.name ? c.name : c.conceptGroup.name + '-' + c.name}
                           color={tagColors.concept}
                         />
                       ))}
@@ -824,36 +849,60 @@ export default function AdaptiveClient() {
                         <Chip key={t.id} label={t.name} color={tagColors.tag} />
                       ))}
                     </div>
-                    <DifficultyStars value={question.adjustedDifficulty} />
+                    {/* Desktop：題號 + 標籤靠左，難易度靠右 */}
+                    <div className="hidden sm:flex sm:items-start sm:justify-between sm:gap-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="shrink-0 font-bold text-blue-700">
+                          <span className="text-[20px]">Q{qi + 1}</span>
+                          <span className="text-base"> / {numQuestionsTarget}</span>
+                        </span>
+                        <Chip label={typeLabel[question.type] ?? question.type} />
+                        {question.exam.map((e) => (
+                          <Chip key={e.id} label={e.name} color={tagColors.exam} />
+                        ))}
+                        {question.concept.map((c) => (
+                          <Chip
+                            key={c.id}
+                            label={c.conceptGroup.name === c.name ? c.name : c.conceptGroup.name + '-' + c.name}
+                            color={tagColors.concept}
+                          />
+                        ))}
+                        {question.tag.map((t) => (
+                          <Chip key={t.id} label={t.name} color={tagColors.tag} />
+                        ))}
+                      </div>
+                      <DifficultyStars value={question.adjustedDifficulty} />
+                    </div>
                   </div>
 
-                  <div className="flex flex-col gap-4 px-5 py-5 lg:px-[40px]">
+                  <div className="flex flex-col gap-4 px-5 lg:px-[40px] py-7">
                     {question.content && (
                       <div
                         dangerouslySetInnerHTML={{ __html: question.content }}
-                        className="prose max-w-none text-[18px] text-black-700 [&>*:last-child]:mb-0"
+                        className="prose max-w-none text-[18px] font-medium text-black-800 [&>*:last-child]:mb-0"
                       />
                     )}
                     {question.answer && (
-                      <>
-                        <AnswerInput
-                          question={question}
-                          answer={repliedAnswer.get(question.id) ?? ''}
-                          onAnswer={(val) =>
-                            setRepliedAnswer((prev) => new Map(prev).set(question.id, val))
-                          }
-                          disabled={!!replyResponse}
-                          correctAnswer={replyResponse?.[offset]?.correctAnswer}
-                        />
-                        {replyResponse?.[offset] && (
-                          <ResultBox result={replyResponse[offset]} />
-                        )}
-                      </>
+                      <AnswerInput
+                        question={question}
+                        answer={repliedAnswer.get(question.id) ?? ''}
+                        onAnswer={(val) =>
+                          setRepliedAnswer((prev) => new Map(prev).set(question.id, val))
+                        }
+                        disabled={!!replyResponse}
+                        correctAnswer={replyResponse?.[offset]?.correctAnswer}
+                      />
                     )}
+                  </div>
 
-                    {question.type === 'GROUP' &&
-                      question.children.map((child, i) => (
-                        <div key={child.id} className="mt-5 border-t border-brown-300 pt-5">
+                  {question.type !== 'GROUP' && replyResponse?.[offset] && (
+                    <ResultBox result={replyResponse[offset]} />
+                  )}
+
+                  {question.type === 'GROUP' &&
+                    question.children.map((child, i) => (
+                      <Fragment key={child.id}>
+                        <div className="border-t border-brown-300 px-5 lg:px-[40px] pt-5 pb-7">
                           {child.content && (
                             <div
                               dangerouslySetInnerHTML={{ __html: child.content }}
@@ -869,25 +918,12 @@ export default function AdaptiveClient() {
                             disabled={!!replyResponse}
                             correctAnswer={replyResponse?.[offset + i]?.correctAnswer}
                           />
-                          {replyResponse?.[offset + i] && (
-                            <ResultBox result={replyResponse[offset + i]} />
-                          )}
                         </div>
-                      ))}
-
-                    {replyResponse?.[offset]?.fbPostId && (
-                      <div className="mt-4">
-                        <a
-                          href={`https://m.facebook.com/${replyResponse[offset].fbPostId!.split('_')[0]}/posts/${replyResponse[offset].fbPostId!.split('_')[1]}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="mt-4 inline-flex items-center gap-1 text-sm text-blue-600 underline hover:text-blue-800"
-                        >
-                          討論區
-                        </a>
-                      </div>
-                    )}
-                  </div>
+                        {replyResponse?.[offset + i] && (
+                          <ResultBox result={replyResponse[offset + i]} />
+                        )}
+                      </Fragment>
+                    ))}
                 </div>
               )
             })}

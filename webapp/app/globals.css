@@ -38,6 +38,7 @@
 @theme {
   --font-sans: var(--font-inter), 'Taipei Sans TC Beta', sans-serif;
   --color-black-900: #302B28;
+  --color-black-800: #3F3A37;
   --color-black-700: #4E4946;
   --color-black-500: #625D5A;
   --color-black-400: #8A8582;
