@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: "AWS::Serverless-2016-10-31"
-Description: spica deployment cloudformation script
+Description: castor deployment cloudformation script
     
 # More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
 Globals:
@@ -19,6 +19,19 @@ Parameters:
 Conditions: 
   IsProd: !Equals [ !Ref TargetEnvr, prod ]
 Resources:
+  #################################
+  ##### Chromium Lambda Layer #####
+  #################################
+  ChromiumLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: !Sub ${Project}-${TargetEnvr}-chromium
+      ContentUri: ../../chromium-arm64.zip
+      CompatibleRuntimes:
+        - nodejs22.x
+      CompatibleArchitectures:
+        - arm64
+      RetentionPolicy: Delete
   ##########################################
   ##### AWS IAM Role to execute lambda #####
   ##########################################
@@ -40,6 +53,8 @@ Resources:
         - arn:aws:iam::aws:policy/AWSLambda_FullAccess
         - arn:aws:iam::aws:policy/AmazonAPIGatewayInvokeFullAccess
         - arn:aws:iam::aws:policy/AmazonSQSFullAccess
+        - arn:aws:iam::aws:policy/AmazonS3FullAccess
+        - arn:aws:iam::aws:policy/AmazonEventBridgeFullAccess
   ##############################################
   ##### API Gateway and associated Lambdas #####
   ##############################################
@@ -1034,7 +1049,6 @@ Resources:
               "properties": {
                 "subjectId":{"type": "number"},
                 "type":{"type": "string", "enum": ["GROUP","SINGLE","MULTIPLE","TRUE_FALSE","FILL"]},
-                "imageUrl":{"type": "string"},
                 "content":{"type": "string"},
                 "options": {"type": "string",nullable: true},
                 "answer": {"type": "string",nullable: true},
@@ -1065,7 +1079,7 @@ Resources:
                   }
                 }
               },
-              "required": ["subjectId","type","imageUrl","difficulty","examId","conceptIds"]
+              "required": ["subjectId","type","difficulty","examId","conceptIds"]
             },
             "postConceptGroup": {
               "type": "object",
@@ -1132,10 +1146,14 @@ Resources:
       Role: !GetAtt ExecutionRole.Arn
       CodeUri: ../../dist
       MemorySize: 512
+      Timeout: 60
+      Layers:
+        - !Ref ChromiumLayer
       Environment:
         Variables:
           ENVR: !Sub ${TargetEnvr}
           PROJECT: !Sub ${Project}
+          S3_BUCKET: !Sub ${Project}-public-bucket
           DB_HOST:
             Fn::ImportValue: !Sub celestial-studio-${TargetEnvr}-db-endpoint
           DB_PWD: !Sub '{{resolve:ssm:mysql-${TargetEnvr}-${Project}-pwd}}'
@@ -1178,6 +1196,37 @@ Resources:
       Action: 'lambda:InvokeFunction'
       Principal: events.amazonaws.com
       SourceArn: !GetAtt EventBridgeHousekeep.Arn
+  LambdaFacebook:
+    Type: AWS::Serverless::Function
+    Properties:
+      Architectures: [arm64]
+      Handler: index.facebook
+      Runtime: nodejs22.x
+      FunctionName: !Sub ${Project}-${TargetEnvr}-facebook
+      Role: !GetAtt ExecutionRole.Arn
+      CodeUri: ../../dist
+      MemorySize: 1024
+      Timeout: 60
+      Layers:
+        - !Ref ChromiumLayer
+      Environment:
+        Variables:
+          PROJECT: !Sub ${Project}
+          ENVR: !Sub ${TargetEnvr}
+          DB_HOST:
+            Fn::ImportValue: !Sub celestial-studio-${TargetEnvr}-db-endpoint
+          DB_PWD: !Sub '{{resolve:ssm:mysql-${TargetEnvr}-${Project}-pwd}}'
+          S3_BUCKET: !Sub ${Project}-public-bucket
+          FB_PAGE_ID: '352343371286540'
+          FB_ACCESS_TOKEN: !Sub '{{resolve:ssm:${Project}-fb-access-token}}'
+  InvokePermissionFacebook:
+    Type: AWS::Lambda::Permission
+    DependsOn: [LambdaFacebook]
+    Properties:
+      FunctionName: !Sub ${Project}-${TargetEnvr}-facebook
+      Action: 'lambda:InvokeFunction'
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt EventBridgeFacebook.Arn
   #########################################
   ##### Cloudfront and Route53 config #####
   #########################################
@@ -1291,3 +1340,13 @@ Resources:
       Targets:
         - Arn: !GetAtt LambdaHousekeep.Arn
           Id: !Sub ${Project}-${TargetEnvr}-housekeep
+  EventBridgeFacebook:
+    Type: AWS::Events::Rule
+    DependsOn: [LambdaFacebook]
+    Properties:
+      Name: !Sub ${Project}-${TargetEnvr}-facebook
+      ScheduleExpression: cron(*/10 * * * ? *)
+      State: DISABLED
+      Targets:
+        - Arn: !GetAtt LambdaFacebook.Arn
+          Id: !Sub ${Project}-${TargetEnvr}-facebook
