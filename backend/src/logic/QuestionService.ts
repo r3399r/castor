@@ -5,11 +5,9 @@ import {
   GetQuestionParams,
   GetQuestionResponse,
   PostQuestionRequest,
-  PostQuestionResponse,
   Question,
   Tag,
 } from '@castor/shared';
-import axios from 'axios';
 import { inject, injectable } from 'inversify';
 import { In, MoreThan } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
@@ -27,6 +25,7 @@ import { PendingReplyEntity } from 'src/model/entity/PendingReplyEntity';
 import { QuestionEntity } from 'src/model/entity/QuestionEntity';
 import { BadRequestError, UnauthorizedError } from 'src/model/error';
 import { genPagination } from 'src/utils/paginator';
+import { FacebookService } from './FacebookService';
 import { UserService } from './UserService';
 
 /**
@@ -54,6 +53,8 @@ export class QuestionService {
   private readonly conceptGroupAccess!: ConceptGroupAccess;
   @inject(PendingReplyAccess)
   private readonly pendingReplyAccess!: PendingReplyAccess;
+  @inject(FacebookService)
+  private readonly facebookService!: FacebookService;
 
   public async getQuestionByUuid(uuid: string): Promise<GetQuestionIdResponse> {
     return await this.questionAccess.findOneOrFailByUuid(uuid);
@@ -327,32 +328,7 @@ export class QuestionService {
     };
   }
 
-  private async postFb(imageUrl: string, caption: string) {
-    const fbPageId = process.env.FB_PAGE_ID;
-    const fbAccessToken = process.env.FB_ACCESS_TOKEN;
-    const res = await axios.post(
-      `https://graph.facebook.com/${fbPageId}/photos`,
-      {
-        url: imageUrl,
-        access_token: fbAccessToken,
-        caption,
-      }
-    );
-
-    return res.data;
-  }
-
-  private async commentFbPost(postId: string, solution: string) {
-    const fbAccessToken = process.env.FB_ACCESS_TOKEN;
-    await axios.post(`https://graph.facebook.com/${postId}/comments`, {
-      message: solution,
-      access_token: fbAccessToken,
-    });
-  }
-
-  public async createQuestion(
-    data: PostQuestionRequest
-  ): Promise<PostQuestionResponse> {
+  public async createQuestion(data: PostQuestionRequest) {
     const user = await this.userService.getUser();
     if (user === null) throw new UnauthorizedError('User not found');
     if (user.email !== 'lamplighter.planet@gmail.com')
@@ -404,24 +380,12 @@ export class QuestionService {
       concept.numberOfQuestions += 1;
       await this.conceptAccess.save(concept);
     }
-    const fbPost = await this.postFb(
-      data.imageUrl,
-      [
-        ...subject.category.map((c) => c.name),
-        subject.name,
-        exam.name,
-        ...tags.map((t) => t.name),
-        ...concepts.map((c) => c.name),
-      ]
-        .map((t) => `#${t}`)
-        .join(' ')
-    );
 
     const questionEntity = new QuestionEntity();
     questionEntity.uuid = uuidv4();
     questionEntity.subjectId = data.subjectId;
     questionEntity.parentId = null;
-    questionEntity.fbPostId = fbPost.post_id;
+    questionEntity.fbPostId = null;
     questionEntity.isGroup = data.type === 'GROUP';
     questionEntity.type = data.type;
     questionEntity.sortOrder = null;
@@ -435,8 +399,6 @@ export class QuestionService {
     questionEntity.concept = concepts;
 
     const newQuestionEntity = await this.questionAccess.save(questionEntity);
-
-    if (data.solution) await this.commentFbPost(fbPost.post_id, data.solution);
 
     const children: QuestionEntity[] = [];
     if (data.childQuestions !== undefined)
@@ -458,6 +420,8 @@ export class QuestionService {
         const tmpQuestion = await this.questionAccess.save(childEntity);
         children.push(tmpQuestion);
       }
+
+    await this.facebookService.enableEventBridge();
 
     return [newQuestionEntity, ...children];
   }
