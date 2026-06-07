@@ -287,7 +287,13 @@ export default function AdaptiveClient() {
   const [responseOffsets, setResponseOffsets] = useState<number[]>([])
   const [repliedAnswer, setRepliedAnswer] = useState<Map<number, string>>(new Map())
   const [replyResponse, setReplyResponse] = useState<PostReplyResponse | null>(null)
+  const [showResultModal, setShowResultModal] = useState(false)
+  const [showLeaveModal, setShowLeaveModal] = useState(false)
   const [loading, setLoading] = useState(false)
+
+  const totalScore = useMemo(() => replyResponse?.reduce((sum, r) => sum + r.score, 0) ?? 0, [replyResponse])
+  const correctCount = useMemo(() => replyResponse?.filter((r) => r.score > 0).length ?? 0, [replyResponse])
+  const wrongCount = useMemo(() => replyResponse?.filter((r) => r.score <= 0).length ?? 0, [replyResponse])
 
   const showConceptGroupHeader = useMemo(
     () => conceptGroupList.some((cg) => cg.concepts.length > 1),
@@ -414,6 +420,7 @@ export default function AdaptiveClient() {
       const res = await apiPost<PostReplyResponse, PostReplyRequest>('reply', payload)
       setReplyResponse(res)
       setResponseOffsets(offsets)
+      setShowResultModal(true)
     } catch (e) {
       console.error(e)
     } finally {
@@ -464,7 +471,7 @@ export default function AdaptiveClient() {
         </>
       ) : (
         <button
-          onClick={onReset}
+          onClick={() => (!replyResponse ? setShowLeaveModal(true) : onReset())}
           className="mt-[60px] mb-6 flex items-center gap-2 rounded-lg px-3 py-1.5 text-lg font-bold text-black-700 hover:bg-beige-200 hover:text-black-900 transition cursor-pointer"
         >
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -818,7 +825,7 @@ export default function AdaptiveClient() {
       {adaptiveQuestion.length > 0 && (
         <div>
           <MathJax dynamic>
-            <div className="flex flex-col gap-6">
+            <div className="flex flex-col gap-[40px]">
             {adaptiveQuestion.map((question, qi) => {
               const offset = responseOffsets[qi] ?? 0
               return (
@@ -902,7 +909,7 @@ export default function AdaptiveClient() {
                   {question.type === 'GROUP' &&
                     question.children.map((child, i) => (
                       <Fragment key={child.id}>
-                        <div className="border-t border-brown-300 px-5 lg:px-[40px] pt-5 pb-7">
+                        <div className="flex flex-col gap-4 border-t border-brown-300 px-5 lg:px-[40px] pt-5 pb-7">
                           {child.content && (
                             <div
                               dangerouslySetInnerHTML={{ __html: child.content }}
@@ -952,20 +959,98 @@ export default function AdaptiveClient() {
       )}
 
       {replyResponse && (
-        <div className="mt-6 flex flex-wrap gap-3">
+        <div className="mt-[40px] mb-[70px] flex flex-wrap justify-end gap-3">
           <button
             onClick={fetchAdaptive}
             disabled={loading}
-            className="rounded-md bg-blue-700 px-6 py-2.5 text-sm font-bold text-white transition hover:bg-[#1f3ea3] disabled:opacity-50"
+            className="rounded-md border border-blue-700 px-6 py-2.5 text-sm font-bold text-blue-700 transition hover:bg-blue-700/10 disabled:opacity-50"
           >
             用相同條件再練一組
           </button>
           <button
             onClick={onReset}
-            className="rounded-md bg-red-500 px-6 py-2.5 text-sm font-bold text-white transition hover:bg-red-600"
+            className="rounded-md bg-blue-700 px-6 py-2.5 text-sm font-bold text-white transition hover:bg-[#1f3ea3]"
           >
-            清除篩選條件
+            重新篩選
           </button>
+        </div>
+      )}
+
+      {showLeaveModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+          onClick={() => setShowLeaveModal(false)}
+        >
+          <div
+            className="mx-4 w-full max-w-xs rounded-xl bg-beige-100 p-[10px] shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex flex-col items-center gap-6 rounded border border-brown-700 px-6 py-8">
+              <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-black-700">
+                <circle cx="20" cy="20" r="19" stroke="currentColor" strokeWidth="2"/>
+                <line x1="20" y1="12" x2="20" y2="24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
+                <circle cx="20" cy="29" r="1.5" fill="currentColor"/>
+              </svg>
+              <p className="w-full text-center text-base font-normal text-black-700">
+                尚有題目未完成，下次回來時再繼續挑戰。
+              </p>
+              <div className="flex w-full gap-3">
+                <button
+                  onClick={() => setShowLeaveModal(false)}
+                  className="flex-1 rounded-md border border-brown-300 py-2.5 text-sm text-black-900 transition hover:bg-beige-200"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={() => { setShowLeaveModal(false); onReset() }}
+                  className="flex-1 rounded-md border border-brown-300 py-2.5 text-sm text-black-900 transition hover:bg-beige-200"
+                >
+                  仍要離開
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showResultModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+          onClick={() => setShowResultModal(false)}
+        >
+          <div
+            className="mx-4 w-full max-w-xs rounded-xl bg-beige-100 p-[10px] shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex flex-col items-center gap-6 rounded border border-brown-700 px-6 py-8">
+              <div className="w-full text-center">
+                <p className="text-base font-normal text-black-700">此次練習一共獲得</p>
+                <div className="mt-1 flex justify-center">
+                  <span className="relative text-[64px] font-bold leading-tight text-blue-700">
+                    {totalScore}
+                    <span className="absolute bottom-3 left-full ml-1 text-base font-normal text-black-700">分</span>
+                  </span>
+                </div>
+                <hr className="mt-2 border-brown-700" />
+              </div>
+              <div className="flex w-full gap-4">
+                <div className="flex-1 rounded-lg bg-green-700/10 px-4 py-3 text-center">
+                  <p className="text-2xl font-bold text-black-700">{correctCount}</p>
+                  <p className="mt-1 text-sm font-medium text-green-700">正確</p>
+                </div>
+                <div className="flex-1 rounded-lg bg-red-600/10 px-4 py-3 text-center">
+                  <p className="text-2xl font-bold text-black-700">{wrongCount}</p>
+                  <p className="mt-1 text-sm font-medium text-red-600">錯誤</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowResultModal(false)}
+                className="w-full rounded-md border border-brown-300 py-2.5 text-sm text-black-900 transition hover:bg-beige-200"
+              >
+                好
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
