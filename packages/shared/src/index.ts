@@ -308,3 +308,35 @@ export type GetInfoResponse = {
   questionCount: number;
   userCount: number;
 }
+
+export type UserStatHistory = {
+  id: number;
+  userId: number;
+  subjectId: number;
+  date: string;
+  weightedMastery: number | null;
+  dailyAttempts: number;
+  dailyCorrect: number;
+  createdAt: string | null;
+  updatedAt: string | null;
+};
+
+export type DailyMastery = {
+  date: string;
+  weightedMastery: number;
+};
+
+export type SubjectHistory = {
+  subjectId: number;
+  subjectName: string;
+  dailyStats: DailyMastery[];
+};
+
+export type GetUserHistoryResponse = {
+  totalAttempts: number;
+  overallAccuracy: number;
+  streakDays: number;
+  overallDailyMastery: DailyMastery[];
+  subjectHistory: SubjectHistory[];
+  activityMap: { date: string; count: number }[];
+};

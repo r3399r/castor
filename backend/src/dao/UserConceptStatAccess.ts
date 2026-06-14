@@ -4,6 +4,11 @@ import { FindManyOptions, FindOneOptions } from 'typeorm';
 import { UserConceptStatEntity } from 'src/model/entity/UserConceptStatEntity';
 import { Database } from 'src/utils/Database';
 
+type ConceptMasteryWithWeight = {
+  mastery: number | null;
+  numberOfQuestions: number;
+};
+
 /**
  * Access class for UserConceptStat model.
  */
@@ -29,6 +34,23 @@ export class UserConceptStatAccess {
         ...options,
       }
     );
+  }
+
+  public async findByUserAndSubject(
+    userId: number,
+    subjectId: number
+  ): Promise<ConceptMasteryWithWeight[]> {
+    const qr = await this.database.getQueryRunner();
+
+    return await qr.manager
+      .createQueryBuilder(UserConceptStatEntity, 'ucs')
+      .select('ucs.mastery', 'mastery')
+      .addSelect('c.number_of_questions', 'numberOfQuestions')
+      .innerJoin('concept', 'c', 'c.id = ucs.concept_id')
+      .innerJoin('concept_group', 'cg', 'cg.id = c.concept_group_id')
+      .where('ucs.user_id = :userId', { userId })
+      .andWhere('cg.subject_id = :subjectId', { subjectId })
+      .getRawMany<ConceptMasteryWithWeight>();
   }
 
   public async save(data: UserConceptStat): Promise<UserConceptStat> {

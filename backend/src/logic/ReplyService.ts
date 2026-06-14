@@ -13,8 +13,10 @@ import { PendingReplyAccess } from 'src/dao/PendingReplyAccess';
 import { QuestionAccess } from 'src/dao/QuestionAccess';
 import { ReplyAccess } from 'src/dao/ReplyAccess';
 import { UserConceptStatAccess } from 'src/dao/UserConceptStatAccess';
+import { UserStatHistoryAccess } from 'src/dao/UserStatHistoryAccess';
 import { ReplyEntity } from 'src/model/entity/ReplyEntity';
 import { UserConceptStatEntity } from 'src/model/entity/UserConceptStatEntity';
+import { UserStatHistoryEntity } from 'src/model/entity/UserStatHistoryEntity';
 import { UnauthorizedError } from 'src/model/error';
 import { genPagination } from 'src/utils/paginator';
 import { UserService } from './UserService';
@@ -32,6 +34,8 @@ export class ReplyService {
   private readonly userService!: UserService;
   @inject(UserConceptStatAccess)
   private readonly userConceptStatAccess!: UserConceptStatAccess;
+  @inject(UserStatHistoryAccess)
+  private readonly userStatHistoryAccess!: UserStatHistoryAccess;
   @inject(PendingReplyAccess)
   private readonly pendingReplyAccess!: PendingReplyAccess;
 
@@ -171,6 +175,48 @@ export class ReplyService {
     return result;
   }
 
+  private async upsertStatHistory(
+    userId: number,
+    subjectId: number,
+    batchAttempts: number,
+    batchCorrect: number
+  ): Promise<void> {
+    const today = new Date().toISOString().split('T')[0];
+
+    const concepts = await this.userConceptStatAccess.findByUserAndSubject(
+      userId,
+      subjectId
+    );
+    const totalQ = concepts.reduce((sum, c) => sum + c.numberOfQuestions, 0);
+    const weightedMastery =
+      totalQ > 0
+        ? concepts.reduce(
+            (sum, c) => sum + (c.mastery ?? 0) * c.numberOfQuestions,
+            0
+          ) / totalQ
+        : null;
+
+    const existing = await this.userStatHistoryAccess.findOne({
+      where: { userId, subjectId, date: today },
+    });
+
+    if (existing) {
+      existing.weightedMastery = weightedMastery;
+      existing.dailyAttempts += batchAttempts;
+      existing.dailyCorrect += batchCorrect;
+      await this.userStatHistoryAccess.save(existing);
+    } else {
+      const entity = new UserStatHistoryEntity();
+      entity.userId = userId;
+      entity.subjectId = subjectId;
+      entity.date = today;
+      entity.weightedMastery = weightedMastery;
+      entity.dailyAttempts = batchAttempts;
+      entity.dailyCorrect = batchCorrect;
+      await this.userStatHistoryAccess.save(entity);
+    }
+  }
+
   public async reply(data: PostReplyRequest): Promise<PostReplyResponse> {
     const user = await this.userService.getUser();
     if (user === null) throw new UnauthorizedError('User not found');
@@ -203,6 +249,8 @@ export class ReplyService {
         await this.pendingReplyAccess.delete(pendingReply.id);
 
     const responses: PostReplyResponse = [];
+    const subjectBatch = new Map<number, { attempts: number; correct: number }>();
+
     for (const d of data) {
       const question = questionMap.get(d.questionId) ?? null;
       const parentQuestion = questionMap.get(question?.parentId ?? -1) ?? null;
@@ -214,6 +262,12 @@ export class ReplyService {
         user.id
       );
       responses.push(res);
+
+      const sid = question.subjectId;
+      const entry = subjectBatch.get(sid) ?? { attempts: 0, correct: 0 };
+      entry.attempts += 1;
+      entry.correct += res.score;
+      subjectBatch.set(sid, entry);
     }
 
     for (const parentId of new Set([...parentQuestionIds])) {
@@ -229,6 +283,9 @@ export class ReplyService {
       parentQuestion.adjustedDifficulty = difficulty;
       await this.questionAccess.save(parentQuestion);
     }
+
+    for (const [subjectId, { attempts, correct }] of subjectBatch)
+      await this.upsertStatHistory(user.id, subjectId, attempts, correct);
 
     return responses;
   }
