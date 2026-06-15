@@ -1,6 +1,17 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import {
+  CartesianGrid,
+  Legend,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts'
+import { ActivityCalendar } from 'react-activity-calendar'
 import { apiFetch } from '@/lib/api'
 import type {
   DailyMastery,
@@ -61,12 +72,6 @@ type ChartSeries = {
 }
 
 function ProgressChart({ series }: { series: ChartSeries[] }) {
-  const [tooltip, setTooltip] = useState<{
-    pct: number
-    date: string
-    values: { name: string; mastery: number | null; color: string }[]
-  } | null>(null)
-
   const nonEmpty = series.filter((s) => s.data.length > 0)
 
   if (nonEmpty.length === 0)
@@ -76,333 +81,113 @@ function ProgressChart({ series }: { series: ChartSeries[] }) {
       </div>
     )
 
-  const W = 600, H = 160, padL = 28, padR = 8, padT = 8, padB = 20
-  const chartW = W - padL - padR
-  const chartH = H - padT - padB
-
   const allDatesSet = new Set<string>()
   nonEmpty.forEach((s) => s.data.forEach((d) => allDatesSet.add(d.date)))
   const allDates = [...allDatesSet].sort()
 
-  const timestamps = allDates.map((d) => new Date(d + 'T00:00:00').getTime())
-  const minDate = Math.min(...timestamps)
-  const maxDate = Math.max(...timestamps)
-  const dateRange = maxDate - minDate || 1
-
-  const toX = (dateStr: string) =>
-    padL + ((new Date(dateStr + 'T00:00:00').getTime() - minDate) / dateRange) * chartW
-  const toY = (mastery: number) => padT + chartH - (mastery / 10) * chartH
-
-  const seriesLookup = nonEmpty.map(
-    (s) => new Map(s.data.map((d) => [d.date, d.weightedMastery]))
-  )
-
-  const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect()
-    const chartX = ((e.clientX - rect.left) / rect.width) * W - padL
-    if (chartX < 0 || chartX > chartW) { setTooltip(null); return }
-
-    const t = minDate + (chartX / chartW) * dateRange
-    const nearestDate = allDates.reduce((best, d) => {
-      const dt = new Date(d + 'T00:00:00').getTime()
-      const bt = new Date(best + 'T00:00:00').getTime()
-      return Math.abs(dt - t) < Math.abs(bt - t) ? d : best
-    })
-
-    const pct = (toX(nearestDate) - padL) / chartW
-    setTooltip({
-      pct,
-      date: nearestDate,
-      values: nonEmpty.map((s, i) => ({
-        name: s.name,
-        color: s.color,
-        mastery: seriesLookup[i].get(nearestDate) ?? null,
-      })),
-    })
-  }
-
-  const crosshairX = tooltip !== null ? padL + tooltip.pct * chartW : null
-
-  const xLabelDates = [
-    allDates[0],
-    allDates[Math.floor(allDates.length / 2)],
-    allDates[allDates.length - 1],
-  ].filter((d, i, arr) => d && arr.indexOf(d) === i)
+  const chartData = allDates.map((date) => {
+    const entry: Record<string, string | number | null> = { date: date.slice(5) }
+    for (const s of nonEmpty)
+      entry[s.name] = s.data.find((d) => d.date === date)?.weightedMastery ?? null
+    return entry
+  })
 
   return (
-    <div className="relative">
-      <svg
-        viewBox={`0 0 ${W} ${H}`}
-        className="w-full"
-        onMouseMove={handleMouseMove}
-        onMouseLeave={() => setTooltip(null)}
-      >
-        {/* Grid */}
-        {[0, 2, 4, 6, 8, 10].map((v) => (
-          <line key={v} x1={padL} y1={toY(v)} x2={W - padR} y2={toY(v)} stroke="#E5E0DC" strokeWidth={0.5} />
-        ))}
-        {[0, 5, 10].map((v) => (
-          <text key={v} x={padL - 4} y={toY(v) + 4} textAnchor="end" fontSize={8} fill="#9b9186">{v}</text>
-        ))}
-
-        {/* Lines */}
-        {nonEmpty.map((s) =>
-          s.data.length < 2 ? null : (
-            <polyline
-              key={s.name}
-              points={s.data.map((d) => `${toX(d.date)},${toY(d.weightedMastery)}`).join(' ')}
-              fill="none"
-              stroke={s.color}
-              strokeWidth={1.5}
-              strokeLinejoin="round"
-              strokeLinecap="round"
-              strokeOpacity={tooltip ? 0.3 : 1}
-            />
-          )
-        )}
-
-        {/* Data point dots */}
-        {nonEmpty.map((s) =>
-          s.data.map((d) => (
-            <circle
-              key={`${s.name}-${d.date}`}
-              cx={toX(d.date)}
-              cy={toY(d.weightedMastery)}
-              r={2}
-              fill={s.color}
-              fillOpacity={tooltip ? 0.2 : 0.85}
-            />
-          ))
-        )}
-
-        {/* Crosshair */}
-        {crosshairX !== null && (
-          <line x1={crosshairX} y1={padT} x2={crosshairX} y2={H - padB}
-            stroke="#9b9186" strokeWidth={1} strokeDasharray="4,2" />
-        )}
-
-        {/* Highlighted dots */}
-        {tooltip &&
-          nonEmpty.map((s, i) => {
-            const m = seriesLookup[i].get(tooltip.date)
-            return m != null ? (
-              <circle key={s.name} cx={crosshairX!} cy={toY(m)} r={3.5}
-                fill={s.color} stroke="white" strokeWidth={1.5} />
-            ) : null
-          })}
-
-        {/* X labels */}
-        {xLabelDates.map((d) => (
-          <text key={d} x={toX(d)} y={H - 4} textAnchor="middle" fontSize={8} fill="#9b9186">
-            {d.slice(5)}
-          </text>
-        ))}
-      </svg>
-
-      {/* Tooltip */}
-      {tooltip && tooltip.values.some((v) => v.mastery !== null) && (
-        <div
-          className="pointer-events-none absolute top-0 z-10 min-w-[120px]"
-          style={{
-            left: `${tooltip.pct * 100}%`,
-            transform: tooltip.pct > 0.65 ? 'translateX(calc(-100% - 8px))' : 'translateX(8px)',
-          }}
-        >
-          <div className="rounded-lg border border-brown-300 bg-white px-3 py-2 shadow-md">
-            <div className="mb-1.5 text-[10px] font-medium text-black-500">{tooltip.date}</div>
-            {tooltip.values
-              .filter((v) => v.mastery !== null)
-              .map((v) => (
-                <div key={v.name} className="flex items-center gap-1.5 text-[11px]">
-                  <span style={{ color: v.color }}>●</span>
-                  <span className="text-black-500 truncate">{v.name}</span>
-                  <span className="ml-auto pl-2 font-medium text-black-900">
-                    {v.mastery!.toFixed(2)}
-                  </span>
-                </div>
-              ))}
-          </div>
-        </div>
-      )}
-
-      {/* Legend */}
-      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+    <ResponsiveContainer width="100%" height={220}>
+      <LineChart data={chartData} margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#E5E0DC" />
+        <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#9b9186' }} tickLine={false} />
+        <YAxis
+          domain={[0, 10]}
+          tick={{ fontSize: 10, fill: '#9b9186' }}
+          tickLine={false}
+          axisLine={false}
+        />
+        <Tooltip
+          contentStyle={{ borderRadius: 12, borderColor: '#E5E0DC', fontSize: 12 }}
+          itemStyle={{ padding: '2px 0' }}
+          formatter={(value) => (typeof value === 'number' ? value.toFixed(2) : value)}
+        />
+        <Legend iconType="plainline" wrapperStyle={{ fontSize: 11 }} />
         {nonEmpty.map((s) => (
-          <div key={s.name} className="flex items-center gap-1.5">
-            <span style={{ width: 16, height: 2, backgroundColor: s.color, display: 'inline-block', borderRadius: 1 }} />
-            <span className="text-[10px] text-black-500">{s.name}</span>
-          </div>
+          <Line
+            key={s.name}
+            type="monotone"
+            dataKey={s.name}
+            stroke={s.color}
+            strokeWidth={2}
+            dot={{ r: 2, fill: s.color }}
+            activeDot={{ r: 4 }}
+            connectNulls
+          />
         ))}
-      </div>
-    </div>
+      </LineChart>
+    </ResponsiveContainer>
   )
 }
 
 // ─── Learning Heatmap ─────────────────────────────────────────────────────────
 
-function heatColor(count: number): string {
-  if (count === 0) return '#EBEDF0'
-  if (count <= 2) return '#9BE9A8'
-  if (count <= 5) return '#40C463'
-  if (count <= 9) return '#30A14E'
-  return '#216E39'
+function toLevel(count: number, max: number): number {
+  if (count === 0) return 0
+  if (count <= Math.ceil(max * 0.25)) return 1
+  if (count <= Math.ceil(max * 0.5)) return 2
+  if (count <= Math.ceil(max * 0.75)) return 3
+  return 4
 }
-
-const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-const DAY_LABELS = ['日', '', '二', '', '四', '', '六']
-
-// All sizing in px — keep consistent so month labels align with week columns
-const CELL = 11
-const GAP = 2
-const WEEK_W = CELL + GAP  // 13 px per week column (cell + right gap)
-const DAY_W = 18            // day-label column width (includes its right gap)
 
 function LearningHeatmap({
   activityMap,
 }: {
   activityMap: { date: string; count: number }[]
 }) {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const [tooltip, setTooltip] = useState<{
-    date: string
-    count: number
-    x: number
-    y: number
-  } | null>(null)
-
   const countByDate = useMemo(
     () => new Map(activityMap.map((a) => [a.date, a.count])),
     [activityMap]
   )
 
-  const handleCellEnter = (e: React.MouseEvent<HTMLDivElement>, date: string, count: number) => {
-    if (!containerRef.current) return
-    const cr = containerRef.current.getBoundingClientRect()
-    const tr = (e.currentTarget as HTMLElement).getBoundingClientRect()
-    setTooltip({ date, count, x: tr.left - cr.left + tr.width / 2, y: tr.top - cr.top })
-  }
+  const maxCount = useMemo(
+    () => Math.max(...activityMap.map((a) => a.count), 1),
+    [activityMap]
+  )
 
-  // Generate last 365 days
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const allDays: string[] = []
-  for (let i = 364; i >= 0; i--) {
-    const d = new Date(today)
-    d.setDate(d.getDate() - i)
-    allDays.push(toDateString(d))
-  }
-
-  // Pad start to align with Sunday (day 0)
-  const firstDayOfWeek = new Date(allDays[0] + 'T00:00:00').getDay()
-  const padded: (string | null)[] = [
-    ...Array<null>(firstDayOfWeek).fill(null),
-    ...allDays,
-  ]
-
-  // Chunk into weeks of 7
-  const weeks: (string | null)[][] = []
-  for (let i = 0; i < padded.length; i += 7) {
-    weeks.push(padded.slice(i, i + 7).concat(Array(7).fill(null)).slice(0, 7))
-  }
-
-  // Month labels: record week index where month first appears
-  const monthLabels: { weekIdx: number; month: string }[] = []
-  let lastMonth = -1
-  weeks.forEach((week, wi) => {
-    const first = week.find((d) => d !== null)
-    if (!first) return
-    const m = new Date(first + 'T00:00:00').getMonth()
-    if (m !== lastMonth) {
-      monthLabels.push({ weekIdx: wi, month: MONTH_NAMES[m] })
-      lastMonth = m
+  const calendarData = useMemo(() => {
+    const startDate = cutoffDate(365)
+    const todayStr = toDateString(new Date())
+    const data: { date: string; count: number; level: number }[] = []
+    const cur = new Date(startDate + 'T00:00:00')
+    const end = new Date(todayStr + 'T00:00:00')
+    while (cur <= end) {
+      const d = toDateString(cur)
+      const count = countByDate.get(d) ?? 0
+      data.push({ date: d, count, level: toLevel(count, maxCount) })
+      cur.setDate(cur.getDate() + 1)
     }
-  })
+    return data
+  }, [countByDate, maxCount])
 
   return (
-    <div className="relative overflow-x-auto" ref={containerRef}>
-      <div style={{ width: DAY_W + weeks.length * WEEK_W }}>
-        {/* Month labels — paddingLeft = DAY_W, each slot = WEEK_W → exact column alignment */}
-        <div className="mb-1 flex" style={{ paddingLeft: DAY_W }}>
-          {weeks.map((_, wi) => {
-            const label = monthLabels.find((ml) => ml.weekIdx === wi)
-            return (
-              <div key={wi} style={{ width: WEEK_W, flexShrink: 0, fontSize: 9, color: '#9b9186' }}>
-                {label?.month ?? ''}
-              </div>
-            )
-          })}
-        </div>
-
-        {/* Grid row: day-label column + week columns */}
-        <div style={{ display: 'flex' }}>
-          {/* Day labels */}
-          <div style={{ width: DAY_W, flexShrink: 0 }}>
-            {DAY_LABELS.map((label, i) => (
-              <div
-                key={i}
-                style={{
-                  height: CELL,
-                  marginBottom: i < 6 ? GAP : 0,
-                  fontSize: 8,
-                  lineHeight: `${CELL}px`,
-                  color: '#9b9186',
-                  textAlign: 'right',
-                  paddingRight: 4,
-                }}
-              >
-                {label}
-              </div>
-            ))}
-          </div>
-
-          {/* Week columns */}
-          {weeks.map((week, wi) => (
-            <div key={wi} style={{ width: WEEK_W, flexShrink: 0 }}>
-              {week.map((day, di) => (
-                <div
-                  key={di}
-                  onMouseEnter={day ? (e) => handleCellEnter(e, day, countByDate.get(day) ?? 0) : undefined}
-                  onMouseLeave={() => setTooltip(null)}
-                  style={{
-                    width: CELL,
-                    height: CELL,
-                    marginBottom: di < 6 ? GAP : 0,
-                    borderRadius: 2,
-                    backgroundColor: day ? heatColor(countByDate.get(day) ?? 0) : 'transparent',
-                    cursor: day ? 'default' : undefined,
-                  }}
-                />
-              ))}
-            </div>
-          ))}
-        </div>
-
-        {/* Legend */}
-        <div className="mt-2 flex items-center gap-1.5">
-          <span className="text-[9px] text-black-300">少</span>
-          {[0, 2, 5, 9, 10].map((v) => (
-            <div
-              key={v}
-              style={{ width: CELL, height: CELL, borderRadius: 2, backgroundColor: heatColor(v) }}
-            />
-          ))}
-          <span className="text-[9px] text-black-300">多</span>
-        </div>
-      </div>
-
-      {/* Tooltip */}
-      {tooltip && (
-        <div
-          className="pointer-events-none absolute z-10 -translate-x-1/2 whitespace-nowrap"
-          style={{ left: tooltip.x, top: tooltip.y - 6, transform: 'translate(-50%, -100%)' }}
-        >
-          <div className="rounded-md border border-brown-300 bg-white px-2 py-1 shadow-sm text-[11px]">
-            <span className="text-black-500">{tooltip.date}</span>
-            <span className="ml-2 font-medium text-blue-700">{tooltip.count} 題</span>
-          </div>
-          <div className="mx-auto mt-0.5 h-1.5 w-1.5 rotate-45 border-b border-r border-brown-300 bg-white" />
-        </div>
-      )}
+    <div className="overflow-x-auto">
+      <ActivityCalendar
+        data={calendarData}
+        colorScheme="light"
+        theme={{ light: ['#EBEDF0', '#9BE9A8', '#40C463', '#30A14E', '#216E39'] }}
+        showWeekdayLabels
+        blockSize={11}
+        blockMargin={2}
+        fontSize={11}
+        labels={{
+          months: ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'],
+          weekdays: ['日', '一', '二', '三', '四', '五', '六'],
+          legend: { less: '少', more: '多' },
+          totalCount: '共 {{count}} 筆活動',
+        }}
+        tooltips={{
+          activity: {
+            text: (activity) => `${activity.date}：${activity.count} 題`,
+          },
+        }}
+      />
     </div>
   )
 }
