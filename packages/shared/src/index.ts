@@ -288,6 +288,7 @@ export type StatsConceptGroup = {
   id: number;
   name: string;
   mastery: number;
+  numberOfQuestions: number;
 };
 
 export type StatsSubject = {

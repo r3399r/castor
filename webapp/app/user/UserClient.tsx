@@ -207,12 +207,29 @@ function MasteryBar({ value, max = 10 }: { value: number; max?: number }) {
 }
 
 function SubjectCard({ stat }: { stat: StatsSubject }) {
+  const totalQ = stat.conceptGroup.reduce((sum, cg) => sum + cg.numberOfQuestions, 0)
+  const avgMastery =
+    totalQ > 0
+      ? stat.conceptGroup.reduce((sum, cg) => sum + cg.mastery * cg.numberOfQuestions, 0) / totalQ
+      : 0
+
   return (
     <div className="rounded-[24px] border border-brown-300 bg-white p-6">
       <div className="mb-1 text-xs font-medium text-black-500">
         {stat.category.map((c) => c.name).join('・')}
       </div>
-      <h2 className="mb-4 text-lg font-bold text-blue-700">{stat.name}</h2>
+      <div className="mb-4 flex items-end justify-between gap-4">
+        <h2 className="text-lg font-bold text-blue-700">{stat.name}</h2>
+        {stat.conceptGroup.length > 0 && (
+          <span className="shrink-0 text-xs text-black-500">
+            平均{' '}
+            <span className="text-base font-bold text-blue-700">
+              {avgMastery.toFixed(2)}
+            </span>{' '}
+            / 10
+          </span>
+        )}
+      </div>
       {stat.conceptGroup.length === 0 ? (
         <p className="text-sm text-black-200">尚無觀念熟練度資料</p>
       ) : (

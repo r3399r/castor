@@ -125,6 +125,7 @@ export class UserService {
         id: cg.id,
         name: cg.name,
         mastery: totalCount > 0 ? totalMastery / totalCount : 0,
+        numberOfQuestions: totalCount,
       };
 
       if (!subjectMap.has(cg.subject.id))
