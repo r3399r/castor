@@ -39,13 +39,13 @@ function ResultBox({ result }: { result: { correctAnswer: string; score: number;
   return (
     <div
       className={`border-t px-5 py-4 ${
-        correct ? 'border-green-700/30 bg-green-700/10' : 'border-red-600/30 bg-red-600/10'
+        correct ? 'border-green-700/30 bg-green-700/10' : 'border-orange-700/30 bg-orange-700/10'
       }`}
     >
       <div className="flex flex-col gap-y-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4 sm:gap-y-1">
         <div
           className={`flex items-center gap-1.5 text-[18px] font-semibold ${
-            correct ? 'text-green-700' : 'text-red-700'
+            correct ? 'text-green-700' : 'text-orange-700'
           }`}
         >
           {correct ? (
@@ -59,7 +59,7 @@ function ResultBox({ result }: { result: { correctAnswer: string; score: number;
             </>
           ) : (
             <>
-              <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-red-600">
+              <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-orange-700">
                 <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
                   <path d="M3 3L9 9M9 3L3 9" stroke="white" strokeWidth="2" strokeLinecap="round"/>
                 </svg>
@@ -70,9 +70,9 @@ function ResultBox({ result }: { result: { correctAnswer: string; score: number;
         </div>
         <div className="flex items-center gap-4 sm:contents">
           <div className="text-base text-black-700">
-            正確答案：<span className={`inline-block rounded border bg-white/80 px-2 py-0.5 font-semibold ${correct ? 'border-green-700/30' : 'border-red-600/30'}`}>{result.correctAnswer}</span>
+            正確答案：<span className={`inline-block rounded border bg-white/80 px-2 py-0.5 font-semibold ${correct ? 'border-green-700/30' : 'border-orange-700/30'}`}>{result.correctAnswer}</span>
           </div>
-          <div className="text-base text-black-500">得分：<span className={`inline-block rounded border bg-white/80 px-2 py-0.5 font-semibold ${correct ? 'border-green-700/30' : 'border-red-600/30'}`}>{result.score}</span></div>
+          <div className="text-base text-black-500">得分：<span className={`inline-block rounded border bg-white/80 px-2 py-0.5 font-semibold ${correct ? 'border-green-700/30' : 'border-orange-700/30'}`}>{result.score}</span></div>
         </div>
         {fbUrl && (
           <a
@@ -101,7 +101,7 @@ const CorrectIcon = () => (
 )
 
 const WrongIcon = () => (
-  <span className="absolute -top-1 -right-1 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-red-600 sm:relative sm:inset-auto sm:ml-auto sm:h-6 sm:w-6">
+  <span className="absolute -top-1 -right-1 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-orange-700 sm:relative sm:inset-auto sm:ml-auto sm:h-6 sm:w-6">
     <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
       <path d="M3 3L9 9M9 3L3 9" stroke="white" strokeWidth="2" strokeLinecap="round"/>
     </svg>
@@ -130,13 +130,13 @@ function AnswerInput({
       const isCorrect = opt === correctAnswer
       const isWrongSelected = opt === answer && opt !== correctAnswer
       if (isCorrect) return `${base} cursor-default border-2 border-green-700 bg-green-700/10 text-green-700`
-      if (isWrongSelected) return `${base} cursor-default border-2 border-red-600/60 bg-red-600/10 text-red-600`
+      if (isWrongSelected) return `${base} cursor-default border-2 border-orange-700/60 bg-orange-700/10 text-orange-700`
       return `${base} cursor-default border-brown-300 bg-beige-200 text-black-400 opacity-40`
     }
     return `${base} cursor-pointer ${
       opt === answer
         ? 'border-2 border-blue-700 bg-blue-700/20 text-blue-700'
-        : 'border-[#E3D1C5] bg-beige-100 text-black-700 hover:border-brown-700 active:scale-[0.97]'
+        : 'border-[#E3D1C5] bg-beige-200/80 text-black-700 hover:border-brown-700 active:scale-[0.97]'
     } ${disabled ? 'cursor-not-allowed opacity-60' : ''}`
   }
 
@@ -146,13 +146,13 @@ function AnswerInput({
       const isCorrect = val === correctAnswer
       const isWrongSelected = val === answer && val !== correctAnswer
       if (isCorrect) return `${base} cursor-default border-2 border-green-700 bg-green-700/10 text-green-700`
-      if (isWrongSelected) return `${base} cursor-default border-2 border-red-600/60 bg-red-600/10 text-red-600`
+      if (isWrongSelected) return `${base} cursor-default border-2 border-orange-700/60 bg-orange-700/10 text-orange-700`
       return `${base} cursor-default border-brown-300 bg-beige-200 text-black-400 opacity-40`
     }
     return `${base} cursor-pointer ${
       val === answer
         ? 'border-2 border-blue-700 bg-blue-700/20 text-blue-700'
-        : 'border-[#E3D1C5] bg-beige-100 text-black-700 hover:border-brown-700 active:scale-[0.97]'
+        : 'border-[#E3D1C5] bg-beige-200/80 text-black-700 hover:border-brown-700 active:scale-[0.97]'
     } ${disabled ? 'cursor-not-allowed opacity-60' : ''}`
   }
 
@@ -484,7 +484,7 @@ export default function AdaptiveClient() {
       {adaptiveQuestion.length === 0 && !loading && <div className="flex flex-col gap-4">
         <div className="flex flex-col gap-3">
           <span className="text-base font-bold text-black-700">考試類別</span>
-          <div className={`rounded-lg border border-brown-700 overflow-hidden ${filtersLocked ? 'pointer-events-none opacity-50' : ''}`}>
+          <div className={`rounded-lg border border-brown-700 overflow-hidden bg-white/80 ${filtersLocked ? 'pointer-events-none opacity-50' : ''}`}>
             {/* Mobile tabs */}
             <div className="flex md:hidden border-b border-brown-700">
               {(['入學考試', '國家考試', '專技證照'] as const).map((tab) => (
@@ -501,10 +501,10 @@ export default function AdaptiveClient() {
                 </button>
               ))}
             </div>
-          <div className="px-6 pb-2 md:pb-6">
+          <div className="px-6">
           <div className="grid grid-cols-1 md:grid-cols-3 md:divide-x divide-brown-700">
             {/* 入學考試 */}
-            <div className={`${activeTab !== '入學考試' ? 'hidden md:flex' : 'flex'} flex-col gap-3 py-4 md:py-0 md:pr-6`}>
+            <div className={`${activeTab !== '入學考試' ? 'hidden md:flex' : 'flex'} flex-col gap-3 py-4 md:pt-0 md:pb-6 md:pr-6`}>
               <span className="border-b border-brown-700 pt-2 pb-2 text-sm font-semibold text-black-700 uppercase tracking-wide hidden md:block">入學考試</span>
               <div className="mt-2 grid grid-cols-2 md:grid-cols-1 lg:grid-cols-2 gap-3">
                 {categoryList.map((c) => (
@@ -514,14 +514,14 @@ export default function AdaptiveClient() {
                     className={`rounded-lg px-4 py-3 text-sm font-medium transition text-left ${
                       selectedCategoryId === String(c.id)
                         ? 'border-2 border-blue-700 bg-blue-700/10 text-blue-700'
-                        : 'border border-brown-300 bg-beige-200 text-black-900 hover:border-brown-700 active:scale-[0.97]'
+                        : 'border border-brown-300 bg-beige-200/80 text-black-900 hover:border-brown-700 active:scale-[0.97]'
                     }`}
                   >
                     {c.name}
                   </button>
                 ))}
                 {['分科'].map((name) => (
-                  <button key={name} disabled className="rounded-lg border border-brown-300 bg-beige-200 px-4 py-3 text-sm font-medium text-black-300 cursor-not-allowed text-left">
+                  <button key={name} disabled className="rounded-lg border border-brown-300 bg-beige-200/80 px-4 py-3 text-sm font-medium text-black-300 cursor-not-allowed text-left">
                     {name}
                   </button>
                 ))}
@@ -529,11 +529,11 @@ export default function AdaptiveClient() {
             </div>
 
             {/* 國家考試 */}
-            <div className={`${activeTab !== '國家考試' ? 'hidden md:flex' : 'flex'} flex-col gap-3 py-4 md:py-0 md:px-6`}>
+            <div className={`${activeTab !== '國家考試' ? 'hidden md:flex' : 'flex'} flex-col gap-3 py-4 md:pt-0 md:pb-6 md:px-6`}>
               <span className="border-b border-brown-700 pt-2 pb-2 text-sm font-semibold text-black-700 uppercase tracking-wide hidden md:block">國家考試</span>
               <div className="mt-2 grid grid-cols-2 md:grid-cols-1 lg:grid-cols-2 gap-3">
                 {['公務員高考三級', '公務員普考', '初等考試', '司法特考', '地方特考'].map((name) => (
-                  <button key={name} disabled className="rounded-lg border border-brown-300 bg-beige-200 px-4 py-3 text-sm font-medium text-black-300 cursor-not-allowed text-left">
+                  <button key={name} disabled className="rounded-lg border border-brown-300 bg-beige-200/80 px-4 py-3 text-sm font-medium text-black-300 cursor-not-allowed text-left">
                     {name}
                   </button>
                 ))}
@@ -541,11 +541,11 @@ export default function AdaptiveClient() {
             </div>
 
             {/* 專技證照 */}
-            <div className={`${activeTab !== '專技證照' ? 'hidden md:flex' : 'flex'} flex-col gap-3 py-4 md:py-0 md:pl-6`}>
+            <div className={`${activeTab !== '專技證照' ? 'hidden md:flex' : 'flex'} flex-col gap-3 py-4 md:pt-0 md:pb-6 md:pl-6`}>
               <span className="border-b border-brown-700 pt-2 pb-2 text-sm font-semibold text-black-700 uppercase tracking-wide hidden md:block">專技證照</span>
               <div className="mt-2 grid grid-cols-2 md:grid-cols-1 lg:grid-cols-2 gap-3">
                 {['護理師執照', '律師執照', '會計師執照'].map((name) => (
-                  <button key={name} disabled className="rounded-lg border border-brown-300 bg-beige-200 px-4 py-3 text-sm font-medium text-black-300 cursor-not-allowed text-left">
+                  <button key={name} disabled className="rounded-lg border border-brown-300 bg-beige-200/80 px-4 py-3 text-sm font-medium text-black-300 cursor-not-allowed text-left">
                     {name}
                   </button>
                 ))}
@@ -559,7 +559,7 @@ export default function AdaptiveClient() {
         {selectedCategoryId && filterDimensions.length > 0 && (
           <div className="flex flex-col gap-2 mt-4">
             <span className="text-base font-bold text-black-700">篩選條件</span>
-            <div className={`rounded-lg border border-brown-700 divide-y divide-brown-300 ${filtersLocked ? 'pointer-events-none opacity-50' : ''}`}>
+            <div className={`rounded-lg border border-brown-700 divide-y divide-brown-300 bg-white/80 ${filtersLocked ? 'pointer-events-none opacity-50' : ''}`}>
               {filterDimensions.map((dim) => (
                 <div key={dim.id} className="px-6 py-4">
                   <span className="mb-3 block text-sm font-bold text-black-700">{dim.name}</span>
@@ -579,7 +579,7 @@ export default function AdaptiveClient() {
                           className={`rounded-lg px-4 py-1 text-sm font-medium transition text-left ${
                             checked
                               ? 'border-2 border-teal-700 bg-teal-700/10 text-teal-700'
-                              : 'border border-brown-300 bg-beige-200 text-black-900 hover:border-brown-700 active:scale-[0.97]'
+                              : 'border border-brown-300 bg-beige-200/80 text-black-900 hover:border-brown-700 active:scale-[0.97]'
                           }`}
                         >
                           {opt.name}
@@ -596,7 +596,7 @@ export default function AdaptiveClient() {
         {selectedCategoryId && filteredSubjectList.length > 0 && (
           <div className="flex flex-col gap-2 mt-4">
             <span className="text-base font-bold text-black-700">選擇科目</span>
-            <div className={`rounded-lg border border-brown-700 px-6 py-4 ${filtersLocked ? 'pointer-events-none opacity-50' : ''}`}>
+            <div className={`rounded-lg border border-brown-700 px-6 py-4 bg-white/80 ${filtersLocked ? 'pointer-events-none opacity-50' : ''}`}>
               <div className="flex flex-wrap gap-2">
                 {filteredSubjectList.map((s) => (
                   <button
@@ -605,7 +605,7 @@ export default function AdaptiveClient() {
                     className={`rounded-lg px-4 py-3 text-sm font-medium transition text-left ${
                       selectedSubjectId === String(s.id)
                         ? 'border-2 border-green-700 bg-green-700/10 text-green-700'
-                        : 'border border-brown-300 bg-beige-200 text-black-900 hover:border-brown-700 active:scale-[0.97]'
+                        : 'border border-brown-300 bg-beige-200/80 text-black-900 hover:border-brown-700 active:scale-[0.97]'
                     }`}
                   >
                     {s.name}
@@ -632,7 +632,7 @@ export default function AdaptiveClient() {
                 </button>
               )}
             </div>
-            <div className={`rounded-lg border border-brown-700 ${filtersLocked ? 'pointer-events-none opacity-50' : ''}`}>
+            <div className={`rounded-lg border border-brown-700 bg-white/80 ${filtersLocked ? 'pointer-events-none opacity-50' : ''}`}>
 
               {/* 選擇試卷 */}
               {examList.length > 0 && (
@@ -652,7 +652,7 @@ export default function AdaptiveClient() {
                           className={`rounded-lg px-4 py-1 text-sm font-medium transition text-left ${
                             checked
                               ? 'border-2 border-purple-700 bg-purple-700/10 text-purple-700'
-                              : 'border border-brown-300 bg-beige-200 text-black-900 hover:border-brown-700 active:scale-[0.97]'
+                              : 'border border-brown-300 bg-beige-200/80 text-black-900 hover:border-brown-700 active:scale-[0.97]'
                           }`}
                         >
                           {e.name}
@@ -693,7 +693,7 @@ export default function AdaptiveClient() {
                                     className={`rounded-full px-4 py-1 text-sm font-medium transition ${
                                       checked
                                         ? 'border-2 border-orange-700 bg-orange-700/10 text-orange-700'
-                                        : 'border border-brown-300 bg-beige-200 text-black-900 hover:border-brown-700 active:scale-[0.97]'
+                                        : 'border border-brown-300 bg-beige-200/80 text-black-900 hover:border-brown-700 active:scale-[0.97]'
                                     }`}
                                   >
                                     {c.name}
@@ -721,7 +721,7 @@ export default function AdaptiveClient() {
                                     className={`rounded-full px-4 py-1 text-sm font-medium transition ${
                                       checked
                                         ? 'border-2 border-orange-700 bg-orange-700/10 text-orange-700'
-                                        : 'border border-brown-300 bg-beige-200 text-black-900 hover:border-brown-700 active:scale-[0.97]'
+                                        : 'border border-brown-300 bg-beige-200/80 text-black-900 hover:border-brown-700 active:scale-[0.97]'
                                     }`}
                                   >
                                     {c.name}
@@ -758,7 +758,7 @@ export default function AdaptiveClient() {
                           className={`rounded-lg px-4 py-1 text-sm font-medium transition ${
                             checked
                               ? 'border-2 border-blue-700 bg-blue-700/10 text-blue-700'
-                              : 'border border-brown-300 bg-beige-200 text-black-900 hover:border-brown-700 active:scale-[0.97]'
+                              : 'border border-brown-300 bg-beige-200/80 text-black-900 hover:border-brown-700 active:scale-[0.97]'
                           }`}
                         >
                           {t.name}
@@ -1038,9 +1038,9 @@ export default function AdaptiveClient() {
                   <p className="text-2xl font-bold text-black-700">{correctCount}</p>
                   <p className="mt-1 text-sm font-medium text-green-700">正確</p>
                 </div>
-                <div className="flex-1 rounded-lg bg-red-600/10 px-4 py-3 text-center">
+                <div className="flex-1 rounded-lg bg-orange-700/10 px-4 py-3 text-center">
                   <p className="text-2xl font-bold text-black-700">{wrongCount}</p>
-                  <p className="mt-1 text-sm font-medium text-red-600">錯誤</p>
+                  <p className="mt-1 text-sm font-medium text-orange-700">錯誤</p>
                 </div>
               </div>
               <button
