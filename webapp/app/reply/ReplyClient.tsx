@@ -113,7 +113,8 @@ export default function ReplyClient() {
 
   return (
     <div>
-      <h1 className="mb-6 text-2xl font-bold text-blue-700">作答記錄</h1>
+      <h1 className="mt-[60px] mb-2 text-3xl font-bold text-blue-700">作答記錄</h1>
+      <p className="mb-10 text-sm text-black-500">查看你的歷史答題紀錄與得分。</p>
 
       <div className="flex flex-col gap-3">
         {replyList.data.map((item) => (
@@ -122,7 +123,7 @@ export default function ReplyClient() {
       </div>
 
       {replyList.paginate.totalPages > 1 && (
-        <div className="mt-6 flex items-center justify-center gap-3">
+        <div className="mt-6 mb-[70px] flex items-center justify-center gap-3">
           <button
             onClick={() => fetchPage(page - 1)}
             disabled={page === 1 || loading}
