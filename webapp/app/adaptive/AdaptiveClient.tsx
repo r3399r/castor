@@ -1,6 +1,7 @@
 'use client'
 
 import { Fragment, useEffect, useMemo, useState } from 'react'
+import { Goal, BookOpenText, Brain, FunnelPlus, NotebookPen } from 'lucide-react'
 import { apiFetch, apiPost } from '@/lib/api'
 import Chip, { tagColors } from '@/components/Chip'
 import DifficultyStars from '@/components/DifficultyStars'
@@ -70,9 +71,9 @@ function ResultBox({ result }: { result: { correctAnswer: string; score: number;
         </div>
         <div className="flex items-center gap-4 sm:contents">
           <div className="text-base text-black-700">
-            正確答案：<span className={`inline-block rounded border bg-white/80 px-2 py-0.5 font-semibold ${correct ? 'border-green-700/30' : 'border-orange-700/30'}`}>{result.correctAnswer}</span>
+            正確答案：<span className={`inline-block rounded border bg-white/60 px-2 py-0.5 font-semibold ${correct ? 'border-green-700/30' : 'border-orange-700/30'}`}>{result.correctAnswer}</span>
           </div>
-          <div className="text-base text-black-500">得分：<span className={`inline-block rounded border bg-white/80 px-2 py-0.5 font-semibold ${correct ? 'border-green-700/30' : 'border-orange-700/30'}`}>{result.score}</span></div>
+          <div className="text-base text-black-500">得分：<span className={`inline-block rounded border bg-white/60 px-2 py-0.5 font-semibold ${correct ? 'border-green-700/30' : 'border-orange-700/30'}`}>{result.score}</span></div>
         </div>
         {fbUrl && (
           <a
@@ -482,9 +483,12 @@ export default function AdaptiveClient() {
       )}
 
       {adaptiveQuestion.length === 0 && !loading && <div className="flex flex-col gap-4">
-        <div className="flex flex-col gap-3">
-          <span className="text-base font-bold text-black-700">考試類別</span>
-          <div className={`rounded-lg border border-brown-700 overflow-hidden bg-white/80 ${filtersLocked ? 'pointer-events-none opacity-50' : ''}`}>
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center gap-2">
+            <Goal size={20} strokeWidth={2.5} className="text-orange-700/70 shrink-0" />
+            <span className="text-xl font-bold text-black-700">考試類別</span>
+          </div>
+          <div className={`rounded-lg border border-brown-700 overflow-hidden bg-white/60 ${filtersLocked ? 'pointer-events-none opacity-50' : ''}`}>
             {/* Mobile tabs */}
             <div className="flex md:hidden border-b border-brown-700">
               {(['入學考試', '國家考試', '專技證照'] as const).map((tab) => (
@@ -557,9 +561,12 @@ export default function AdaptiveClient() {
         </div>
 
         {selectedCategoryId && filterDimensions.length > 0 && (
-          <div className="flex flex-col gap-2 mt-4">
-            <span className="text-base font-bold text-black-700">篩選條件</span>
-            <div className={`rounded-lg border border-brown-700 divide-y divide-brown-300 bg-white/80 ${filtersLocked ? 'pointer-events-none opacity-50' : ''}`}>
+          <div className="flex flex-col gap-4 mt-6">
+            <div className="flex items-center gap-2">
+              <Brain size={20} strokeWidth={2.5} className="text-orange-700/70 shrink-0" />
+              <span className="text-xl font-bold text-black-700">篩選條件</span>
+            </div>
+            <div className={`rounded-lg border border-brown-700 divide-y divide-brown-300 bg-white/60 ${filtersLocked ? 'pointer-events-none opacity-50' : ''}`}>
               {filterDimensions.map((dim) => (
                 <div key={dim.id} className="px-6 py-4">
                   <span className="mb-3 block text-sm font-bold text-black-700">{dim.name}</span>
@@ -594,9 +601,12 @@ export default function AdaptiveClient() {
         )}
 
         {selectedCategoryId && filteredSubjectList.length > 0 && (
-          <div className="flex flex-col gap-2 mt-4">
-            <span className="text-base font-bold text-black-700">選擇科目</span>
-            <div className={`rounded-lg border border-brown-700 px-6 py-4 bg-white/80 ${filtersLocked ? 'pointer-events-none opacity-50' : ''}`}>
+          <div className="flex flex-col gap-4 mt-6">
+            <div className="flex items-center gap-2">
+              <BookOpenText size={20} strokeWidth={2.5} className="text-orange-700/70 shrink-0" />
+              <span className="text-xl font-bold text-black-700">選擇科目</span>
+            </div>
+            <div className={`rounded-lg border border-brown-700 px-6 py-4 bg-white/60 ${filtersLocked ? 'pointer-events-none opacity-50' : ''}`}>
               <div className="flex flex-wrap gap-2">
                 {filteredSubjectList.map((s) => (
                   <button
@@ -617,9 +627,12 @@ export default function AdaptiveClient() {
         )}
 
         {selectedSubjectId && (examList.length > 0 || conceptGroupList.length > 0 || tagList.length > 0) && (
-          <div className="flex flex-col gap-2 mt-4">
+          <div className="flex flex-col gap-4 mt-6">
             <div className="flex items-center gap-3">
-              <span className="text-base font-bold text-black-700">進階篩選</span>
+              <div className="flex items-center gap-2">
+                <FunnelPlus size={20} strokeWidth={2.5} className="text-orange-700/70 shrink-0" />
+                <span className="text-xl font-bold text-black-700">進階篩選</span>
+              </div>
               {(selectedExamIds.length > 0 || selectedConceptIds.length > 0 || selectedTagIds.length > 0) && !filtersLocked && (
                 <button
                   onClick={() => { setSelectedExamIds([]); setSelectedConceptIds([]); setSelectedTagIds([]) }}
@@ -632,7 +645,7 @@ export default function AdaptiveClient() {
                 </button>
               )}
             </div>
-            <div className={`rounded-lg border border-brown-700 bg-white/80 ${filtersLocked ? 'pointer-events-none opacity-50' : ''}`}>
+            <div className={`rounded-lg border border-brown-700 bg-white/60 ${filtersLocked ? 'pointer-events-none opacity-50' : ''}`}>
 
               {/* 選擇試卷 */}
               {examList.length > 0 && (
@@ -777,7 +790,10 @@ export default function AdaptiveClient() {
 
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 mb-10">
           <div className="flex items-center gap-3">
-            <span className="text-base font-bold text-black-700">練習題數</span>
+            <div className="flex items-center gap-2">
+              <NotebookPen size={20} strokeWidth={2.5} className="text-orange-700/70 shrink-0" />
+              <span className="text-xl font-bold text-black-700">練習題數</span>
+            </div>
             <div className="flex gap-2">
               {[1, 2, 5, 10].map((n) => (
                 <button
@@ -829,7 +845,7 @@ export default function AdaptiveClient() {
             {adaptiveQuestion.map((question, qi) => {
               const offset = responseOffsets[qi] ?? 0
               return (
-                <div key={question.id} className="overflow-hidden rounded-lg border border-brown-700 bg-white/80">
+                <div key={question.id} className="overflow-hidden rounded-lg border border-brown-700 bg-white/60">
                   <div className="border-b border-[#E3D1C5] px-5 pt-3 pb-2">
                     {/* 題號 + 難易度（同一行）*/}
                     <div className="flex items-center justify-between gap-3 sm:hidden">

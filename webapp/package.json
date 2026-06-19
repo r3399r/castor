@@ -9,9 +9,12 @@
   },
   "dependencies": {
     "@castor/shared": "*",
+    "@heroicons/react": "^2.2.0",
+    "@phosphor-icons/react": "^2.1.10",
     "better-react-mathjax": "^3.0.1",
     "firebase": "^11.0.0",
     "lightningcss": "^1.32.0",
+    "lucide-react": "^1.21.0",
     "next": "^15.3.2",
     "react": "^19.0.0",
     "react-activity-calendar": "^3.2.0",
