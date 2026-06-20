@@ -1,8 +1,20 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { MathJax } from 'better-react-mathjax'
+import { BookOpenText } from 'lucide-react'
 import { apiFetch, LIMIT } from '@/lib/api'
+import Chip, { tagColors } from '@/components/Chip'
+import DifficultyStars from '@/components/DifficultyStars'
 import type { GetReplyResponse, Reply } from '@/types/api'
+
+const typeLabel: Record<string, string> = {
+  SINGLE: '單選題',
+  MULTIPLE: '多選題',
+  TRUE_FALSE: '是非題',
+  FILL: '選填題',
+  GROUP: '題組',
+}
 
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return '—'
@@ -11,41 +23,144 @@ function formatDate(dateStr: string | null): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
 
+function getFbUrl(fbPostId: string | null): string | null {
+  if (!fbPostId) return null
+  const [pageId, postId] = fbPostId.split('_')
+  if (!pageId || !postId) return null
+  return `https://m.facebook.com/${pageId}/posts/${postId}`
+}
+
 function ReplyRow({ item }: { item: Reply }) {
-  const fbPostId = item.parent === null ? item.question.fbPostId : item.parent.fbPostId
+  const question = item.parent ?? item.question
+  const childQuestion = item.parent ? item.question : null
+  const fbUrl = getFbUrl(question.fbPostId)
+  const correct = item.score > 0
+  const exams = question.exam ?? []
+  const concepts = question.concept ?? []
+  const tags = question.tag ?? []
+  const difficulty = question.adjustedDifficulty ?? question.difficulty ?? 0
+
   return (
-    <div className="rounded-[20px] border border-brown-300 bg-white p-4">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="space-y-1">
-          <div className="text-xs text-black-200">{formatDate(item.createdAt)}</div>
-          <div className="font-medium text-black-900">{item.subject.name}</div>
+    <article className="overflow-hidden rounded-lg border border-brown-700 bg-white/60">
+      <div className="border-b border-[#E3D1C5] px-5 pt-3 pb-2">
+        <div className="flex items-center justify-between gap-3 sm:hidden">
+          <span className="flex items-center gap-2 font-bold text-blue-700">
+            <BookOpenText size={20} strokeWidth={2.5} className="shrink-0 text-orange-700/70" />
+            {item.subject.name}
+          </span>
+          <DifficultyStars value={difficulty} />
         </div>
-        <div className="flex items-center gap-4 text-sm">
-          <div>
-            <span className="text-black-500">作答：</span>
-            <span className="font-medium text-black-900">{item.repliedAnswer ?? '—'}</span>
-          </div>
-          <div>
-            <span className="text-black-500">得分：</span>
-            <span
-              className={`font-bold ${item.score > 0 ? 'text-green-600' : 'text-red-500'}`}
-            >
-              {item.score}
+        <div className="mt-2.5 flex flex-wrap gap-2 sm:hidden">
+          <Chip label={typeLabel[question.type] ?? question.type} />
+          {exams.map((e) => (
+            <Chip key={e.id} label={e.name} color={tagColors.exam} />
+          ))}
+          {concepts.map((c) => (
+            <Chip
+              key={c.id}
+              label={c.conceptGroup.name === c.name ? c.name : c.conceptGroup.name + '-' + c.name}
+              color={tagColors.concept}
+            />
+          ))}
+          {tags.map((t) => (
+            <Chip key={t.id} label={t.name} color={tagColors.tag} />
+          ))}
+        </div>
+
+        <div className="hidden sm:flex sm:items-start sm:justify-between sm:gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="flex shrink-0 items-center gap-2 font-bold text-blue-700">
+              <BookOpenText size={20} strokeWidth={2.5} className="shrink-0 text-orange-700/70" />
+              {item.subject.name}
             </span>
+            <div className="ml-2 flex flex-wrap gap-2">
+              <Chip label={typeLabel[question.type] ?? question.type} />
+              {exams.map((e) => (
+                <Chip key={e.id} label={e.name} color={tagColors.exam} />
+              ))}
+              {concepts.map((c) => (
+                <Chip
+                  key={c.id}
+                  label={c.conceptGroup.name === c.name ? c.name : c.conceptGroup.name + '-' + c.name}
+                  color={tagColors.concept}
+                />
+              ))}
+              {tags.map((t) => (
+                <Chip key={t.id} label={t.name} color={tagColors.tag} />
+              ))}
+            </div>
           </div>
-          {fbPostId && (
+          <DifficultyStars value={difficulty} />
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-4 px-5 py-7 lg:px-[40px]">
+        {question.content && (
+          <div
+            dangerouslySetInnerHTML={{ __html: question.content }}
+            className="prose max-w-none text-[18px] font-medium text-black-800 [&>*:last-child]:mb-0"
+          />
+        )}
+
+        {childQuestion?.content && (
+          <div className="border-t border-brown-300 pt-5">
+            <div
+              dangerouslySetInnerHTML={{ __html: childQuestion.content }}
+              className="prose prose-sm max-w-none text-black-800 [&>*:last-child]:mb-0"
+            />
+          </div>
+        )}
+      </div>
+
+      <div
+        className={`border-t px-5 py-4 ${
+          correct ? 'border-green-700/30 bg-green-700/10' : 'border-orange-700/30 bg-orange-700/10'
+        }`}
+      >
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-2 text-base text-black-700 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4">
+            <div>
+              作答時間：
+              <span className="font-medium text-black-900">{formatDate(item.createdAt)}</span>
+            </div>
+            <div className="flex items-center gap-4">
+              <div>
+                作答：
+                <span className="inline-block rounded border border-brown-300 bg-white/60 px-2 py-0.5 font-semibold text-black-900">
+                  {item.repliedAnswer ?? '—'}
+                </span>
+              </div>
+              <div>
+                得分：
+                <span
+                  className={`inline-block rounded border bg-white/60 px-2 py-0.5 font-semibold ${
+                    correct
+                      ? 'border-green-700/30 text-green-700'
+                      : 'border-orange-700/30 text-orange-700'
+                  }`}
+                >
+                  {item.score}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {fbUrl && (
             <a
-              href={`https://m.facebook.com/${fbPostId.split('_')[0]}/posts/${fbPostId.split('_')[1]}`}
+              href={fbUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-blue-600 underline hover:text-blue-800"
+              className="inline-flex w-full items-center justify-center gap-1.5 rounded-md border border-brown-900 px-3 py-1.5 text-sm font-medium text-brown-900 transition hover:bg-brown-900/10 sm:w-auto sm:justify-start"
             >
               討論區
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M5.5 2.5H2.5C1.95 2.5 1.5 2.95 1.5 3.5V11.5C1.5 12.05 1.95 12.5 2.5 12.5H10.5C11.05 12.5 11.5 12.05 11.5 11.5V8.5M8.5 1.5H12.5M12.5 1.5V5.5M12.5 1.5L6 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
             </a>
           )}
         </div>
       </div>
-    </div>
+    </article>
   )
 }
 
@@ -114,13 +229,15 @@ export default function ReplyClient() {
   return (
     <div>
       <h1 className="mt-[60px] mb-2 text-3xl font-bold text-blue-700">作答記錄</h1>
-      <p className="mb-10 text-sm text-black-500">查看你的歷史答題紀錄與得分。</p>
+      <p className="mb-10 text-sm text-black-500">回顧每次練習的題目、作答與得分。</p>
 
-      <div className="flex flex-col gap-3">
-        {replyList.data.map((item) => (
-          <ReplyRow key={item.id} item={item} />
-        ))}
-      </div>
+      <MathJax dynamic>
+        <div className="flex flex-col gap-[40px]">
+          {replyList.data.map((item) => (
+            <ReplyRow key={item.id} item={item} />
+          ))}
+        </div>
+      </MathJax>
 
       {replyList.paginate.totalPages > 1 && (
         <div className="mt-6 mb-[70px] flex items-center justify-center gap-3">
