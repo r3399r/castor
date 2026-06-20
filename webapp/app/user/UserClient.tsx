@@ -13,6 +13,7 @@ import {
 } from 'recharts'
 import { ActivityCalendar } from 'react-activity-calendar'
 import { apiFetch } from '@/lib/api'
+import Chip from '@/components/Chip'
 import type {
   DailyMastery,
   GetUserHistoryResponse,
@@ -41,16 +42,34 @@ function StatCard({
   label,
   value,
   sub,
+  tone = 'blue',
 }: {
   label: string
   value: string | number
   sub?: string
+  tone?: 'blue' | 'orange' | 'green'
 }) {
+  const toneClass = {
+    blue: 'border-blue-700/40 bg-blue-700/15 text-blue-700',
+    orange: 'border-orange-700/40 bg-orange-700/10 text-orange-700',
+    green: 'border-green-700/40 bg-green-700/10 text-green-700',
+  }[tone]
+  const percentValue = typeof value === 'string' && value.endsWith('%')
+
   return (
-    <div className="flex flex-col gap-1 rounded-[20px] border border-brown-300 bg-white p-5">
-      <span className="text-xs font-medium text-black-500">{label}</span>
-      <span className="text-2xl font-bold text-blue-700">{value}</span>
-      {sub && <span className="text-xs text-black-300">{sub}</span>}
+    <div className={`flex flex-col gap-2 rounded-lg border p-5 ${toneClass}`}>
+      <span className="text-sm font-medium text-black-700">{label}</span>
+      <span className="text-4xl font-bold">
+        {percentValue ? (
+          <>
+            {value.slice(0, -1)}
+            <span className="ml-0.5 align-baseline text-base">%</span>
+          </>
+        ) : (
+          value
+        )}
+      </span>
+      {sub && <span className="text-xs text-black-500">{sub}</span>}
     </div>
   )
 }
@@ -63,7 +82,7 @@ const DATE_RANGES = [
   { label: '全部', days: 0 },
 ]
 
-const SERIES_COLORS = ['#1d4ed8', '#dc2626', '#16a34a', '#d97706', '#7c3aed', '#db2777', '#0891b2']
+const SERIES_COLORS = ['#5D7ED8', '#C0266A', '#16A34A', '#F97316', '#7C4DCC', '#D14F8F', '#1C9AA5']
 
 type ChartSeries = {
   name: string
@@ -197,9 +216,9 @@ function LearningHeatmap({
 function MasteryBar({ value, max = 10 }: { value: number; max?: number }) {
   const pct = Math.min(100, Math.round((value / max) * 100))
   return (
-    <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-[#E5E0DC]">
+    <div className="h-2.5 flex-1 overflow-hidden rounded-[2px] bg-[#E5E0DC]">
       <div
-        className="h-full rounded-full bg-blue-700 transition-all"
+        className="h-full rounded-[2px] bg-blue-500 transition-all"
         style={{ width: `${pct}%` }}
       />
     </div>
@@ -214,32 +233,36 @@ function SubjectCard({ stat }: { stat: StatsSubject }) {
       : 0
 
   return (
-    <div className="rounded-[24px] border border-brown-300 bg-white p-6">
-      <div className="mb-1 text-xs font-medium text-black-500">
-        {stat.category.map((c) => c.name).join('・')}
-      </div>
-      <div className="mb-4 flex items-end justify-between gap-4">
-        <h2 className="text-lg font-bold text-blue-700">{stat.name}</h2>
-        {stat.conceptGroup.length > 0 && (
-          <span className="shrink-0 text-xs text-black-500">
-            平均{' '}
-            <span className="text-base font-bold text-blue-700">
-              {avgMastery.toFixed(2)}
-            </span>{' '}
-            / 10
-          </span>
-        )}
+    <div className="rounded-lg border border-brown-300 bg-white/40 p-6 pt-4 pb-8">
+      <div className="mb-4">
+        <div className="mb-3 flex flex-wrap gap-1.5">
+            {stat.category.map((c) => (
+              <Chip key={c.id} label={c.name} color="bg-orange-700/15 text-orange-800" />
+            ))}
+        </div>
+        <div className="flex items-center justify-between gap-4">
+          <h2 className="text-base font-bold text-black-500">{stat.name}</h2>
+          {stat.conceptGroup.length > 0 && (
+            <span className="shrink-0 text-xs text-black-500">
+              平均{' '}
+              <span className="text-base font-bold text-blue-700">
+                {avgMastery.toFixed(2)}
+              </span>{' '}
+              / 10
+            </span>
+          )}
+        </div>
       </div>
       {stat.conceptGroup.length === 0 ? (
         <p className="text-sm text-black-200">尚無觀念熟練度資料</p>
       ) : (
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-3 border-t border-brown-300/60 pt-4">
           <div className="grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-2 text-xs font-medium text-black-700">
             <span>觀念</span>
             <span className="text-right">熟練度 / 10</span>
           </div>
           {stat.conceptGroup.map((cg) => (
-            <div key={cg.id} className="grid grid-cols-[1fr_auto] items-center gap-x-4">
+            <div key={cg.id} className="grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1">
               <span className="truncate text-sm text-black-900">{cg.name}</span>
               <span className="text-right text-sm font-medium text-blue-700">
                 {Math.round(cg.mastery * 100) / 100}
@@ -280,28 +303,29 @@ function HistorySection({ history }: { history: GetUserHistoryResponse }) {
     <div className="mb-8 flex flex-col gap-6">
       {/* Stats cards */}
       <div className="grid grid-cols-3 gap-4">
-        <StatCard label="總刷題數" value={history.totalAttempts} sub="題" />
+        <StatCard label="總刷題數" value={history.totalAttempts} sub="題" tone="blue" />
         <StatCard
           label="總得分率"
           value={`${Math.round(history.overallAccuracy)}%`}
           sub="平均正確率"
+          tone="orange"
         />
-        <StatCard label="連續天數" value={history.streakDays} sub="天" />
+        <StatCard label="連續天數" value={history.streakDays} sub="天" tone="green" />
       </div>
 
       {/* Progress curve */}
-      <div className="rounded-[24px] border border-brown-300 bg-white p-6">
+      <div className="rounded-lg border border-brown-300 bg-white/40 p-6">
         <div className="mb-4 flex items-center justify-between gap-3">
-          <h2 className="text-base font-bold text-blue-700">進步曲線</h2>
-          <div className="flex rounded-md border border-brown-300 overflow-hidden">
+          <h2 className="text-base font-bold text-black-500">進步曲線</h2>
+          <div className="flex overflow-hidden rounded-md border border-brown-300 divide-x divide-brown-300/50">
             {DATE_RANGES.map(({ label, days }) => (
               <button
                 key={days}
                 onClick={() => setRangeDays(days)}
                 className={`px-3 py-1 text-xs transition-colors ${
                   rangeDays === days
-                    ? 'bg-blue-700 text-white'
-                    : 'bg-white text-black-700 hover:bg-[#F5F3F0]'
+                    ? 'bg-beige-300 text-brown-900'
+                    : 'bg-beige-100 text-black-700 hover:bg-beige-200'
                 }`}
               >
                 {label}
@@ -314,8 +338,8 @@ function HistorySection({ history }: { history: GetUserHistoryResponse }) {
       </div>
 
       {/* Learning heatmap */}
-      <div className="rounded-[24px] border border-brown-300 bg-white p-6">
-        <h2 className="mb-4 text-base font-bold text-blue-700">學習熱點圖</h2>
+      <div className="rounded-lg border border-brown-300 bg-white/40 p-6">
+        <h2 className="mb-4 text-base font-bold text-black-500">學習熱點圖</h2>
         <LearningHeatmap activityMap={history.activityMap} />
       </div>
     </div>
@@ -366,14 +390,14 @@ export default function UserClient() {
   }
 
   return (
-    <div>
-      <h1 className="mb-6 text-2xl font-bold text-blue-700">學習分析</h1>
+    <div className="pb-[70px]">
+      <h1 className="mt-[60px] mb-6 text-3xl font-bold text-blue-700">學習分析</h1>
 
       {history && <HistorySection history={history} />}
 
       {stats && stats.length > 0 && (
         <>
-          <h2 className="mb-4 text-base font-bold text-blue-700">當前熟練度</h2>
+          <h2 className="mt-12 mb-5 text-xl font-bold text-blue-700">當前熟練度</h2>
           <div className="grid gap-6 md:grid-cols-2">
             {stats.map((stat) => (
               <SubjectCard key={stat.id} stat={stat} />

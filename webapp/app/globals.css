@@ -46,9 +46,29 @@
   --color-black-200: #B2ADAA;
   --color-brown-900: #614F43;
   --color-brown-700: #89776B;
+  --color-brown-500: #A19085;
   --color-brown-300: #C5B3A7;
   --color-blue-700: #2E4FB6;
+  --color-blue-500: #5D7ED8;
   --color-beige-100: #FCF9F5;
   --color-beige-200: #F1EDE9;
   --color-beige-300: #E2DEDA;
+}
+
+.react-activity-calendar__tooltip {
+  width: max-content;
+  max-width: calc(100vw - 20px);
+  border: 1px solid #E5E0DC;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.96);
+  padding: 6px 10px;
+  color: #4E4946;
+  font-size: 12px;
+  line-height: 1.4;
+  box-shadow: 0 8px 24px rgba(48, 43, 40, 0.12);
+}
+
+.react-activity-calendar__tooltip-arrow {
+  fill: rgba(255, 255, 255, 0.96);
+  stroke: #E5E0DC;
 }
