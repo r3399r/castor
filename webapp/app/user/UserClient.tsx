@@ -90,7 +90,41 @@ type ChartSeries = {
   data: DailyMastery[]
 }
 
-function ProgressChart({ series }: { series: ChartSeries[] }) {
+function ChartLegend({
+  items,
+  hiddenSeries,
+  onToggle,
+}: {
+  items: ChartSeries[]
+  hiddenSeries: Set<string>
+  onToggle: (name: string) => void
+}) {
+  return (
+    <div className="mt-2 flex flex-wrap justify-center gap-x-4 gap-y-1 px-1">
+      {items.map((s) => (
+        <button
+          key={s.name}
+          onClick={() => onToggle(s.name)}
+          className="flex items-center gap-1.5"
+          style={{ opacity: hiddenSeries.has(s.name) ? 0.3 : 1 }}
+        >
+          <svg width="16" height="3" style={{ display: 'block', flexShrink: 0 }}>
+            <line x1="0" y1="1.5" x2="16" y2="1.5" stroke={s.color} strokeWidth="2" />
+          </svg>
+          <span className="text-[11px] text-black-700">{s.name}</span>
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function ProgressChart({ series, toggleable = false }: { series: ChartSeries[]; toggleable?: boolean }) {
+  const [hiddenSeries, setHiddenSeries] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    setHiddenSeries(new Set())
+  }, [series])
+
   const nonEmpty = series.filter((s) => s.data.length > 0)
 
   if (nonEmpty.length === 0)
@@ -111,6 +145,14 @@ function ProgressChart({ series }: { series: ChartSeries[] }) {
     return entry
   })
 
+  const toggle = (name: string) =>
+    setHiddenSeries((prev) => {
+      const next = new Set(prev)
+      if (next.has(name)) next.delete(name)
+      else next.add(name)
+      return next
+    })
+
   return (
     <ResponsiveContainer width="100%" height={220}>
       <LineChart data={chartData} margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
@@ -127,7 +169,11 @@ function ProgressChart({ series }: { series: ChartSeries[] }) {
           itemStyle={{ padding: '2px 0' }}
           formatter={(value) => (typeof value === 'number' ? value.toFixed(2) : value)}
         />
-        <Legend iconType="plainline" wrapperStyle={{ fontSize: 11 }} />
+        {toggleable ? (
+          <Legend content={() => <ChartLegend items={nonEmpty} hiddenSeries={hiddenSeries} onToggle={toggle} />} />
+        ) : (
+          <Legend iconType="plainline" wrapperStyle={{ fontSize: 11 }} />
+        )}
         {nonEmpty.map((s) => (
           <Line
             key={s.name}
@@ -138,6 +184,7 @@ function ProgressChart({ series }: { series: ChartSeries[] }) {
             dot={{ r: 2, fill: s.color }}
             activeDot={{ r: 4 }}
             connectNulls
+            hide={toggleable ? hiddenSeries.has(s.name) : false}
           />
         ))}
       </LineChart>
@@ -280,8 +327,14 @@ function SubjectCard({ stat }: { stat: StatsSubject }) {
 
 // ─── History Section ──────────────────────────────────────────────────────────
 
+const VIEW_MODES = [
+  { label: '整體', value: 'overall' as const },
+  { label: '各科', value: 'subjects' as const },
+]
+
 function HistorySection({ history }: { history: GetUserHistoryResponse }) {
   const [rangeDays, setRangeDays] = useState(90)
+  const [viewMode, setViewMode] = useState<'overall' | 'subjects'>('overall')
 
   const series = useMemo<ChartSeries[]>(() => {
     const filter = (data: DailyMastery[]) => {
@@ -289,15 +342,42 @@ function HistorySection({ history }: { history: GetUserHistoryResponse }) {
       const cutoff = cutoffDate(rangeDays)
       return data.filter((d) => d.date >= cutoff)
     }
-    return [
-      { name: '整體', color: SERIES_COLORS[0], data: filter(history.overallDailyMastery) },
-      ...history.subjectHistory.map((s, i) => ({
-        name: s.subjectName,
-        color: SERIES_COLORS[(i + 1) % SERIES_COLORS.length],
-        data: filter(s.dailyStats),
-      })),
-    ]
-  }, [history, rangeDays])
+    const overall: ChartSeries = { name: '整體', color: SERIES_COLORS[0], data: filter(history.overallDailyMastery) }
+    const subjects: ChartSeries[] = history.subjectHistory.map((s, i) => ({
+      name: s.subjectName,
+      color: SERIES_COLORS[(i + 1) % SERIES_COLORS.length],
+      data: filter(s.dailyStats),
+    }))
+    return viewMode === 'overall' ? [overall] : subjects
+  }, [history, rangeDays, viewMode])
+
+  function TabGroup<T extends string | number>({
+    options,
+    value,
+    onChange,
+  }: {
+    options: { label: string; value: T }[]
+    value: T
+    onChange: (v: T) => void
+  }) {
+    return (
+      <div className="flex overflow-hidden rounded-md border border-brown-300 divide-x divide-brown-300/50">
+        {options.map((o) => (
+          <button
+            key={o.value}
+            onClick={() => onChange(o.value)}
+            className={`px-3 py-1 text-xs transition-colors ${
+              value === o.value
+                ? 'bg-beige-300 text-brown-900'
+                : 'bg-beige-100 text-black-700 hover:bg-beige-200'
+            }`}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+    )
+  }
 
   return (
     <div className="mb-8 flex flex-col gap-6">
@@ -317,23 +397,12 @@ function HistorySection({ history }: { history: GetUserHistoryResponse }) {
       <div className="rounded-lg border border-brown-300 bg-white/40 p-6">
         <div className="mb-4 flex items-center justify-between gap-3">
           <h2 className="text-base font-bold text-black-500">進步曲線</h2>
-          <div className="flex overflow-hidden rounded-md border border-brown-300 divide-x divide-brown-300/50">
-            {DATE_RANGES.map(({ label, days }) => (
-              <button
-                key={days}
-                onClick={() => setRangeDays(days)}
-                className={`px-3 py-1 text-xs transition-colors ${
-                  rangeDays === days
-                    ? 'bg-beige-300 text-brown-900'
-                    : 'bg-beige-100 text-black-700 hover:bg-beige-200'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
+          <div className="flex items-center gap-2">
+            <TabGroup options={VIEW_MODES} value={viewMode} onChange={setViewMode} />
+            <TabGroup<number> options={DATE_RANGES.map(r => ({ label: r.label, value: r.days }))} value={rangeDays} onChange={setRangeDays} />
           </div>
         </div>
-        <ProgressChart series={series} />
+        <ProgressChart series={series} toggleable={viewMode === 'subjects'} />
         <p className="mt-1 text-right text-[10px] text-black-300">熟練度 0–10</p>
       </div>
 

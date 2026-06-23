@@ -211,10 +211,9 @@ export class UserService {
       );
     }
 
-    // Overall daily mastery: weighted average across subjects per date
-    const overallDailyMastery: DailyMastery[] = [...dateSubjectMap.entries()]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, subjectEntries]) => {
+    // Overall daily mastery: weighted average across subjects per date (sparse)
+    const sparseMastery = new Map<string, number>(
+      [...dateSubjectMap.entries()].map(([date, subjectEntries]) => {
         let weightedSum = 0;
         let totalQ = 0;
         for (const [subjectId, { mastery }] of subjectEntries) {
@@ -223,28 +222,52 @@ export class UserService {
           weightedSum += mastery * q;
           totalQ += q;
         }
-        return {
-          date,
-          weightedMastery: totalQ > 0 ? weightedSum / totalQ : 0,
-        };
-      });
+        return [date, totalQ > 0 ? weightedSum / totalQ : 0];
+      })
+    );
 
-    // Per-subject history
-    const subjectDailyMap = new Map<number, DailyMastery[]>();
+    // Fill every day from first recorded date to today, carrying forward last known mastery
+    const firstDate = [...sparseMastery.keys()].sort()[0];
+    const today = new Date().toISOString().slice(0, 10);
+    const overallDailyMastery: DailyMastery[] = [];
+    let lastMastery = 0;
+    const cursor = new Date(firstDate);
+    const endDate = new Date(today);
+    while (cursor <= endDate) {
+      const dateStr = cursor.toISOString().slice(0, 10);
+      if (sparseMastery.has(dateStr)) lastMastery = sparseMastery.get(dateStr)!;
+      overallDailyMastery.push({ date: dateStr, weightedMastery: lastMastery });
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
+    }
+
+    // Per-subject history: sparse map of date -> mastery per subject
+    const subjectSparseMastery = new Map<number, Map<string, number>>();
     for (const row of rows) {
       if (row.weightedMastery === null) continue;
-      if (!subjectDailyMap.has(row.subjectId))
-        subjectDailyMap.set(row.subjectId, []);
-      subjectDailyMap
-        .get(row.subjectId)!
-        .push({ date: row.date, weightedMastery: row.weightedMastery });
+      if (!subjectSparseMastery.has(row.subjectId))
+        subjectSparseMastery.set(row.subjectId, new Map());
+      subjectSparseMastery.get(row.subjectId)!.set(row.date, row.weightedMastery);
     }
-    const subjectHistory = [...subjectDailyMap.entries()].map(
-      ([subjectId, dailyStats]) => ({
-        subjectId,
-        subjectName: subjectNameMap.get(subjectId) ?? '',
-        dailyStats: dailyStats.sort((a, b) => a.date.localeCompare(b.date)),
-      })
+    // Fill every day from each subject's first recorded date to today, carrying forward
+    const subjectHistory = [...subjectSparseMastery.entries()].map(
+      ([subjectId, sparse]) => {
+        const subjectFirst = [...sparse.keys()].sort()[0];
+        const dailyStats: DailyMastery[] = [];
+        let last = 0;
+        const cur = new Date(subjectFirst);
+        const end = new Date(today);
+        while (cur <= end) {
+          const d = cur.toISOString().slice(0, 10);
+          if (sparse.has(d)) last = sparse.get(d)!;
+          dailyStats.push({ date: d, weightedMastery: last });
+          cur.setUTCDate(cur.getUTCDate() + 1);
+        }
+        return {
+          subjectId,
+          subjectName: subjectNameMap.get(subjectId) ?? '',
+          dailyStats,
+        };
+      }
     );
 
     // Heatmap: total daily attempts across all subjects
