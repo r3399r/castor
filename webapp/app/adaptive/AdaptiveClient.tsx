@@ -38,56 +38,58 @@ function ResultBox({ result }: { result: { correctAnswer: string; score: number;
     ? `https://m.facebook.com/${result.fbPostId.split('_')[0]}/posts/${result.fbPostId.split('_')[1]}`
     : null
   return (
-    <div
-      className={`border-t px-5 py-4 ${
-        correct ? 'border-green-700/30 bg-green-700/10' : 'border-orange-700/30 bg-orange-700/10'
-      }`}
-    >
-      <div className="flex flex-col gap-y-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4 sm:gap-y-1">
-        <div
-          className={`flex items-center gap-1.5 text-[18px] font-semibold ${
-            correct ? 'text-green-700' : 'text-orange-700'
-          }`}
-        >
-          {correct ? (
-            <>
-              <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-green-700">
-                <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
-                  <path d="M2 6L5 9L10 3" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </span>
-              答對了！
-            </>
-          ) : (
-            <>
-              <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-orange-700">
-                <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
-                  <path d="M3 3L9 9M9 3L3 9" stroke="white" strokeWidth="2" strokeLinecap="round"/>
-                </svg>
-              </span>
-              答錯了
-            </>
+    <div className="px-5 pb-5">
+      <div
+        className={`rounded-md border px-5 py-4 ${
+          correct ? 'border-green-700/30 bg-green-700/10' : 'border-orange-700/30 bg-orange-700/10'
+        }`}
+      >
+        <div className="flex flex-col gap-y-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4 sm:gap-y-1">
+          <div
+            className={`flex items-center gap-1.5 text-[18px] font-semibold ${
+              correct ? 'text-green-700' : 'text-orange-700'
+            }`}
+          >
+            {correct ? (
+              <>
+                <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-green-700">
+                  <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+                    <path d="M2 6L5 9L10 3" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </span>
+                答對了！
+              </>
+            ) : (
+              <>
+                <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-orange-700">
+                  <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+                    <path d="M3 3L9 9M9 3L3 9" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+                  </svg>
+                </span>
+                答錯了
+              </>
+            )}
+          </div>
+          <div className="flex items-center gap-4 sm:contents">
+            <div className="text-base text-black-700">
+              正確答案：<span className={`inline-block rounded border bg-white/60 px-2 py-0.5 font-semibold ${correct ? 'border-green-700/30' : 'border-orange-700/30'}`}>{result.correctAnswer}</span>
+            </div>
+            <div className="text-base text-black-500">得分：<span className={`inline-block rounded border bg-white/60 px-2 py-0.5 font-semibold ${correct ? 'border-green-700/30' : 'border-orange-700/30'}`}>{result.score}</span></div>
+          </div>
+          {fbUrl && (
+            <a
+              href={fbUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-md border border-brown-900 px-3 py-1.5 text-sm font-medium text-brown-900 transition hover:bg-brown-900/10 sm:mt-0 sm:ml-auto sm:w-auto sm:justify-start"
+            >
+              討論區
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M5.5 2.5H2.5C1.95 2.5 1.5 2.95 1.5 3.5V11.5C1.5 12.05 1.95 12.5 2.5 12.5H10.5C11.05 12.5 11.5 12.05 11.5 11.5V8.5M8.5 1.5H12.5M12.5 1.5V5.5M12.5 1.5L6 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </a>
           )}
         </div>
-        <div className="flex items-center gap-4 sm:contents">
-          <div className="text-base text-black-700">
-            正確答案：<span className={`inline-block rounded border bg-white/60 px-2 py-0.5 font-semibold ${correct ? 'border-green-700/30' : 'border-orange-700/30'}`}>{result.correctAnswer}</span>
-          </div>
-          <div className="text-base text-black-500">得分：<span className={`inline-block rounded border bg-white/60 px-2 py-0.5 font-semibold ${correct ? 'border-green-700/30' : 'border-orange-700/30'}`}>{result.score}</span></div>
-        </div>
-        {fbUrl && (
-          <a
-            href={fbUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-md border border-brown-900 px-3 py-1.5 text-sm font-medium text-brown-900 transition hover:bg-brown-900/10 sm:mt-0 sm:ml-auto sm:w-auto sm:justify-start"
-          >
-            討論區
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path d="M5.5 2.5H2.5C1.95 2.5 1.5 2.95 1.5 3.5V11.5C1.5 12.05 1.95 12.5 2.5 12.5H10.5C11.05 12.5 11.5 12.05 11.5 11.5V8.5M8.5 1.5H12.5M12.5 1.5V5.5M12.5 1.5L6 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </a>
-        )}
       </div>
     </div>
   )

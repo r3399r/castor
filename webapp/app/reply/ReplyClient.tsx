@@ -112,52 +112,54 @@ function ReplyRow({ item }: { item: Reply }) {
         )}
       </div>
 
-      <div
-        className={`border-t px-5 py-4 ${
-          correct ? 'border-green-700/30 bg-green-700/10' : 'border-orange-700/30 bg-orange-700/10'
-        }`}
-      >
-        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-          <div className="flex flex-col gap-2 text-base text-black-700 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4">
-            <div>
-              作答時間：
-              <span className="font-medium text-black-900">{formatDate(item.createdAt)}</span>
-            </div>
-            <div className="flex items-center gap-4">
+      <div className="px-5 pb-5">
+        <div
+          className={`rounded-md border px-5 py-4 ${
+            correct ? 'border-green-700/30 bg-green-700/10' : 'border-orange-700/30 bg-orange-700/10'
+          }`}
+        >
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-2 text-base text-black-700 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4">
               <div>
-                作答：
-                <span className="inline-block rounded border border-brown-300 bg-white/60 px-2 py-0.5 font-semibold text-black-900">
-                  {item.repliedAnswer ?? '—'}
-                </span>
+                作答時間：
+                <span className="font-medium text-black-900">{formatDate(item.createdAt)}</span>
               </div>
-              <div>
-                得分：
-                <span
-                  className={`inline-block rounded border bg-white/60 px-2 py-0.5 font-semibold ${
-                    correct
-                      ? 'border-green-700/30 text-green-700'
-                      : 'border-orange-700/30 text-orange-700'
-                  }`}
-                >
-                  {item.score}
-                </span>
+              <div className="flex items-center gap-4">
+                <div>
+                  作答：
+                  <span className="inline-block rounded border border-brown-300 bg-white/60 px-2 py-0.5 font-semibold text-black-900">
+                    {item.repliedAnswer ?? '—'}
+                  </span>
+                </div>
+                <div>
+                  得分：
+                  <span
+                    className={`inline-block rounded border bg-white/60 px-2 py-0.5 font-semibold ${
+                      correct
+                        ? 'border-green-700/30 text-green-700'
+                        : 'border-orange-700/30 text-orange-700'
+                    }`}
+                  >
+                    {item.score}
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
 
-          {fbUrl && (
-            <a
-              href={fbUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex w-full items-center justify-center gap-1.5 rounded-md border border-brown-900 px-3 py-1.5 text-sm font-medium text-brown-900 transition hover:bg-brown-900/10 sm:w-auto sm:justify-start"
-            >
-              討論區
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path d="M5.5 2.5H2.5C1.95 2.5 1.5 2.95 1.5 3.5V11.5C1.5 12.05 1.95 12.5 2.5 12.5H10.5C11.05 12.5 11.5 12.05 11.5 11.5V8.5M8.5 1.5H12.5M12.5 1.5V5.5M12.5 1.5L6 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </a>
-          )}
+            {fbUrl && (
+              <a
+                href={fbUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex w-full items-center justify-center gap-1.5 rounded-md border border-brown-900 px-3 py-1.5 text-sm font-medium text-brown-900 transition hover:bg-brown-900/10 sm:w-auto sm:justify-start"
+              >
+                討論區
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                  <path d="M5.5 2.5H2.5C1.95 2.5 1.5 2.95 1.5 3.5V11.5C1.5 12.05 1.95 12.5 2.5 12.5H10.5C11.05 12.5 11.5 12.05 11.5 11.5V8.5M8.5 1.5H12.5M12.5 1.5V5.5M12.5 1.5L6 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </a>
+            )}
+          </div>
         </div>
       </div>
     </article>
