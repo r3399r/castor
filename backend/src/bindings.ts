@@ -37,8 +37,8 @@ import { ReplyEntity } from './model/entity/ReplyEntity';
 import { SubjectEntity } from './model/entity/SubjectEntity';
 import { TagEntity } from './model/entity/TagEntity';
 import { UserConceptStatEntity } from './model/entity/UserConceptStatEntity';
-import { UserStatHistoryEntity } from './model/entity/UserStatHistoryEntity';
 import { UserEntity } from './model/entity/UserEntity';
+import { UserStatHistoryEntity } from './model/entity/UserStatHistoryEntity';
 import { Database, dbEntitiesBindingId } from './utils/Database';
 
 const container: Container = new Container();

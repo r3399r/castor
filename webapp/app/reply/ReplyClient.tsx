@@ -6,7 +6,7 @@ import { BookOpenText } from 'lucide-react'
 import { apiFetch, LIMIT } from '@/lib/api'
 import Chip, { tagColors } from '@/components/Chip'
 import DifficultyStars from '@/components/DifficultyStars'
-import type { GetReplyResponse, Reply } from '@/types/api'
+import type { GetReplyResponse, ReplyGroup } from '@/types/api'
 
 const typeLabel: Record<string, string> = {
   SINGLE: '單選題',
@@ -30,18 +30,41 @@ function getFbUrl(fbPostId: string | null): string | null {
   return `https://m.facebook.com/${pageId}/posts/${postId}`
 }
 
-function ReplyRow({ item }: { item: Reply }) {
-  const question = item.parent ?? item.question
-  const childQuestion = item.parent ? item.question : null
-  const fbUrl = getFbUrl(question.fbPostId)
-  const correct = item.score > 0
+function ReplyRow({ item }: { item: ReplyGroup }) {
+  // For a group, parentQuestion is the 題組 header.
+  // For a standalone question, parentQuestion is null and children has one entry.
+  const question = item.parentQuestion ?? item.children[0]?.question
+  if (!question) return null
+
   const exams = question.exam ?? []
   const concepts = question.concept ?? []
   const tags = question.tag ?? []
   const difficulty = question.adjustedDifficulty ?? question.difficulty ?? 0
+  const fbUrl = getFbUrl(question.fbPostId)
+  const isGroup = item.parentQuestion !== null
+
+  const MetaChips = () => (
+    <>
+      <Chip label={typeLabel[question.type] ?? question.type} />
+      {exams.map((e) => (
+        <Chip key={e.id} label={e.name} color={tagColors.exam} />
+      ))}
+      {concepts.map((c) => (
+        <Chip
+          key={c.id}
+          label={c.conceptGroup.name === c.name ? c.name : c.conceptGroup.name + '-' + c.name}
+          color={tagColors.concept}
+        />
+      ))}
+      {tags.map((t) => (
+        <Chip key={t.id} label={t.name} color={tagColors.tag} />
+      ))}
+    </>
+  )
 
   return (
     <article className="overflow-hidden rounded-lg border border-brown-700 bg-white/60">
+      {/* Header */}
       <div className="border-b border-[#E3D1C5] px-5 pt-3 pb-2">
         <div className="flex items-center justify-between gap-3 sm:hidden">
           <span className="flex items-center gap-2 font-bold text-blue-700">
@@ -51,22 +74,8 @@ function ReplyRow({ item }: { item: Reply }) {
           <DifficultyStars value={difficulty} />
         </div>
         <div className="mt-2.5 flex flex-wrap gap-2 sm:hidden">
-          <Chip label={typeLabel[question.type] ?? question.type} />
-          {exams.map((e) => (
-            <Chip key={e.id} label={e.name} color={tagColors.exam} />
-          ))}
-          {concepts.map((c) => (
-            <Chip
-              key={c.id}
-              label={c.conceptGroup.name === c.name ? c.name : c.conceptGroup.name + '-' + c.name}
-              color={tagColors.concept}
-            />
-          ))}
-          {tags.map((t) => (
-            <Chip key={t.id} label={t.name} color={tagColors.tag} />
-          ))}
+          <MetaChips />
         </div>
-
         <div className="hidden sm:flex sm:items-start sm:justify-between sm:gap-3">
           <div className="flex flex-wrap items-center gap-2">
             <span className="flex shrink-0 items-center gap-2 font-bold text-blue-700">
@@ -74,27 +83,16 @@ function ReplyRow({ item }: { item: Reply }) {
               {item.subject.name}
             </span>
             <div className="ml-2 flex flex-wrap gap-2">
-              <Chip label={typeLabel[question.type] ?? question.type} />
-              {exams.map((e) => (
-                <Chip key={e.id} label={e.name} color={tagColors.exam} />
-              ))}
-              {concepts.map((c) => (
-                <Chip
-                  key={c.id}
-                  label={c.conceptGroup.name === c.name ? c.name : c.conceptGroup.name + '-' + c.name}
-                  color={tagColors.concept}
-                />
-              ))}
-              {tags.map((t) => (
-                <Chip key={t.id} label={t.name} color={tagColors.tag} />
-              ))}
+              <MetaChips />
             </div>
           </div>
           <DifficultyStars value={difficulty} />
         </div>
       </div>
 
+      {/* Body */}
       <div className="flex flex-col gap-4 px-5 py-7 lg:px-[40px]">
+        {/* Parent / standalone question content */}
         {question.content && (
           <div
             dangerouslySetInnerHTML={{ __html: question.content }}
@@ -102,65 +100,89 @@ function ReplyRow({ item }: { item: Reply }) {
           />
         )}
 
-        {childQuestion?.content && (
-          <div className="border-t border-brown-300 pt-5">
-            <div
-              dangerouslySetInnerHTML={{ __html: childQuestion.content }}
-              className="prose prose-sm max-w-none text-black-800 [&>*:last-child]:mb-0"
-            />
-          </div>
-        )}
-      </div>
+        {/* Sub-questions (for 題組) or single answer block */}
+        <div className={`flex flex-col ${isGroup ? 'gap-6' : 'gap-0'}`}>
+          {item.children.map((child, idx) => {
+            const correct = child.score > 0
+            const childQ = isGroup ? child.question : null
+            return (
+              <div key={child.id} className={isGroup ? 'border-t border-brown-300 pt-5' : ''}>
+                {childQ?.content && (
+                  <div
+                    dangerouslySetInnerHTML={{ __html: childQ.content }}
+                    className="prose prose-sm mb-4 max-w-none text-black-800 [&>*:last-child]:mb-0"
+                  />
+                )}
+                <div
+                  className={`rounded-md border px-5 py-4 ${
+                    correct ? 'border-green-700/30 bg-green-700/10' : 'border-orange-700/30 bg-orange-700/10'
+                  }`}
+                >
+                  <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+                    <div className="flex flex-col gap-2 text-base text-black-700 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4">
+                      {isGroup && (
+                        <div className="text-sm font-medium text-black-500">第 {idx + 1} 題</div>
+                      )}
+                      <div>
+                        作答時間：
+                        <span className="font-medium text-black-900">{formatDate(child.createdAt)}</span>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div>
+                          作答：
+                          <span className="inline-block rounded border border-brown-300 bg-white/60 px-2 py-0.5 font-semibold text-black-900">
+                            {child.repliedAnswer ?? '—'}
+                          </span>
+                        </div>
+                        <div>
+                          得分：
+                          <span
+                            className={`inline-block rounded border bg-white/60 px-2 py-0.5 font-semibold ${
+                              correct
+                                ? 'border-green-700/30 text-green-700'
+                                : 'border-orange-700/30 text-orange-700'
+                            }`}
+                          >
+                            {child.score}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
 
-      <div className="px-5 pb-5">
-        <div
-          className={`rounded-md border px-5 py-4 ${
-            correct ? 'border-green-700/30 bg-green-700/10' : 'border-orange-700/30 bg-orange-700/10'
-          }`}
-        >
-          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-            <div className="flex flex-col gap-2 text-base text-black-700 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4">
-              <div>
-                作答時間：
-                <span className="font-medium text-black-900">{formatDate(item.createdAt)}</span>
-              </div>
-              <div className="flex items-center gap-4">
-                <div>
-                  作答：
-                  <span className="inline-block rounded border border-brown-300 bg-white/60 px-2 py-0.5 font-semibold text-black-900">
-                    {item.repliedAnswer ?? '—'}
-                  </span>
-                </div>
-                <div>
-                  得分：
-                  <span
-                    className={`inline-block rounded border bg-white/60 px-2 py-0.5 font-semibold ${
-                      correct
-                        ? 'border-green-700/30 text-green-700'
-                        : 'border-orange-700/30 text-orange-700'
-                    }`}
-                  >
-                    {item.score}
-                  </span>
+                    {!isGroup && fbUrl && (
+                      <a
+                        href={fbUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex w-full items-center justify-center gap-1.5 rounded-md border border-brown-900 px-3 py-1.5 text-sm font-medium text-brown-900 transition hover:bg-brown-900/10 sm:w-auto sm:justify-start"
+                      >
+                        討論區
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                          <path d="M5.5 2.5H2.5C1.95 2.5 1.5 2.95 1.5 3.5V11.5C1.5 12.05 1.95 12.5 2.5 12.5H10.5C11.05 12.5 11.5 12.05 11.5 11.5V8.5M8.5 1.5H12.5M12.5 1.5V5.5M12.5 1.5L6 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </a>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-
-            {fbUrl && (
-              <a
-                href={fbUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex w-full items-center justify-center gap-1.5 rounded-md border border-brown-900 px-3 py-1.5 text-sm font-medium text-brown-900 transition hover:bg-brown-900/10 sm:w-auto sm:justify-start"
-              >
-                討論區
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                  <path d="M5.5 2.5H2.5C1.95 2.5 1.5 2.95 1.5 3.5V11.5C1.5 12.05 1.95 12.5 2.5 12.5H10.5C11.05 12.5 11.5 12.05 11.5 11.5V8.5M8.5 1.5H12.5M12.5 1.5V5.5M12.5 1.5L6 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </a>
-            )}
-          </div>
+            )
+          })}
         </div>
+
+        {/* 討論區 link for group (shown once at bottom) */}
+        {isGroup && fbUrl && (
+          <a
+            href={fbUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex w-auto items-center gap-1.5 self-end rounded-md border border-brown-900 px-3 py-1.5 text-sm font-medium text-brown-900 transition hover:bg-brown-900/10"
+          >
+            討論區
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M5.5 2.5H2.5C1.95 2.5 1.5 2.95 1.5 3.5V11.5C1.5 12.05 1.95 12.5 2.5 12.5H10.5C11.05 12.5 11.5 12.05 11.5 11.5V8.5M8.5 1.5H12.5M12.5 1.5V5.5M12.5 1.5L6 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </a>
+        )}
       </div>
     </article>
   )
@@ -236,7 +258,7 @@ export default function ReplyClient() {
       <MathJax dynamic>
         <div className="flex flex-col gap-[40px]">
           {replyList.data.map((item) => (
-            <ReplyRow key={item.id} item={item} />
+            <ReplyRow key={`${item.repliedAt}|${item.children[0]?.parentId ?? item.children[0]?.questionId}`} item={item} />
           ))}
         </div>
       </MathJax>

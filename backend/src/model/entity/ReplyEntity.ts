@@ -48,6 +48,9 @@ export class ReplyEntity implements Reply {
   @Column({ type: 'text', name: 'replied_answer', default: null })
   repliedAnswer: string | null = null;
 
+  @Column({ type: 'datetime', name: 'replied_at', default: null })
+  repliedAt: string | null = null;
+
   @Column({ type: 'datetime', name: 'created_at', default: null })
   createdAt: string | null = null;
 

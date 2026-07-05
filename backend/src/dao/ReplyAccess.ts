@@ -60,6 +60,40 @@ export class ReplyAccess {
     });
   }
 
+  public async countGroups(userId: number): Promise<number> {
+    const qr = await this.database.getQueryRunner();
+    const rows = await qr.manager.query<{ cnt: string }[]>(
+      `SELECT COUNT(*) AS cnt FROM (
+         SELECT 1 FROM reply
+         WHERE user_id = ?
+         GROUP BY replied_at, COALESCE(parent_id, question_id)
+       ) t`,
+      [userId]
+    );
+
+    return parseInt(rows[0]?.cnt ?? '0', 10);
+  }
+
+  public async getGroupKeys(
+    userId: number,
+    limit: number,
+    offset: number
+  ): Promise<{ repliedAt: string; groupQuestionKey: number }[]> {
+    const qr = await this.database.getQueryRunner();
+
+    return await qr.manager.query<
+      { repliedAt: string; groupQuestionKey: number }[]
+    >(
+      `SELECT replied_at AS repliedAt, COALESCE(parent_id, question_id) AS groupQuestionKey
+       FROM reply
+       WHERE user_id = ?
+       GROUP BY replied_at, COALESCE(parent_id, question_id)
+       ORDER BY replied_at DESC
+       LIMIT ? OFFSET ?`,
+      [userId, limit, offset]
+    );
+  }
+
   private async createQueryBuilder() {
     const qr = await this.database.getQueryRunner();
 

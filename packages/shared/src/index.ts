@@ -60,6 +60,7 @@ export type Reply = {
   parent: Question | null;
   score: number;
   repliedAnswer: string | null;
+  repliedAt: string | null;
   createdAt: string | null;
   updatedAt: string | null;
 };
@@ -227,7 +228,15 @@ export type PostReplyResponse = {
 
 export type GetReplyParams = PaginationParams;
 
-export type GetReplyResponse = Paginate<Reply>
+export type ReplyGroup = {
+  repliedAt: string;
+  parentQuestion: Question | null;
+  subject: Subject;
+  subjectId: number;
+  children: Reply[];
+};
+
+export type GetReplyResponse = Paginate<ReplyGroup>
 
 export type PostPreviewRequest = { text: string; imageUrl: string }
 

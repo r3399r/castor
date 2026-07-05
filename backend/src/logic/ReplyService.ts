@@ -4,6 +4,7 @@ import {
   PostReplyRequest,
   PostReplyResponse,
   Question,
+  ReplyGroup,
 } from '@castor/shared';
 import { differenceInDays } from 'date-fns';
 import { inject, injectable } from 'inversify';
@@ -69,7 +70,8 @@ export class ReplyService {
     question: Question,
     parentQuestion: Question | null,
     repliedAnswer: string,
-    userId: number
+    userId: number,
+    repliedAt: string
   ) {
     let score = 0;
     switch (question.type) {
@@ -113,6 +115,7 @@ export class ReplyService {
     replyEntity.parentId = parentQuestion ? parentQuestion.id : null;
     replyEntity.score = score;
     replyEntity.repliedAnswer = repliedAnswer;
+    replyEntity.repliedAt = repliedAt;
     await this.replyAccess.save(replyEntity);
 
     const conceptIds = new Set<number>();
@@ -249,7 +252,11 @@ export class ReplyService {
         await this.pendingReplyAccess.delete(pendingReply.id);
 
     const responses: PostReplyResponse = [];
-    const subjectBatch = new Map<number, { attempts: number; correct: number }>();
+    const subjectBatch = new Map<
+      number,
+      { attempts: number; correct: number }
+    >();
+    const repliedAt = new Date().toISOString();
 
     for (const d of data) {
       const question = questionMap.get(d.questionId) ?? null;
@@ -259,7 +266,8 @@ export class ReplyService {
         question,
         parentQuestion,
         d.repliedAnswer,
-        user.id
+        user.id,
+        repliedAt
       );
       responses.push(res);
 
@@ -299,21 +307,49 @@ export class ReplyService {
     const limit = params?.limit ? Number(params.limit) : LIMIT;
     const offset = params?.offset ? Number(params.offset) : OFFSET;
 
-    const [replies, total] = await this.replyAccess.findAndCount({
-      where: { userId: user.id },
-      relations: {
-        question: true,
-        parent: true,
-        subject: true,
-      },
-      take: limit,
-      skip: offset,
-      order: { createdAt: 'DESC' },
+    const [groupKeys, total] = await Promise.all([
+      this.replyAccess.getGroupKeys(user.id, limit, offset),
+      this.replyAccess.countGroups(user.id),
+    ]);
+
+    if (groupKeys.length === 0)
+      return { data: [], paginate: genPagination(total, limit, offset) };
+
+    const distinctRepliedAts = [...new Set(groupKeys.map((k) => k.repliedAt))];
+    const replies = await this.replyAccess.find({
+      where: { userId: user.id, repliedAt: In(distinctRepliedAts) },
+      relations: { question: true, parent: true, subject: true },
+      order: { repliedAt: 'DESC' },
     });
 
-    return {
-      data: replies,
-      paginate: genPagination(total, limit, offset),
-    };
+    const compositeKeyOrder = new Map(
+      groupKeys.map((k, i) => [`${k.repliedAt}|${k.groupQuestionKey}`, i])
+    );
+
+    const groupMap = new Map<string, ReplyGroup>();
+    for (const reply of replies) {
+      const questionKey = reply.parentId ?? reply.questionId;
+      const compositeKey = `${reply.repliedAt}|${questionKey}`;
+      if (!compositeKeyOrder.has(compositeKey)) continue;
+      if (!groupMap.has(compositeKey))
+        groupMap.set(compositeKey, {
+          repliedAt: reply.repliedAt!,
+          parentQuestion: reply.parent,
+          subject: reply.subject,
+          subjectId: reply.subjectId,
+          children: [],
+        });
+
+      groupMap.get(compositeKey)!.children.push(reply);
+    }
+
+    const data = [...groupMap.entries()]
+      .sort(
+        ([a], [b]) =>
+          (compositeKeyOrder.get(a) ?? 0) - (compositeKeyOrder.get(b) ?? 0)
+      )
+      .map(([, group]) => group);
+
+    return { data, paginate: genPagination(total, limit, offset) };
   }
 }

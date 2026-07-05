@@ -175,12 +175,10 @@ export class UserService {
 
       if (!dateSubjectMap.has(row.date))
         dateSubjectMap.set(row.date, new Map());
-      dateSubjectMap
-        .get(row.date)!
-        .set(row.subjectId, {
-          mastery: row.weightedMastery,
-          attempts: row.dailyAttempts,
-        });
+      dateSubjectMap.get(row.date)!.set(row.subjectId, {
+        mastery: row.weightedMastery,
+        attempts: row.dailyAttempts,
+      });
     }
 
     // Streak: consecutive days descending from today or yesterday
@@ -222,6 +220,7 @@ export class UserService {
           weightedSum += mastery * q;
           totalQ += q;
         }
+
         return [date, totalQ > 0 ? weightedSum / totalQ : 0];
       })
     );
@@ -246,7 +245,9 @@ export class UserService {
       if (row.weightedMastery === null) continue;
       if (!subjectSparseMastery.has(row.subjectId))
         subjectSparseMastery.set(row.subjectId, new Map());
-      subjectSparseMastery.get(row.subjectId)!.set(row.date, row.weightedMastery);
+      subjectSparseMastery
+        .get(row.subjectId)!
+        .set(row.date, row.weightedMastery);
     }
     // Fill every day from each subject's first recorded date to today, carrying forward
     const subjectHistory = [...subjectSparseMastery.entries()].map(
@@ -262,6 +263,7 @@ export class UserService {
           dailyStats.push({ date: d, weightedMastery: last });
           cur.setUTCDate(cur.getUTCDate() + 1);
         }
+
         return {
           subjectId,
           subjectName: subjectNameMap.get(subjectId) ?? '',
@@ -282,9 +284,7 @@ export class UserService {
       }));
 
     const overallAccuracy =
-      totalAttempts > 0
-        ? (totalCorrect / totalAttempts / 10) * 100
-        : 0;
+      totalAttempts > 0 ? (totalCorrect / totalAttempts / 10) * 100 : 0;
 
     return {
       totalAttempts,
@@ -302,22 +302,18 @@ export class UserService {
     const yesterday = new Date(Date.now() - 86400000)
       .toISOString()
       .split('T')[0];
-    if (
-      sortedDatesDesc[0] !== today &&
-      sortedDatesDesc[0] !== yesterday
-    )
+    if (sortedDatesDesc[0] !== today && sortedDatesDesc[0] !== yesterday)
       return 0;
 
     let streak = 1;
     for (let i = 1; i < sortedDatesDesc.length; i++) {
       const prev = new Date(sortedDatesDesc[i - 1]);
       const curr = new Date(sortedDatesDesc[i]);
-      const diffDays = Math.round(
-        (prev.getTime() - curr.getTime()) / 86400000
-      );
+      const diffDays = Math.round((prev.getTime() - curr.getTime()) / 86400000);
       if (diffDays === 1) streak++;
       else break;
     }
+
     return streak;
   }
 }
