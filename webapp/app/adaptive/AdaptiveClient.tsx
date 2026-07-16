@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { Goal, BookOpenText, Brain, FunnelPlus, NotebookPen } from 'lucide-react'
 import { apiFetch, apiPost } from '@/lib/api'
 import Chip, { tagColors } from '@/components/Chip'
@@ -367,8 +367,16 @@ export default function AdaptiveClient() {
     setTagList(subjectList.find((s) => String(s.id) === selectedSubjectId)?.tags ?? [])
   }, [selectedSubjectId])
 
+  const prevSubjectIdForCountRef = useRef(selectedSubjectId)
+
   useEffect(() => {
+    const subjectJustChanged = prevSubjectIdForCountRef.current !== selectedSubjectId
+    prevSubjectIdForCountRef.current = selectedSubjectId
     if (!selectedSubjectId) return
+    // when the subject changes, the effect above resets the filter arrays right after this
+    // render, which will re-trigger this effect with the cleared filters — skip this pass to
+    // avoid firing the request twice (once with the previous subject's stale filters)
+    if (subjectJustChanged) return
     setQuestionCount(-1)
     apiFetch<GetQuestionResponse>('question', {
       subjectId: selectedSubjectId,
