@@ -12,6 +12,16 @@ const postCategory = (body: unknown) =>
     body: JSON.stringify(body),
   });
 
+const putCategory = (id: number | string, body: unknown) =>
+  app.request(`/api/category/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+const deleteCategory = (id: number | string) =>
+  app.request(`/api/category/${id}`, { method: 'DELETE' });
+
 describe('category routes', () => {
   beforeAll(async () => {
     await getDb().delete(categoryTable);
@@ -76,5 +86,66 @@ describe('category routes', () => {
     // mapping (409) would be a reasonable follow-up, not a silent regression.
     const second = await postCategory({ name: 'duplicate' });
     expect(second.status).toBe(500);
+  });
+
+  describe('PUT /:id', () => {
+    it('updates a category and returns the updated record', async () => {
+      const created = (await (
+        await postCategory({ name: 'old name' })
+      ).json()) as CategoryDto;
+
+      const res = await putCategory(created.id, { name: 'new name' });
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ ...created, name: 'new name' });
+
+      const getRes = await app.request(`/api/category/${created.id}`);
+      expect(await getRes.json()).toMatchObject({ name: 'new name' });
+    });
+
+    it('404s for an unknown category id', async () => {
+      const res = await putCategory(999999, { name: 'anything' });
+      expect(res.status).toBe(404);
+      expect(await res.json()).toMatchObject({
+        status: 404,
+        name: 'NotFoundError',
+        code: 'NOT_FOUND',
+      });
+    });
+
+    it('rejects a missing name with 400 before touching the database', async () => {
+      const created = (await (
+        await postCategory({ name: 'keep me' })
+      ).json()) as CategoryDto;
+
+      const res = await putCategory(created.id, {});
+      expect(res.status).toBe(400);
+
+      const getRes = await app.request(`/api/category/${created.id}`);
+      expect(await getRes.json()).toMatchObject({ name: 'keep me' });
+    });
+  });
+
+  describe('DELETE /:id', () => {
+    it('deletes a category', async () => {
+      const created = (await (
+        await postCategory({ name: 'to delete' })
+      ).json()) as CategoryDto;
+
+      const res = await deleteCategory(created.id);
+      expect(res.status).toBe(204);
+
+      const getRes = await app.request(`/api/category/${created.id}`);
+      expect(getRes.status).toBe(404);
+    });
+
+    it('404s for an unknown category id', async () => {
+      const res = await deleteCategory(999999);
+      expect(res.status).toBe(404);
+      expect(await res.json()).toMatchObject({
+        status: 404,
+        name: 'NotFoundError',
+        code: 'NOT_FOUND',
+      });
+    });
   });
 });

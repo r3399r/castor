@@ -27,60 +27,44 @@ function buildUrl(path: string, params?: Params): string {
   return qs ? `${base}?${qs}` : base
 }
 
-async function apiFetch<T>(path: string, params?: Params, token?: string): Promise<T> {
-  const res = await fetch(buildUrl(path, params), {
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-      Authorization: token ?? getStoredToken(),
-    },
-  })
+async function parseResponse<T>(res: Response): Promise<T> {
+  if (res.status === 204) return undefined as T
+  return res.json() as Promise<T>
+}
+
+async function request<T>(url: string, init: RequestInit, token?: string): Promise<T> {
+  const headers = {
+    'Content-Type': 'application/json',
+    Accept: 'application/json',
+    Authorization: token ?? getStoredToken(),
+  }
+  const res = await fetch(url, { ...init, headers })
   if (res.status === 401 && !token) {
     const newToken = await forceRefreshToken()
     if (newToken) {
-      const retry = await fetch(buildUrl(path, params), {
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-          Authorization: newToken,
-        },
-      })
-      if (!retry.ok) throw new Error(`API ${retry.status}: ${path}`)
-      return retry.json() as Promise<T>
+      const retry = await fetch(url, { ...init, headers: { ...headers, Authorization: newToken } })
+      if (!retry.ok) throw new Error(`API ${retry.status}: ${url}`)
+      return parseResponse<T>(retry)
     }
   }
-  if (!res.ok) throw new Error(`API ${res.status}: ${path}`)
-  return res.json() as Promise<T>
+  if (!res.ok) throw new Error(`API ${res.status}: ${url}`)
+  return parseResponse<T>(res)
+}
+
+async function apiFetch<T>(path: string, params?: Params, token?: string): Promise<T> {
+  return request<T>(buildUrl(path, params), { method: 'GET' }, token)
 }
 
 async function apiPost<T, B = unknown>(path: string, body: B, token?: string): Promise<T> {
-  const res = await fetch(`/api/${path}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-      Authorization: token ?? getStoredToken(),
-    },
-    body: JSON.stringify(body),
-  })
-  if (res.status === 401 && !token) {
-    const newToken = await forceRefreshToken()
-    if (newToken) {
-      const retry = await fetch(`/api/${path}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-          Authorization: newToken,
-        },
-        body: JSON.stringify(body),
-      })
-      if (!retry.ok) throw new Error(`API ${retry.status}: ${path}`)
-      return retry.json() as Promise<T>
-    }
-  }
-  if (!res.ok) throw new Error(`API ${res.status}: ${path}`)
-  return res.json() as Promise<T>
+  return request<T>(`/api/${path}`, { method: 'POST', body: JSON.stringify(body) }, token)
 }
 
-export { apiFetch, apiPost, LIMIT }
+async function apiPut<T, B = unknown>(path: string, body: B, token?: string): Promise<T> {
+  return request<T>(`/api/${path}`, { method: 'PUT', body: JSON.stringify(body) }, token)
+}
+
+async function apiDelete<T = void>(path: string, token?: string): Promise<T> {
+  return request<T>(`/api/${path}`, { method: 'DELETE' }, token)
+}
+
+export { apiFetch, apiPost, apiPut, apiDelete, LIMIT }

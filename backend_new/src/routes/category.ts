@@ -12,21 +12,26 @@ export const postCategorySchema = z.object({
 
 export const category = new Hono<TransactionEnv>()
   .get('/', async (c) => {
+    console.log('GET /api/category');
     const categories = await c.get('db').select().from(categoryTable);
     return c.json(categories);
   })
   .get('/:id', async (c) => {
+    const id = c.req.param('id');
+    console.log(`GET /api/category/${id}`);
     const [found] = await c
       .get('db')
       .select()
       .from(categoryTable)
-      .where(eq(categoryTable.id, Number(c.req.param('id'))));
-    if (found === undefined) throw new NotFoundError('category not found');
+      .where(eq(categoryTable.id, Number(id)));
+    if (found === undefined)
+      throw new NotFoundError(`category ${id} not found`);
 
     return c.json(found);
   })
   .post('/', zValidator('json', postCategorySchema), async (c) => {
     const { name } = c.req.valid('json');
+    console.log(`POST /api/category name=${name}`);
     const db = c.get('db');
 
     const [{ insertId }] = await db
@@ -38,4 +43,37 @@ export const category = new Hono<TransactionEnv>()
       .where(eq(categoryTable.id, insertId));
 
     return c.json(saved, 201);
+  })
+  .put('/:id', zValidator('json', postCategorySchema), async (c) => {
+    const db = c.get('db');
+    const id = Number(c.req.param('id'));
+    const { name } = c.req.valid('json');
+    console.log(`PUT /api/category/${id} name=${name}`);
+
+    const [{ affectedRows }] = await db
+      .update(categoryTable)
+      .set({ name })
+      .where(eq(categoryTable.id, id));
+    if (affectedRows === 0)
+      throw new NotFoundError(`category ${id} not found`);
+
+    const [updated] = await db
+      .select()
+      .from(categoryTable)
+      .where(eq(categoryTable.id, id));
+
+    return c.json(updated);
+  })
+  .delete('/:id', async (c) => {
+    const db = c.get('db');
+    const id = Number(c.req.param('id'));
+    console.log(`DELETE /api/category/${id}`);
+
+    const [{ affectedRows }] = await db
+      .delete(categoryTable)
+      .where(eq(categoryTable.id, id));
+    if (affectedRows === 0)
+      throw new NotFoundError(`category ${id} not found`);
+
+    return c.body(null, 204);
   });
