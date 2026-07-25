@@ -1,8 +1,9 @@
 'use client'
 
-import { FormEvent, useEffect, useState } from 'react'
+import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { apiDelete, apiFetch, apiPost, apiPut } from '@/lib/api'
 import MultiSelectField from '@/components/MultiSelectField'
+import SortableTh, { type SortDirection } from '@/components/SortableTh'
 import type { Category } from '@/types/api'
 
 type SubjectDto = {
@@ -15,10 +16,15 @@ type SubjectDto = {
   categories: string | null
 }
 
+type SortColumn = 'id' | 'name' | 'sortOrder' | 'categories'
+
 export default function SubjectClient() {
   const [subjects, setSubjects] = useState<SubjectDto[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  const [sortColumn, setSortColumn] = useState<SortColumn>('sortOrder')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
 
   const [newName, setNewName] = useState('')
   const [newSortOrder, setNewSortOrder] = useState('0')
@@ -183,6 +189,26 @@ export default function SubjectClient() {
     }
   }
 
+  const handleSort = (column: SortColumn) => {
+    if (column === sortColumn) {
+      setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortColumn(column)
+      setSortDirection('asc')
+    }
+  }
+
+  const sortedSubjects = useMemo(() => {
+    const dir = sortDirection === 'asc' ? 1 : -1
+    return [...subjects].sort((a, b) => {
+      if (sortColumn === 'id') return (a.id - b.id) * dir
+      if (sortColumn === 'sortOrder') return (a.sortOrder - b.sortOrder) * dir
+      if (sortColumn === 'categories')
+        return (a.categories ?? '').localeCompare(b.categories ?? '') * dir
+      return a.name.localeCompare(b.name) * dir
+    })
+  }, [subjects, sortColumn, sortDirection])
+
   if (loading) {
     return (
       <div className="flex h-48 items-center justify-center">
@@ -236,23 +262,22 @@ export default function SubjectClient() {
         <table className="w-full text-left text-sm">
           <thead>
             <tr className="border-b border-brown-300/60 text-xs font-medium text-black-700">
-              <th className="px-4 py-3">ID</th>
-              <th className="px-4 py-3">名稱</th>
-              <th className="px-4 py-3">排序</th>
-              <th className="px-4 py-3">類別</th>
-              <th className="px-4 py-3">建立時間</th>
+              <SortableTh label="ID" column="id" activeColumn={sortColumn} direction={sortDirection} onSort={handleSort} />
+              <SortableTh label="名稱" column="name" activeColumn={sortColumn} direction={sortDirection} onSort={handleSort} />
+              <SortableTh label="排序" column="sortOrder" activeColumn={sortColumn} direction={sortDirection} onSort={handleSort} />
+              <SortableTh label="類別" column="categories" activeColumn={sortColumn} direction={sortDirection} onSort={handleSort} />
               <th className="px-4 py-3 text-right">操作</th>
             </tr>
           </thead>
           <tbody>
-            {subjects.length === 0 && (
+            {sortedSubjects.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-black-300">
+                <td colSpan={5} className="px-4 py-8 text-center text-black-300">
                   尚無科目
                 </td>
               </tr>
             )}
-            {subjects.map((subject) => {
+            {sortedSubjects.map((subject) => {
               const isEditing = editingId === subject.id
               return (
                 <tr key={subject.id} className="border-b border-brown-300/30 last:border-0">
@@ -320,9 +345,6 @@ export default function SubjectClient() {
                     ) : (
                       subject.categories ?? '-'
                     )}
-                  </td>
-                  <td className="px-4 py-3 text-black-500">
-                    {subject.createdAt ? new Date(subject.createdAt).toLocaleString('zh-TW') : '-'}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end gap-2">

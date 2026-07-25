@@ -1,13 +1,19 @@
 'use client'
 
-import { FormEvent, useEffect, useState } from 'react'
+import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { apiDelete, apiFetch, apiPost, apiPut } from '@/lib/api'
+import SortableTh, { type SortDirection } from '@/components/SortableTh'
 import type { Category } from '@/types/api'
+
+type SortColumn = 'id' | 'name'
 
 export default function CategoryClient() {
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  const [sortColumn, setSortColumn] = useState<SortColumn>('id')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
 
   const [newName, setNewName] = useState('')
   const [creating, setCreating] = useState(false)
@@ -88,6 +94,22 @@ export default function CategoryClient() {
     }
   }
 
+  const handleSort = (column: SortColumn) => {
+    if (column === sortColumn) {
+      setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortColumn(column)
+      setSortDirection('asc')
+    }
+  }
+
+  const sortedCategories = useMemo(() => {
+    const dir = sortDirection === 'asc' ? 1 : -1
+    return [...categories].sort((a, b) =>
+      sortColumn === 'id' ? (a.id - b.id) * dir : a.name.localeCompare(b.name) * dir
+    )
+  }, [categories, sortColumn, sortDirection])
+
   if (loading) {
     return (
       <div className="flex h-48 items-center justify-center">
@@ -132,21 +154,20 @@ export default function CategoryClient() {
         <table className="w-full text-left text-sm">
           <thead>
             <tr className="border-b border-brown-300/60 text-xs font-medium text-black-700">
-              <th className="px-4 py-3">ID</th>
-              <th className="px-4 py-3">名稱</th>
-              <th className="px-4 py-3">建立時間</th>
+              <SortableTh label="ID" column="id" activeColumn={sortColumn} direction={sortDirection} onSort={handleSort} />
+              <SortableTh label="名稱" column="name" activeColumn={sortColumn} direction={sortDirection} onSort={handleSort} />
               <th className="px-4 py-3 text-right">操作</th>
             </tr>
           </thead>
           <tbody>
-            {categories.length === 0 && (
+            {sortedCategories.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-black-300">
+                <td colSpan={3} className="px-4 py-8 text-center text-black-300">
                   尚無分類
                 </td>
               </tr>
             )}
-            {categories.map((category) => {
+            {sortedCategories.map((category) => {
               const isEditing = editingId === category.id
               return (
                 <tr key={category.id} className="border-b border-brown-300/30 last:border-0">
@@ -165,9 +186,6 @@ export default function CategoryClient() {
                     ) : (
                       <span className="text-black-900">{category.name}</span>
                     )}
-                  </td>
-                  <td className="px-4 py-3 text-black-500">
-                    {category.createdAt ? new Date(category.createdAt).toLocaleString('zh-TW') : '-'}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end gap-2">
