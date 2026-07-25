@@ -4,6 +4,7 @@
   "workspaces": [
     "webapp",
     "backend",
+    "backend_new",
     "packages/*"
   ],
   "scripts": {

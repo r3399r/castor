@@ -1,0 +1,42 @@
+{
+  "name": "castor-backend-new",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.tools.json --noEmit",
+    "clean": "del-cli dist -f",
+    "build": "esbuild src/index.ts --bundle --minify --platform=node --target=node22 --outfile=dist/index.js",
+    "pre:deploy": "run-s clean typecheck build",
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "dev": "tsx watch local.ts",
+    "test:unit": "vitest run --dir test",
+    "test:regression": "vitest run --dir regression",
+    "test": "run-s test:unit test:regression",
+    "test:unit:coverage": "vitest run --dir test --coverage --coverage.reportsDirectory=coverage/unit",
+    "test:regression:coverage": "vitest run --dir regression --coverage --coverage.reportsDirectory=coverage/regression",
+    "test:coverage": "vitest run --coverage --coverage.reportsDirectory=coverage/combined"
+  },
+  "dependencies": {
+    "@castor/shared": "*",
+    "@hono/zod-validator": "^0.4.3",
+    "drizzle-orm": "^0.45.2",
+    "hono": "^4.6.14",
+    "mysql2": "^3.15.1",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@hono/node-server": "^1.13.7",
+    "@types/aws-lambda": "^8.10.149",
+    "@types/node": "^24.5.2",
+    "@vitest/coverage-v8": "^4.1.10",
+    "del-cli": "^7.0.0",
+    "dotenv": "^16.4.7",
+    "esbuild": "^0.27.4",
+    "npm-run-all": "^4.1.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.9.2",
+    "vite-tsconfig-paths": "^6.1.1",
+    "vitest": "^4.1.10"
+  }
+}
