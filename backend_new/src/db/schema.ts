@@ -1,4 +1,11 @@
-import { datetime, int, mysqlTable, varchar } from 'drizzle-orm/mysql-core';
+import {
+  datetime,
+  int,
+  mysqlTable,
+  primaryKey,
+  tinyint,
+  varchar,
+} from 'drizzle-orm/mysql-core';
 
 export const categoryTable = mysqlTable('category', {
   id: int('id', { unsigned: true }).autoincrement().primaryKey(),
@@ -11,3 +18,23 @@ export const categoryTable = mysqlTable('category', {
   // unchanged.
   createdAt: datetime('created_at', { mode: 'date', fsp: 3 }),
 });
+
+export const subjectTable = mysqlTable('subject', {
+  id: int('id', { unsigned: true }).autoincrement().primaryKey(),
+  name: varchar('name', { length: 255 }).notNull(),
+  sortOrder: tinyint('sort_order', { unsigned: true }).notNull().default(0),
+  createdAt: datetime('created_at', { mode: 'date', fsp: 3 }),
+});
+
+export const subjectCategoryTable = mysqlTable(
+  'subject_category',
+  {
+    subjectId: int('subject_id', { unsigned: true })
+      .notNull()
+      .references(() => subjectTable.id),
+    categoryId: int('category_id', { unsigned: true })
+      .notNull()
+      .references(() => categoryTable.id),
+  },
+  (table) => [primaryKey({ columns: [table.subjectId, table.categoryId] })]
+);

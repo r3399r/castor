@@ -2,7 +2,7 @@ import { zValidator } from '@hono/zod-validator';
 import { eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { categoryTable } from 'src/db/schema';
+import { categoryTable, subjectCategoryTable } from 'src/db/schema';
 import { TransactionEnv } from 'src/middleware/transaction';
 import { NotFoundError } from 'src/model/error';
 
@@ -69,6 +69,11 @@ export const category = new Hono<TransactionEnv>()
     const id = Number(c.req.param('id'));
     console.log(`DELETE /api/category/${id}`);
 
+    // Clear subject_category links first -- the FK would otherwise reject
+    // deleting a category that any subject is still linked to.
+    await db
+      .delete(subjectCategoryTable)
+      .where(eq(subjectCategoryTable.categoryId, id));
     const [{ affectedRows }] = await db
       .delete(categoryTable)
       .where(eq(categoryTable.id, id));

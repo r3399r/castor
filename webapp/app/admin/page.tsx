@@ -3,6 +3,7 @@ import Navbar from '@/components/Navbar'
 
 const ADMIN_FUNCTIONS = [
   { label: '類別管理', description: '新增、編輯、刪除考試類別', href: '/admin/category' },
+  { label: '科目管理', description: '新增、編輯、刪除科目', href: '/admin/subject' },
 ]
 
 export default function AdminPage() {

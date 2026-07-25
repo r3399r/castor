@@ -1,7 +1,27 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
 import { app } from 'src/app';
 import { closeDb, getDb } from 'src/db/client';
-import { categoryTable } from 'src/db/schema';
+import {
+  categoryTable,
+  subjectCategoryTable,
+  subjectTable,
+} from 'src/db/schema';
+import { ADMIN_EMAILS } from 'src/middleware/adminAuth';
+
+// The admin gate is exercised end-to-end in its own describe block below;
+// every other test just needs writes to succeed, so default the mocked
+// Firebase verification to the admin identity.
+vi.mock('src/lib/firebaseAdmin', () => ({ verifyIdToken: vi.fn() }));
+import { verifyIdToken } from 'src/lib/firebaseAdmin';
 
 type CategoryDto = { id: number; name: string; createdAt: string };
 
@@ -22,14 +42,23 @@ const putCategory = (id: number | string, body: unknown) =>
 const deleteCategory = (id: number | string) =>
   app.request(`/api/category/${id}`, { method: 'DELETE' });
 
+// Cleared in FK-safe order: subject_category references both category and
+// subject, so it must go first.
+const clearTables = async () => {
+  const db = getDb();
+  await db.delete(subjectCategoryTable);
+  await db.delete(subjectTable);
+  await db.delete(categoryTable);
+};
+
 describe('category routes', () => {
-  beforeAll(async () => {
-    await getDb().delete(categoryTable);
+  beforeAll(clearTables);
+
+  beforeEach(() => {
+    vi.mocked(verifyIdToken).mockResolvedValue(ADMIN_EMAILS[0]);
   });
 
-  afterEach(async () => {
-    await getDb().delete(categoryTable);
-  });
+  afterEach(clearTables);
 
   afterAll(async () => {
     await closeDb();
@@ -146,6 +175,55 @@ describe('category routes', () => {
         name: 'NotFoundError',
         code: 'NOT_FOUND',
       });
+    });
+
+    it('deletes a category that still has linked subjects', async () => {
+      const created = (await (
+        await postCategory({ name: 'linked' })
+      ).json()) as CategoryDto;
+      const db = getDb();
+      const [{ insertId: subjectId }] = await db
+        .insert(subjectTable)
+        .values({ name: 'linked subject', createdAt: new Date() });
+      await db
+        .insert(subjectCategoryTable)
+        .values({ subjectId, categoryId: created.id });
+
+      const res = await deleteCategory(created.id);
+      expect(res.status).toBe(204);
+    });
+  });
+
+  describe('admin auth gate', () => {
+    it('rejects a write with 401 when there is no valid identity', async () => {
+      vi.mocked(verifyIdToken).mockResolvedValue(null);
+
+      const res = await postCategory({ name: 'blocked' });
+      expect(res.status).toBe(401);
+      expect(await res.json()).toMatchObject({
+        status: 401,
+        name: 'UnauthorizedError',
+        code: 'UNAUTHORIZED',
+      });
+    });
+
+    it('rejects a write with 403 for a non-admin email', async () => {
+      vi.mocked(verifyIdToken).mockResolvedValue('someone-else@example.com');
+
+      const res = await postCategory({ name: 'blocked' });
+      expect(res.status).toBe(403);
+      expect(await res.json()).toMatchObject({
+        status: 403,
+        name: 'ForbiddenError',
+        code: 'FORBIDDEN',
+      });
+    });
+
+    it('leaves GET ungated even with no valid identity', async () => {
+      vi.mocked(verifyIdToken).mockResolvedValue(null);
+
+      const res = await app.request('/api/category');
+      expect(res.status).toBe(200);
     });
   });
 });

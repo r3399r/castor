@@ -67,6 +67,7 @@ Resources:
             Fn::ImportValue: !Sub celestial-studio-${TargetEnvr}-db-endpoint
           DB_PWD: !Sub '{{resolve:ssm:mysql-${TargetEnvr}-${Project}-pwd}}'
           DB_POOL_SIZE: '2'
+          FIREBASE_ADMIN_KEY: !Sub '{{resolve:ssm:${Project}-firebase-admin-key}}'
       Events:
         AnyRoute:
           Type: Api
