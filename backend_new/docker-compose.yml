@@ -20,6 +20,9 @@ services:
       - ../db/table/concept_group.sql:/docker-entrypoint-initdb.d/07_concept_group.sql:ro
       - ../db/table/concept.sql:/docker-entrypoint-initdb.d/08_concept.sql:ro
       - ../db/table/user.sql:/docker-entrypoint-initdb.d/09_user.sql:ro
+      - ../db/table/filter_dimension.sql:/docker-entrypoint-initdb.d/10_filter_dimension.sql:ro
+      - ../db/table/filter_option.sql:/docker-entrypoint-initdb.d/11_filter_option.sql:ro
+      - ../db/table/filter_subject_option.sql:/docker-entrypoint-initdb.d/12_filter_subject_option.sql:ro
     healthcheck:
       test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost', '-u', 'root', '-proot']
       interval: 5s

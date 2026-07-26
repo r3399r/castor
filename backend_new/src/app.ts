@@ -6,6 +6,8 @@ import { category } from 'src/routes/category';
 import { concept } from 'src/routes/concept';
 import { conceptGroup } from 'src/routes/conceptGroup';
 import { exam } from 'src/routes/exam';
+import { filterDimension } from 'src/routes/filterDimension';
+import { filterOption } from 'src/routes/filterOption';
 import { info } from 'src/routes/info';
 import { subject } from 'src/routes/subject';
 import { tag } from 'src/routes/tag';
@@ -31,6 +33,12 @@ export const app = new Hono()
   .use('/api/concept/*', adminAuth)
   .use('/api/concept/*', transaction)
   .route('/api/concept', concept)
+  .use('/api/filter-dimension/*', adminAuth)
+  .use('/api/filter-dimension/*', transaction)
+  .route('/api/filter-dimension', filterDimension)
+  .use('/api/filter-option/*', adminAuth)
+  .use('/api/filter-option/*', transaction)
+  .route('/api/filter-option', filterOption)
   .use('/api/user/*', requireAdmin)
   .use('/api/user/*', transaction)
   .route('/api/user', user)

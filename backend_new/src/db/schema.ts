@@ -1,4 +1,5 @@
 import {
+  AnyMySqlColumn,
   datetime,
   int,
   mysqlTable,
@@ -96,6 +97,49 @@ export const conceptTable = mysqlTable('concept', {
     .default(0),
   createdAt: datetime('created_at', { mode: 'date', fsp: 3 }),
 });
+
+// One-to-many with category (like tag/concept_group's relation to
+// subject), plus a sortOrder to control display order among a category's
+// dimensions -- same shape as subject's own sortOrder.
+export const filterDimensionTable = mysqlTable('filter_dimension', {
+  id: int('id', { unsigned: true }).autoincrement().primaryKey(),
+  categoryId: int('category_id', { unsigned: true })
+    .notNull()
+    .references(() => categoryTable.id),
+  name: varchar('name', { length: 255 }).notNull(),
+  sortOrder: tinyint('sort_order', { unsigned: true }).notNull().default(0),
+});
+
+// One-to-many with filter_dimension, plus an optional self-referential
+// parent -- an option can nest under an option from a preceding dimension
+// in the same category, which is what lets the practice-page filter UI
+// cascade (picking a parent option narrows which child options show next).
+export const filterOptionTable = mysqlTable('filter_option', {
+  id: int('id', { unsigned: true }).autoincrement().primaryKey(),
+  dimensionId: int('dimension_id', { unsigned: true })
+    .notNull()
+    .references(() => filterDimensionTable.id),
+  parentId: int('parent_id', { unsigned: true }).references(
+    (): AnyMySqlColumn => filterOptionTable.id
+  ),
+  name: varchar('name', { length: 255 }).notNull(),
+});
+
+// Many-to-many join recording which filter options apply to which
+// subjects -- same shape as subject_category/exam_subject, no attributes
+// of its own.
+export const filterSubjectOptionTable = mysqlTable(
+  'filter_subject_option',
+  {
+    subjectId: int('subject_id', { unsigned: true })
+      .notNull()
+      .references(() => subjectTable.id),
+    optionId: int('option_id', { unsigned: true })
+      .notNull()
+      .references(() => filterOptionTable.id),
+  },
+  (table) => [primaryKey({ columns: [table.subjectId, table.optionId] })]
+);
 
 // Rows here come from the app's own sign-in flow (Firebase), never from
 // this admin panel -- there's no create/update/delete route for it.
