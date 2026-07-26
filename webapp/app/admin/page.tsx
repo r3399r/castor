@@ -11,6 +11,7 @@ const ADMIN_FUNCTIONS = [
   { label: '篩選維度管理', description: '新增、編輯、刪除篩選維度', href: '/admin/filter-dimension' },
   { label: '篩選選項管理', description: '新增、編輯、刪除篩選選項', href: '/admin/filter-option' },
   { label: '使用者管理', description: '檢視使用者列表', href: '/admin/user' },
+  { label: '題目管理', description: '檢視、編輯、刪除題目', href: '/admin/question' },
 ]
 
 export default function AdminPage() {

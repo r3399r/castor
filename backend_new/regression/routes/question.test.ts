@@ -53,6 +53,73 @@ const postQuestions = (body: unknown) =>
     body: JSON.stringify(body),
   });
 
+const getQuestionList = (query = '') => app.request(`/api/question${query}`);
+
+const getQuestion = (id: number | string) => app.request(`/api/question/${id}`);
+
+const putQuestion = (id: number | string, body: unknown) =>
+  app.request(`/api/question/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+const deleteQuestion = (id: number | string) =>
+  app.request(`/api/question/${id}`, { method: 'DELETE' });
+
+const getQuestionTag = (id: number | string) => app.request(`/api/question/${id}/tag`);
+
+const putQuestionTag = (id: number | string, body: unknown) =>
+  app.request(`/api/question/${id}/tag`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+const getQuestionConcept = (id: number | string) =>
+  app.request(`/api/question/${id}/concept`);
+
+const putQuestionConcept = (id: number | string, body: unknown) =>
+  app.request(`/api/question/${id}/concept`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+// Creates one question in its own batch call and returns its flat row --
+// convenient for GET/PUT/DELETE tests that just need an existing question,
+// not the batch machinery itself.
+const createQuestion = async (
+  subjectId: number,
+  examId: number,
+  overrides: Partial<{
+    type: string;
+    content: string;
+    options: string;
+    answer: string;
+    difficulty: number;
+    conceptIds: number[];
+    tagIds: number[];
+  }> & { conceptIds: number[] }
+) => {
+  const res = await postQuestions({
+    subjectId,
+    examId,
+    questions: [
+      {
+        type: 'SINGLE',
+        content: 'question content',
+        options: 'A|B',
+        answer: 'A',
+        difficulty: 5,
+        ...overrides,
+      },
+    ],
+  });
+  const body = (await res.json()) as QuestionDto[][];
+  return body[0][0];
+};
+
 const clearTables = async () => {
   const db = getDb();
   await db.delete(questionTagTable);
@@ -399,6 +466,308 @@ describe('question routes', () => {
     expect(res.status).toBe(400);
   });
 
+  describe('GET /', () => {
+    it('lists only top-level questions, with a childCount for GROUP questions', async () => {
+      const { subjectId, examId, conceptId } = await seedFixture();
+      const single = await createQuestion(subjectId, examId, { conceptIds: [conceptId] });
+      const groupRes = await postQuestions({
+        subjectId,
+        examId,
+        questions: [
+          {
+            type: 'GROUP',
+            difficulty: 5,
+            conceptIds: [conceptId],
+            childQuestions: [
+              { type: 'SINGLE', sortOrder: 0, content: 'c1', options: 'A|B', answer: 'A', difficulty: 3 },
+              { type: 'SINGLE', sortOrder: 1, content: 'c2', options: 'A|B', answer: 'B', difficulty: 3 },
+            ],
+          },
+        ],
+      });
+      const [[group]] = (await groupRes.json()) as QuestionDto[][];
+
+      const res = await getQuestionList();
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as {
+        data: (QuestionDto & { subject: string; childCount: number })[];
+        paginate: { total: number };
+      };
+      expect(body.paginate.total).toBe(2);
+      const ids = body.data.map((q) => q.id);
+      expect(ids).toContain(single.id);
+      expect(ids).toContain(group.id);
+      const groupRow = body.data.find((q) => q.id === group.id)!;
+      expect(groupRow.childCount).toBe(2);
+      expect(groupRow.subject).toBe('fixture subject');
+      const singleRow = body.data.find((q) => q.id === single.id)!;
+      expect(singleRow.childCount).toBe(0);
+    });
+
+    it('sorts by difficulty ascending and descending', async () => {
+      const { subjectId, examId, conceptId } = await seedFixture();
+      const low = await createQuestion(subjectId, examId, { difficulty: 2, conceptIds: [conceptId] });
+      const high = await createQuestion(subjectId, examId, { difficulty: 9, conceptIds: [conceptId] });
+
+      const ascRes = await getQuestionList('?sort=difficulty&order=asc');
+      const ascBody = (await ascRes.json()) as { data: QuestionDto[] };
+      expect(ascBody.data.map((q) => q.id)).toEqual([low.id, high.id]);
+
+      const descRes = await getQuestionList('?sort=difficulty&order=desc');
+      const descBody = (await descRes.json()) as { data: QuestionDto[] };
+      expect(descBody.data.map((q) => q.id)).toEqual([high.id, low.id]);
+    });
+
+    it('rejects an invalid sort column with 400', async () => {
+      const res = await getQuestionList('?sort=bogus');
+      expect(res.status).toBe(400);
+    });
+
+    it('leaves GET ungated even with no valid identity', async () => {
+      vi.mocked(verifyIdToken).mockResolvedValue(null);
+      const res = await getQuestionList();
+      expect(res.status).toBe(200);
+    });
+  });
+
+  describe('GET /:id', () => {
+    it('fetches a question bundled with its examId/tagIds/conceptIds', async () => {
+      const { subjectId, examId, tagId, conceptId } = await seedFixture();
+      const created = await createQuestion(subjectId, examId, {
+        tagIds: [tagId],
+        conceptIds: [conceptId],
+      });
+
+      const res = await getQuestion(created.id);
+      expect(res.status).toBe(200);
+      expect(await res.json()).toMatchObject({
+        id: created.id,
+        examId,
+        tagIds: [tagId],
+        conceptIds: [conceptId],
+      });
+    });
+
+    it('404s for an unknown question id', async () => {
+      const res = await getQuestion(999999);
+      expect(res.status).toBe(404);
+      expect(await res.json()).toMatchObject({
+        status: 404,
+        name: 'NotFoundError',
+        code: 'NOT_FOUND',
+      });
+    });
+  });
+
+  describe('PUT /:id', () => {
+    it('updates scalar fields and replaces the exam link', async () => {
+      const { subjectId, examId, conceptId } = await seedFixture();
+      const created = await createQuestion(subjectId, examId, { conceptIds: [conceptId] });
+      const db = getDb();
+      const [{ insertId: otherExamId }] = await db
+        .insert(examTable)
+        .values({ name: 'other exam', createdAt: new Date() });
+      await db.insert(examSubjectTable).values({ examId: otherExamId, subjectId });
+
+      const res = await putQuestion(created.id, {
+        type: 'SINGLE',
+        content: 'updated content',
+        options: 'A|B|C',
+        answer: 'C',
+        difficulty: 7,
+        examId: otherExamId,
+      });
+      expect(res.status).toBe(200);
+      expect(await res.json()).toMatchObject({
+        content: 'updated content',
+        answer: 'C',
+        difficulty: 7,
+      });
+
+      const getRes = await getQuestion(created.id);
+      expect(await getRes.json()).toMatchObject({ examId: otherExamId });
+    });
+
+    it('404s for an unknown question id', async () => {
+      const { examId } = await seedFixture();
+      const res = await putQuestion(999999, {
+        type: 'SINGLE',
+        difficulty: 5,
+        examId,
+      });
+      expect(res.status).toBe(404);
+    });
+
+    it('rejects an exam that does not belong to the subject with 400', async () => {
+      const { subjectId, examId, conceptId } = await seedFixture();
+      const created = await createQuestion(subjectId, examId, { conceptIds: [conceptId] });
+      const db = getDb();
+      const [{ insertId: otherSubjectId }] = await db
+        .insert(subjectTable)
+        .values({ name: 'unrelated subject', createdAt: new Date() });
+      const [{ insertId: unlinkedExamId }] = await db
+        .insert(examTable)
+        .values({ name: 'unlinked exam', createdAt: new Date() });
+      await db
+        .insert(examSubjectTable)
+        .values({ examId: unlinkedExamId, subjectId: otherSubjectId });
+
+      const res = await putQuestion(created.id, {
+        type: 'SINGLE',
+        difficulty: 5,
+        examId: unlinkedExamId,
+      });
+      expect(res.status).toBe(400);
+    });
+  });
+
+  describe('DELETE /:id', () => {
+    it('deletes a question and decrements its concepts numberOfQuestions', async () => {
+      const { subjectId, examId, conceptId } = await seedFixture();
+      const created = await createQuestion(subjectId, examId, { conceptIds: [conceptId] });
+
+      const res = await deleteQuestion(created.id);
+      expect(res.status).toBe(204);
+
+      const getRes = await getQuestion(created.id);
+      expect(getRes.status).toBe(404);
+
+      const db = getDb();
+      const [concept] = await db.select().from(conceptTable).where(eq(conceptTable.id, conceptId));
+      expect(concept.numberOfQuestions).toBe(0);
+    });
+
+    it('cascades to a GROUP question’s children', async () => {
+      const { subjectId, examId, conceptId } = await seedFixture();
+      const res = await postQuestions({
+        subjectId,
+        examId,
+        questions: [
+          {
+            type: 'GROUP',
+            difficulty: 5,
+            conceptIds: [conceptId],
+            childQuestions: [
+              { type: 'SINGLE', sortOrder: 0, content: 'c1', options: 'A|B', answer: 'A', difficulty: 3 },
+            ],
+          },
+        ],
+      });
+      const [[group, child]] = (await res.json()) as QuestionDto[][];
+
+      const deleteRes = await deleteQuestion(group.id);
+      expect(deleteRes.status).toBe(204);
+
+      expect((await getQuestion(child.id)).status).toBe(404);
+    });
+
+    it('404s for an unknown question id', async () => {
+      const res = await deleteQuestion(999999);
+      expect(res.status).toBe(404);
+    });
+  });
+
+  describe('/:id/tag', () => {
+    it('sets, replaces, and clears tag links', async () => {
+      const { subjectId, examId, conceptId } = await seedFixture();
+      const db = getDb();
+      const [{ insertId: tag1 }] = await db
+        .insert(tagTable)
+        .values({ name: 'tag one', subjectId, createdAt: new Date() });
+      const [{ insertId: tag2 }] = await db
+        .insert(tagTable)
+        .values({ name: 'tag two', subjectId, createdAt: new Date() });
+      const created = await createQuestion(subjectId, examId, { conceptIds: [conceptId] });
+
+      const setRes = await putQuestionTag(created.id, { tagIds: [tag1, tag2] });
+      expect(setRes.status).toBe(200);
+      const setBody = (await setRes.json()) as { tagIds: number[] };
+      expect(setBody.tagIds.sort()).toEqual([tag1, tag2].sort());
+
+      const getRes = await getQuestionTag(created.id);
+      expect(((await getRes.json()) as { tagIds: number[] }).tagIds.sort()).toEqual(
+        [tag1, tag2].sort()
+      );
+
+      const clearRes = await putQuestionTag(created.id, { tagIds: [] });
+      expect(await clearRes.json()).toEqual({ tagIds: [] });
+    });
+
+    it('rejects a tag that does not belong to the subject with 400', async () => {
+      const { subjectId, examId, conceptId } = await seedFixture();
+      const created = await createQuestion(subjectId, examId, { conceptIds: [conceptId] });
+      const db = getDb();
+      const [{ insertId: otherSubjectId }] = await db
+        .insert(subjectTable)
+        .values({ name: 'unrelated subject 2', createdAt: new Date() });
+      const [{ insertId: unrelatedTagId }] = await db
+        .insert(tagTable)
+        .values({ name: 'unrelated tag', subjectId: otherSubjectId, createdAt: new Date() });
+
+      const res = await putQuestionTag(created.id, { tagIds: [unrelatedTagId] });
+      expect(res.status).toBe(400);
+    });
+
+    it('404s for an unknown question id', async () => {
+      expect((await getQuestionTag(999999)).status).toBe(404);
+      expect((await putQuestionTag(999999, { tagIds: [] })).status).toBe(404);
+    });
+  });
+
+  describe('/:id/concept', () => {
+    it('adjusts numberOfQuestions for added and removed concepts', async () => {
+      const { subjectId, examId, conceptId: conceptA } = await seedFixture();
+      const db = getDb();
+      const [{ insertId: groupB }] = await db
+        .insert(conceptGroupTable)
+        .values({ name: 'fixture group b', subjectId, createdAt: new Date() });
+      const [{ insertId: conceptB }] = await db
+        .insert(conceptTable)
+        .values({ name: 'fixture concept b', conceptGroupId: groupB, createdAt: new Date() });
+      const created = await createQuestion(subjectId, examId, { conceptIds: [conceptA] });
+
+      const res = await putQuestionConcept(created.id, { conceptIds: [conceptB] });
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ conceptIds: [conceptB] });
+
+      const [rowA] = await db.select().from(conceptTable).where(eq(conceptTable.id, conceptA));
+      const [rowB] = await db.select().from(conceptTable).where(eq(conceptTable.id, conceptB));
+      expect(rowA.numberOfQuestions).toBe(0);
+      expect(rowB.numberOfQuestions).toBe(1);
+    });
+
+    it('rejects an empty conceptIds with 400', async () => {
+      const { subjectId, examId, conceptId } = await seedFixture();
+      const created = await createQuestion(subjectId, examId, { conceptIds: [conceptId] });
+
+      const res = await putQuestionConcept(created.id, { conceptIds: [] });
+      expect(res.status).toBe(400);
+    });
+
+    it('rejects a concept that does not belong to the subject with 400', async () => {
+      const { subjectId, examId, conceptId } = await seedFixture();
+      const created = await createQuestion(subjectId, examId, { conceptIds: [conceptId] });
+      const db = getDb();
+      const [{ insertId: otherSubjectId }] = await db
+        .insert(subjectTable)
+        .values({ name: 'unrelated subject 3', createdAt: new Date() });
+      const [{ insertId: otherGroupId }] = await db
+        .insert(conceptGroupTable)
+        .values({ name: 'other group', subjectId: otherSubjectId, createdAt: new Date() });
+      const [{ insertId: unrelatedConceptId }] = await db
+        .insert(conceptTable)
+        .values({ name: 'unrelated concept', conceptGroupId: otherGroupId, createdAt: new Date() });
+
+      const res = await putQuestionConcept(created.id, { conceptIds: [unrelatedConceptId] });
+      expect(res.status).toBe(400);
+    });
+
+    it('404s for an unknown question id', async () => {
+      expect((await getQuestionConcept(999999)).status).toBe(404);
+      expect((await putQuestionConcept(999999, { conceptIds: [1] })).status).toBe(404);
+    });
+  });
+
   describe('admin auth gate', () => {
     it('rejects a create with 401 when there is no valid identity', async () => {
       vi.mocked(verifyIdToken).mockResolvedValue(null);
@@ -412,6 +781,20 @@ describe('question routes', () => {
 
       const res = await postQuestions({});
       expect(res.status).toBe(403);
+    });
+
+    it('rejects an update with 401 when there is no valid identity', async () => {
+      vi.mocked(verifyIdToken).mockResolvedValue(null);
+
+      const res = await putQuestion(1, {});
+      expect(res.status).toBe(401);
+    });
+
+    it('rejects a delete with 401 when there is no valid identity', async () => {
+      vi.mocked(verifyIdToken).mockResolvedValue(null);
+
+      const res = await deleteQuestion(1);
+      expect(res.status).toBe(401);
     });
   });
 });

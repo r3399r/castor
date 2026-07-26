@@ -383,7 +383,7 @@ export default function SubjectClient() {
                             {deletingId === subject.id ? '刪除中…' : '刪除'}
                           </button>
                           <a
-                            href={`/admin/subject/${subject.id}/new-question`}
+                            href={`/admin/subject/new-question?id=${subject.id}`}
                             className="rounded-md border border-brown-300 px-3 py-1.5 text-xs text-black-700 transition hover:bg-beige-200"
                           >
                             新增題目

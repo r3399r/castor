@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { questionBodySchema } from 'src/routes/question';
+import {
+  questionBodySchema,
+  questionConceptBodySchema,
+  questionTagBodySchema,
+  questionUpdateBodySchema,
+} from 'src/routes/question';
 
 const validQuestion = {
   type: 'SINGLE' as const,
@@ -142,5 +147,56 @@ describe('questionBodySchema', () => {
       ],
     });
     expect(result.success).toBe(true);
+  });
+});
+
+describe('questionUpdateBodySchema', () => {
+  const validUpdate = { type: 'SINGLE' as const, difficulty: 5, examId: 1 };
+
+  it('accepts a minimal valid update', () => {
+    expect(questionUpdateBodySchema.safeParse(validUpdate).success).toBe(true);
+  });
+
+  it('does not accept subjectId (update never changes the owning subject)', () => {
+    const result = questionUpdateBodySchema.safeParse({ ...validUpdate, subjectId: 1 });
+    // subjectId isn't part of the schema, so zod strips it rather than
+    // rejecting -- the important thing is the parsed value has no
+    // subjectId field for the route to accidentally use.
+    expect(result.success && 'subjectId' in result.data).toBe(false);
+  });
+
+  it('rejects a missing examId', () => {
+    const { examId: _examId, ...rest } = validUpdate;
+    expect(questionUpdateBodySchema.safeParse(rest).success).toBe(false);
+  });
+
+  it('rejects a difficulty outside 1-10', () => {
+    expect(
+      questionUpdateBodySchema.safeParse({ ...validUpdate, difficulty: 0 }).success
+    ).toBe(false);
+  });
+});
+
+describe('questionTagBodySchema', () => {
+  it('accepts an array of tag ids', () => {
+    expect(questionTagBodySchema.safeParse({ tagIds: [1, 2] }).success).toBe(true);
+  });
+
+  it('accepts an empty array', () => {
+    expect(questionTagBodySchema.safeParse({ tagIds: [] }).success).toBe(true);
+  });
+
+  it('rejects a non-array tagIds', () => {
+    expect(questionTagBodySchema.safeParse({ tagIds: 1 }).success).toBe(false);
+  });
+});
+
+describe('questionConceptBodySchema', () => {
+  it('accepts a non-empty array of concept ids', () => {
+    expect(questionConceptBodySchema.safeParse({ conceptIds: [1] }).success).toBe(true);
+  });
+
+  it('rejects an empty array', () => {
+    expect(questionConceptBodySchema.safeParse({ conceptIds: [] }).success).toBe(false);
   });
 });

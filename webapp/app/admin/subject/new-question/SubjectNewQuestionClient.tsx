@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { apiFetch, apiPost } from '@/lib/api'
 import MultiSelectField from '@/components/MultiSelectField'
 import { MathJax } from 'better-react-mathjax'
@@ -88,7 +89,11 @@ function missingFields(q: QuestionDraft): string[] {
   return problems
 }
 
-export default function SubjectNewQuestionClient({ subjectId }: { subjectId: number }) {
+export default function SubjectNewQuestionClient() {
+  const searchParams = useSearchParams()
+  const subjectIdParam = searchParams.get('id')
+  const subjectId = subjectIdParam ? Number(subjectIdParam) : null
+
   const [subject, setSubject] = useState<SubjectDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -179,6 +184,11 @@ export default function SubjectNewQuestionClient({ subjectId }: { subjectId: num
   }
 
   useEffect(() => {
+    if (subjectId === null) {
+      setError('缺少科目 id（網址需包含 ?id=）。')
+      setLoading(false)
+      return
+    }
     setLoading(true)
     setError(null)
     apiFetch<SubjectDetail>(`subject/${subjectId}`)
