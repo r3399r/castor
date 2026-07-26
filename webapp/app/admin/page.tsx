@@ -6,6 +6,7 @@ const ADMIN_FUNCTIONS = [
   { label: '科目管理', description: '新增、編輯、刪除科目', href: '/admin/subject' },
   { label: '考試管理', description: '新增、編輯、刪除考試', href: '/admin/exam' },
   { label: '標籤管理', description: '新增、編輯、刪除標籤', href: '/admin/tag' },
+  { label: '觀念群組管理', description: '新增、編輯、刪除觀念群組', href: '/admin/concept-group' },
 ]
 
 export default function AdminPage() {

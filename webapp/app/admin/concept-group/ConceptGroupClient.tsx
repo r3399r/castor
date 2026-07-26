@@ -10,7 +10,7 @@ import type { Paginate } from '@/types/api'
 // there's no realistic admin dataset near this size yet.
 const ALL_ITEMS_LIMIT = 1000
 
-type TagDto = {
+type ConceptGroupDto = {
   id: number
   name: string
   subjectId: number
@@ -28,8 +28,8 @@ const subjectLabel = (subject: SubjectOption | undefined) => {
   return subject.categories ? `${subject.name}（${subject.categories}）` : subject.name
 }
 
-export default function TagClient() {
-  const [tags, setTags] = useState<TagDto[] | null>(null)
+export default function ConceptGroupClient() {
+  const [conceptGroups, setConceptGroups] = useState<ConceptGroupDto[] | null>(null)
   const [allSubjects, setAllSubjects] = useState<SubjectOption[]>([])
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
@@ -65,17 +65,17 @@ export default function TagClient() {
     setLoading(true)
     setError(null)
     try {
-      const res = await apiFetch<Paginate<TagDto>>('tag', {
+      const res = await apiFetch<Paginate<ConceptGroupDto>>('concept-group', {
         limit: LIMIT,
         offset: (targetPage - 1) * LIMIT,
         sort,
         order,
       })
-      setTags(res.data)
+      setConceptGroups(res.data)
       setTotalPages(res.paginate.totalPages)
       setPage(targetPage)
     } catch {
-      setError('無法載入標籤列表。')
+      setError('無法載入觀念群組列表。')
     } finally {
       setLoading(false)
     }
@@ -97,7 +97,7 @@ export default function TagClient() {
     setCreating(true)
     setCreateError(null)
     try {
-      await apiPost<TagDto>('tag', {
+      await apiPost<ConceptGroupDto>('concept-group', {
         name,
         subjectId: Number(newSubjectId),
       })
@@ -111,10 +111,10 @@ export default function TagClient() {
     }
   }
 
-  const startEdit = (tag: TagDto) => {
-    setEditingId(tag.id)
-    setEditName(tag.name)
-    setEditSubjectId(String(tag.subjectId))
+  const startEdit = (conceptGroup: ConceptGroupDto) => {
+    setEditingId(conceptGroup.id)
+    setEditName(conceptGroup.name)
+    setEditSubjectId(String(conceptGroup.subjectId))
     setEditError(null)
   }
 
@@ -132,7 +132,7 @@ export default function TagClient() {
     setSavingId(id)
     setEditError(null)
     try {
-      await apiPut<TagDto>(`tag/${id}`, {
+      await apiPut<ConceptGroupDto>(`concept-group/${id}`, {
         name,
         subjectId: Number(editSubjectId),
       })
@@ -146,11 +146,11 @@ export default function TagClient() {
   }
 
   const handleDelete = async (id: number) => {
-    if (!confirm('確定要刪除這個標籤嗎？')) return
+    if (!confirm('確定要刪除這個觀念群組嗎？')) return
 
     setDeletingId(id)
     try {
-      await apiDelete(`tag/${id}`)
+      await apiDelete(`concept-group/${id}`)
       await load(page, sortColumn, sortDirection)
     } catch {
       alert('刪除失敗，請稍後再試。')
@@ -167,7 +167,7 @@ export default function TagClient() {
     load(1, column, direction)
   }
 
-  if (loading && tags === null) {
+  if (loading && conceptGroups === null) {
     return (
       <div className="flex h-48 items-center justify-center">
         <span className="text-sm text-black-500">載入中…</span>
@@ -185,7 +185,7 @@ export default function TagClient() {
 
   return (
     <div className="pb-[70px]">
-      <h1 className="mt-[60px] mb-6 text-3xl font-bold text-blue-700">標籤管理</h1>
+      <h1 className="mt-[60px] mb-6 text-3xl font-bold text-blue-700">觀念群組管理</h1>
 
       <form
         onSubmit={handleCreate}
@@ -194,7 +194,7 @@ export default function TagClient() {
         <input
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
-          placeholder="新增標籤名稱"
+          placeholder="新增觀念群組名稱"
           className="flex-1 rounded-md border border-brown-300 bg-white px-3 py-2 text-sm text-black-900 outline-none focus:border-blue-700"
         />
         <select
@@ -230,18 +230,18 @@ export default function TagClient() {
             </tr>
           </thead>
           <tbody>
-            {(tags ?? []).length === 0 && (
+            {(conceptGroups ?? []).length === 0 && (
               <tr>
                 <td colSpan={4} className="px-4 py-8 text-center text-black-300">
-                  尚無標籤
+                  尚無觀念群組
                 </td>
               </tr>
             )}
-            {(tags ?? []).map((tag) => {
-              const isEditing = editingId === tag.id
+            {(conceptGroups ?? []).map((conceptGroup) => {
+              const isEditing = editingId === conceptGroup.id
               return (
-                <tr key={tag.id} className="border-b border-brown-300/30 last:border-0">
-                  <td className="px-4 py-3 text-black-500">{tag.id}</td>
+                <tr key={conceptGroup.id} className="border-b border-brown-300/30 last:border-0">
+                  <td className="px-4 py-3 text-black-500">{conceptGroup.id}</td>
                   <td className="px-4 py-3">
                     {isEditing ? (
                       <>
@@ -254,7 +254,7 @@ export default function TagClient() {
                         {editError && <p className="mt-1 text-xs text-red-600">{editError}</p>}
                       </>
                     ) : (
-                      <span className="text-black-900">{tag.name}</span>
+                      <span className="text-black-900">{conceptGroup.name}</span>
                     )}
                   </td>
                   <td className="px-4 py-3 text-black-500">
@@ -271,7 +271,7 @@ export default function TagClient() {
                         ))}
                       </select>
                     ) : (
-                      subjectLabel(subjectById.get(tag.subjectId))
+                      subjectLabel(subjectById.get(conceptGroup.subjectId))
                     )}
                   </td>
                   <td className="px-4 py-3">
@@ -279,11 +279,11 @@ export default function TagClient() {
                       {isEditing ? (
                         <>
                           <button
-                            onClick={() => handleUpdate(tag.id)}
-                            disabled={savingId === tag.id}
+                            onClick={() => handleUpdate(conceptGroup.id)}
+                            disabled={savingId === conceptGroup.id}
                             className="rounded-md bg-blue-700 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-[#1f3ea3] disabled:opacity-50"
                           >
-                            {savingId === tag.id ? '儲存中…' : '儲存'}
+                            {savingId === conceptGroup.id ? '儲存中…' : '儲存'}
                           </button>
                           <button
                             onClick={cancelEdit}
@@ -295,17 +295,17 @@ export default function TagClient() {
                       ) : (
                         <>
                           <button
-                            onClick={() => startEdit(tag)}
+                            onClick={() => startEdit(conceptGroup)}
                             className="rounded-md border border-brown-300 px-3 py-1.5 text-xs text-black-700 transition hover:bg-beige-200"
                           >
                             編輯
                           </button>
                           <button
-                            onClick={() => handleDelete(tag.id)}
-                            disabled={deletingId === tag.id}
+                            onClick={() => handleDelete(conceptGroup.id)}
+                            disabled={deletingId === conceptGroup.id}
                             className="rounded-md border border-red-200 px-3 py-1.5 text-xs text-red-600 transition hover:bg-red-50 disabled:opacity-50"
                           >
-                            {deletingId === tag.id ? '刪除中…' : '刪除'}
+                            {deletingId === conceptGroup.id ? '刪除中…' : '刪除'}
                           </button>
                         </>
                       )}

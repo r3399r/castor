@@ -73,7 +73,10 @@ describe('exam routes', () => {
   it('lists exams, empty when there is no data', async () => {
     const res = await app.request('/api/exam');
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual([]);
+    expect(await res.json()).toEqual({
+      data: [],
+      paginate: { total: 0, page: 1, limit: 20, totalPages: 1 },
+    });
   });
 
   it('creates an exam and lists it back', async () => {
@@ -84,7 +87,10 @@ describe('exam routes', () => {
     expect(created.id).toEqual(expect.any(Number));
 
     const listRes = await app.request('/api/exam');
-    expect(await listRes.json()).toEqual([{ ...created, subjects: null }]);
+    const listBody = (await listRes.json()) as {
+      data: (ExamDto & { subjects: string | null })[];
+    };
+    expect(listBody.data).toEqual([{ ...created, subjects: null }]);
   });
 
   it('shows a comma-separated list of linked subject names', async () => {
@@ -102,9 +108,10 @@ describe('exam routes', () => {
     ]);
 
     const res = await app.request('/api/exam');
-    const [examRow] = (await res.json()) as (ExamDto & {
-      subjects: string | null;
-    })[];
+    const { data } = (await res.json()) as {
+      data: (ExamDto & { subjects: string | null })[];
+    };
+    const [examRow] = data;
     expect(examRow.subjects).toBe('math, verbal');
   });
 
@@ -265,6 +272,63 @@ describe('exam routes', () => {
       ).json()) as ExamDto;
 
       const res = await putExamSubject(exam.id, { subjectIds: 1 });
+      expect(res.status).toBe(400);
+    });
+  });
+
+  describe('pagination and sorting', () => {
+    it('paginates with limit/offset and reports page metadata', async () => {
+      await postExam({ name: 'c-charlie' });
+      await postExam({ name: 'a-alpha' });
+      await postExam({ name: 'b-bravo' });
+
+      const res = await app.request('/api/exam?limit=2&offset=0&sort=name');
+      const body = (await res.json()) as {
+        data: ExamDto[];
+        paginate: { total: number; page: number; limit: number; totalPages: number };
+      };
+      expect(body.data).toHaveLength(2);
+      expect(body.paginate).toEqual({
+        total: 3,
+        page: 1,
+        limit: 2,
+        totalPages: 2,
+      });
+
+      const page2 = await app.request('/api/exam?limit=2&offset=2&sort=name');
+      const page2Body = (await page2.json()) as { data: ExamDto[] };
+      expect(page2Body.data).toHaveLength(1);
+    });
+
+    it('sorts by name ascending and descending', async () => {
+      await postExam({ name: 'c-charlie' });
+      await postExam({ name: 'a-alpha' });
+      await postExam({ name: 'b-bravo' });
+
+      const ascRes = await app.request('/api/exam?sort=name&order=asc');
+      const ascBody = (await ascRes.json()) as { data: ExamDto[] };
+      expect(ascBody.data.map((e) => e.name)).toEqual([
+        'a-alpha',
+        'b-bravo',
+        'c-charlie',
+      ]);
+
+      const descRes = await app.request('/api/exam?sort=name&order=desc');
+      const descBody = (await descRes.json()) as { data: ExamDto[] };
+      expect(descBody.data.map((e) => e.name)).toEqual([
+        'c-charlie',
+        'b-bravo',
+        'a-alpha',
+      ]);
+    });
+
+    it('rejects an out-of-range limit with 400', async () => {
+      const res = await app.request('/api/exam?limit=99999');
+      expect(res.status).toBe(400);
+    });
+
+    it('rejects an invalid sort column with 400', async () => {
+      const res = await app.request('/api/exam?sort=bogus');
       expect(res.status).toBe(400);
     });
   });

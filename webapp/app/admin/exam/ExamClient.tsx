@@ -1,9 +1,15 @@
 'use client'
 
-import { FormEvent, useEffect, useMemo, useState } from 'react'
-import { apiDelete, apiFetch, apiPost, apiPut } from '@/lib/api'
+import { FormEvent, useEffect, useState } from 'react'
+import { apiDelete, apiFetch, apiPost, apiPut, LIMIT } from '@/lib/api'
 import MultiSelectField from '@/components/MultiSelectField'
+import Pagination from '@/components/Pagination'
 import SortableTh, { type SortDirection } from '@/components/SortableTh'
+import type { Paginate } from '@/types/api'
+
+// High enough to fetch every subject in one page for the relation-editor
+// dropdown -- there's no realistic admin dataset near this size yet.
+const ALL_ITEMS_LIMIT = 1000
 
 type ExamDto = {
   id: number
@@ -21,7 +27,9 @@ type SubjectOption = { id: number; name: string; categories: string | null }
 type SortColumn = 'id' | 'name' | 'subjects'
 
 export default function ExamClient() {
-  const [exams, setExams] = useState<ExamDto[]>([])
+  const [exams, setExams] = useState<ExamDto[] | null>(null)
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -46,17 +54,36 @@ export default function ExamClient() {
   const [savingRelationId, setSavingRelationId] = useState<number | null>(null)
   const [relationError, setRelationError] = useState<string | null>(null)
 
-  useEffect(() => {
-    Promise.all([
-      apiFetch<ExamDto[]>('exam'),
-      apiFetch<SubjectOption[]>('subject'),
-    ])
-      .then(([exams, subjects]) => {
-        setExams(exams)
-        setAllSubjects(subjects)
+  const load = async (
+    targetPage: number,
+    sort: SortColumn,
+    order: SortDirection
+  ) => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await apiFetch<Paginate<ExamDto>>('exam', {
+        limit: LIMIT,
+        offset: (targetPage - 1) * LIMIT,
+        sort,
+        order,
       })
-      .catch(() => setError('無法載入考試列表。'))
-      .finally(() => setLoading(false))
+      setExams(res.data)
+      setTotalPages(res.paginate.totalPages)
+      setPage(targetPage)
+    } catch {
+      setError('無法載入考試列表。')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    load(1, sortColumn, sortDirection)
+    apiFetch<Paginate<SubjectOption>>('subject', { limit: ALL_ITEMS_LIMIT })
+      .then((res) => setAllSubjects(res.data))
+      .catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const handleCreate = async (e: FormEvent) => {
@@ -67,10 +94,9 @@ export default function ExamClient() {
     setCreating(true)
     setCreateError(null)
     try {
-      const created = await apiPost<ExamDto>('exam', { name })
-      // POST doesn't return subject links -- a brand-new exam has none yet.
-      setExams((prev) => [...prev, { ...created, subjects: null }])
+      await apiPost<ExamDto>('exam', { name })
       setNewName('')
+      await load(page, sortColumn, sortDirection)
     } catch {
       setCreateError('新增失敗，請確認名稱未重複。')
     } finally {
@@ -97,13 +123,9 @@ export default function ExamClient() {
     setSavingId(id)
     setEditError(null)
     try {
-      const updated = await apiPut<ExamDto>(`exam/${id}`, { name })
-      // PUT doesn't touch subject links -- carry the existing row's value
-      // forward instead of overwriting it with whatever the API omitted.
-      setExams((prev) =>
-        prev.map((e) => (e.id === id ? { ...updated, subjects: e.subjects } : e))
-      )
+      await apiPut<ExamDto>(`exam/${id}`, { name })
       setEditingId(null)
+      await load(page, sortColumn, sortDirection)
     } catch {
       setEditError('更新失敗，請確認名稱未重複。')
     } finally {
@@ -117,7 +139,7 @@ export default function ExamClient() {
     setDeletingId(id)
     try {
       await apiDelete(`exam/${id}`)
-      setExams((prev) => prev.filter((e) => e.id !== id))
+      await load(page, sortColumn, sortDirection)
     } catch {
       alert('刪除失敗，請稍後再試。')
     } finally {
@@ -151,20 +173,11 @@ export default function ExamClient() {
     setSavingRelationId(id)
     setRelationError(null)
     try {
-      const { subjectIds } = await apiPut<{ subjectIds: number[] }>(
-        `exam/${id}/subject`,
-        { subjectIds: selectedSubjectIds.map(Number) }
-      )
-      const subjects =
-        allSubjects
-          .filter((s) => subjectIds.includes(s.id))
-          .map((s) => s.name)
-          .sort((a, b) => a.localeCompare(b))
-          .join(', ') || null
-      setExams((prev) =>
-        prev.map((e) => (e.id === id ? { ...e, subjects } : e))
-      )
+      await apiPut<{ subjectIds: number[] }>(`exam/${id}/subject`, {
+        subjectIds: selectedSubjectIds.map(Number),
+      })
       setEditingRelationId(null)
+      await load(page, sortColumn, sortDirection)
     } catch {
       setRelationError('更新科目關聯失敗，請稍後再試。')
     } finally {
@@ -173,25 +186,14 @@ export default function ExamClient() {
   }
 
   const handleSort = (column: SortColumn) => {
-    if (column === sortColumn) {
-      setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'))
-    } else {
-      setSortColumn(column)
-      setSortDirection('asc')
-    }
+    const direction =
+      column === sortColumn ? (sortDirection === 'asc' ? 'desc' : 'asc') : 'asc'
+    setSortColumn(column)
+    setSortDirection(direction)
+    load(1, column, direction)
   }
 
-  const sortedExams = useMemo(() => {
-    const dir = sortDirection === 'asc' ? 1 : -1
-    return [...exams].sort((a, b) => {
-      if (sortColumn === 'id') return (a.id - b.id) * dir
-      if (sortColumn === 'subjects')
-        return (a.subjects ?? '').localeCompare(b.subjects ?? '') * dir
-      return a.name.localeCompare(b.name) * dir
-    })
-  }, [exams, sortColumn, sortDirection])
-
-  if (loading) {
+  if (loading && exams === null) {
     return (
       <div className="flex h-48 items-center justify-center">
         <span className="text-sm text-black-500">載入中…</span>
@@ -242,14 +244,14 @@ export default function ExamClient() {
             </tr>
           </thead>
           <tbody>
-            {sortedExams.length === 0 && (
+            {(exams ?? []).length === 0 && (
               <tr>
                 <td colSpan={4} className="px-4 py-8 text-center text-black-300">
                   尚無考試
                 </td>
               </tr>
             )}
-            {sortedExams.map((exam) => {
+            {(exams ?? []).map((exam) => {
               const isEditing = editingId === exam.id
               return (
                 <tr key={exam.id} className="border-b border-brown-300/30 last:border-0">
@@ -356,6 +358,12 @@ export default function ExamClient() {
           </tbody>
         </table>
       </div>
+
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        onChange={(p) => load(p, sortColumn, sortDirection)}
+      />
     </div>
   )
 }

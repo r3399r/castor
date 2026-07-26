@@ -1,5 +1,5 @@
 import { zValidator } from '@hono/zod-validator';
-import { eq, sql } from 'drizzle-orm';
+import { asc, count, desc, eq, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import {
@@ -8,6 +8,7 @@ import {
   subjectCategoryTable,
   subjectTable,
 } from 'src/db/schema';
+import { DEFAULT_LIMIT, genPagination, MAX_LIMIT } from 'src/lib/paginator';
 import { TransactionEnv } from 'src/middleware/transaction';
 import { NotFoundError } from 'src/model/error';
 
@@ -20,11 +21,38 @@ export const subjectCategoryBodySchema = z.object({
   categoryIds: z.array(z.number().int().positive()),
 });
 
+// Reused in both the SELECT list and ORDER BY below -- same JS reference,
+// so the identical GROUP_CONCAT expression is emitted in both places,
+// which MySQL requires for ordering by an aggregate in a grouped query.
+const categoriesExpr = sql<string | null>`GROUP_CONCAT(
+  ${categoryTable.name} ORDER BY ${categoryTable.name} SEPARATOR ', '
+)`;
+
+const SUBJECT_SORT_COLUMNS = {
+  id: subjectTable.id,
+  name: subjectTable.name,
+  sortOrder: subjectTable.sortOrder,
+  categories: categoriesExpr,
+};
+
+export const subjectListQuerySchema = z.object({
+  limit: z.coerce.number().int().positive().max(MAX_LIMIT).optional().default(DEFAULT_LIMIT),
+  offset: z.coerce.number().int().min(0).optional().default(0),
+  sort: z.enum(['id', 'name', 'sortOrder', 'categories']).optional().default('sortOrder'),
+  order: z.enum(['asc', 'desc']).optional().default('asc'),
+});
+
 export const subject = new Hono<TransactionEnv>()
-  .get('/', async (c) => {
-    console.log('GET /api/subject');
-    const subjects = await c
-      .get('db')
+  .get('/', zValidator('query', subjectListQuerySchema), async (c) => {
+    const { limit, offset, sort, order } = c.req.valid('query');
+    console.log(
+      `GET /api/subject limit=${limit} offset=${offset} sort=${sort} order=${order}`
+    );
+    const db = c.get('db');
+
+    const [{ total }] = await db.select({ total: count() }).from(subjectTable);
+    const sortColumn = SUBJECT_SORT_COLUMNS[sort];
+    const data = await db
       .select({
         id: subjectTable.id,
         name: subjectTable.name,
@@ -34,9 +62,7 @@ export const subject = new Hono<TransactionEnv>()
         // editable through this endpoint, so a formatted CSV string is
         // all the UI needs (no reason to ship structured category data
         // the client can't act on).
-        categories: sql<string | null>`GROUP_CONCAT(
-          ${categoryTable.name} ORDER BY ${categoryTable.name} SEPARATOR ', '
-        )`,
+        categories: categoriesExpr,
       })
       .from(subjectTable)
       .leftJoin(
@@ -48,8 +74,11 @@ export const subject = new Hono<TransactionEnv>()
         eq(categoryTable.id, subjectCategoryTable.categoryId)
       )
       .groupBy(subjectTable.id)
-      .orderBy(subjectTable.sortOrder);
-    return c.json(subjects);
+      .orderBy(order === 'desc' ? desc(sortColumn) : asc(sortColumn))
+      .limit(limit)
+      .offset(offset);
+
+    return c.json({ data, paginate: genPagination(total, limit, offset) });
   })
   .get('/:id', async (c) => {
     const id = c.req.param('id');

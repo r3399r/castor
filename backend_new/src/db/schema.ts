@@ -69,3 +69,13 @@ export const tagTable = mysqlTable('tag', {
     .references(() => subjectTable.id),
   createdAt: datetime('created_at', { mode: 'date', fsp: 3 }),
 });
+
+// Same one-to-many-with-subject shape as tag.
+export const conceptGroupTable = mysqlTable('concept_group', {
+  id: int('id', { unsigned: true }).autoincrement().primaryKey(),
+  name: varchar('name', { length: 255 }).notNull(),
+  subjectId: int('subject_id', { unsigned: true })
+    .notNull()
+    .references(() => subjectTable.id),
+  createdAt: datetime('created_at', { mode: 'date', fsp: 3 }),
+});

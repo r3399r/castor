@@ -1,10 +1,15 @@
 'use client'
 
-import { FormEvent, useEffect, useMemo, useState } from 'react'
-import { apiDelete, apiFetch, apiPost, apiPut } from '@/lib/api'
+import { FormEvent, useEffect, useState } from 'react'
+import { apiDelete, apiFetch, apiPost, apiPut, LIMIT } from '@/lib/api'
 import MultiSelectField from '@/components/MultiSelectField'
+import Pagination from '@/components/Pagination'
 import SortableTh, { type SortDirection } from '@/components/SortableTh'
-import type { Category } from '@/types/api'
+import type { Category, Paginate } from '@/types/api'
+
+// High enough to fetch every category in one page for the relation-editor
+// dropdown -- there's no realistic admin dataset near this size yet.
+const ALL_ITEMS_LIMIT = 1000
 
 type SubjectDto = {
   id: number
@@ -19,7 +24,9 @@ type SubjectDto = {
 type SortColumn = 'id' | 'name' | 'sortOrder' | 'categories'
 
 export default function SubjectClient() {
-  const [subjects, setSubjects] = useState<SubjectDto[]>([])
+  const [subjects, setSubjects] = useState<SubjectDto[] | null>(null)
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -46,17 +53,36 @@ export default function SubjectClient() {
   const [savingRelationId, setSavingRelationId] = useState<number | null>(null)
   const [relationError, setRelationError] = useState<string | null>(null)
 
-  useEffect(() => {
-    Promise.all([
-      apiFetch<SubjectDto[]>('subject'),
-      apiFetch<Category[]>('category'),
-    ])
-      .then(([subjects, categories]) => {
-        setSubjects(subjects)
-        setAllCategories(categories)
+  const load = async (
+    targetPage: number,
+    sort: SortColumn,
+    order: SortDirection
+  ) => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await apiFetch<Paginate<SubjectDto>>('subject', {
+        limit: LIMIT,
+        offset: (targetPage - 1) * LIMIT,
+        sort,
+        order,
       })
-      .catch(() => setError('無法載入科目列表。'))
-      .finally(() => setLoading(false))
+      setSubjects(res.data)
+      setTotalPages(res.paginate.totalPages)
+      setPage(targetPage)
+    } catch {
+      setError('無法載入科目列表。')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    load(1, sortColumn, sortDirection)
+    apiFetch<Paginate<Category>>('category', { limit: ALL_ITEMS_LIMIT })
+      .then((res) => setAllCategories(res.data))
+      .catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const handleCreate = async (e: FormEvent) => {
@@ -67,18 +93,13 @@ export default function SubjectClient() {
     setCreating(true)
     setCreateError(null)
     try {
-      const created = await apiPost<SubjectDto>('subject', {
+      await apiPost<SubjectDto>('subject', {
         name,
         sortOrder: Number(newSortOrder) || 0,
       })
-      // POST doesn't return category links -- a brand-new subject has none yet.
-      setSubjects((prev) =>
-        [...prev, { ...created, categories: null }].sort(
-          (a, b) => a.sortOrder - b.sortOrder
-        )
-      )
       setNewName('')
       setNewSortOrder('0')
+      await load(page, sortColumn, sortDirection)
     } catch {
       setCreateError('新增失敗，請稍後再試。')
     } finally {
@@ -107,20 +128,12 @@ export default function SubjectClient() {
     setSavingId(id)
     setEditError(null)
     try {
-      const updated = await apiPut<SubjectDto>(`subject/${id}`, {
+      await apiPut<SubjectDto>(`subject/${id}`, {
         name,
         sortOrder: Number(editSortOrder) || 0,
       })
-      // PUT doesn't touch category links -- carry the existing row's value
-      // forward instead of overwriting it with whatever the API omitted.
-      setSubjects((prev) =>
-        prev
-          .map((s) =>
-            s.id === id ? { ...updated, categories: s.categories } : s
-          )
-          .sort((a, b) => a.sortOrder - b.sortOrder)
-      )
       setEditingId(null)
+      await load(page, sortColumn, sortDirection)
     } catch {
       setEditError('更新失敗，請稍後再試。')
     } finally {
@@ -134,7 +147,7 @@ export default function SubjectClient() {
     setDeletingId(id)
     try {
       await apiDelete(`subject/${id}`)
-      setSubjects((prev) => prev.filter((s) => s.id !== id))
+      await load(page, sortColumn, sortDirection)
     } catch {
       alert('刪除失敗，請稍後再試。')
     } finally {
@@ -168,20 +181,11 @@ export default function SubjectClient() {
     setSavingRelationId(id)
     setRelationError(null)
     try {
-      const { categoryIds } = await apiPut<{ categoryIds: number[] }>(
-        `subject/${id}/category`,
-        { categoryIds: selectedCategoryIds.map(Number) }
-      )
-      const categories =
-        allCategories
-          .filter((c) => categoryIds.includes(c.id))
-          .map((c) => c.name)
-          .sort((a, b) => a.localeCompare(b))
-          .join(', ') || null
-      setSubjects((prev) =>
-        prev.map((s) => (s.id === id ? { ...s, categories } : s))
-      )
+      await apiPut<{ categoryIds: number[] }>(`subject/${id}/category`, {
+        categoryIds: selectedCategoryIds.map(Number),
+      })
       setEditingRelationId(null)
+      await load(page, sortColumn, sortDirection)
     } catch {
       setRelationError('更新類別關聯失敗，請稍後再試。')
     } finally {
@@ -190,26 +194,14 @@ export default function SubjectClient() {
   }
 
   const handleSort = (column: SortColumn) => {
-    if (column === sortColumn) {
-      setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'))
-    } else {
-      setSortColumn(column)
-      setSortDirection('asc')
-    }
+    const direction =
+      column === sortColumn ? (sortDirection === 'asc' ? 'desc' : 'asc') : 'asc'
+    setSortColumn(column)
+    setSortDirection(direction)
+    load(1, column, direction)
   }
 
-  const sortedSubjects = useMemo(() => {
-    const dir = sortDirection === 'asc' ? 1 : -1
-    return [...subjects].sort((a, b) => {
-      if (sortColumn === 'id') return (a.id - b.id) * dir
-      if (sortColumn === 'sortOrder') return (a.sortOrder - b.sortOrder) * dir
-      if (sortColumn === 'categories')
-        return (a.categories ?? '').localeCompare(b.categories ?? '') * dir
-      return a.name.localeCompare(b.name) * dir
-    })
-  }, [subjects, sortColumn, sortDirection])
-
-  if (loading) {
+  if (loading && subjects === null) {
     return (
       <div className="flex h-48 items-center justify-center">
         <span className="text-sm text-black-500">載入中…</span>
@@ -270,14 +262,14 @@ export default function SubjectClient() {
             </tr>
           </thead>
           <tbody>
-            {sortedSubjects.length === 0 && (
+            {(subjects ?? []).length === 0 && (
               <tr>
                 <td colSpan={5} className="px-4 py-8 text-center text-black-300">
                   尚無科目
                 </td>
               </tr>
             )}
-            {sortedSubjects.map((subject) => {
+            {(subjects ?? []).map((subject) => {
               const isEditing = editingId === subject.id
               return (
                 <tr key={subject.id} className="border-b border-brown-300/30 last:border-0">
@@ -400,6 +392,12 @@ export default function SubjectClient() {
           </tbody>
         </table>
       </div>
+
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        onChange={(p) => load(p, sortColumn, sortDirection)}
+      />
     </div>
   )
 }

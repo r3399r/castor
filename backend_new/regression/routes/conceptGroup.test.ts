@@ -10,7 +10,7 @@ import {
 } from 'vitest';
 import { app } from 'src/app';
 import { closeDb, getDb } from 'src/db/client';
-import { subjectTable, tagTable } from 'src/db/schema';
+import { conceptGroupTable, subjectTable } from 'src/db/schema';
 import { ADMIN_EMAILS } from 'src/middleware/adminAuth';
 
 // The admin gate is exercised end-to-end in its own describe block below;
@@ -19,7 +19,7 @@ import { ADMIN_EMAILS } from 'src/middleware/adminAuth';
 vi.mock('src/lib/firebaseAdmin', () => ({ verifyIdToken: vi.fn() }));
 import { verifyIdToken } from 'src/lib/firebaseAdmin';
 
-type TagDto = {
+type ConceptGroupDto = {
   id: number;
   name: string;
   subjectId: number;
@@ -36,31 +36,32 @@ const postSubject = async (name: string) => {
   return (await res.json()) as SubjectDto;
 };
 
-const postTag = (body: unknown) =>
-  app.request('/api/tag', {
+const postConceptGroup = (body: unknown) =>
+  app.request('/api/concept-group', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
 
-const putTag = (id: number | string, body: unknown) =>
-  app.request(`/api/tag/${id}`, {
+const putConceptGroup = (id: number | string, body: unknown) =>
+  app.request(`/api/concept-group/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
 
-const deleteTag = (id: number | string) =>
-  app.request(`/api/tag/${id}`, { method: 'DELETE' });
+const deleteConceptGroup = (id: number | string) =>
+  app.request(`/api/concept-group/${id}`, { method: 'DELETE' });
 
-// Cleared in FK-safe order: tag references subject, so it must go first.
+// Cleared in FK-safe order: concept_group references subject, so it must
+// go first.
 const clearTables = async () => {
   const db = getDb();
-  await db.delete(tagTable);
+  await db.delete(conceptGroupTable);
   await db.delete(subjectTable);
 };
 
-describe('tag routes', () => {
+describe('concept-group routes', () => {
   beforeAll(clearTables);
 
   beforeEach(() => {
@@ -73,8 +74,8 @@ describe('tag routes', () => {
     await closeDb();
   });
 
-  it('lists tags, empty when there is no data', async () => {
-    const res = await app.request('/api/tag');
+  it('lists concept groups, empty when there is no data', async () => {
+    const res = await app.request('/api/concept-group');
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
       data: [],
@@ -82,36 +83,39 @@ describe('tag routes', () => {
     });
   });
 
-  it('creates a tag and lists it back', async () => {
+  it('creates a concept group and lists it back', async () => {
     const subject = await postSubject('algebra');
 
-    const postRes = await postTag({ name: 'linear-equations', subjectId: subject.id });
+    const postRes = await postConceptGroup({
+      name: 'linear equations',
+      subjectId: subject.id,
+    });
     expect(postRes.status).toBe(201);
-    const created = (await postRes.json()) as TagDto;
+    const created = (await postRes.json()) as ConceptGroupDto;
     expect(created).toMatchObject({
-      name: 'linear-equations',
+      name: 'linear equations',
       subjectId: subject.id,
     });
     expect(created.id).toEqual(expect.any(Number));
 
-    const listRes = await app.request('/api/tag');
-    const listBody = (await listRes.json()) as { data: TagDto[] };
+    const listRes = await app.request('/api/concept-group');
+    const listBody = (await listRes.json()) as { data: ConceptGroupDto[] };
     expect(listBody.data).toEqual([created]);
   });
 
-  it('fetches a tag by id', async () => {
+  it('fetches a concept group by id', async () => {
     const subject = await postSubject('biology');
     const created = (await (
-      await postTag({ name: 'genetics', subjectId: subject.id })
-    ).json()) as TagDto;
+      await postConceptGroup({ name: 'genetics', subjectId: subject.id })
+    ).json()) as ConceptGroupDto;
 
-    const res = await app.request(`/api/tag/${created.id}`);
+    const res = await app.request(`/api/concept-group/${created.id}`);
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual(created);
   });
 
-  it('404s for an unknown tag id', async () => {
-    const res = await app.request('/api/tag/999999');
+  it('404s for an unknown concept group id', async () => {
+    const res = await app.request('/api/concept-group/999999');
     expect(res.status).toBe(404);
     expect(await res.json()).toMatchObject({
       status: 404,
@@ -122,24 +126,24 @@ describe('tag routes', () => {
 
   it('rejects a missing name with 400 before touching the database', async () => {
     const subject = await postSubject('chemistry');
-    const res = await postTag({ subjectId: subject.id });
+    const res = await postConceptGroup({ subjectId: subject.id });
     expect(res.status).toBe(400);
   });
 
   it('rejects a missing subjectId with 400 before touching the database', async () => {
-    const res = await postTag({ name: 'orphaned' });
+    const res = await postConceptGroup({ name: 'orphaned' });
     expect(res.status).toBe(400);
   });
 
   describe('PUT /:id', () => {
-    it('updates a tag and returns the updated record', async () => {
+    it('updates a concept group and returns the updated record', async () => {
       const subjectA = await postSubject('physics');
       const subjectB = await postSubject('astronomy');
       const created = (await (
-        await postTag({ name: 'old name', subjectId: subjectA.id })
-      ).json()) as TagDto;
+        await postConceptGroup({ name: 'old name', subjectId: subjectA.id })
+      ).json()) as ConceptGroupDto;
 
-      const res = await putTag(created.id, {
+      const res = await putConceptGroup(created.id, {
         name: 'new name',
         subjectId: subjectB.id,
       });
@@ -150,16 +154,16 @@ describe('tag routes', () => {
         subjectId: subjectB.id,
       });
 
-      const getRes = await app.request(`/api/tag/${created.id}`);
+      const getRes = await app.request(`/api/concept-group/${created.id}`);
       expect(await getRes.json()).toMatchObject({
         name: 'new name',
         subjectId: subjectB.id,
       });
     });
 
-    it('404s for an unknown tag id', async () => {
+    it('404s for an unknown concept group id', async () => {
       const subject = await postSubject('history');
-      const res = await putTag(999999, {
+      const res = await putConceptGroup(999999, {
         name: 'anything',
         subjectId: subject.id,
       });
@@ -174,33 +178,33 @@ describe('tag routes', () => {
     it('rejects a missing name with 400 before touching the database', async () => {
       const subject = await postSubject('geography');
       const created = (await (
-        await postTag({ name: 'keep me', subjectId: subject.id })
-      ).json()) as TagDto;
+        await postConceptGroup({ name: 'keep me', subjectId: subject.id })
+      ).json()) as ConceptGroupDto;
 
-      const res = await putTag(created.id, { subjectId: subject.id });
+      const res = await putConceptGroup(created.id, { subjectId: subject.id });
       expect(res.status).toBe(400);
 
-      const getRes = await app.request(`/api/tag/${created.id}`);
+      const getRes = await app.request(`/api/concept-group/${created.id}`);
       expect(await getRes.json()).toMatchObject({ name: 'keep me' });
     });
   });
 
   describe('DELETE /:id', () => {
-    it('deletes a tag', async () => {
+    it('deletes a concept group', async () => {
       const subject = await postSubject('literature');
       const created = (await (
-        await postTag({ name: 'to delete', subjectId: subject.id })
-      ).json()) as TagDto;
+        await postConceptGroup({ name: 'to delete', subjectId: subject.id })
+      ).json()) as ConceptGroupDto;
 
-      const res = await deleteTag(created.id);
+      const res = await deleteConceptGroup(created.id);
       expect(res.status).toBe(204);
 
-      const getRes = await app.request(`/api/tag/${created.id}`);
+      const getRes = await app.request(`/api/concept-group/${created.id}`);
       expect(getRes.status).toBe(404);
     });
 
-    it('404s for an unknown tag id', async () => {
-      const res = await deleteTag(999999);
+    it('404s for an unknown concept group id', async () => {
+      const res = await deleteConceptGroup(999999);
       expect(res.status).toBe(404);
       expect(await res.json()).toMatchObject({
         status: 404,
@@ -213,13 +217,15 @@ describe('tag routes', () => {
   describe('pagination and sorting', () => {
     it('paginates with limit/offset and reports page metadata', async () => {
       const subject = await postSubject('paging subject');
-      await postTag({ name: 'c-charlie', subjectId: subject.id });
-      await postTag({ name: 'a-alpha', subjectId: subject.id });
-      await postTag({ name: 'b-bravo', subjectId: subject.id });
+      await postConceptGroup({ name: 'c-charlie', subjectId: subject.id });
+      await postConceptGroup({ name: 'a-alpha', subjectId: subject.id });
+      await postConceptGroup({ name: 'b-bravo', subjectId: subject.id });
 
-      const res = await app.request('/api/tag?limit=2&offset=0&sort=name');
+      const res = await app.request(
+        '/api/concept-group?limit=2&offset=0&sort=name'
+      );
       const body = (await res.json()) as {
-        data: TagDto[];
+        data: ConceptGroupDto[];
         paginate: { total: number; page: number; limit: number; totalPages: number };
       };
       expect(body.data).toHaveLength(2);
@@ -230,28 +236,34 @@ describe('tag routes', () => {
         totalPages: 2,
       });
 
-      const page2 = await app.request('/api/tag?limit=2&offset=2&sort=name');
-      const page2Body = (await page2.json()) as { data: TagDto[] };
+      const page2 = await app.request(
+        '/api/concept-group?limit=2&offset=2&sort=name'
+      );
+      const page2Body = (await page2.json()) as { data: ConceptGroupDto[] };
       expect(page2Body.data).toHaveLength(1);
     });
 
     it('sorts by name ascending and descending', async () => {
       const subject = await postSubject('sorting subject');
-      await postTag({ name: 'c-charlie', subjectId: subject.id });
-      await postTag({ name: 'a-alpha', subjectId: subject.id });
-      await postTag({ name: 'b-bravo', subjectId: subject.id });
+      await postConceptGroup({ name: 'c-charlie', subjectId: subject.id });
+      await postConceptGroup({ name: 'a-alpha', subjectId: subject.id });
+      await postConceptGroup({ name: 'b-bravo', subjectId: subject.id });
 
-      const ascRes = await app.request('/api/tag?sort=name&order=asc');
-      const ascBody = (await ascRes.json()) as { data: TagDto[] };
-      expect(ascBody.data.map((t) => t.name)).toEqual([
+      const ascRes = await app.request(
+        '/api/concept-group?sort=name&order=asc'
+      );
+      const ascBody = (await ascRes.json()) as { data: ConceptGroupDto[] };
+      expect(ascBody.data.map((cg) => cg.name)).toEqual([
         'a-alpha',
         'b-bravo',
         'c-charlie',
       ]);
 
-      const descRes = await app.request('/api/tag?sort=name&order=desc');
-      const descBody = (await descRes.json()) as { data: TagDto[] };
-      expect(descBody.data.map((t) => t.name)).toEqual([
+      const descRes = await app.request(
+        '/api/concept-group?sort=name&order=desc'
+      );
+      const descBody = (await descRes.json()) as { data: ConceptGroupDto[] };
+      expect(descBody.data.map((cg) => cg.name)).toEqual([
         'c-charlie',
         'b-bravo',
         'a-alpha',
@@ -261,24 +273,26 @@ describe('tag routes', () => {
     it('sorts by the linked subject name', async () => {
       const subjectZ = await postSubject('z-subject');
       const subjectA = await postSubject('a-subject');
-      await postTag({ name: 'tag-on-z', subjectId: subjectZ.id });
-      await postTag({ name: 'tag-on-a', subjectId: subjectA.id });
+      await postConceptGroup({ name: 'cg-on-z', subjectId: subjectZ.id });
+      await postConceptGroup({ name: 'cg-on-a', subjectId: subjectA.id });
 
-      const res = await app.request('/api/tag?sort=subject&order=asc');
-      const body = (await res.json()) as { data: TagDto[] };
-      expect(body.data.map((t) => t.subjectId)).toEqual([
+      const res = await app.request(
+        '/api/concept-group?sort=subject&order=asc'
+      );
+      const body = (await res.json()) as { data: ConceptGroupDto[] };
+      expect(body.data.map((cg) => cg.subjectId)).toEqual([
         subjectA.id,
         subjectZ.id,
       ]);
     });
 
     it('rejects an out-of-range limit with 400', async () => {
-      const res = await app.request('/api/tag?limit=99999');
+      const res = await app.request('/api/concept-group?limit=99999');
       expect(res.status).toBe(400);
     });
 
     it('rejects an invalid sort column with 400', async () => {
-      const res = await app.request('/api/tag?sort=bogus');
+      const res = await app.request('/api/concept-group?sort=bogus');
       expect(res.status).toBe(400);
     });
   });
@@ -288,7 +302,10 @@ describe('tag routes', () => {
       const subject = await postSubject('economics');
       vi.mocked(verifyIdToken).mockResolvedValue(null);
 
-      const res = await postTag({ name: 'blocked', subjectId: subject.id });
+      const res = await postConceptGroup({
+        name: 'blocked',
+        subjectId: subject.id,
+      });
       expect(res.status).toBe(401);
       expect(await res.json()).toMatchObject({
         status: 401,
@@ -301,7 +318,10 @@ describe('tag routes', () => {
       const subject = await postSubject('psychology');
       vi.mocked(verifyIdToken).mockResolvedValue('someone-else@example.com');
 
-      const res = await postTag({ name: 'blocked', subjectId: subject.id });
+      const res = await postConceptGroup({
+        name: 'blocked',
+        subjectId: subject.id,
+      });
       expect(res.status).toBe(403);
       expect(await res.json()).toMatchObject({
         status: 403,
@@ -313,7 +333,7 @@ describe('tag routes', () => {
     it('leaves GET ungated even with no valid identity', async () => {
       vi.mocked(verifyIdToken).mockResolvedValue(null);
 
-      const res = await app.request('/api/tag');
+      const res = await app.request('/api/concept-group');
       expect(res.status).toBe(200);
     });
   });

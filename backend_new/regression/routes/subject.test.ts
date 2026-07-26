@@ -86,7 +86,10 @@ describe('subject routes', () => {
   it('lists subjects, empty when there is no data', async () => {
     const res = await app.request('/api/subject');
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual([]);
+    expect(await res.json()).toEqual({
+      data: [],
+      paginate: { total: 0, page: 1, limit: 20, totalPages: 1 },
+    });
   });
 
   it('creates a subject with a default sortOrder and lists it back', async () => {
@@ -97,7 +100,10 @@ describe('subject routes', () => {
     expect(created.id).toEqual(expect.any(Number));
 
     const listRes = await app.request('/api/subject');
-    expect(await listRes.json()).toEqual([{ ...created, categories: null }]);
+    const listBody = (await listRes.json()) as {
+      data: (SubjectDto & { categories: string | null })[];
+    };
+    expect(listBody.data).toEqual([{ ...created, categories: null }]);
   });
 
   it('shows a comma-separated list of linked category names', async () => {
@@ -117,10 +123,10 @@ describe('subject routes', () => {
     ]);
 
     const res = await app.request('/api/subject');
-    const [subject] = (await res.json()) as (SubjectDto & {
-      categories: string | null;
-    })[];
-    expect(subject.categories).toBe('exam prep, science');
+    const { data } = (await res.json()) as {
+      data: (SubjectDto & { categories: string | null })[];
+    };
+    expect(data[0].categories).toBe('exam prep, science');
   });
 
   it('lists subjects ordered by sortOrder', async () => {
@@ -132,8 +138,8 @@ describe('subject routes', () => {
     ).json()) as SubjectDto;
 
     const res = await app.request('/api/subject');
-    const subjects = (await res.json()) as SubjectDto[];
-    expect(subjects.map((s) => s.id)).toEqual([first.id, second.id]);
+    const { data } = (await res.json()) as { data: SubjectDto[] };
+    expect(data.map((s) => s.id)).toEqual([first.id, second.id]);
   });
 
   it('fetches a subject by id', async () => {
@@ -327,6 +333,65 @@ describe('subject routes', () => {
       ).json()) as SubjectDto;
 
       const res = await putSubjectCategory(subject.id, { categoryIds: 1 });
+      expect(res.status).toBe(400);
+    });
+  });
+
+  describe('pagination and sorting', () => {
+    it('paginates with limit/offset and reports page metadata', async () => {
+      await postSubject({ name: 'c-charlie' });
+      await postSubject({ name: 'a-alpha' });
+      await postSubject({ name: 'b-bravo' });
+
+      const res = await app.request('/api/subject?limit=2&offset=0&sort=name');
+      const body = (await res.json()) as {
+        data: SubjectDto[];
+        paginate: { total: number; page: number; limit: number; totalPages: number };
+      };
+      expect(body.data).toHaveLength(2);
+      expect(body.paginate).toEqual({
+        total: 3,
+        page: 1,
+        limit: 2,
+        totalPages: 2,
+      });
+
+      const page2 = await app.request(
+        '/api/subject?limit=2&offset=2&sort=name'
+      );
+      const page2Body = (await page2.json()) as { data: SubjectDto[] };
+      expect(page2Body.data).toHaveLength(1);
+    });
+
+    it('sorts by name ascending and descending', async () => {
+      await postSubject({ name: 'c-charlie' });
+      await postSubject({ name: 'a-alpha' });
+      await postSubject({ name: 'b-bravo' });
+
+      const ascRes = await app.request('/api/subject?sort=name&order=asc');
+      const ascBody = (await ascRes.json()) as { data: SubjectDto[] };
+      expect(ascBody.data.map((s) => s.name)).toEqual([
+        'a-alpha',
+        'b-bravo',
+        'c-charlie',
+      ]);
+
+      const descRes = await app.request('/api/subject?sort=name&order=desc');
+      const descBody = (await descRes.json()) as { data: SubjectDto[] };
+      expect(descBody.data.map((s) => s.name)).toEqual([
+        'c-charlie',
+        'b-bravo',
+        'a-alpha',
+      ]);
+    });
+
+    it('rejects an out-of-range limit with 400', async () => {
+      const res = await app.request('/api/subject?limit=99999');
+      expect(res.status).toBe(400);
+    });
+
+    it('rejects an invalid sort column with 400', async () => {
+      const res = await app.request('/api/subject?sort=bogus');
       expect(res.status).toBe(400);
     });
   });

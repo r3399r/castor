@@ -17,6 +17,7 @@ services:
       - ../db/table/exam.sql:/docker-entrypoint-initdb.d/04_exam.sql:ro
       - ../db/table/exam_subject.sql:/docker-entrypoint-initdb.d/05_exam_subject.sql:ro
       - ../db/table/tag.sql:/docker-entrypoint-initdb.d/06_tag.sql:ro
+      - ../db/table/concept_group.sql:/docker-entrypoint-initdb.d/07_concept_group.sql:ro
     healthcheck:
       test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost', '-u', 'root', '-proot']
       interval: 5s

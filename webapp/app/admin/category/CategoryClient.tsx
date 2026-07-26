@@ -1,14 +1,17 @@
 'use client'
 
-import { FormEvent, useEffect, useMemo, useState } from 'react'
-import { apiDelete, apiFetch, apiPost, apiPut } from '@/lib/api'
+import { FormEvent, useEffect, useState } from 'react'
+import { apiDelete, apiFetch, apiPost, apiPut, LIMIT } from '@/lib/api'
+import Pagination from '@/components/Pagination'
 import SortableTh, { type SortDirection } from '@/components/SortableTh'
-import type { Category } from '@/types/api'
+import type { Category, Paginate } from '@/types/api'
 
 type SortColumn = 'id' | 'name'
 
 export default function CategoryClient() {
-  const [categories, setCategories] = useState<Category[]>([])
+  const [categories, setCategories] = useState<Category[] | null>(null)
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -26,11 +29,33 @@ export default function CategoryClient() {
 
   const [deletingId, setDeletingId] = useState<number | null>(null)
 
+  const load = async (
+    targetPage: number,
+    sort: SortColumn,
+    order: SortDirection
+  ) => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await apiFetch<Paginate<Category>>('category', {
+        limit: LIMIT,
+        offset: (targetPage - 1) * LIMIT,
+        sort,
+        order,
+      })
+      setCategories(res.data)
+      setTotalPages(res.paginate.totalPages)
+      setPage(targetPage)
+    } catch {
+      setError('無法載入分類列表。')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   useEffect(() => {
-    apiFetch<Category[]>('category')
-      .then(setCategories)
-      .catch(() => setError('無法載入分類列表。'))
-      .finally(() => setLoading(false))
+    load(1, sortColumn, sortDirection)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const handleCreate = async (e: FormEvent) => {
@@ -41,9 +66,9 @@ export default function CategoryClient() {
     setCreating(true)
     setCreateError(null)
     try {
-      const created = await apiPost<Category>('category', { name })
-      setCategories((prev) => [...prev, created])
+      await apiPost<Category>('category', { name })
       setNewName('')
+      await load(page, sortColumn, sortDirection)
     } catch {
       setCreateError('新增失敗，請確認名稱未重複。')
     } finally {
@@ -70,9 +95,9 @@ export default function CategoryClient() {
     setSavingId(id)
     setEditError(null)
     try {
-      const updated = await apiPut<Category>(`category/${id}`, { name })
-      setCategories((prev) => prev.map((c) => (c.id === id ? updated : c)))
+      await apiPut<Category>(`category/${id}`, { name })
       setEditingId(null)
+      await load(page, sortColumn, sortDirection)
     } catch {
       setEditError('更新失敗，請確認名稱未重複。')
     } finally {
@@ -86,7 +111,7 @@ export default function CategoryClient() {
     setDeletingId(id)
     try {
       await apiDelete(`category/${id}`)
-      setCategories((prev) => prev.filter((c) => c.id !== id))
+      await load(page, sortColumn, sortDirection)
     } catch {
       alert('刪除失敗，請稍後再試。')
     } finally {
@@ -95,22 +120,14 @@ export default function CategoryClient() {
   }
 
   const handleSort = (column: SortColumn) => {
-    if (column === sortColumn) {
-      setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'))
-    } else {
-      setSortColumn(column)
-      setSortDirection('asc')
-    }
+    const direction =
+      column === sortColumn ? (sortDirection === 'asc' ? 'desc' : 'asc') : 'asc'
+    setSortColumn(column)
+    setSortDirection(direction)
+    load(1, column, direction)
   }
 
-  const sortedCategories = useMemo(() => {
-    const dir = sortDirection === 'asc' ? 1 : -1
-    return [...categories].sort((a, b) =>
-      sortColumn === 'id' ? (a.id - b.id) * dir : a.name.localeCompare(b.name) * dir
-    )
-  }, [categories, sortColumn, sortDirection])
-
-  if (loading) {
+  if (loading && categories === null) {
     return (
       <div className="flex h-48 items-center justify-center">
         <span className="text-sm text-black-500">載入中…</span>
@@ -160,14 +177,14 @@ export default function CategoryClient() {
             </tr>
           </thead>
           <tbody>
-            {sortedCategories.length === 0 && (
+            {(categories ?? []).length === 0 && (
               <tr>
                 <td colSpan={3} className="px-4 py-8 text-center text-black-300">
                   尚無分類
                 </td>
               </tr>
             )}
-            {sortedCategories.map((category) => {
+            {(categories ?? []).map((category) => {
               const isEditing = editingId === category.id
               return (
                 <tr key={category.id} className="border-b border-brown-300/30 last:border-0">
@@ -230,6 +247,12 @@ export default function CategoryClient() {
           </tbody>
         </table>
       </div>
+
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        onChange={(p) => load(p, sortColumn, sortDirection)}
+      />
     </div>
   )
 }

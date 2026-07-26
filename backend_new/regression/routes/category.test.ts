@@ -67,7 +67,10 @@ describe('category routes', () => {
   it('lists categories, empty when there is no data', async () => {
     const res = await app.request('/api/category');
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual([]);
+    expect(await res.json()).toEqual({
+      data: [],
+      paginate: { total: 0, page: 1, limit: 20, totalPages: 1 },
+    });
   });
 
   it('creates a category and lists it back', async () => {
@@ -78,7 +81,11 @@ describe('category routes', () => {
     expect(created.id).toEqual(expect.any(Number));
 
     const listRes = await app.request('/api/category');
-    expect(await listRes.json()).toEqual([created]);
+    const listBody = (await listRes.json()) as {
+      data: CategoryDto[];
+      paginate: unknown;
+    };
+    expect(listBody.data).toEqual([created]);
   });
 
   it('fetches a category by id', async () => {
@@ -191,6 +198,63 @@ describe('category routes', () => {
 
       const res = await deleteCategory(created.id);
       expect(res.status).toBe(204);
+    });
+  });
+
+  describe('pagination and sorting', () => {
+    it('paginates with limit/offset and reports page metadata', async () => {
+      await postCategory({ name: 'c-charlie' });
+      await postCategory({ name: 'a-alpha' });
+      await postCategory({ name: 'b-bravo' });
+
+      const res = await app.request('/api/category?limit=2&offset=0');
+      const body = (await res.json()) as {
+        data: CategoryDto[];
+        paginate: { total: number; page: number; limit: number; totalPages: number };
+      };
+      expect(body.data).toHaveLength(2);
+      expect(body.paginate).toEqual({
+        total: 3,
+        page: 1,
+        limit: 2,
+        totalPages: 2,
+      });
+
+      const page2 = await app.request('/api/category?limit=2&offset=2');
+      const page2Body = (await page2.json()) as { data: CategoryDto[] };
+      expect(page2Body.data).toHaveLength(1);
+    });
+
+    it('sorts by name ascending and descending', async () => {
+      await postCategory({ name: 'c-charlie' });
+      await postCategory({ name: 'a-alpha' });
+      await postCategory({ name: 'b-bravo' });
+
+      const ascRes = await app.request('/api/category?sort=name&order=asc');
+      const ascBody = (await ascRes.json()) as { data: CategoryDto[] };
+      expect(ascBody.data.map((c) => c.name)).toEqual([
+        'a-alpha',
+        'b-bravo',
+        'c-charlie',
+      ]);
+
+      const descRes = await app.request('/api/category?sort=name&order=desc');
+      const descBody = (await descRes.json()) as { data: CategoryDto[] };
+      expect(descBody.data.map((c) => c.name)).toEqual([
+        'c-charlie',
+        'b-bravo',
+        'a-alpha',
+      ]);
+    });
+
+    it('rejects an out-of-range limit with 400', async () => {
+      const res = await app.request('/api/category?limit=99999');
+      expect(res.status).toBe(400);
+    });
+
+    it('rejects an invalid sort column with 400', async () => {
+      const res = await app.request('/api/category?sort=bogus');
+      expect(res.status).toBe(400);
     });
   });
 
