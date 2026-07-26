@@ -38,3 +38,22 @@ export const subjectCategoryTable = mysqlTable(
   },
   (table) => [primaryKey({ columns: [table.subjectId, table.categoryId] })]
 );
+
+export const examTable = mysqlTable('exam', {
+  id: int('id', { unsigned: true }).autoincrement().primaryKey(),
+  name: varchar('name', { length: 255 }).notNull(),
+  createdAt: datetime('created_at', { mode: 'date', fsp: 3 }),
+});
+
+export const examSubjectTable = mysqlTable(
+  'exam_subject',
+  {
+    examId: int('exam_id', { unsigned: true })
+      .notNull()
+      .references(() => examTable.id),
+    subjectId: int('subject_id', { unsigned: true })
+      .notNull()
+      .references(() => subjectTable.id),
+  },
+  (table) => [primaryKey({ columns: [table.examId, table.subjectId] })]
+);

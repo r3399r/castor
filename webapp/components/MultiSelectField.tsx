@@ -89,7 +89,7 @@ export default function MultiSelectField({
     selectedLabels.length === 0
       ? placeholder
       : selectedLabels.length <= 2
-        ? selectedLabels.join('、')
+        ? selectedLabels.join(', ')
         : `${selectedLabels.length} 項已選`
 
   return (

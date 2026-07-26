@@ -4,6 +4,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import {
   categoryTable,
+  examSubjectTable,
   subjectCategoryTable,
   subjectTable,
 } from 'src/db/schema';
@@ -105,11 +106,14 @@ export const subject = new Hono<TransactionEnv>()
     const id = Number(c.req.param('id'));
     console.log(`DELETE /api/subject/${id}`);
 
-    // Clear subject_category links first -- the FK would otherwise reject
-    // deleting a subject that still has linked categories.
+    // Clear subject_category and exam_subject links first -- the FKs would
+    // otherwise reject deleting a subject that's still referenced there.
     await db
       .delete(subjectCategoryTable)
       .where(eq(subjectCategoryTable.subjectId, id));
+    await db
+      .delete(examSubjectTable)
+      .where(eq(examSubjectTable.subjectId, id));
     const [{ affectedRows }] = await db
       .delete(subjectTable)
       .where(eq(subjectTable.id, id));

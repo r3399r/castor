@@ -14,6 +14,8 @@ services:
       - ../db/table/category.sql:/docker-entrypoint-initdb.d/01_category.sql:ro
       - ../db/table/subject.sql:/docker-entrypoint-initdb.d/02_subject.sql:ro
       - ../db/table/subject_category.sql:/docker-entrypoint-initdb.d/03_subject_category.sql:ro
+      - ../db/table/exam.sql:/docker-entrypoint-initdb.d/04_exam.sql:ro
+      - ../db/table/exam_subject.sql:/docker-entrypoint-initdb.d/05_exam_subject.sql:ro
     healthcheck:
       test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost', '-u', 'root', '-proot']
       interval: 5s

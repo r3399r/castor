@@ -12,6 +12,8 @@ import { app } from 'src/app';
 import { closeDb, getDb } from 'src/db/client';
 import {
   categoryTable,
+  examSubjectTable,
+  examTable,
   subjectCategoryTable,
   subjectTable,
 } from 'src/db/schema';
@@ -57,13 +59,15 @@ const putSubjectCategory = (id: number | string, body: unknown) =>
     body: JSON.stringify(body),
   });
 
-// Cleared in FK-safe order: subject_category references both subject and
-// category, so it must go first.
+// Cleared in FK-safe order: subject_category and exam_subject both
+// reference subject, so they must go first.
 const clearTables = async () => {
   const db = getDb();
   await db.delete(subjectCategoryTable);
+  await db.delete(examSubjectTable);
   await db.delete(subjectTable);
   await db.delete(categoryTable);
+  await db.delete(examTable);
 };
 
 describe('subject routes', () => {
@@ -238,6 +242,22 @@ describe('subject routes', () => {
       await db
         .insert(subjectCategoryTable)
         .values({ subjectId: created.id, categoryId: catId });
+
+      const res = await deleteSubject(created.id);
+      expect(res.status).toBe(204);
+    });
+
+    it('deletes a subject that still has linked exams', async () => {
+      const created = (await (
+        await postSubject({ name: 'exam-linked' })
+      ).json()) as SubjectDto;
+      const db = getDb();
+      const [{ insertId: examId }] = await db
+        .insert(examTable)
+        .values({ name: 'linked exam', createdAt: new Date() });
+      await db
+        .insert(examSubjectTable)
+        .values({ examId, subjectId: created.id });
 
       const res = await deleteSubject(created.id);
       expect(res.status).toBe(204);
