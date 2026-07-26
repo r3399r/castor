@@ -6,6 +6,7 @@ import { category } from 'src/routes/category';
 import { exam } from 'src/routes/exam';
 import { info } from 'src/routes/info';
 import { subject } from 'src/routes/subject';
+import { tag } from 'src/routes/tag';
 
 export const app = new Hono()
   .route('/api/info', info)
@@ -18,6 +19,9 @@ export const app = new Hono()
   .use('/api/exam/*', adminAuth)
   .use('/api/exam/*', transaction)
   .route('/api/exam', exam)
+  .use('/api/tag/*', adminAuth)
+  .use('/api/tag/*', transaction)
+  .route('/api/tag', tag)
   .onError((err, c) => {
     console.error(err);
     const { status, body } = toErrorResponse(err);

@@ -57,3 +57,15 @@ export const examSubjectTable = mysqlTable(
   },
   (table) => [primaryKey({ columns: [table.examId, table.subjectId] })]
 );
+
+// One-to-many with subject (subjectId is a plain required attribute, not a
+// join table) -- unlike category/exam, there's no separate relation-edit
+// flow, it's just edited alongside name on the tag itself.
+export const tagTable = mysqlTable('tag', {
+  id: int('id', { unsigned: true }).autoincrement().primaryKey(),
+  name: varchar('name', { length: 255 }).notNull(),
+  subjectId: int('subject_id', { unsigned: true })
+    .notNull()
+    .references(() => subjectTable.id),
+  createdAt: datetime('created_at', { mode: 'date', fsp: 3 }),
+});
