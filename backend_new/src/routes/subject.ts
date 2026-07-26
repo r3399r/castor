@@ -4,8 +4,6 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import {
   categoryTable,
-  conceptGroupTable,
-  conceptTable,
   examSubjectTable,
   subjectCategoryTable,
   subjectTable,
@@ -30,34 +28,17 @@ const categoriesExpr = sql<string | null>`GROUP_CONCAT(
   ${categoryTable.name} ORDER BY ${categoryTable.name} SEPARATOR ', '
 )`;
 
-// A correlated subquery rather than another join -- the query below
-// already left-joins subject_category/category (grouped by subject.id)
-// for the categories summary, and adding a second one-to-many join chain
-// (subject -> concept_group -> concept) into that same grouped query
-// would fan out and duplicate rows in both GROUP_CONCATs. Computing this
-// independently sidesteps that entirely.
-const conceptsExpr = sql<string | null>`(
-  SELECT GROUP_CONCAT(
-    CONCAT(${conceptTable.name}, '=', ${conceptTable.id})
-    ORDER BY ${conceptTable.id} SEPARATOR ','
-  )
-  FROM ${conceptTable}
-  INNER JOIN ${conceptGroupTable} ON ${conceptGroupTable.id} = ${conceptTable.conceptGroupId}
-  WHERE ${conceptGroupTable.subjectId} = ${subjectTable.id}
-)`;
-
 const SUBJECT_SORT_COLUMNS = {
   id: subjectTable.id,
   name: subjectTable.name,
   sortOrder: subjectTable.sortOrder,
   categories: categoriesExpr,
-  concepts: conceptsExpr,
 };
 
 export const subjectListQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(MAX_LIMIT).optional().default(DEFAULT_LIMIT),
   offset: z.coerce.number().int().min(0).optional().default(0),
-  sort: z.enum(['id', 'name', 'sortOrder', 'categories', 'concepts']).optional().default('sortOrder'),
+  sort: z.enum(['id', 'name', 'sortOrder', 'categories']).optional().default('sortOrder'),
   order: z.enum(['asc', 'desc']).optional().default('asc'),
 });
 
@@ -82,10 +63,6 @@ export const subject = new Hono<TransactionEnv>()
         // all the UI needs (no reason to ship structured category data
         // the client can't act on).
         categories: categoriesExpr,
-        // Read-only "name=id" CSV of every concept under this subject (via
-        // its concept groups) -- lets an admin copy concept ids straight
-        // out of the list instead of cross-referencing the concept page.
-        concepts: conceptsExpr,
       })
       .from(subjectTable)
       .leftJoin(

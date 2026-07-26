@@ -19,13 +19,9 @@ type SubjectDto = {
   // Read-only summary of the subject's linked categories (many-to-many).
   // Not editable here -- comes pre-formatted as a CSV string from the API.
   categories: string | null
-  // Read-only "name=id" CSV of every concept under this subject (across
-  // its concept groups) -- lets an admin copy concept ids straight out of
-  // this list instead of cross-referencing the concept page.
-  concepts: string | null
 }
 
-type SortColumn = 'id' | 'name' | 'sortOrder' | 'categories' | 'concepts'
+type SortColumn = 'id' | 'name' | 'sortOrder' | 'categories'
 
 export default function SubjectClient() {
   const [subjects, setSubjects] = useState<SubjectDto[] | null>(null)
@@ -56,8 +52,6 @@ export default function SubjectClient() {
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([])
   const [savingRelationId, setSavingRelationId] = useState<number | null>(null)
   const [relationError, setRelationError] = useState<string | null>(null)
-
-  const [copiedConceptsId, setCopiedConceptsId] = useState<number | null>(null)
 
   const load = async (
     targetPage: number,
@@ -199,19 +193,6 @@ export default function SubjectClient() {
     }
   }
 
-  const handleCopyConcepts = async (id: number, concepts: string) => {
-    try {
-      await navigator.clipboard.writeText(concepts)
-      setCopiedConceptsId(id)
-      setTimeout(
-        () => setCopiedConceptsId((current) => (current === id ? null : current)),
-        1500
-      )
-    } catch {
-      alert('複製失敗，請手動選取複製。')
-    }
-  }
-
   const handleSort = (column: SortColumn) => {
     const direction =
       column === sortColumn ? (sortDirection === 'asc' ? 'desc' : 'asc') : 'asc'
@@ -283,7 +264,7 @@ export default function SubjectClient() {
           <tbody>
             {(subjects ?? []).length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-black-300">
+                <td colSpan={5} className="px-4 py-8 text-center text-black-300">
                   尚無科目
                 </td>
               </tr>
@@ -401,13 +382,12 @@ export default function SubjectClient() {
                           >
                             {deletingId === subject.id ? '刪除中…' : '刪除'}
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => handleCopyConcepts(subject.id, subject.concepts!)}
-                            className="shrink-0 rounded-md border border-brown-300 px-2 py-1 text-xs text-black-700 transition hover:bg-beige-200"
+                          <a
+                            href={`/admin/subject/${subject.id}/new-question`}
+                            className="rounded-md border border-brown-300 px-3 py-1.5 text-xs text-black-700 transition hover:bg-beige-200"
                           >
-                            {copiedConceptsId === subject.id ? '已複製!' : '複製觀念清單'}
-                          </button>
+                            新增題目
+                          </a>
                         </>
                       )}
                     </div>

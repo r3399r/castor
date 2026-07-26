@@ -12,8 +12,6 @@ import { app } from 'src/app';
 import { closeDb, getDb } from 'src/db/client';
 import {
   categoryTable,
-  conceptGroupTable,
-  conceptTable,
   examSubjectTable,
   examTable,
   subjectCategoryTable,
@@ -62,14 +60,11 @@ const putSubjectCategory = (id: number | string, body: unknown) =>
   });
 
 // Cleared in FK-safe order: subject_category and exam_subject both
-// reference subject, so they must go first; concept references
-// concept_group which references subject, so those go first too.
+// reference subject, so they must go first.
 const clearTables = async () => {
   const db = getDb();
   await db.delete(subjectCategoryTable);
   await db.delete(examSubjectTable);
-  await db.delete(conceptTable);
-  await db.delete(conceptGroupTable);
   await db.delete(subjectTable);
   await db.delete(categoryTable);
   await db.delete(examTable);
@@ -106,11 +101,9 @@ describe('subject routes', () => {
 
     const listRes = await app.request('/api/subject');
     const listBody = (await listRes.json()) as {
-      data: (SubjectDto & { categories: string | null; concepts: string | null })[];
+      data: (SubjectDto & { categories: string | null })[];
     };
-    expect(listBody.data).toEqual([
-      { ...created, categories: null, concepts: null },
-    ]);
+    expect(listBody.data).toEqual([{ ...created, categories: null }]);
   });
 
   it('shows a comma-separated list of linked category names', async () => {
@@ -134,54 +127,6 @@ describe('subject routes', () => {
       data: (SubjectDto & { categories: string | null })[];
     };
     expect(data[0].categories).toBe('exam prep, science');
-  });
-
-  it('shows a "name=id" CSV of every concept under the subject, across concept groups', async () => {
-    const created = (await (
-      await postSubject({ name: 'calculus' })
-    ).json()) as SubjectDto;
-    const db = getDb();
-    const [{ insertId: groupA }] = await db
-      .insert(conceptGroupTable)
-      .values({ name: 'limits', subjectId: created.id });
-    const [{ insertId: groupB }] = await db
-      .insert(conceptGroupTable)
-      .values({ name: 'integrals', subjectId: created.id });
-    const [{ insertId: conceptA }] = await db
-      .insert(conceptTable)
-      .values({ name: '極限', conceptGroupId: groupA });
-    const [{ insertId: conceptB }] = await db
-      .insert(conceptTable)
-      .values({ name: '積分', conceptGroupId: groupB });
-
-    const res = await app.request('/api/subject');
-    const { data } = (await res.json()) as {
-      data: (SubjectDto & { concepts: string | null })[];
-    };
-    expect(data[0].concepts).toBe(`極限=${conceptA},積分=${conceptB}`);
-  });
-
-  it('does not let unrelated concepts under other subjects leak into the CSV', async () => {
-    const created = (await (
-      await postSubject({ name: 'no concepts here' })
-    ).json()) as SubjectDto;
-    const other = (await (
-      await postSubject({ name: 'has concepts' })
-    ).json()) as SubjectDto;
-    const db = getDb();
-    const [{ insertId: groupId }] = await db
-      .insert(conceptGroupTable)
-      .values({ name: 'group', subjectId: other.id });
-    await db
-      .insert(conceptTable)
-      .values({ name: 'unrelated', conceptGroupId: groupId });
-
-    const res = await app.request('/api/subject?sort=name&order=asc');
-    const { data } = (await res.json()) as {
-      data: (SubjectDto & { concepts: string | null })[];
-    };
-    const target = data.find((s) => s.id === created.id);
-    expect(target?.concepts).toBeNull();
   });
 
   it('lists subjects ordered by sortOrder', async () => {
@@ -437,31 +382,6 @@ describe('subject routes', () => {
         'c-charlie',
         'b-bravo',
         'a-alpha',
-      ]);
-    });
-
-    it('sorts by the concepts CSV', async () => {
-      const withConcepts = (await (
-        await postSubject({ name: 'has concepts' })
-      ).json()) as SubjectDto;
-      const withoutConcepts = (await (
-        await postSubject({ name: 'no concepts' })
-      ).json()) as SubjectDto;
-      const db = getDb();
-      const [{ insertId: groupId }] = await db
-        .insert(conceptGroupTable)
-        .values({ name: 'group', subjectId: withConcepts.id });
-      await db
-        .insert(conceptTable)
-        .values({ name: 'a-concept', conceptGroupId: groupId });
-
-      const res = await app.request(
-        '/api/subject?sort=concepts&order=asc'
-      );
-      const { data } = (await res.json()) as { data: SubjectDto[] };
-      expect(data.map((s) => s.id)).toEqual([
-        withoutConcepts.id,
-        withConcepts.id,
       ]);
     });
 
