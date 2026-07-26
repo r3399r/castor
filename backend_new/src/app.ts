@@ -9,6 +9,7 @@ import { exam } from 'src/routes/exam';
 import { filterDimension } from 'src/routes/filterDimension';
 import { filterOption } from 'src/routes/filterOption';
 import { info } from 'src/routes/info';
+import { question } from 'src/routes/question';
 import { subject } from 'src/routes/subject';
 import { tag } from 'src/routes/tag';
 import { user } from 'src/routes/user';
@@ -42,6 +43,9 @@ export const app = new Hono()
   .use('/api/user/*', requireAdmin)
   .use('/api/user/*', transaction)
   .route('/api/user', user)
+  .use('/api/question/*', adminAuth)
+  .use('/api/question/*', transaction)
+  .route('/api/question', question)
   .onError((err, c) => {
     console.error(err);
     const { status, body } = toErrorResponse(err);

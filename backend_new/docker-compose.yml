@@ -23,6 +23,10 @@ services:
       - ../db/table/filter_dimension.sql:/docker-entrypoint-initdb.d/10_filter_dimension.sql:ro
       - ../db/table/filter_option.sql:/docker-entrypoint-initdb.d/11_filter_option.sql:ro
       - ../db/table/filter_subject_option.sql:/docker-entrypoint-initdb.d/12_filter_subject_option.sql:ro
+      - ../db/table/question.sql:/docker-entrypoint-initdb.d/13_question.sql:ro
+      - ../db/table/question_tag.sql:/docker-entrypoint-initdb.d/14_question_tag.sql:ro
+      - ../db/table/question_concept.sql:/docker-entrypoint-initdb.d/15_question_concept.sql:ro
+      - ../db/table/question_exam.sql:/docker-entrypoint-initdb.d/16_question_exam.sql:ro
     healthcheck:
       test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost', '-u', 'root', '-proot']
       interval: 5s

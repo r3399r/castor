@@ -1,6 +1,8 @@
 import {
   AnyMySqlColumn,
+  boolean,
   datetime,
+  double,
   int,
   mysqlTable,
   primaryKey,
@@ -139,6 +141,84 @@ export const filterSubjectOptionTable = mysqlTable(
       .references(() => filterOptionTable.id),
   },
   (table) => [primaryKey({ columns: [table.subjectId, table.optionId] })]
+);
+
+// Rows represent both top-level questions and GROUP-question children via
+// the nullable self-referential parentId -- a GROUP question has
+// isGroup=true, parentId=null, and its children are separate rows with
+// their own type/content/options/answer, parentId pointing back at the
+// parent, and sortOrder for their display order within the group.
+export const questionTable = mysqlTable('question', {
+  id: int('id', { unsigned: true }).autoincrement().primaryKey(),
+  uuid: varchar('uuid', { length: 36 }).notNull(),
+  subjectId: int('subject_id', { unsigned: true })
+    .notNull()
+    .references(() => subjectTable.id),
+  parentId: int('parent_id', { unsigned: true }).references(
+    (): AnyMySqlColumn => questionTable.id
+  ),
+  fbPostId: varchar('fb_post_id', { length: 255 }),
+  isGroup: boolean('is_group').notNull().default(false),
+  type: varchar('type', { length: 255 }).notNull(),
+  sortOrder: int('sort_order'),
+  content: text('content'),
+  options: varchar('options', { length: 255 }),
+  answer: varchar('answer', { length: 255 }),
+  difficulty: tinyint('difficulty', { unsigned: true }).notNull(),
+  // Column name matches the "attemp_count" typo already baked into both
+  // the deployed DB schema and the shared API type -- not fixing it here,
+  // that would be a three-way (DB/backend/frontend) rename for no
+  // behavioral gain.
+  attempCount: int('attemp_count', { unsigned: true }).notNull().default(0),
+  scoringTotal: double('scoring_total').notNull().default(0),
+  adjustedDifficulty: double('adjusted_difficulty').notNull(),
+  createdAt: datetime('created_at', { mode: 'date', fsp: 3 }),
+  updatedAt: datetime('updated_at', { mode: 'date', fsp: 3 }),
+});
+
+// Many-to-many join between question and tag -- only ever populated on
+// the parent of a GROUP question (children don't get their own tags).
+export const questionTagTable = mysqlTable(
+  'question_tag',
+  {
+    questionId: int('question_id', { unsigned: true })
+      .notNull()
+      .references(() => questionTable.id),
+    tagId: int('tag_id', { unsigned: true })
+      .notNull()
+      .references(() => tagTable.id),
+  },
+  (table) => [primaryKey({ columns: [table.questionId, table.tagId] })]
+);
+
+// Many-to-many join between question and concept -- same shape as
+// question_tag; only the parent of a GROUP question gets concept links.
+export const questionConceptTable = mysqlTable(
+  'question_concept',
+  {
+    questionId: int('question_id', { unsigned: true })
+      .notNull()
+      .references(() => questionTable.id),
+    conceptId: int('concept_id', { unsigned: true })
+      .notNull()
+      .references(() => conceptTable.id),
+  },
+  (table) => [primaryKey({ columns: [table.questionId, table.conceptId] })]
+);
+
+// Many-to-many join between question and exam -- same shape as
+// question_tag/question_concept.
+export const questionExamTable = mysqlTable(
+  'question_exam',
+  {
+    questionId: int('question_id', { unsigned: true })
+      .notNull()
+      .references(() => questionTable.id),
+    examId: int('exam_id', { unsigned: true })
+      .notNull()
+      .references(() => examTable.id),
+  },
+  (table) => [primaryKey({ columns: [table.questionId, table.examId] })]
 );
 
 // Rows here come from the app's own sign-in flow (Firebase), never from
