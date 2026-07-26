@@ -3,6 +3,7 @@ import {
   int,
   mysqlTable,
   primaryKey,
+  text,
   tinyint,
   varchar,
 } from 'drizzle-orm/mysql-core';
@@ -94,4 +95,17 @@ export const conceptTable = mysqlTable('concept', {
     .notNull()
     .default(0),
   createdAt: datetime('created_at', { mode: 'date', fsp: 3 }),
+});
+
+// Rows here come from the app's own sign-in flow (Firebase), never from
+// this admin panel -- there's no create/update/delete route for it.
+export const userTable = mysqlTable('user', {
+  id: int('id', { unsigned: true }).autoincrement().primaryKey(),
+  firebaseUid: varchar('firebase_uid', { length: 128 }).notNull(),
+  email: varchar('email', { length: 255 }),
+  name: varchar('name', { length: 255 }),
+  avatar: text('avatar'),
+  lastLoginAt: datetime('last_login_at', { mode: 'date', fsp: 3 }),
+  createdAt: datetime('created_at', { mode: 'date', fsp: 3 }),
+  updatedAt: datetime('updated_at', { mode: 'date', fsp: 3 }),
 });

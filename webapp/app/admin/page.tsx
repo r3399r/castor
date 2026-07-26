@@ -8,6 +8,7 @@ const ADMIN_FUNCTIONS = [
   { label: '標籤管理', description: '新增、編輯、刪除標籤', href: '/admin/tag' },
   { label: '觀念群組管理', description: '新增、編輯、刪除觀念群組', href: '/admin/concept-group' },
   { label: '觀念管理', description: '新增、編輯、刪除觀念', href: '/admin/concept' },
+  { label: '使用者管理', description: '檢視使用者列表', href: '/admin/user' },
 ]
 
 export default function AdminPage() {

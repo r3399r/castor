@@ -1,4 +1,5 @@
 import AuthGuard from '@/components/AuthGuard'
+import BackToAdminLink from '@/components/BackToAdminLink'
 import Navbar from '@/components/Navbar'
 import ExamClient from './ExamClient'
 
@@ -10,6 +11,7 @@ export default function ExamPage() {
       </div>
       <div className="px-4 md:px-10 lg:px-[70px]">
         <div className="mx-auto max-w-[1120px]">
+          <BackToAdminLink />
           <AuthGuard>
             <ExamClient />
           </AuthGuard>

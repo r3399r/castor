@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { toErrorResponse } from 'src/lib/errorResponse';
-import { adminAuth } from 'src/middleware/adminAuth';
+import { adminAuth, requireAdmin } from 'src/middleware/adminAuth';
 import { transaction } from 'src/middleware/transaction';
 import { category } from 'src/routes/category';
 import { concept } from 'src/routes/concept';
@@ -9,6 +9,7 @@ import { exam } from 'src/routes/exam';
 import { info } from 'src/routes/info';
 import { subject } from 'src/routes/subject';
 import { tag } from 'src/routes/tag';
+import { user } from 'src/routes/user';
 
 export const app = new Hono()
   .route('/api/info', info)
@@ -30,6 +31,9 @@ export const app = new Hono()
   .use('/api/concept/*', adminAuth)
   .use('/api/concept/*', transaction)
   .route('/api/concept', concept)
+  .use('/api/user/*', requireAdmin)
+  .use('/api/user/*', transaction)
+  .route('/api/user', user)
   .onError((err, c) => {
     console.error(err);
     const { status, body } = toErrorResponse(err);
