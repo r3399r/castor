@@ -46,7 +46,7 @@ type QuestionDto = {
   adjustedDifficulty: number;
 };
 
-const postQuestion = (body: unknown) =>
+const postQuestions = (body: unknown) =>
   app.request('/api/question', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -112,20 +112,25 @@ describe('question routes', () => {
   it('creates a SINGLE question and links exam/concept', async () => {
     const { subjectId, examId, conceptId } = await seedFixture();
 
-    const res = await postQuestion({
+    const res = await postQuestions({
       subjectId,
-      type: 'SINGLE',
-      content: 'what is 1+1?',
-      options: 'A|B|C|D',
-      answer: 'B',
-      difficulty: 3,
       examId,
-      conceptIds: [conceptId],
+      questions: [
+        {
+          type: 'SINGLE',
+          content: 'what is 1+1?',
+          options: 'A|B|C|D',
+          answer: 'B',
+          difficulty: 3,
+          conceptIds: [conceptId],
+        },
+      ],
     });
     expect(res.status).toBe(201);
-    const body = (await res.json()) as QuestionDto[];
+    const body = (await res.json()) as QuestionDto[][];
     expect(body).toHaveLength(1);
-    expect(body[0]).toMatchObject({
+    expect(body[0]).toHaveLength(1);
+    expect(body[0][0]).toMatchObject({
       subjectId,
       parentId: null,
       isGroup: false,
@@ -135,20 +140,20 @@ describe('question routes', () => {
       difficulty: 3,
       adjustedDifficulty: 3,
     });
-    expect(body[0].uuid).toEqual(expect.any(String));
+    expect(body[0][0].uuid).toEqual(expect.any(String));
 
     const db = getDb();
     const [examLink] = await db
       .select()
       .from(questionExamTable)
-      .where(eq(questionExamTable.questionId, body[0].id));
-    expect(examLink).toMatchObject({ questionId: body[0].id, examId });
+      .where(eq(questionExamTable.questionId, body[0][0].id));
+    expect(examLink).toMatchObject({ questionId: body[0][0].id, examId });
 
     const [conceptLink] = await db
       .select()
       .from(questionConceptTable)
-      .where(eq(questionConceptTable.questionId, body[0].id));
-    expect(conceptLink).toMatchObject({ questionId: body[0].id, conceptId });
+      .where(eq(questionConceptTable.questionId, body[0][0].id));
+    expect(conceptLink).toMatchObject({ questionId: body[0][0].id, conceptId });
 
     const [concept] = await db
       .select()
@@ -157,19 +162,67 @@ describe('question routes', () => {
     expect(concept.numberOfQuestions).toBe(1);
   });
 
+  it('creates multiple questions in a single batch request', async () => {
+    const { subjectId, examId, conceptId } = await seedFixture();
+
+    const res = await postQuestions({
+      subjectId,
+      examId,
+      questions: [
+        { type: 'SINGLE', content: 'q1', options: 'A|B', answer: 'A', difficulty: 3, conceptIds: [conceptId] },
+        { type: 'SINGLE', content: 'q2', options: 'A|B', answer: 'B', difficulty: 4, conceptIds: [conceptId] },
+        { type: 'SINGLE', content: 'q3', options: 'A|B', answer: 'A', difficulty: 5, conceptIds: [conceptId] },
+      ],
+    });
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as QuestionDto[][];
+    expect(body).toHaveLength(3);
+    expect(body.map((rows) => rows[0].content)).toEqual(['q1', 'q2', 'q3']);
+
+    const db = getDb();
+    const [concept] = await db
+      .select()
+      .from(conceptTable)
+      .where(eq(conceptTable.id, conceptId));
+    expect(concept.numberOfQuestions).toBe(3);
+  });
+
+  it('rolls back the whole batch if any question in it is invalid', async () => {
+    const { subjectId, examId, conceptId } = await seedFixture();
+
+    const res = await postQuestions({
+      subjectId,
+      examId,
+      questions: [
+        { type: 'SINGLE', content: 'q1', options: 'A|B', answer: 'A', difficulty: 3, conceptIds: [conceptId] },
+        { type: 'SINGLE', content: 'q2', options: 'A|B', answer: 'B', difficulty: 4, conceptIds: [] },
+      ],
+    });
+    expect(res.status).toBe(400);
+
+    const db = getDb();
+    const remaining = await db.select().from(questionTable);
+    expect(remaining).toHaveLength(0);
+    const [concept] = await db
+      .select()
+      .from(conceptTable)
+      .where(eq(conceptTable.id, conceptId));
+    expect(concept.numberOfQuestions).toBe(0);
+  });
+
   it('links tags when tagIds is provided', async () => {
     const { subjectId, examId, tagId, conceptId } = await seedFixture();
 
-    const res = await postQuestion({
+    const res = await postQuestions({
       subjectId,
-      type: 'SINGLE',
-      difficulty: 3,
       examId,
-      tagIds: [tagId],
-      conceptIds: [conceptId],
+      questions: [
+        { type: 'SINGLE', difficulty: 3, tagIds: [tagId], conceptIds: [conceptId] },
+      ],
     });
     expect(res.status).toBe(201);
-    const [{ id: questionId }] = (await res.json()) as QuestionDto[];
+    const body = (await res.json()) as QuestionDto[][];
+    const questionId = body[0][0].id;
 
     const db = getDb();
     const [tagLink] = await db
@@ -182,36 +235,41 @@ describe('question routes', () => {
   it('creates a GROUP question with childQuestions, each keeping its own difficulty', async () => {
     const { subjectId, examId, conceptId } = await seedFixture();
 
-    const res = await postQuestion({
+    const res = await postQuestions({
       subjectId,
-      type: 'GROUP',
-      difficulty: 5,
       examId,
-      conceptIds: [conceptId],
-      childQuestions: [
+      questions: [
         {
-          type: 'SINGLE',
-          sortOrder: 0,
-          content: 'child 1',
-          options: 'A|B',
-          answer: 'A',
-          difficulty: 2,
-        },
-        {
-          type: 'SINGLE',
-          sortOrder: 1,
-          content: 'child 2',
-          options: 'A|B',
-          answer: 'B',
-          difficulty: 8,
+          type: 'GROUP',
+          difficulty: 5,
+          conceptIds: [conceptId],
+          childQuestions: [
+            {
+              type: 'SINGLE',
+              sortOrder: 0,
+              content: 'child 1',
+              options: 'A|B',
+              answer: 'A',
+              difficulty: 2,
+            },
+            {
+              type: 'SINGLE',
+              sortOrder: 1,
+              content: 'child 2',
+              options: 'A|B',
+              answer: 'B',
+              difficulty: 8,
+            },
+          ],
         },
       ],
     });
     expect(res.status).toBe(201);
-    const body = (await res.json()) as QuestionDto[];
-    expect(body).toHaveLength(3);
+    const body = (await res.json()) as QuestionDto[][];
+    expect(body).toHaveLength(1);
+    expect(body[0]).toHaveLength(3);
 
-    const [parent, child1, child2] = body;
+    const [parent, child1, child2] = body[0];
     expect(parent).toMatchObject({ isGroup: true, type: 'GROUP', parentId: null });
     expect(child1).toMatchObject({
       parentId: parent.id,
@@ -231,25 +289,28 @@ describe('question routes', () => {
   it('rejects an empty conceptIds with 400', async () => {
     const { subjectId, examId } = await seedFixture();
 
-    const res = await postQuestion({
+    const res = await postQuestions({
       subjectId,
-      type: 'SINGLE',
-      difficulty: 3,
       examId,
-      conceptIds: [],
+      questions: [{ type: 'SINGLE', difficulty: 3, conceptIds: [] }],
     });
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects an empty questions array with 400', async () => {
+    const { subjectId, examId } = await seedFixture();
+
+    const res = await postQuestions({ subjectId, examId, questions: [] });
     expect(res.status).toBe(400);
   });
 
   it('404s for an unknown subjectId', async () => {
     const { examId, conceptId } = await seedFixture();
 
-    const res = await postQuestion({
+    const res = await postQuestions({
       subjectId: 999999,
-      type: 'SINGLE',
-      difficulty: 3,
       examId,
-      conceptIds: [conceptId],
+      questions: [{ type: 'SINGLE', difficulty: 3, conceptIds: [conceptId] }],
     });
     expect(res.status).toBe(404);
   });
@@ -257,12 +318,10 @@ describe('question routes', () => {
   it('404s for an unknown examId', async () => {
     const { subjectId, conceptId } = await seedFixture();
 
-    const res = await postQuestion({
+    const res = await postQuestions({
       subjectId,
-      type: 'SINGLE',
-      difficulty: 3,
       examId: 999999,
-      conceptIds: [conceptId],
+      questions: [{ type: 'SINGLE', difficulty: 3, conceptIds: [conceptId] }],
     });
     expect(res.status).toBe(404);
   });
@@ -280,12 +339,10 @@ describe('question routes', () => {
       .insert(examSubjectTable)
       .values({ examId: unlinkedExamId, subjectId: otherSubjectId });
 
-    const res = await postQuestion({
+    const res = await postQuestions({
       subjectId,
-      type: 'SINGLE',
-      difficulty: 3,
       examId: unlinkedExamId,
-      conceptIds: [conceptId],
+      questions: [{ type: 'SINGLE', difficulty: 3, conceptIds: [conceptId] }],
     });
     expect(res.status).toBe(400);
   });
@@ -300,13 +357,12 @@ describe('question routes', () => {
       .insert(tagTable)
       .values({ name: 'unrelated tag', subjectId: otherSubjectId, createdAt: new Date() });
 
-    const res = await postQuestion({
+    const res = await postQuestions({
       subjectId,
-      type: 'SINGLE',
-      difficulty: 3,
       examId,
-      tagIds: [unrelatedTagId],
-      conceptIds: [conceptId],
+      questions: [
+        { type: 'SINGLE', difficulty: 3, tagIds: [unrelatedTagId], conceptIds: [conceptId] },
+      ],
     });
     expect(res.status).toBe(400);
   });
@@ -324,12 +380,10 @@ describe('question routes', () => {
       .insert(conceptTable)
       .values({ name: 'unrelated concept', conceptGroupId: otherGroupId, createdAt: new Date() });
 
-    const res = await postQuestion({
+    const res = await postQuestions({
       subjectId,
-      type: 'SINGLE',
-      difficulty: 3,
       examId,
-      conceptIds: [unrelatedConceptId],
+      questions: [{ type: 'SINGLE', difficulty: 3, conceptIds: [unrelatedConceptId] }],
     });
     expect(res.status).toBe(400);
   });
@@ -337,12 +391,10 @@ describe('question routes', () => {
   it('rejects a difficulty outside 1-10 with 400', async () => {
     const { subjectId, examId, conceptId } = await seedFixture();
 
-    const res = await postQuestion({
+    const res = await postQuestions({
       subjectId,
-      type: 'SINGLE',
-      difficulty: 0,
       examId,
-      conceptIds: [conceptId],
+      questions: [{ type: 'SINGLE', difficulty: 0, conceptIds: [conceptId] }],
     });
     expect(res.status).toBe(400);
   });
@@ -351,14 +403,14 @@ describe('question routes', () => {
     it('rejects a create with 401 when there is no valid identity', async () => {
       vi.mocked(verifyIdToken).mockResolvedValue(null);
 
-      const res = await postQuestion({});
+      const res = await postQuestions({});
       expect(res.status).toBe(401);
     });
 
     it('rejects a create with 403 for a non-admin email', async () => {
       vi.mocked(verifyIdToken).mockResolvedValue('someone-else@example.com');
 
-      const res = await postQuestion({});
+      const res = await postQuestions({});
       expect(res.status).toBe(403);
     });
   });

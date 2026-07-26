@@ -12,10 +12,13 @@ import { app } from 'src/app';
 import { closeDb, getDb } from 'src/db/client';
 import {
   categoryTable,
+  conceptGroupTable,
+  conceptTable,
   examSubjectTable,
   examTable,
   subjectCategoryTable,
   subjectTable,
+  tagTable,
 } from 'src/db/schema';
 import { ADMIN_EMAILS } from 'src/middleware/adminAuth';
 
@@ -59,12 +62,16 @@ const putSubjectCategory = (id: number | string, body: unknown) =>
     body: JSON.stringify(body),
   });
 
-// Cleared in FK-safe order: subject_category and exam_subject both
-// reference subject, so they must go first.
+// Cleared in FK-safe order: subject_category, exam_subject, tag, concept,
+// and concept_group all reference subject (concept via concept_group), so
+// they must go first.
 const clearTables = async () => {
   const db = getDb();
   await db.delete(subjectCategoryTable);
   await db.delete(examSubjectTable);
+  await db.delete(tagTable);
+  await db.delete(conceptTable);
+  await db.delete(conceptGroupTable);
   await db.delete(subjectTable);
   await db.delete(categoryTable);
   await db.delete(examTable);
@@ -142,14 +149,67 @@ describe('subject routes', () => {
     expect(data.map((s) => s.id)).toEqual([first.id, second.id]);
   });
 
-  it('fetches a subject by id', async () => {
+  it('fetches a subject by id, bundled with its (empty) exams/tags/concept groups', async () => {
     const created = (await (
       await postSubject({ name: 'biology' })
     ).json()) as SubjectDto;
 
     const res = await app.request(`/api/subject/${created.id}`);
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual(created);
+    expect(await res.json()).toEqual({
+      ...created,
+      exams: [],
+      tags: [],
+      conceptGroups: [],
+    });
+  });
+
+  it('bundles linked exams, tags, and concept groups (with their concepts) for a subject', async () => {
+    const created = (await (
+      await postSubject({ name: 'anatomy' })
+    ).json()) as SubjectDto;
+    const db = getDb();
+    const [{ insertId: examId }] = await db
+      .insert(examTable)
+      .values({ name: 'midterm', createdAt: new Date() });
+    await db
+      .insert(examSubjectTable)
+      .values({ examId, subjectId: created.id });
+    const [{ insertId: tagId }] = await db
+      .insert(tagTable)
+      .values({ name: 'important', subjectId: created.id, createdAt: new Date() });
+    const [{ insertId: groupId }] = await db
+      .insert(conceptGroupTable)
+      .values({ name: 'cells', subjectId: created.id, createdAt: new Date() });
+    const [{ insertId: conceptId }] = await db
+      .insert(conceptTable)
+      .values({ name: 'mitochondria', conceptGroupId: groupId, createdAt: new Date() });
+
+    const res = await app.request(`/api/subject/${created.id}`);
+    expect(await res.json()).toEqual({
+      ...created,
+      exams: [{ id: examId, name: 'midterm' }],
+      tags: [{ id: tagId, name: 'important' }],
+      conceptGroups: [
+        { id: groupId, name: 'cells', concepts: [{ id: conceptId, name: 'mitochondria' }] },
+      ],
+    });
+  });
+
+  it('includes a concept group with no concepts yet as an empty concepts array', async () => {
+    const created = (await (
+      await postSubject({ name: 'empty group subject' })
+    ).json()) as SubjectDto;
+    const db = getDb();
+    const [{ insertId: groupId }] = await db
+      .insert(conceptGroupTable)
+      .values({ name: 'no concepts yet', subjectId: created.id, createdAt: new Date() });
+
+    const res = await app.request(`/api/subject/${created.id}`);
+    const body = (await res.json()) as { conceptGroups: unknown };
+    expect(body.conceptGroups).toEqual([
+      { id: groupId, name: 'no concepts yet', concepts: [] },
+    ]);
   });
 
   it('404s for an unknown subject id', async () => {

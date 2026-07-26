@@ -4,9 +4,13 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import {
   categoryTable,
+  conceptGroupTable,
+  conceptTable,
   examSubjectTable,
+  examTable,
   subjectCategoryTable,
   subjectTable,
+  tagTable,
 } from 'src/db/schema';
 import { DEFAULT_LIMIT, genPagination, MAX_LIMIT } from 'src/lib/paginator';
 import { TransactionEnv } from 'src/middleware/transaction';
@@ -81,17 +85,65 @@ export const subject = new Hono<TransactionEnv>()
     return c.json({ data, paginate: genPagination(total, limit, offset) });
   })
   .get('/:id', async (c) => {
-    const id = c.req.param('id');
+    const id = Number(c.req.param('id'));
     console.log(`GET /api/subject/${id}`);
-    const [found] = await c
-      .get('db')
+    const db = c.get('db');
+    const [found] = await db
       .select()
       .from(subjectTable)
-      .where(eq(subjectTable.id, Number(id)));
+      .where(eq(subjectTable.id, id));
     if (found === undefined)
       throw new NotFoundError(`subject ${id} not found`);
 
-    return c.json(found);
+    // Bundled for the "add questions" flow, which needs all three lists
+    // for this one subject up front -- kept as separate queries (rather
+    // than joined into the subject query above) so none of them can fan
+    // out and duplicate rows in another.
+    const exams = await db
+      .select({ id: examTable.id, name: examTable.name })
+      .from(examTable)
+      .innerJoin(examSubjectTable, eq(examSubjectTable.examId, examTable.id))
+      .where(eq(examSubjectTable.subjectId, id));
+
+    const tags = await db
+      .select({ id: tagTable.id, name: tagTable.name })
+      .from(tagTable)
+      .where(eq(tagTable.subjectId, id));
+
+    const conceptRows = await db
+      .select({
+        groupId: conceptGroupTable.id,
+        groupName: conceptGroupTable.name,
+        conceptId: conceptTable.id,
+        conceptName: conceptTable.name,
+      })
+      .from(conceptGroupTable)
+      .leftJoin(
+        conceptTable,
+        eq(conceptTable.conceptGroupId, conceptGroupTable.id)
+      )
+      .where(eq(conceptGroupTable.subjectId, id));
+    const conceptGroupById = new Map<
+      number,
+      { id: number; name: string; concepts: { id: number; name: string }[] }
+    >();
+    for (const row of conceptRows) {
+      const group = conceptGroupById.get(row.groupId) ?? {
+        id: row.groupId,
+        name: row.groupName,
+        concepts: [],
+      };
+      if (row.conceptId !== null)
+        group.concepts.push({ id: row.conceptId, name: row.conceptName! });
+      conceptGroupById.set(row.groupId, group);
+    }
+
+    return c.json({
+      ...found,
+      exams,
+      tags,
+      conceptGroups: [...conceptGroupById.values()],
+    });
   })
   .post('/', zValidator('json', subjectBodySchema), async (c) => {
     const { name, sortOrder } = c.req.valid('json');
