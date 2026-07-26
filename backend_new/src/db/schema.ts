@@ -79,3 +79,19 @@ export const conceptGroupTable = mysqlTable('concept_group', {
     .references(() => subjectTable.id),
   createdAt: datetime('created_at', { mode: 'date', fsp: 3 }),
 });
+
+// One-to-many with concept_group, same shape as tag/concept_group's
+// relation to subject. numberOfQuestions is populated elsewhere (counted
+// as questions get added) -- not an admin-editable attribute, so it's
+// never part of the create/update body, just left to its DB default.
+export const conceptTable = mysqlTable('concept', {
+  id: int('id', { unsigned: true }).autoincrement().primaryKey(),
+  name: varchar('name', { length: 255 }).notNull(),
+  conceptGroupId: int('concept_group_id', { unsigned: true })
+    .notNull()
+    .references(() => conceptGroupTable.id),
+  numberOfQuestions: int('number_of_questions', { unsigned: true })
+    .notNull()
+    .default(0),
+  createdAt: datetime('created_at', { mode: 'date', fsp: 3 }),
+});

@@ -23,10 +23,10 @@ type SubjectOption = { id: number; name: string; categories: string | null }
 
 type SortColumn = 'id' | 'name' | 'subject'
 
-const subjectLabel = (subject: SubjectOption | undefined) => {
-  if (!subject) return '-'
-  return subject.categories ? `${subject.name}（${subject.categories}）` : subject.name
-}
+// Flat, dash-separated label for the picker dropdown, where a single line
+// of text is all we have to disambiguate same-named subjects.
+const subjectOptionLabel = (subject: SubjectOption) =>
+  subject.categories ? `${subject.name} - ${subject.categories}` : subject.name
 
 export default function ConceptGroupClient() {
   const [conceptGroups, setConceptGroups] = useState<ConceptGroupDto[] | null>(null)
@@ -205,7 +205,7 @@ export default function ConceptGroupClient() {
           <option value="">-- 選擇科目 --</option>
           {allSubjects.map((s) => (
             <option key={s.id} value={s.id}>
-              {subjectLabel(s)}
+              {subjectOptionLabel(s)}
             </option>
           ))}
         </select>
@@ -226,13 +226,14 @@ export default function ConceptGroupClient() {
               <SortableTh label="ID" column="id" activeColumn={sortColumn} direction={sortDirection} onSort={handleSort} />
               <SortableTh label="名稱" column="name" activeColumn={sortColumn} direction={sortDirection} onSort={handleSort} />
               <SortableTh label="科目" column="subject" activeColumn={sortColumn} direction={sortDirection} onSort={handleSort} />
+              <th className="px-4 py-3">類別</th>
               <th className="px-4 py-3 text-right">操作</th>
             </tr>
           </thead>
           <tbody>
             {(conceptGroups ?? []).length === 0 && (
               <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-black-300">
+                <td colSpan={5} className="px-4 py-8 text-center text-black-300">
                   尚無觀念群組
                 </td>
               </tr>
@@ -266,13 +267,18 @@ export default function ConceptGroupClient() {
                       >
                         {allSubjects.map((s) => (
                           <option key={s.id} value={s.id}>
-                            {subjectLabel(s)}
+                            {subjectOptionLabel(s)}
                           </option>
                         ))}
                       </select>
                     ) : (
-                      subjectLabel(subjectById.get(conceptGroup.subjectId))
+                      subjectById.get(conceptGroup.subjectId)?.name ?? '-'
                     )}
+                  </td>
+                  <td className="px-4 py-3 text-black-500">
+                    {(isEditing
+                      ? subjectById.get(Number(editSubjectId))?.categories
+                      : subjectById.get(conceptGroup.subjectId)?.categories) ?? '-'}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end gap-2">

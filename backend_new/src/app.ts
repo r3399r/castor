@@ -3,6 +3,7 @@ import { toErrorResponse } from 'src/lib/errorResponse';
 import { adminAuth } from 'src/middleware/adminAuth';
 import { transaction } from 'src/middleware/transaction';
 import { category } from 'src/routes/category';
+import { concept } from 'src/routes/concept';
 import { conceptGroup } from 'src/routes/conceptGroup';
 import { exam } from 'src/routes/exam';
 import { info } from 'src/routes/info';
@@ -26,6 +27,9 @@ export const app = new Hono()
   .use('/api/concept-group/*', adminAuth)
   .use('/api/concept-group/*', transaction)
   .route('/api/concept-group', conceptGroup)
+  .use('/api/concept/*', adminAuth)
+  .use('/api/concept/*', transaction)
+  .route('/api/concept', concept)
   .onError((err, c) => {
     console.error(err);
     const { status, body } = toErrorResponse(err);
