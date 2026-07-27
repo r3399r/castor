@@ -1,8 +1,15 @@
 import { zValidator } from '@hono/zod-validator';
-import { asc, count, desc, eq } from 'drizzle-orm';
+import { asc, count, desc, eq, inArray } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { categoryTable, subjectCategoryTable } from 'src/db/schema';
+import {
+  categoryTable,
+  filterDimensionTable,
+  filterOptionTable,
+  filterSubjectOptionTable,
+  subjectCategoryTable,
+  subjectTable,
+} from 'src/db/schema';
 import { DEFAULT_LIMIT, genPagination, MAX_LIMIT } from 'src/lib/paginator';
 import { TransactionEnv } from 'src/middleware/transaction';
 import { NotFoundError } from 'src/model/error';
@@ -107,4 +114,90 @@ export const category = new Hono<TransactionEnv>()
       throw new NotFoundError(`category ${id} not found`);
 
     return c.body(null, 204);
+  })
+  .get('/:id/subject', async (c) => {
+    const db = c.get('db');
+    const id = Number(c.req.param('id'));
+    console.log(`GET /api/category/${id}/subject`);
+
+    const [found] = await db.select().from(categoryTable).where(eq(categoryTable.id, id));
+    if (found === undefined) throw new NotFoundError(`category ${id} not found`);
+
+    // Read-only, unpaginated -- a category's subject list is what the
+    // practice-page filter flow needs up front, and it's not a dataset
+    // that grows anywhere near pagination territory.
+    const subjects = await db
+      .select({
+        id: subjectTable.id,
+        name: subjectTable.name,
+        sortOrder: subjectTable.sortOrder,
+      })
+      .from(subjectTable)
+      .innerJoin(subjectCategoryTable, eq(subjectCategoryTable.subjectId, subjectTable.id))
+      .where(eq(subjectCategoryTable.categoryId, id))
+      .orderBy(asc(subjectTable.sortOrder));
+
+    return c.json(subjects);
+  })
+  .get('/:id/filter', async (c) => {
+    const db = c.get('db');
+    const id = Number(c.req.param('id'));
+    console.log(`GET /api/category/${id}/filter`);
+
+    const [found] = await db.select().from(categoryTable).where(eq(categoryTable.id, id));
+    if (found === undefined) throw new NotFoundError(`category ${id} not found`);
+
+    // Three flat queries (dimensions -> their options -> those options'
+    // subject links) instead of the N+1 that composing this client-side
+    // from /api/filter-option/:id/subject per option would need.
+    const dimensions = await db
+      .select()
+      .from(filterDimensionTable)
+      .where(eq(filterDimensionTable.categoryId, id))
+      .orderBy(asc(filterDimensionTable.sortOrder));
+    const dimensionIds = dimensions.map((d) => d.id);
+
+    const options =
+      dimensionIds.length > 0
+        ? await db
+            .select()
+            .from(filterOptionTable)
+            .where(inArray(filterOptionTable.dimensionId, dimensionIds))
+        : [];
+    const optionIds = options.map((o) => o.id);
+
+    const subjectLinks =
+      optionIds.length > 0
+        ? await db
+            .select()
+            .from(filterSubjectOptionTable)
+            .where(inArray(filterSubjectOptionTable.optionId, optionIds))
+        : [];
+    const subjectIdsByOption = new Map<number, number[]>();
+    for (const link of subjectLinks) {
+      const list = subjectIdsByOption.get(link.optionId) ?? [];
+      list.push(link.subjectId);
+      subjectIdsByOption.set(link.optionId, list);
+    }
+
+    const optionsByDimension = new Map<number, typeof options>();
+    for (const option of options) {
+      const list = optionsByDimension.get(option.dimensionId) ?? [];
+      list.push(option);
+      optionsByDimension.set(option.dimensionId, list);
+    }
+
+    return c.json(
+      dimensions.map((dim) => ({
+        id: dim.id,
+        name: dim.name,
+        sortOrder: dim.sortOrder,
+        options: (optionsByDimension.get(dim.id) ?? []).map((opt) => ({
+          id: opt.id,
+          name: opt.name,
+          parentId: opt.parentId,
+          subjectIds: subjectIdsByOption.get(opt.id) ?? [],
+        })),
+      }))
+    );
   });

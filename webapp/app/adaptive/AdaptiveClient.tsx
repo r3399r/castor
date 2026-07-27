@@ -6,21 +6,36 @@ import { apiFetch, apiPost } from '@/lib/api'
 import Chip, { tagColors } from '@/components/Chip'
 import DifficultyStars from '@/components/DifficultyStars'
 import type {
-  Category,
-  ConceptGroup,
-  Exam,
-  GetCategoryResponse,
-  GetCategorySubjectResponse,
   GetQuestionAdaptiveResponse,
   GetQuestionResponse,
+  Paginate,
   PostReplyRequest,
   PostReplyResponse,
   Question,
-  Tag,
 } from '@/types/api'
-
-type FilterDimensionWithOptions = GetCategorySubjectResponse['filterDimensions'][number]
 import { MathJax } from 'better-react-mathjax'
+
+// High enough to fetch every category in one page -- there's no realistic
+// dataset near this size yet.
+const ALL_ITEMS_LIMIT = 1000
+
+type CategoryOption = { id: number; name: string }
+type SubjectOption = { id: number; name: string; sortOrder: number }
+type NamedOption = { id: number; name: string }
+type ConceptGroupOption = { id: number; name: string; concepts: NamedOption[] }
+type SubjectDetail = {
+  id: number
+  name: string
+  exams: NamedOption[]
+  tags: NamedOption[]
+  conceptGroups: ConceptGroupOption[]
+}
+type FilterDimensionWithOptions = {
+  id: number
+  name: string
+  sortOrder: number
+  options: { id: number; name: string; parentId: number | null; subjectIds: number[] }[]
+}
 
 const typeLabel: Record<string, string> = {
   SINGLE: '單選題',
@@ -276,12 +291,12 @@ export default function AdaptiveClient() {
 
   const [selectedFilterOptionByDim, setSelectedFilterOptionByDim] = useState<Record<number, number>>({})
 
-  const [categoryList, setCategoryList] = useState<Category[]>([])
-  const [subjectList, setSubjectList] = useState<GetCategorySubjectResponse['subjects']>([])
+  const [categoryList, setCategoryList] = useState<CategoryOption[]>([])
+  const [subjectList, setSubjectList] = useState<SubjectOption[]>([])
   const [filterDimensions, setFilterDimensions] = useState<FilterDimensionWithOptions[]>([])
-  const [examList, setExamList] = useState<Exam[]>([])
-  const [conceptGroupList, setConceptGroupList] = useState<ConceptGroup[]>([])
-  const [tagList, setTagList] = useState<Tag[]>([])
+  const [examList, setExamList] = useState<NamedOption[]>([])
+  const [conceptGroupList, setConceptGroupList] = useState<ConceptGroupOption[]>([])
+  const [tagList, setTagList] = useState<NamedOption[]>([])
 
   const [numQuestionsTarget, setNumQuestionsTarget] = useState(5)
   const [questionCount, setQuestionCount] = useState(-1)
@@ -312,7 +327,9 @@ export default function AdaptiveClient() {
   }, [adaptiveQuestion, repliedAnswer])
 
   useEffect(() => {
-    apiFetch<GetCategoryResponse>('category').then(setCategoryList).catch(console.error)
+    apiFetch<Paginate<CategoryOption>>('category', { limit: ALL_ITEMS_LIMIT })
+      .then((res) => setCategoryList(res.data))
+      .catch(console.error)
   }, [])
 
   useEffect(() => {
@@ -322,10 +339,14 @@ export default function AdaptiveClient() {
     setSelectedExamIds([])
     setSelectedConceptIds([])
     setSelectedTagIds([])
-    apiFetch<GetCategorySubjectResponse>(`category/${selectedCategoryId}/subject`)
-      .then((res) => {
-        setSubjectList(res.subjects)
-        setFilterDimensions(res.filterDimensions)
+
+    Promise.all([
+      apiFetch<SubjectOption[]>(`category/${selectedCategoryId}/subject`),
+      apiFetch<FilterDimensionWithOptions[]>(`category/${selectedCategoryId}/filter`),
+    ])
+      .then(([subjects, dimensions]) => {
+        setSubjectList(subjects)
+        setFilterDimensions(dimensions)
       })
       .catch(console.error)
   }, [selectedCategoryId])
@@ -362,9 +383,13 @@ export default function AdaptiveClient() {
     setSelectedExamIds([])
     setSelectedConceptIds([])
     setSelectedTagIds([])
-    setExamList(subjectList.find((s) => String(s.id) === selectedSubjectId)?.exams ?? [])
-    setConceptGroupList(subjectList.find((s) => String(s.id) === selectedSubjectId)?.conceptGroups ?? [])
-    setTagList(subjectList.find((s) => String(s.id) === selectedSubjectId)?.tags ?? [])
+    apiFetch<SubjectDetail>(`subject/${selectedSubjectId}`)
+      .then((detail) => {
+        setExamList(detail.exams)
+        setConceptGroupList(detail.conceptGroups)
+        setTagList(detail.tags)
+      })
+      .catch(console.error)
   }, [selectedSubjectId])
 
   const prevSubjectIdForCountRef = useRef(selectedSubjectId)

@@ -12,6 +12,9 @@ import { app } from 'src/app';
 import { closeDb, getDb } from 'src/db/client';
 import {
   categoryTable,
+  filterDimensionTable,
+  filterOptionTable,
+  filterSubjectOptionTable,
   subjectCategoryTable,
   subjectTable,
 } from 'src/db/schema';
@@ -46,6 +49,14 @@ const deleteCategory = (id: number | string) =>
 // subject, so it must go first.
 const clearTables = async () => {
   const db = getDb();
+  await db.delete(filterSubjectOptionTable);
+  // filter_option.parentId is self-referential -- a bulk DELETE can hit a
+  // parent row before a still-live child row that points to it, tripping
+  // the FK. Null out every self-reference first so the delete has nothing
+  // left to violate.
+  await db.update(filterOptionTable).set({ parentId: null });
+  await db.delete(filterOptionTable);
+  await db.delete(filterDimensionTable);
   await db.delete(subjectCategoryTable);
   await db.delete(subjectTable);
   await db.delete(categoryTable);
@@ -255,6 +266,133 @@ describe('category routes', () => {
     it('rejects an invalid sort column with 400', async () => {
       const res = await app.request('/api/category?sort=bogus');
       expect(res.status).toBe(400);
+    });
+  });
+
+  describe('/:id/subject', () => {
+    it('lists only the subjects linked to this category, ordered by sortOrder', async () => {
+      const created = (await (
+        await postCategory({ name: 'target category' })
+      ).json()) as CategoryDto;
+      const db = getDb();
+      const [{ insertId: otherCategoryId }] = await db
+        .insert(categoryTable)
+        .values({ name: 'other category', createdAt: new Date() });
+      const [{ insertId: subjectA }] = await db
+        .insert(subjectTable)
+        .values({ name: 'subject a', sortOrder: 2, createdAt: new Date() });
+      const [{ insertId: subjectB }] = await db
+        .insert(subjectTable)
+        .values({ name: 'subject b', sortOrder: 1, createdAt: new Date() });
+      const [{ insertId: unrelatedSubject }] = await db
+        .insert(subjectTable)
+        .values({ name: 'unrelated subject', createdAt: new Date() });
+      await db.insert(subjectCategoryTable).values([
+        { subjectId: subjectA, categoryId: created.id },
+        { subjectId: subjectB, categoryId: created.id },
+        { subjectId: unrelatedSubject, categoryId: otherCategoryId },
+      ]);
+
+      const res = await app.request(`/api/category/${created.id}/subject`);
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { id: number; name: string; sortOrder: number }[];
+      expect(body.map((s) => s.id)).toEqual([subjectB, subjectA]);
+    });
+
+    it('returns an empty array for a category with no linked subjects', async () => {
+      const created = (await (
+        await postCategory({ name: 'empty category' })
+      ).json()) as CategoryDto;
+
+      const res = await app.request(`/api/category/${created.id}/subject`);
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual([]);
+    });
+
+    it('404s for an unknown category id', async () => {
+      const res = await app.request('/api/category/999999/subject');
+      expect(res.status).toBe(404);
+    });
+  });
+
+  describe('/:id/filter', () => {
+    it('bundles dimensions, their options, and each option\'s subjectIds', async () => {
+      const created = (await (
+        await postCategory({ name: 'filter category' })
+      ).json()) as CategoryDto;
+      const db = getDb();
+      const [{ insertId: subjectA }] = await db
+        .insert(subjectTable)
+        .values({ name: 'admin subject', createdAt: new Date() });
+      const [{ insertId: subjectB }] = await db
+        .insert(subjectTable)
+        .values({ name: 'tech subject', createdAt: new Date() });
+      const [{ insertId: groupDim }] = await db
+        .insert(filterDimensionTable)
+        .values({ categoryId: created.id, name: '類科分組', sortOrder: 1 });
+      const [{ insertId: choiceDim }] = await db
+        .insert(filterDimensionTable)
+        .values({ categoryId: created.id, name: '類科選擇', sortOrder: 2 });
+      const [{ insertId: adminOption }] = await db
+        .insert(filterOptionTable)
+        .values({ dimensionId: groupDim, name: '行政類' });
+      const [{ insertId: subOption }] = await db
+        .insert(filterOptionTable)
+        .values({ dimensionId: choiceDim, parentId: adminOption, name: '普通行政' });
+      await db.insert(filterSubjectOptionTable).values([
+        { subjectId: subjectA, optionId: adminOption },
+        { subjectId: subjectA, optionId: subOption },
+        { subjectId: subjectB, optionId: adminOption },
+      ]);
+
+      const res = await app.request(`/api/category/${created.id}/filter`);
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as {
+        id: number;
+        name: string;
+        sortOrder: number;
+        options: { id: number; name: string; parentId: number | null; subjectIds: number[] }[];
+      }[];
+
+      expect(body.map((d) => d.id)).toEqual([groupDim, choiceDim]);
+      const group = body.find((d) => d.id === groupDim)!;
+      expect(group.options).toHaveLength(1);
+      expect(group.options[0]).toMatchObject({ id: adminOption, parentId: null });
+      expect(group.options[0].subjectIds.sort()).toEqual([subjectA, subjectB].sort());
+
+      const choice = body.find((d) => d.id === choiceDim)!;
+      expect(choice.options).toHaveLength(1);
+      expect(choice.options[0]).toMatchObject({ id: subOption, parentId: adminOption });
+      expect(choice.options[0].subjectIds).toEqual([subjectA]);
+    });
+
+    it('returns an empty array for a category with no filter dimensions', async () => {
+      const created = (await (
+        await postCategory({ name: 'no filters category' })
+      ).json()) as CategoryDto;
+
+      const res = await app.request(`/api/category/${created.id}/filter`);
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual([]);
+    });
+
+    it('includes a dimension with no options yet as an empty options array', async () => {
+      const created = (await (
+        await postCategory({ name: 'empty dim category' })
+      ).json()) as CategoryDto;
+      const db = getDb();
+      const [{ insertId: dimId }] = await db
+        .insert(filterDimensionTable)
+        .values({ categoryId: created.id, name: 'no options yet', sortOrder: 1 });
+
+      const res = await app.request(`/api/category/${created.id}/filter`);
+      const body = (await res.json()) as { id: number; options: unknown[] }[];
+      expect(body).toEqual([{ id: dimId, name: 'no options yet', sortOrder: 1, options: [] }]);
+    });
+
+    it('404s for an unknown category id', async () => {
+      const res = await app.request('/api/category/999999/filter');
+      expect(res.status).toBe(404);
     });
   });
 
