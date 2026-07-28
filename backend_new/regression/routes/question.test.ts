@@ -55,6 +55,8 @@ const postQuestions = (body: unknown) =>
 
 const getQuestionList = (query = '') => app.request(`/api/question${query}`);
 
+const getQuestionCount = (query: string) => app.request(`/api/question/count${query}`);
+
 const getQuestion = (id: number | string) => app.request(`/api/question/${id}`);
 
 const putQuestion = (id: number | string, body: unknown) =>
@@ -526,6 +528,132 @@ describe('question routes', () => {
     it('leaves GET ungated even with no valid identity', async () => {
       vi.mocked(verifyIdToken).mockResolvedValue(null);
       const res = await getQuestionList();
+      expect(res.status).toBe(200);
+    });
+  });
+
+  describe('GET /count', () => {
+    it('counts only top-level questions for the given subject', async () => {
+      const { subjectId, examId, conceptId } = await seedFixture();
+      await createQuestion(subjectId, examId, { conceptIds: [conceptId] });
+      await createQuestion(subjectId, examId, { conceptIds: [conceptId] });
+      const db = getDb();
+      const [{ insertId: otherSubjectId }] = await db
+        .insert(subjectTable)
+        .values({ name: 'other subject count', createdAt: new Date() });
+      const [{ insertId: otherExamId }] = await db
+        .insert(examTable)
+        .values({ name: 'other exam count', createdAt: new Date() });
+      await db.insert(examSubjectTable).values({ examId: otherExamId, subjectId: otherSubjectId });
+      const [{ insertId: otherGroupId }] = await db
+        .insert(conceptGroupTable)
+        .values({ name: 'other group count', subjectId: otherSubjectId, createdAt: new Date() });
+      const [{ insertId: otherConceptId }] = await db
+        .insert(conceptTable)
+        .values({ name: 'other concept count', conceptGroupId: otherGroupId, createdAt: new Date() });
+      await createQuestion(otherSubjectId, otherExamId, { conceptIds: [otherConceptId] });
+
+      const res = await getQuestionCount(`?subjectId=${subjectId}`);
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ total: 2 });
+    });
+
+    it('excludes GROUP question children from the count', async () => {
+      const { subjectId, examId, conceptId } = await seedFixture();
+      await postQuestions({
+        subjectId,
+        examId,
+        questions: [
+          {
+            type: 'GROUP',
+            difficulty: 5,
+            conceptIds: [conceptId],
+            childQuestions: [
+              { type: 'SINGLE', sortOrder: 0, content: 'c1', options: 'A|B', answer: 'A', difficulty: 3 },
+            ],
+          },
+        ],
+      });
+
+      const res = await getQuestionCount(`?subjectId=${subjectId}`);
+      expect(await res.json()).toEqual({ total: 1 });
+    });
+
+    it('filters by examIds', async () => {
+      const { subjectId, examId, conceptId } = await seedFixture();
+      const db = getDb();
+      const [{ insertId: examId2 }] = await db
+        .insert(examTable)
+        .values({ name: 'second exam', createdAt: new Date() });
+      await db.insert(examSubjectTable).values({ examId: examId2, subjectId });
+      await createQuestion(subjectId, examId, { conceptIds: [conceptId] });
+      await createQuestion(subjectId, examId2, { conceptIds: [conceptId] });
+
+      const res = await getQuestionCount(`?subjectId=${subjectId}&examIds=${examId2}`);
+      expect(await res.json()).toEqual({ total: 1 });
+    });
+
+    it('filters by conceptIds', async () => {
+      const { subjectId, examId, conceptId } = await seedFixture();
+      const db = getDb();
+      const [{ insertId: groupId2 }] = await db
+        .insert(conceptGroupTable)
+        .values({ name: 'second group', subjectId, createdAt: new Date() });
+      const [{ insertId: conceptId2 }] = await db
+        .insert(conceptTable)
+        .values({ name: 'second concept', conceptGroupId: groupId2, createdAt: new Date() });
+      await createQuestion(subjectId, examId, { conceptIds: [conceptId] });
+      await createQuestion(subjectId, examId, { conceptIds: [conceptId2] });
+
+      const res = await getQuestionCount(`?subjectId=${subjectId}&conceptIds=${conceptId2}`);
+      expect(await res.json()).toEqual({ total: 1 });
+    });
+
+    it('filters by tagIds', async () => {
+      const { subjectId, examId, tagId, conceptId } = await seedFixture();
+      const db = getDb();
+      const [{ insertId: tagId2 }] = await db
+        .insert(tagTable)
+        .values({ name: 'second tag', subjectId, createdAt: new Date() });
+      await createQuestion(subjectId, examId, { tagIds: [tagId], conceptIds: [conceptId] });
+      await createQuestion(subjectId, examId, { tagIds: [tagId2], conceptIds: [conceptId] });
+
+      const res = await getQuestionCount(`?subjectId=${subjectId}&tagIds=${tagId2}`);
+      expect(await res.json()).toEqual({ total: 1 });
+    });
+
+    it('combines filters with AND semantics', async () => {
+      const { subjectId, examId, tagId, conceptId } = await seedFixture();
+      const db = getDb();
+      const [{ insertId: tagId2 }] = await db
+        .insert(tagTable)
+        .values({ name: 'second tag 2', subjectId, createdAt: new Date() });
+      await createQuestion(subjectId, examId, { tagIds: [tagId], conceptIds: [conceptId] });
+      await createQuestion(subjectId, examId, { tagIds: [tagId2], conceptIds: [conceptId] });
+
+      const res = await getQuestionCount(
+        `?subjectId=${subjectId}&examIds=${examId}&tagIds=${tagId}&conceptIds=${conceptId}`
+      );
+      expect(await res.json()).toEqual({ total: 1 });
+    });
+
+    it('returns 0 when no question matches the filters', async () => {
+      const { subjectId, examId, conceptId } = await seedFixture();
+      await createQuestion(subjectId, examId, { conceptIds: [conceptId] });
+
+      const res = await getQuestionCount(`?subjectId=${subjectId}&tagIds=999999`);
+      expect(await res.json()).toEqual({ total: 0 });
+    });
+
+    it('rejects a missing subjectId with 400', async () => {
+      const res = await getQuestionCount('');
+      expect(res.status).toBe(400);
+    });
+
+    it('leaves GET ungated even with no valid identity', async () => {
+      const { subjectId } = await seedFixture();
+      vi.mocked(verifyIdToken).mockResolvedValue(null);
+      const res = await getQuestionCount(`?subjectId=${subjectId}`);
       expect(res.status).toBe(200);
     });
   });

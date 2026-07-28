@@ -7,7 +7,6 @@ import Chip, { tagColors } from '@/components/Chip'
 import DifficultyStars from '@/components/DifficultyStars'
 import type {
   GetQuestionAdaptiveResponse,
-  GetQuestionResponse,
   Paginate,
   PostReplyRequest,
   PostReplyResponse,
@@ -402,14 +401,13 @@ export default function AdaptiveClient() {
     // avoid firing the request twice (once with the previous subject's stale filters)
     if (subjectJustChanged) return
     setQuestionCount(-1)
-    apiFetch<GetQuestionResponse>('question', {
+    apiFetch<{ total: number }>('question/count', {
       subjectId: selectedSubjectId,
       examIds: selectedExamIds.length ? selectedExamIds.join(',') : undefined,
       conceptIds: selectedConceptIds.length ? selectedConceptIds.join(',') : undefined,
       tagIds: selectedTagIds.length ? selectedTagIds.join(',') : undefined,
-      limit: 1,
     })
-      .then((res) => setQuestionCount(res.paginate.total))
+      .then((res) => setQuestionCount(res.total))
       .catch(console.error)
   }, [selectedSubjectId, selectedExamIds, selectedConceptIds, selectedTagIds])
 

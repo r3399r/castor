@@ -92,6 +92,16 @@ export const questionListQuerySchema = z.object({
   order: z.enum(['asc', 'desc']).optional().default('desc'),
 });
 
+export const questionCountQuerySchema = z.object({
+  subjectId: z.coerce.number().int().positive(),
+  examIds: z.string().optional(),
+  conceptIds: z.string().optional(),
+  tagIds: z.string().optional(),
+});
+
+const parseIdList = (value: string | undefined) =>
+  value ? value.split(',').map(Number) : [];
+
 type QuestionItem = z.infer<typeof questionItemSchema>;
 
 const validateExamForSubject = async (db: Db, subjectId: number, examId: number) => {
@@ -265,6 +275,53 @@ export const question = new Hono<TransactionEnv>()
       .offset(offset);
 
     return c.json({ data, paginate: genPagination(total, limit, offset) });
+  })
+  .get('/count', zValidator('query', questionCountQuerySchema), async (c) => {
+    const { subjectId, examIds, conceptIds, tagIds } = c.req.valid('query');
+    console.log(
+      `GET /api/question/count subjectId=${subjectId} examIds=${examIds ?? ''} conceptIds=${conceptIds ?? ''} tagIds=${tagIds ?? ''}`
+    );
+    const db = c.get('db');
+
+    // Same shape as GET / -- top-level questions only.
+    const conditions = [isNull(questionTable.parentId), eq(questionTable.subjectId, subjectId)];
+
+    // Each filter is resolved to a question-id set first (rather than
+    // joining the link tables directly), so a question matching multiple
+    // exams/concepts/tags in the filter list is still only counted once.
+    const examIdList = parseIdList(examIds);
+    if (examIdList.length > 0) {
+      const links = await db
+        .select({ questionId: questionExamTable.questionId })
+        .from(questionExamTable)
+        .where(inArray(questionExamTable.examId, examIdList));
+      conditions.push(inArray(questionTable.id, links.map((l) => l.questionId)));
+    }
+
+    const conceptIdList = parseIdList(conceptIds);
+    if (conceptIdList.length > 0) {
+      const links = await db
+        .select({ questionId: questionConceptTable.questionId })
+        .from(questionConceptTable)
+        .where(inArray(questionConceptTable.conceptId, conceptIdList));
+      conditions.push(inArray(questionTable.id, links.map((l) => l.questionId)));
+    }
+
+    const tagIdList = parseIdList(tagIds);
+    if (tagIdList.length > 0) {
+      const links = await db
+        .select({ questionId: questionTagTable.questionId })
+        .from(questionTagTable)
+        .where(inArray(questionTagTable.tagId, tagIdList));
+      conditions.push(inArray(questionTable.id, links.map((l) => l.questionId)));
+    }
+
+    const [{ total }] = await db
+      .select({ total: count() })
+      .from(questionTable)
+      .where(and(...conditions));
+
+    return c.json({ total });
   })
   .get('/:id', async (c) => {
     const id = Number(c.req.param('id'));
