@@ -233,3 +233,64 @@ export const userTable = mysqlTable('user', {
   createdAt: datetime('created_at', { mode: 'date', fsp: 3 }),
   updatedAt: datetime('updated_at', { mode: 'date', fsp: 3 }),
 });
+
+// A question served to a user by adaptive selection that they haven't
+// answered yet -- exists so a second adaptive fetch before the reply
+// lands doesn't hand out a different question for work already in
+// flight. Cleared once the user replies (elsewhere, not in this file).
+export const pendingReplyTable = mysqlTable('pending_reply', {
+  id: int('id', { unsigned: true }).autoincrement().primaryKey(),
+  questionId: int('question_id', { unsigned: true })
+    .notNull()
+    .references(() => questionTable.id),
+  userId: int('user_id', { unsigned: true })
+    .notNull()
+    .references(() => userTable.id),
+  createdAt: datetime('created_at', { mode: 'date', fsp: 3 }),
+  updatedAt: datetime('updated_at', { mode: 'date', fsp: 3 }),
+});
+
+// One row per submitted answer. parentId mirrors question.parentId (set
+// when the reply is for a GROUP question's child), so replies belonging
+// to the same group can be found without joining back through question.
+export const replyTable = mysqlTable('reply', {
+  id: int('id', { unsigned: true }).autoincrement().primaryKey(),
+  questionId: int('question_id', { unsigned: true })
+    .notNull()
+    .references(() => questionTable.id),
+  subjectId: int('subject_id', { unsigned: true })
+    .notNull()
+    .references(() => subjectTable.id),
+  userId: int('user_id', { unsigned: true })
+    .notNull()
+    .references(() => userTable.id),
+  parentId: int('parent_id', { unsigned: true }).references(() => questionTable.id),
+  score: double('score').notNull().default(0),
+  repliedAnswer: varchar('replied_answer', { length: 255 }),
+  repliedAt: datetime('replied_at', { mode: 'date', fsp: 3 }).notNull(),
+  createdAt: datetime('created_at', { mode: 'date', fsp: 3 }),
+  updatedAt: datetime('updated_at', { mode: 'date', fsp: 3 }),
+});
+
+// Per-user, per-concept mastery score that adaptive selection reads to
+// pick questions near the user's current skill level. The scoring
+// columns (attemptCount/scoringTotal/weightedSum/decaySum) are
+// maintained by whatever grades replies elsewhere -- adaptive selection
+// only ever reads mastery off this table, never writes it.
+export const userConceptStatTable = mysqlTable('user_concept_stat', {
+  id: int('id', { unsigned: true }).autoincrement().primaryKey(),
+  userId: int('user_id', { unsigned: true })
+    .notNull()
+    .references(() => userTable.id),
+  conceptId: int('concept_id', { unsigned: true })
+    .notNull()
+    .references(() => conceptTable.id),
+  mastery: double('mastery'),
+  attemptCount: int('attempt_count', { unsigned: true }).notNull().default(0),
+  scoringTotal: double('scoring_total').notNull().default(0),
+  lastAttemptAt: datetime('last_attempt_at', { mode: 'date', fsp: 3 }),
+  weightedSum: double('weighted_sum').notNull().default(0),
+  decaySum: double('decay_sum').notNull().default(0),
+  createdAt: datetime('created_at', { mode: 'date', fsp: 3 }),
+  updatedAt: datetime('updated_at', { mode: 'date', fsp: 3 }),
+});

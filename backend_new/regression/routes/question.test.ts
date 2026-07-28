@@ -16,20 +16,28 @@ import {
   conceptTable,
   examSubjectTable,
   examTable,
+  pendingReplyTable,
   questionConceptTable,
   questionExamTable,
   questionTable,
   questionTagTable,
+  replyTable,
   subjectTable,
   tagTable,
+  userConceptStatTable,
+  userTable,
 } from 'src/db/schema';
 import { ADMIN_EMAILS } from 'src/middleware/adminAuth';
 
 // The admin gate is exercised end-to-end in its own describe block below;
 // every other test just needs writes to succeed, so default the mocked
-// Firebase verification to the admin identity.
-vi.mock('src/lib/firebaseAdmin', () => ({ verifyIdToken: vi.fn() }));
-import { verifyIdToken } from 'src/lib/firebaseAdmin';
+// Firebase verification to the admin identity. verifyIdTokenUid backs
+// GET /adaptive's separate app-user resolution (requireUser) -- unmocked
+// calls resolve to undefined, which requireUser treats the same as "no
+// identity" (401), so tests that never touch /adaptive don't need to
+// configure it.
+vi.mock('src/lib/firebaseAdmin', () => ({ verifyIdToken: vi.fn(), verifyIdTokenUid: vi.fn() }));
+import { verifyIdToken, verifyIdTokenUid } from 'src/lib/firebaseAdmin';
 
 type QuestionDto = {
   id: number;
@@ -56,6 +64,8 @@ const postQuestions = (body: unknown) =>
 const getQuestionList = (query = '') => app.request(`/api/question${query}`);
 
 const getQuestionCount = (query: string) => app.request(`/api/question/count${query}`);
+
+const getAdaptive = (query: string) => app.request(`/api/question/adaptive${query}`);
 
 const getQuestion = (id: number | string) => app.request(`/api/question/${id}`);
 
@@ -127,6 +137,12 @@ const clearTables = async () => {
   await db.delete(questionTagTable);
   await db.delete(questionConceptTable);
   await db.delete(questionExamTable);
+  // pending_reply/reply/user_concept_stat all reference question and/or
+  // user -- clear them before question/user go, same FK-ordering concern
+  // as the join tables above.
+  await db.delete(pendingReplyTable);
+  await db.delete(replyTable);
+  await db.delete(userConceptStatTable);
   // question.parentId is self-referential -- a bulk DELETE can hit a
   // parent row before a still-live child row that points to it, tripping
   // the FK. Null out every self-reference first so the delete has nothing
@@ -139,6 +155,7 @@ const clearTables = async () => {
   await db.delete(examSubjectTable);
   await db.delete(examTable);
   await db.delete(subjectTable);
+  await db.delete(userTable);
 };
 
 // Seeds a subject with one exam (linked via exam_subject), one tag, and
@@ -163,6 +180,22 @@ const seedFixture = async () => {
     .insert(conceptTable)
     .values({ name: 'fixture concept', conceptGroupId: groupId, createdAt: new Date() });
   return { subjectId, examId, tagId, conceptId };
+};
+
+// Adaptive selection resolves the caller via requireUser (firebase_uid ->
+// user row), separate from the admin-allowlist gate the other tests use
+// -- this seeds that row and returns its id for tests that need to
+// insert reply/user_concept_stat fixtures directly.
+const seedUser = async () => {
+  const db = getDb();
+  const [{ insertId: userId }] = await db.insert(userTable).values({
+    firebaseUid: 'fixture-uid',
+    email: 'fixture-user@example.com',
+    name: 'fixture user',
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
+  return userId;
 };
 
 describe('question routes', () => {
@@ -655,6 +688,157 @@ describe('question routes', () => {
       vi.mocked(verifyIdToken).mockResolvedValue(null);
       const res = await getQuestionCount(`?subjectId=${subjectId}`);
       expect(res.status).toBe(200);
+    });
+  });
+
+  describe('GET /adaptive', () => {
+    type AdaptiveDto = QuestionDto & {
+      exam: { id: number; name: string }[];
+      tag: { id: number; name: string }[];
+      concept: { id: number; name: string; conceptGroup: { id: number; name: string } }[];
+    };
+
+    it('rejects with 401 when there is no valid identity', async () => {
+      vi.mocked(verifyIdTokenUid).mockResolvedValue(null);
+      const { subjectId } = await seedFixture();
+
+      const res = await getAdaptive(`?subjectId=${subjectId}`);
+      expect(res.status).toBe(401);
+    });
+
+    it('rejects with 401 when the token resolves to an unknown user', async () => {
+      vi.mocked(verifyIdTokenUid).mockResolvedValue('unknown-uid');
+      const { subjectId } = await seedFixture();
+
+      const res = await getAdaptive(`?subjectId=${subjectId}`);
+      expect(res.status).toBe(401);
+    });
+
+    it('rejects a conceptId that does not belong to the subject with 400', async () => {
+      await seedUser();
+      vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+      const { subjectId, examId, conceptId } = await seedFixture();
+      await createQuestion(subjectId, examId, { conceptIds: [conceptId] });
+      const db = getDb();
+      const [{ insertId: otherSubjectId }] = await db
+        .insert(subjectTable)
+        .values({ name: 'other adaptive subject', createdAt: new Date() });
+      const [{ insertId: otherGroupId }] = await db
+        .insert(conceptGroupTable)
+        .values({ name: 'other adaptive group', subjectId: otherSubjectId, createdAt: new Date() });
+      const [{ insertId: otherConceptId }] = await db
+        .insert(conceptTable)
+        .values({ name: 'other adaptive concept', conceptGroupId: otherGroupId, createdAt: new Date() });
+
+      const res = await getAdaptive(`?subjectId=${subjectId}&conceptIds=${otherConceptId}`);
+      expect(res.status).toBe(400);
+    });
+
+    it('returns a question bundled with its exam/tag/concept', async () => {
+      await seedUser();
+      vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+      const { subjectId, examId, tagId, conceptId } = await seedFixture();
+      const created = await createQuestion(subjectId, examId, {
+        tagIds: [tagId],
+        conceptIds: [conceptId],
+      });
+
+      const res = await getAdaptive(`?subjectId=${subjectId}`);
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as AdaptiveDto[];
+      expect(body).toHaveLength(1);
+      expect(body[0].id).toBe(created.id);
+      expect(body[0].exam).toEqual([{ id: examId, name: 'fixture exam' }]);
+      expect(body[0].tag).toEqual([{ id: tagId, name: 'fixture tag' }]);
+      expect(body[0].concept).toEqual([
+        { id: conceptId, name: 'fixture concept', conceptGroup: { id: expect.any(Number), name: 'fixture group' } },
+      ]);
+    });
+
+    it('serves the same pending question again on a second fetch, rather than re-randomizing', async () => {
+      await seedUser();
+      vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+      const { subjectId, examId, conceptId } = await seedFixture();
+      await createQuestion(subjectId, examId, { conceptIds: [conceptId] });
+
+      const first = (await (await getAdaptive(`?subjectId=${subjectId}`)).json()) as AdaptiveDto[];
+      const second = (await (await getAdaptive(`?subjectId=${subjectId}`)).json()) as AdaptiveDto[];
+      expect(second.map((q) => q.id)).toEqual(first.map((q) => q.id));
+    });
+
+    it('returns fewer than requested when there are not enough candidates, without erroring', async () => {
+      await seedUser();
+      vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+      const { subjectId, examId, conceptId } = await seedFixture();
+      await createQuestion(subjectId, examId, { conceptIds: [conceptId] });
+
+      const res = await getAdaptive(`?subjectId=${subjectId}&count=5`);
+      expect(res.status).toBe(200);
+      expect((await res.json()) as AdaptiveDto[]).toHaveLength(1);
+    });
+
+    it('filters by examIds', async () => {
+      await seedUser();
+      vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+      const { subjectId, examId, conceptId } = await seedFixture();
+      const db = getDb();
+      const [{ insertId: examId2 }] = await db
+        .insert(examTable)
+        .values({ name: 'second exam', createdAt: new Date() });
+      await db.insert(examSubjectTable).values({ examId: examId2, subjectId });
+      const wanted = await createQuestion(subjectId, examId2, { conceptIds: [conceptId] });
+      await createQuestion(subjectId, examId, { conceptIds: [conceptId] });
+
+      const res = await getAdaptive(`?subjectId=${subjectId}&examIds=${examId2}&count=5`);
+      const body = (await res.json()) as AdaptiveDto[];
+      expect(body.map((q) => q.id)).toEqual([wanted.id]);
+    });
+
+    it('prefers a fresh question over one replied to in the last 7 days when both are candidates', async () => {
+      const userId = await seedUser();
+      vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+      const { subjectId, examId, conceptId } = await seedFixture();
+      const recentlyReplied = await createQuestion(subjectId, examId, { conceptIds: [conceptId] });
+      const fresh = await createQuestion(subjectId, examId, { conceptIds: [conceptId] });
+      const db = getDb();
+      await db.insert(replyTable).values({
+        questionId: recentlyReplied.id,
+        subjectId,
+        userId,
+        parentId: null,
+        score: 1,
+        repliedAnswer: 'A',
+        repliedAt: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      const res = await getAdaptive(`?subjectId=${subjectId}&count=1`);
+      const body = (await res.json()) as AdaptiveDto[];
+      expect(body.map((q) => q.id)).toEqual([fresh.id]);
+    });
+
+    it('falls back to a recently-replied question when it is the only candidate', async () => {
+      const userId = await seedUser();
+      vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+      const { subjectId, examId, conceptId } = await seedFixture();
+      const onlyQuestion = await createQuestion(subjectId, examId, { conceptIds: [conceptId] });
+      const db = getDb();
+      await db.insert(replyTable).values({
+        questionId: onlyQuestion.id,
+        subjectId,
+        userId,
+        parentId: null,
+        score: 1,
+        repliedAnswer: 'A',
+        repliedAt: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      const res = await getAdaptive(`?subjectId=${subjectId}&count=1`);
+      const body = (await res.json()) as AdaptiveDto[];
+      expect(body.map((q) => q.id)).toEqual([onlyQuestion.id]);
     });
   });
 

@@ -27,6 +27,9 @@ services:
       - ../db/table/question_tag.sql:/docker-entrypoint-initdb.d/14_question_tag.sql:ro
       - ../db/table/question_concept.sql:/docker-entrypoint-initdb.d/15_question_concept.sql:ro
       - ../db/table/question_exam.sql:/docker-entrypoint-initdb.d/16_question_exam.sql:ro
+      - ../db/table/pending_reply.sql:/docker-entrypoint-initdb.d/17_pending_reply.sql:ro
+      - ../db/table/reply.sql:/docker-entrypoint-initdb.d/18_reply.sql:ro
+      - ../db/table/user_concept_stat.sql:/docker-entrypoint-initdb.d/19_user_concept_stat.sql:ro
     healthcheck:
       test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost', '-u', 'root', '-proot']
       interval: 5s

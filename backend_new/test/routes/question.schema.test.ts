@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  questionAdaptiveQuerySchema,
   questionBodySchema,
   questionConceptBodySchema,
   questionTagBodySchema,
@@ -198,5 +199,39 @@ describe('questionConceptBodySchema', () => {
 
   it('rejects an empty array', () => {
     expect(questionConceptBodySchema.safeParse({ conceptIds: [] }).success).toBe(false);
+  });
+});
+
+describe('questionAdaptiveQuerySchema', () => {
+  it('defaults count to 1 when omitted', () => {
+    const result = questionAdaptiveQuerySchema.safeParse({ subjectId: '1' });
+    expect(result.success && result.data.count).toBe(1);
+  });
+
+  it('coerces subjectId and count from query strings', () => {
+    const result = questionAdaptiveQuerySchema.safeParse({ subjectId: '3', count: '5' });
+    expect(result.success && result.data).toMatchObject({ subjectId: 3, count: 5 });
+  });
+
+  it('rejects a missing subjectId', () => {
+    expect(questionAdaptiveQuerySchema.safeParse({}).success).toBe(false);
+  });
+
+  it('rejects a count above 50', () => {
+    expect(questionAdaptiveQuerySchema.safeParse({ subjectId: '1', count: '51' }).success).toBe(false);
+  });
+
+  it('rejects a count of 0', () => {
+    expect(questionAdaptiveQuerySchema.safeParse({ subjectId: '1', count: '0' }).success).toBe(false);
+  });
+
+  it('accepts optional examIds/conceptIds/tagIds as comma-separated strings', () => {
+    const result = questionAdaptiveQuerySchema.safeParse({
+      subjectId: '1',
+      examIds: '1,2',
+      conceptIds: '3,4',
+      tagIds: '5,6',
+    });
+    expect(result.success).toBe(true);
   });
 });

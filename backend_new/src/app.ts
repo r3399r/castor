@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { toErrorResponse } from 'src/lib/errorResponse';
 import { adminAuth, requireAdmin } from 'src/middleware/adminAuth';
+import { requireUser } from 'src/middleware/requireUser';
 import { transaction } from 'src/middleware/transaction';
 import { category } from 'src/routes/category';
 import { concept } from 'src/routes/concept';
@@ -45,6 +46,7 @@ export const app = new Hono()
   .route('/api/user', user)
   .use('/api/question/*', adminAuth)
   .use('/api/question/*', transaction)
+  .use('/api/question/adaptive', requireUser)
   .route('/api/question', question)
   .onError((err, c) => {
     console.error(err);

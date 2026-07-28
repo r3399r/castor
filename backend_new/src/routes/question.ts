@@ -1,5 +1,5 @@
 import { zValidator } from '@hono/zod-validator';
-import { and, asc, count, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, inArray, isNull, lte, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
@@ -8,14 +8,18 @@ import {
   conceptTable,
   examSubjectTable,
   examTable,
+  pendingReplyTable,
   questionConceptTable,
   questionExamTable,
   questionTable,
   questionTagTable,
+  replyTable,
   subjectTable,
   tagTable,
+  userConceptStatTable,
 } from 'src/db/schema';
 import { DEFAULT_LIMIT, genPagination, MAX_LIMIT } from 'src/lib/paginator';
+import { UserEnv } from 'src/middleware/requireUser';
 import { TransactionEnv } from 'src/middleware/transaction';
 import { BadRequestError, NotFoundError } from 'src/model/error';
 
@@ -101,6 +105,159 @@ export const questionCountQuerySchema = z.object({
 
 const parseIdList = (value: string | undefined) =>
   value ? value.split(',').map(Number) : [];
+
+// A generous but bounded upper limit -- the legacy endpoint had no cap at
+// all, but nothing in the app ever requests more than 10 at a time (the
+// practice-page buttons are 1/2/5/10), so this just guards against a
+// stray client request driving candidate-query sizes way up.
+export const questionAdaptiveQuerySchema = z.object({
+  subjectId: z.coerce.number().int().positive(),
+  examIds: z.string().optional(),
+  conceptIds: z.string().optional(),
+  tagIds: z.string().optional(),
+  count: z.coerce.number().int().positive().max(50).optional().default(1),
+});
+
+type AdaptiveChildDto = {
+  id: number;
+  type: string;
+  sortOrder: number | null;
+  content: string | null;
+  options: string | null;
+  answer: string | null;
+  difficulty: number;
+  adjustedDifficulty: number;
+};
+
+type AdaptiveQuestionDto = {
+  id: number;
+  uuid: string;
+  subjectId: number;
+  parentId: number | null;
+  isGroup: boolean;
+  type: string;
+  sortOrder: number | null;
+  content: string | null;
+  options: string | null;
+  answer: string | null;
+  difficulty: number;
+  adjustedDifficulty: number;
+  exam: { id: number; name: string }[];
+  tag: { id: number; name: string }[];
+  concept: { id: number; name: string; conceptGroup: { id: number; name: string } }[];
+  children: AdaptiveChildDto[];
+};
+
+// Builds full nested DTOs only for the ids passed in -- the adaptive
+// selection below deliberately keeps its candidate-scoring queries to
+// just question.id, and only calls this once, for the small final set of
+// chosen ids, rather than eager-loading every candidate it examines
+// along the way.
+const buildQuestionDtos = async (db: Db, ids: number[]) => {
+  const dtoById = new Map<number, AdaptiveQuestionDto>();
+  if (ids.length === 0) return dtoById;
+
+  const rows = await db.select().from(questionTable).where(inArray(questionTable.id, ids));
+  const childRows = await db
+    .select()
+    .from(questionTable)
+    .where(inArray(questionTable.parentId, ids))
+    .orderBy(asc(questionTable.sortOrder));
+  const examLinks = await db
+    .select({ questionId: questionExamTable.questionId, id: examTable.id, name: examTable.name })
+    .from(questionExamTable)
+    .innerJoin(examTable, eq(examTable.id, questionExamTable.examId))
+    .where(inArray(questionExamTable.questionId, ids));
+  const tagLinks = await db
+    .select({ questionId: questionTagTable.questionId, id: tagTable.id, name: tagTable.name })
+    .from(questionTagTable)
+    .innerJoin(tagTable, eq(tagTable.id, questionTagTable.tagId))
+    .where(inArray(questionTagTable.questionId, ids));
+  const conceptLinks = await db
+    .select({
+      questionId: questionConceptTable.questionId,
+      id: conceptTable.id,
+      name: conceptTable.name,
+      conceptGroupId: conceptGroupTable.id,
+      conceptGroupName: conceptGroupTable.name,
+    })
+    .from(questionConceptTable)
+    .innerJoin(conceptTable, eq(conceptTable.id, questionConceptTable.conceptId))
+    .innerJoin(conceptGroupTable, eq(conceptGroupTable.id, conceptTable.conceptGroupId))
+    .where(inArray(questionConceptTable.questionId, ids));
+
+  const childrenByParent = new Map<number, AdaptiveChildDto[]>();
+  for (const child of childRows) {
+    const list = childrenByParent.get(child.parentId!) ?? [];
+    list.push({
+      id: child.id,
+      type: child.type,
+      sortOrder: child.sortOrder,
+      content: child.content,
+      options: child.options,
+      answer: child.answer,
+      difficulty: child.difficulty,
+      adjustedDifficulty: child.adjustedDifficulty,
+    });
+    childrenByParent.set(child.parentId!, list);
+  }
+  const examsByQuestion = new Map<number, { id: number; name: string }[]>();
+  for (const link of examLinks) {
+    const list = examsByQuestion.get(link.questionId) ?? [];
+    list.push({ id: link.id, name: link.name });
+    examsByQuestion.set(link.questionId, list);
+  }
+  const tagsByQuestion = new Map<number, { id: number; name: string }[]>();
+  for (const link of tagLinks) {
+    const list = tagsByQuestion.get(link.questionId) ?? [];
+    list.push({ id: link.id, name: link.name });
+    tagsByQuestion.set(link.questionId, list);
+  }
+  const conceptsByQuestion = new Map<number, AdaptiveQuestionDto['concept']>();
+  for (const link of conceptLinks) {
+    const list = conceptsByQuestion.get(link.questionId) ?? [];
+    list.push({
+      id: link.id,
+      name: link.name,
+      conceptGroup: { id: link.conceptGroupId, name: link.conceptGroupName },
+    });
+    conceptsByQuestion.set(link.questionId, list);
+  }
+
+  for (const row of rows)
+    dtoById.set(row.id, {
+      id: row.id,
+      uuid: row.uuid,
+      subjectId: row.subjectId,
+      parentId: row.parentId,
+      isGroup: row.isGroup,
+      type: row.type,
+      sortOrder: row.sortOrder,
+      content: row.content,
+      options: row.options,
+      answer: row.answer,
+      difficulty: row.difficulty,
+      adjustedDifficulty: row.adjustedDifficulty,
+      exam: examsByQuestion.get(row.id) ?? [],
+      tag: tagsByQuestion.get(row.id) ?? [],
+      concept: conceptsByQuestion.get(row.id) ?? [],
+      children: childrenByParent.get(row.id) ?? [],
+    });
+
+  return dtoById;
+};
+
+// Removes and returns one random element from arr in O(1) -- swaps the
+// picked slot with the last element instead of the naive
+// Array.from(map.values())[randomIndex] + Map.delete approach (which
+// rebuilds the whole array on every single pick).
+const pickRandom = (arr: number[]) => {
+  const index = Math.floor(Math.random() * arr.length);
+  const picked = arr[index];
+  arr[index] = arr[arr.length - 1];
+  arr.pop();
+  return picked;
+};
 
 type QuestionItem = z.infer<typeof questionItemSchema>;
 
@@ -235,7 +392,7 @@ const createOneQuestion = async (
   return [questionId, ...childIds].map((id) => rowById.get(id)!);
 };
 
-export const question = new Hono<TransactionEnv>()
+export const question = new Hono<UserEnv>()
   .get('/', zValidator('query', questionListQuerySchema), async (c) => {
     const { limit, offset, sort, order } = c.req.valid('query');
     console.log(
@@ -322,6 +479,228 @@ export const question = new Hono<TransactionEnv>()
       .where(and(...conditions));
 
     return c.json({ total });
+  })
+  .get('/adaptive', zValidator('query', questionAdaptiveQuerySchema), async (c) => {
+    const { subjectId, examIds, conceptIds, tagIds, count: requiredCount } = c.req.valid('query');
+    console.log(
+      `GET /api/question/adaptive subjectId=${subjectId} examIds=${examIds ?? ''} conceptIds=${conceptIds ?? ''} tagIds=${tagIds ?? ''} count=${requiredCount}`
+    );
+    const db = c.get('db');
+    const user = c.get('user');
+
+    // Candidate concepts and their question counts. Explicit conceptIds
+    // are honored even if a concept currently has zero questions (the
+    // caller asked for it specifically); the auto-selected "every
+    // concept in the subject" fallback skips empty ones, since including
+    // them would only dilute every other concept's weightedTake below
+    // for no benefit.
+    const conceptWeights = new Map<number, number>();
+    const conceptIdList = parseIdList(conceptIds);
+    if (conceptIdList.length > 0) {
+      const conceptIdsSet = [...new Set(conceptIdList)];
+      const concepts = await db
+        .select({
+          id: conceptTable.id,
+          numberOfQuestions: conceptTable.numberOfQuestions,
+          subjectId: conceptGroupTable.subjectId,
+        })
+        .from(conceptTable)
+        .innerJoin(conceptGroupTable, eq(conceptGroupTable.id, conceptTable.conceptGroupId))
+        .where(inArray(conceptTable.id, conceptIdsSet));
+      if (concepts.length !== conceptIdsSet.length)
+        throw new BadRequestError('some concepts do not exist');
+      for (const concept of concepts) {
+        if (concept.subjectId !== subjectId)
+          throw new BadRequestError('concept does not belong to the specified subject');
+        conceptWeights.set(concept.id, concept.numberOfQuestions);
+      }
+    } else {
+      const concepts = await db
+        .select({ id: conceptTable.id, numberOfQuestions: conceptTable.numberOfQuestions })
+        .from(conceptTable)
+        .innerJoin(conceptGroupTable, eq(conceptGroupTable.id, conceptTable.conceptGroupId))
+        .where(eq(conceptGroupTable.subjectId, subjectId));
+      for (const concept of concepts)
+        if (concept.numberOfQuestions > 0) conceptWeights.set(concept.id, concept.numberOfQuestions);
+    }
+
+    const totalQuestions = [...conceptWeights.values()].reduce((a, b) => a + b, 0);
+
+    // Pending replies: questions already served to this user for this
+    // subject that they haven't answered yet -- re-serving them fresh
+    // would let a slow client end up with the "same" practice set
+    // returning different questions each time it's fetched. Scoped to
+    // subjectId at the query level via the join below, unlike the
+    // legacy version, which fetched every pending reply for the user
+    // across every subject and relied on the concept-membership check
+    // further down to filter out the unrelated ones after the fact.
+    const pendingReplies = await db
+      .select({ questionId: pendingReplyTable.questionId })
+      .from(pendingReplyTable)
+      .innerJoin(questionTable, eq(questionTable.id, pendingReplyTable.questionId))
+      .where(and(eq(pendingReplyTable.userId, user.id), eq(questionTable.subjectId, subjectId)))
+      .orderBy(desc(pendingReplyTable.createdAt));
+    const pendingQuestionIds = new Set(pendingReplies.map((p) => p.questionId));
+
+    const matchedPendingIds: number[] = [];
+    if (pendingReplies.length > 0) {
+      const conceptLinks = await db
+        .select({ questionId: questionConceptTable.questionId, conceptId: questionConceptTable.conceptId })
+        .from(questionConceptTable)
+        .where(inArray(questionConceptTable.questionId, [...pendingQuestionIds]));
+      const conceptsByQuestion = new Map<number, number[]>();
+      for (const link of conceptLinks) {
+        const list = conceptsByQuestion.get(link.questionId) ?? [];
+        list.push(link.conceptId);
+        conceptsByQuestion.set(link.questionId, list);
+      }
+      for (const pending of pendingReplies) {
+        const questionConcepts = conceptsByQuestion.get(pending.questionId) ?? [];
+        if (questionConcepts.some((cid) => conceptWeights.has(cid)))
+          matchedPendingIds.push(pending.questionId);
+      }
+    }
+
+    const selectedIds: number[] = matchedPendingIds.slice(0, requiredCount);
+
+    if (selectedIds.length < requiredCount && totalQuestions > 0) {
+      // Recently-answered questions (last 7 days) are deprioritized, not
+      // excluded outright -- only used to top up the response if there
+      // aren't enough fresh candidates.
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      const recentReplies = await db
+        .select({ questionId: replyTable.questionId, parentId: replyTable.parentId })
+        .from(replyTable)
+        .where(
+          and(
+            eq(replyTable.subjectId, subjectId),
+            eq(replyTable.userId, user.id),
+            gt(replyTable.createdAt, sevenDaysAgo)
+          )
+        );
+      // A reply to a GROUP question's child is recorded against the
+      // child's own id, with parentId pointing back at the group -- roll
+      // it up to the group id here since that's the unit adaptive
+      // selection actually serves.
+      const recentQuestionIds = new Set(recentReplies.map((r) => r.parentId ?? r.questionId));
+
+      const baseCandidateTake = conceptWeights.size * (5 + Math.ceil(recentQuestionIds.size / 2));
+
+      // Precomputed once rather than per concept (the legacy version
+      // re-ran an equivalent lookup inside its per-concept loop even
+      // though neither depends on which concept is being scored).
+      let examQuestionIds: Set<number> | null = null;
+      const examIdList = parseIdList(examIds);
+      if (examIdList.length > 0) {
+        const rows = await db
+          .select({ questionId: questionExamTable.questionId })
+          .from(questionExamTable)
+          .where(inArray(questionExamTable.examId, examIdList));
+        examQuestionIds = new Set(rows.map((r) => r.questionId));
+      }
+      let tagQuestionIds: Set<number> | null = null;
+      const tagIdList = parseIdList(tagIds);
+      if (tagIdList.length > 0) {
+        const rows = await db
+          .select({ questionId: questionTagTable.questionId })
+          .from(questionTagTable)
+          .where(inArray(questionTagTable.tagId, tagIdList));
+        tagQuestionIds = new Set(rows.map((r) => r.questionId));
+      }
+
+      // Also batched once across every candidate concept instead of one
+      // query per concept.
+      const conceptIdsList = [...conceptWeights.keys()];
+      const masteryRows = await db
+        .select({ conceptId: userConceptStatTable.conceptId, mastery: userConceptStatTable.mastery })
+        .from(userConceptStatTable)
+        .where(
+          and(eq(userConceptStatTable.userId, user.id), inArray(userConceptStatTable.conceptId, conceptIdsList))
+        );
+      const masteryByConcept = new Map(masteryRows.map((r) => [r.conceptId, r.mastery ?? 0]));
+      const conceptLinkRows = await db
+        .select({ conceptId: questionConceptTable.conceptId, questionId: questionConceptTable.questionId })
+        .from(questionConceptTable)
+        .where(inArray(questionConceptTable.conceptId, conceptIdsList));
+      const questionIdsByConcept = new Map<number, number[]>();
+      for (const link of conceptLinkRows) {
+        const list = questionIdsByConcept.get(link.conceptId) ?? [];
+        list.push(link.questionId);
+        questionIdsByConcept.set(link.conceptId, list);
+      }
+
+      const candidateIds = new Set<number>();
+      const recentCandidateIds = new Set<number>();
+
+      // The two per-direction queries below (adjustedDifficulty <=
+      // mastery vs > mastery) still run once per concept -- take (LIMIT)
+      // and the candidate id set both vary per concept, so unlike the
+      // lookups above there's no way to batch these into one query
+      // without a per-partition LIMIT, which MySQL doesn't support.
+      for (const [conceptId, numberOfQuestions] of conceptWeights) {
+        let allowedIds = questionIdsByConcept.get(conceptId) ?? [];
+        if (examQuestionIds) allowedIds = allowedIds.filter((id) => examQuestionIds!.has(id));
+        if (tagQuestionIds) allowedIds = allowedIds.filter((id) => tagQuestionIds!.has(id));
+        if (allowedIds.length === 0) continue;
+
+        const mastery = masteryByConcept.get(conceptId) ?? 0;
+        // This concept's share of the total candidate pool, scaled by
+        // baseCandidateTake. The legacy version's equivalent line was
+        // `baseCandidateTake * (conceptIds.get(conceptId) ?? 1 /
+        // totalQuestions)` -- since .get(conceptId) is always defined
+        // for a key drawn from the same map, the `?? 1 / totalQuestions`
+        // branch could never actually run, so it multiplied by the
+        // concept's raw, un-normalized question count instead of its
+        // fraction of the total. Normalizing here fixes that.
+        const weightedTake = Math.max(1, Math.ceil(baseCandidateTake * (numberOfQuestions / totalQuestions)));
+
+        const baseConditions = [
+          isNull(questionTable.parentId),
+          eq(questionTable.subjectId, subjectId),
+          inArray(questionTable.id, allowedIds),
+        ];
+        const lessRows = await db
+          .select({ id: questionTable.id })
+          .from(questionTable)
+          .where(and(...baseConditions, lte(questionTable.adjustedDifficulty, mastery)))
+          .orderBy(desc(questionTable.adjustedDifficulty))
+          .limit(weightedTake);
+        const greaterRows = await db
+          .select({ id: questionTable.id })
+          .from(questionTable)
+          .where(and(...baseConditions, gt(questionTable.adjustedDifficulty, mastery)))
+          .orderBy(asc(questionTable.adjustedDifficulty))
+          .limit(weightedTake);
+
+        for (const { id } of [...lessRows, ...greaterRows]) {
+          if (pendingQuestionIds.has(id)) continue;
+          if (recentQuestionIds.has(id)) recentCandidateIds.add(id);
+          else candidateIds.add(id);
+        }
+      }
+
+      const candidatePool = [...candidateIds];
+      const recentPool = [...recentCandidateIds];
+      while (selectedIds.length < requiredCount && candidatePool.length > 0)
+        selectedIds.push(pickRandom(candidatePool));
+      while (selectedIds.length < requiredCount && recentPool.length > 0)
+        selectedIds.push(pickRandom(recentPool));
+    }
+
+    // Mark every newly-chosen question as pending so a second fetch
+    // before the reply lands doesn't hand out a different question for
+    // work already in flight (the matched-pending ones are already
+    // marked, from a previous call).
+    const newPendingIds = selectedIds.filter((id) => !pendingQuestionIds.has(id));
+    if (newPendingIds.length > 0) {
+      const now = new Date();
+      await db
+        .insert(pendingReplyTable)
+        .values(newPendingIds.map((questionId) => ({ questionId, userId: user.id, createdAt: now, updatedAt: now })));
+    }
+
+    const dtoById = await buildQuestionDtos(db, selectedIds);
+    return c.json(selectedIds.map((id) => dtoById.get(id)!));
   })
   .get('/:id', async (c) => {
     const id = Number(c.req.param('id'));

@@ -35,3 +35,23 @@ export const verifyIdToken = async (
     return null;
   }
 };
+
+/**
+ * Returns the verified token's Firebase uid, or null if the token is
+ * missing, expired, or otherwise fails verification -- for resolving
+ * *which* app user (by firebase_uid) is asking, as opposed to
+ * verifyIdToken's admin-allowlist email check.
+ */
+export const verifyIdTokenUid = async (
+  token: string | undefined
+): Promise<string | null> => {
+  if (!token) return null;
+
+  try {
+    const decoded = await getAuth().verifyIdToken(token);
+    return decoded.uid;
+  } catch (error) {
+    console.error('Invalid Firebase token', error);
+    return null;
+  }
+};
