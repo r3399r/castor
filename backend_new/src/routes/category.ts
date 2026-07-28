@@ -123,9 +123,11 @@ export const category = new Hono<TransactionEnv>()
     const [found] = await db.select().from(categoryTable).where(eq(categoryTable.id, id));
     if (found === undefined) throw new NotFoundError(`category ${id} not found`);
 
-    // Read-only, unpaginated -- a category's subject list is what the
-    // practice-page filter flow needs up front, and it's not a dataset
-    // that grows anywhere near pagination territory.
+    // Bundled together (subjects + filterDimensions) since the
+    // practice-page filter flow always needs both the moment a category
+    // is picked -- one request instead of two. Read-only, unpaginated --
+    // neither a category's subject list nor its filter surface grows
+    // anywhere near pagination territory.
     const subjects = await db
       .select({
         id: subjectTable.id,
@@ -136,16 +138,6 @@ export const category = new Hono<TransactionEnv>()
       .innerJoin(subjectCategoryTable, eq(subjectCategoryTable.subjectId, subjectTable.id))
       .where(eq(subjectCategoryTable.categoryId, id))
       .orderBy(asc(subjectTable.sortOrder));
-
-    return c.json(subjects);
-  })
-  .get('/:id/filter', async (c) => {
-    const db = c.get('db');
-    const id = Number(c.req.param('id'));
-    console.log(`GET /api/category/${id}/filter`);
-
-    const [found] = await db.select().from(categoryTable).where(eq(categoryTable.id, id));
-    if (found === undefined) throw new NotFoundError(`category ${id} not found`);
 
     // Three flat queries (dimensions -> their options -> those options'
     // subject links) instead of the N+1 that composing this client-side
@@ -187,8 +179,9 @@ export const category = new Hono<TransactionEnv>()
       optionsByDimension.set(option.dimensionId, list);
     }
 
-    return c.json(
-      dimensions.map((dim) => ({
+    return c.json({
+      subjects,
+      filterDimensions: dimensions.map((dim) => ({
         id: dim.id,
         name: dim.name,
         sortOrder: dim.sortOrder,
@@ -198,6 +191,6 @@ export const category = new Hono<TransactionEnv>()
           parentId: opt.parentId,
           subjectIds: subjectIdsByOption.get(opt.id) ?? [],
         })),
-      }))
-    );
+      })),
+    });
   });

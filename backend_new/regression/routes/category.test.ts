@@ -295,28 +295,25 @@ describe('category routes', () => {
 
       const res = await app.request(`/api/category/${created.id}/subject`);
       expect(res.status).toBe(200);
-      const body = (await res.json()) as { id: number; name: string; sortOrder: number }[];
-      expect(body.map((s) => s.id)).toEqual([subjectB, subjectA]);
+      const body = (await res.json()) as {
+        subjects: { id: number; name: string; sortOrder: number }[];
+        filterDimensions: unknown[];
+      };
+      expect(body.subjects.map((s) => s.id)).toEqual([subjectB, subjectA]);
+      expect(body.filterDimensions).toEqual([]);
     });
 
-    it('returns an empty array for a category with no linked subjects', async () => {
+    it('returns empty subjects/filterDimensions for a category with neither', async () => {
       const created = (await (
         await postCategory({ name: 'empty category' })
       ).json()) as CategoryDto;
 
       const res = await app.request(`/api/category/${created.id}/subject`);
       expect(res.status).toBe(200);
-      expect(await res.json()).toEqual([]);
+      expect(await res.json()).toEqual({ subjects: [], filterDimensions: [] });
     });
 
-    it('404s for an unknown category id', async () => {
-      const res = await app.request('/api/category/999999/subject');
-      expect(res.status).toBe(404);
-    });
-  });
-
-  describe('/:id/filter', () => {
-    it('bundles dimensions, their options, and each option\'s subjectIds', async () => {
+    it("bundles filterDimensions with each option's subjectIds alongside the subjects", async () => {
       const created = (await (
         await postCategory({ name: 'filter category' })
       ).json()) as CategoryDto;
@@ -345,35 +342,28 @@ describe('category routes', () => {
         { subjectId: subjectB, optionId: adminOption },
       ]);
 
-      const res = await app.request(`/api/category/${created.id}/filter`);
+      const res = await app.request(`/api/category/${created.id}/subject`);
       expect(res.status).toBe(200);
       const body = (await res.json()) as {
-        id: number;
-        name: string;
-        sortOrder: number;
-        options: { id: number; name: string; parentId: number | null; subjectIds: number[] }[];
-      }[];
+        subjects: unknown[];
+        filterDimensions: {
+          id: number;
+          name: string;
+          sortOrder: number;
+          options: { id: number; name: string; parentId: number | null; subjectIds: number[] }[];
+        }[];
+      };
 
-      expect(body.map((d) => d.id)).toEqual([groupDim, choiceDim]);
-      const group = body.find((d) => d.id === groupDim)!;
+      expect(body.filterDimensions.map((d) => d.id)).toEqual([groupDim, choiceDim]);
+      const group = body.filterDimensions.find((d) => d.id === groupDim)!;
       expect(group.options).toHaveLength(1);
       expect(group.options[0]).toMatchObject({ id: adminOption, parentId: null });
       expect(group.options[0].subjectIds.sort()).toEqual([subjectA, subjectB].sort());
 
-      const choice = body.find((d) => d.id === choiceDim)!;
+      const choice = body.filterDimensions.find((d) => d.id === choiceDim)!;
       expect(choice.options).toHaveLength(1);
       expect(choice.options[0]).toMatchObject({ id: subOption, parentId: adminOption });
       expect(choice.options[0].subjectIds).toEqual([subjectA]);
-    });
-
-    it('returns an empty array for a category with no filter dimensions', async () => {
-      const created = (await (
-        await postCategory({ name: 'no filters category' })
-      ).json()) as CategoryDto;
-
-      const res = await app.request(`/api/category/${created.id}/filter`);
-      expect(res.status).toBe(200);
-      expect(await res.json()).toEqual([]);
     });
 
     it('includes a dimension with no options yet as an empty options array', async () => {
@@ -385,13 +375,15 @@ describe('category routes', () => {
         .insert(filterDimensionTable)
         .values({ categoryId: created.id, name: 'no options yet', sortOrder: 1 });
 
-      const res = await app.request(`/api/category/${created.id}/filter`);
-      const body = (await res.json()) as { id: number; options: unknown[] }[];
-      expect(body).toEqual([{ id: dimId, name: 'no options yet', sortOrder: 1, options: [] }]);
+      const res = await app.request(`/api/category/${created.id}/subject`);
+      const body = (await res.json()) as { filterDimensions: { id: number; options: unknown[] }[] };
+      expect(body.filterDimensions).toEqual([
+        { id: dimId, name: 'no options yet', sortOrder: 1, options: [] },
+      ]);
     });
 
     it('404s for an unknown category id', async () => {
-      const res = await app.request('/api/category/999999/filter');
+      const res = await app.request('/api/category/999999/subject');
       expect(res.status).toBe(404);
     });
   });

@@ -340,13 +340,12 @@ export default function AdaptiveClient() {
     setSelectedConceptIds([])
     setSelectedTagIds([])
 
-    Promise.all([
-      apiFetch<SubjectOption[]>(`category/${selectedCategoryId}/subject`),
-      apiFetch<FilterDimensionWithOptions[]>(`category/${selectedCategoryId}/filter`),
-    ])
-      .then(([subjects, dimensions]) => {
+    apiFetch<{ subjects: SubjectOption[]; filterDimensions: FilterDimensionWithOptions[] }>(
+      `category/${selectedCategoryId}/subject`,
+    )
+      .then(({ subjects, filterDimensions }) => {
         setSubjectList(subjects)
-        setFilterDimensions(dimensions)
+        setFilterDimensions(filterDimensions)
       })
       .catch(console.error)
   }, [selectedCategoryId])
