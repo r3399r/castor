@@ -512,5 +512,81 @@ describe('reply routes', () => {
       expect(body.data).toEqual([]);
       expect(body.paginate).toMatchObject({ total: 0, totalPages: 1 });
     });
+
+    describe('?onlyWrong=true', () => {
+      it('excludes a fully-correct standalone answer', async () => {
+        await seedUser();
+        vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+        const { subjectId, examId, conceptId } = await seedFixture();
+        const correctQ = await createQuestion(subjectId, examId, { answer: 'A', conceptIds: [conceptId] });
+        const wrongQ = await createQuestion(subjectId, examId, { answer: 'A', conceptIds: [conceptId] });
+
+        await postReply([
+          { questionId: correctQ.id, repliedAnswer: 'A' },
+          { questionId: wrongQ.id, repliedAnswer: 'B' },
+        ]);
+
+        const res = await getReplyList('?onlyWrong=true');
+        expect(res.status).toBe(200);
+        const body = (await res.json()) as { data: ReplyGroupDto[]; paginate: { total: number } };
+        expect(body.paginate.total).toBe(1);
+        expect(body.data).toHaveLength(1);
+        expect(body.data[0].children[0].questionId).toBe(wrongQ.id);
+      });
+
+      it('keeps a GROUP row but drops its correct children, keeping only the wrong ones', async () => {
+        await seedUser();
+        vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+        const { subjectId, examId, conceptId } = await seedFixture();
+        const [group, child1, child2] = await createGroupQuestion(subjectId, examId, [conceptId], [
+          { answer: 'A', options: 'A|B' },
+          { answer: 'A', options: 'A|B' },
+        ]);
+
+        await postReply([
+          { questionId: child1.id, repliedAnswer: 'A' }, // correct
+          { questionId: child2.id, repliedAnswer: 'B' }, // wrong
+        ]);
+
+        const res = await getReplyList('?onlyWrong=true');
+        const body = (await res.json()) as { data: ReplyGroupDto[]; paginate: { total: number } };
+        expect(body.paginate.total).toBe(1);
+        expect(body.data).toHaveLength(1);
+        expect(body.data[0].parentQuestion?.id).toBe(group.id);
+        expect(body.data[0].children.map((c) => c.questionId)).toEqual([child2.id]);
+      });
+
+      it('returns an empty page when every answer is correct', async () => {
+        await seedUser();
+        vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+        const { subjectId, examId, conceptId } = await seedFixture();
+        const q = await createQuestion(subjectId, examId, { answer: 'A', conceptIds: [conceptId] });
+        await postReply([{ questionId: q.id, repliedAnswer: 'A' }]);
+
+        const res = await getReplyList('?onlyWrong=true');
+        const body = (await res.json()) as { data: ReplyGroupDto[]; paginate: { total: number } };
+        expect(body.data).toEqual([]);
+        expect(body.paginate.total).toBe(0);
+      });
+
+      it('treats a partial score (e.g. MULTIPLE) as wrong', async () => {
+        await seedUser();
+        vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+        const { subjectId, examId, conceptId } = await seedFixture();
+        // correct = OXOX; one mismatch -> partial score of 5, not 10
+        const q = await createQuestion(subjectId, examId, {
+          type: 'MULTIPLE',
+          options: 'A|B|C|D',
+          answer: 'OXOX',
+          conceptIds: [conceptId],
+        });
+        await postReply([{ questionId: q.id, repliedAnswer: 'OXOO' }]);
+
+        const res = await getReplyList('?onlyWrong=true');
+        const body = (await res.json()) as { data: ReplyGroupDto[] };
+        expect(body.data).toHaveLength(1);
+        expect(body.data[0].children[0].score).toBe(5);
+      });
+    });
   });
 });

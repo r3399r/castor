@@ -53,4 +53,18 @@ describe('replyListQuerySchema', () => {
   it('rejects a negative offset', () => {
     expect(replyListQuerySchema.safeParse({ offset: '-1' }).success).toBe(false);
   });
+
+  it('accepts onlyWrong=true', () => {
+    const result = replyListQuerySchema.safeParse({ onlyWrong: 'true' });
+    expect(result.success && result.data.onlyWrong).toBe('true');
+  });
+
+  it('leaves onlyWrong undefined when omitted', () => {
+    const result = replyListQuerySchema.safeParse({});
+    expect(result.success && result.data.onlyWrong).toBeUndefined();
+  });
+
+  it('rejects onlyWrong=false (only the literal "true" is accepted; omit for "off")', () => {
+    expect(replyListQuerySchema.safeParse({ onlyWrong: 'false' }).success).toBe(false);
+  });
 });

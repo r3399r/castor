@@ -149,12 +149,16 @@ function ReplyRow({ item }: { item: ReplyGroup }) {
                       </div>
                     </div>
 
-                    {!isGroup && fbUrl && (
+                    {!isGroup && (
                       <a
-                        href={fbUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex w-full items-center justify-center gap-1.5 rounded-md border border-brown-900 px-3 py-1.5 text-sm font-medium text-brown-900 transition hover:bg-brown-900/10 sm:w-auto sm:justify-start"
+                        href={fbUrl ?? undefined}
+                        target={fbUrl ? '_blank' : undefined}
+                        rel={fbUrl ? 'noopener noreferrer' : undefined}
+                        aria-disabled={!fbUrl}
+                        onClick={(e) => { if (!fbUrl) e.preventDefault() }}
+                        className={`inline-flex w-full items-center justify-center gap-1.5 rounded-md border border-brown-900 px-3 py-1.5 text-sm font-medium text-brown-900 transition sm:w-auto sm:justify-start ${
+                          fbUrl ? 'hover:bg-brown-900/10' : 'cursor-not-allowed opacity-40'
+                        }`}
                       >
                         討論區
                         <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -169,13 +173,17 @@ function ReplyRow({ item }: { item: ReplyGroup }) {
           })}
         </div>
 
-        {/* 討論區 link for group (shown once at bottom) */}
-        {isGroup && fbUrl && (
+        {/* 討論區 link for group (shown once at bottom), disabled rather than hidden when there's no fbUrl */}
+        {isGroup && (
           <a
-            href={fbUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex w-auto items-center gap-1.5 self-end rounded-md border border-brown-900 px-3 py-1.5 text-sm font-medium text-brown-900 transition hover:bg-brown-900/10"
+            href={fbUrl ?? undefined}
+            target={fbUrl ? '_blank' : undefined}
+            rel={fbUrl ? 'noopener noreferrer' : undefined}
+            aria-disabled={!fbUrl}
+            onClick={(e) => { if (!fbUrl) e.preventDefault() }}
+            className={`inline-flex w-auto items-center gap-1.5 self-end rounded-md border border-brown-900 px-3 py-1.5 text-sm font-medium text-brown-900 transition ${
+              fbUrl ? 'hover:bg-brown-900/10' : 'cursor-not-allowed opacity-40'
+            }`}
           >
             討論區
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -191,15 +199,17 @@ function ReplyRow({ item }: { item: ReplyGroup }) {
 export default function ReplyClient() {
   const [replyList, setReplyList] = useState<GetReplyResponse | null>(null)
   const [page, setPage] = useState(1)
+  const [onlyWrong, setOnlyWrong] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchPage = async (p: number) => {
+  const fetchPage = async (p: number, wrongOnly: boolean) => {
     setLoading(true)
     try {
       const data = await apiFetch<GetReplyResponse>('reply', {
         offset: p > 1 ? (p - 1) * LIMIT : undefined,
         limit: LIMIT,
+        onlyWrong: wrongOnly ? 'true' : undefined,
       })
       setReplyList(data)
       setPage(p)
@@ -211,8 +221,15 @@ export default function ReplyClient() {
   }
 
   useEffect(() => {
-    fetchPage(1)
+    fetchPage(1, onlyWrong)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  const handleToggleOnlyWrong = () => {
+    const next = !onlyWrong
+    setOnlyWrong(next)
+    fetchPage(1, next)
+  }
 
   if (loading && !replyList) {
     return (
@@ -236,53 +253,71 @@ export default function ReplyClient() {
     )
   }
 
-  if (!replyList || replyList.data.length === 0) {
-    return (
-      <div className="rounded-[24px] border border-brown-300 bg-white p-8 text-center">
-        <p className="text-sm text-black-500">尚無答題紀錄</p>
-        <a
-          href="/adaptive"
-          className="mt-4 inline-block rounded-md bg-blue-700 px-6 py-2.5 text-sm font-bold text-white hover:bg-[#1f3ea3]"
-        >
-          開始智慧練習
-        </a>
-      </div>
-    )
-  }
+  const isEmpty = !replyList || replyList.data.length === 0
 
   return (
     <div>
       <h1 className="mt-[60px] mb-2 text-3xl font-bold text-blue-700">作答記錄</h1>
-      <p className="mb-10 text-sm text-black-500">回顧每次練習的題目、作答與得分。</p>
+      <p className="mb-6 text-sm text-black-500">回顧每次練習的題目、作答與得分。</p>
 
-      <MathJax dynamic>
-        <div className="flex flex-col gap-[40px]">
-          {replyList.data.map((item) => (
-            <ReplyRow key={`${item.repliedAt}|${item.children[0]?.parentId ?? item.children[0]?.questionId}`} item={item} />
-          ))}
-        </div>
-      </MathJax>
+      <div className="mb-10 flex items-center gap-2">
+        <button
+          onClick={handleToggleOnlyWrong}
+          disabled={loading}
+          className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
+            onlyWrong
+              ? 'border-2 border-orange-700 bg-orange-700/10 text-orange-700'
+              : 'border border-brown-300 bg-beige-200/80 text-black-900 hover:border-brown-700'
+          } disabled:cursor-not-allowed disabled:opacity-50`}
+        >
+          只顯示錯題
+        </button>
+      </div>
 
-      {replyList.paginate.totalPages > 1 && (
-        <div className="mt-6 mb-[70px] flex items-center justify-center gap-3">
-          <button
-            onClick={() => fetchPage(page - 1)}
-            disabled={page === 1 || loading}
-            className="rounded-md border border-brown-300 px-4 py-2 text-sm disabled:opacity-40"
-          >
-            ← 上一頁
-          </button>
-          <span className="text-sm text-black-500">
-            第 {page} / {replyList.paginate.totalPages} 頁
-          </span>
-          <button
-            onClick={() => fetchPage(page + 1)}
-            disabled={page === replyList.paginate.totalPages || loading}
-            className="rounded-md border border-brown-300 px-4 py-2 text-sm disabled:opacity-40"
-          >
-            下一頁 →
-          </button>
+      {isEmpty ? (
+        <div className="rounded-[24px] border border-brown-300 bg-white p-8 text-center">
+          <p className="text-sm text-black-500">{onlyWrong ? '目前沒有錯題，繼續保持！' : '尚無答題紀錄'}</p>
+          {!onlyWrong && (
+            <a
+              href="/adaptive"
+              className="mt-4 inline-block rounded-md bg-blue-700 px-6 py-2.5 text-sm font-bold text-white hover:bg-[#1f3ea3]"
+            >
+              開始智慧練習
+            </a>
+          )}
         </div>
+      ) : (
+        <>
+          <MathJax dynamic>
+            <div className="flex flex-col gap-[40px]">
+              {replyList.data.map((item) => (
+                <ReplyRow key={`${item.repliedAt}|${item.children[0]?.parentId ?? item.children[0]?.questionId}`} item={item} />
+              ))}
+            </div>
+          </MathJax>
+
+          {replyList.paginate.totalPages > 1 && (
+            <div className="mt-6 mb-[70px] flex items-center justify-center gap-3">
+              <button
+                onClick={() => fetchPage(page - 1, onlyWrong)}
+                disabled={page === 1 || loading}
+                className="rounded-md border border-brown-300 px-4 py-2 text-sm disabled:opacity-40"
+              >
+                ← 上一頁
+              </button>
+              <span className="text-sm text-black-500">
+                第 {page} / {replyList.paginate.totalPages} 頁
+              </span>
+              <button
+                onClick={() => fetchPage(page + 1, onlyWrong)}
+                disabled={page === replyList.paginate.totalPages || loading}
+                className="rounded-md border border-brown-300 px-4 py-2 text-sm disabled:opacity-40"
+              >
+                下一頁 →
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   )

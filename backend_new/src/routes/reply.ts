@@ -1,5 +1,5 @@
 import { zValidator } from '@hono/zod-validator';
-import { and, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, lt, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import {
@@ -30,6 +30,9 @@ export const replyBodySchema = z.array(replyItemSchema).min(1);
 export const replyListQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(MAX_LIMIT).optional().default(DEFAULT_LIMIT),
   offset: z.coerce.number().int().min(0).optional().default(0),
+  // Literal 'true' only (not z.coerce.boolean(), which treats the string
+  // "false" as truthy) -- omit the param entirely for "off".
+  onlyWrong: z.enum(['true']).optional(),
 });
 
 // TRUE_FALSE and SINGLE were two identical exact-match functions in the
@@ -337,10 +340,10 @@ export const reply = new Hono<UserEnv>()
     return c.json(responses);
   })
   .get('/', zValidator('query', replyListQuerySchema), async (c) => {
-    const { limit, offset } = c.req.valid('query');
+    const { limit, offset, onlyWrong } = c.req.valid('query');
     const user = c.get('user');
     const db = c.get('db');
-    console.log(`GET /api/reply userId=${user.id} limit=${limit} offset=${offset}`);
+    console.log(`GET /api/reply userId=${user.id} limit=${limit} offset=${offset} onlyWrong=${onlyWrong ?? ''}`);
 
     // A "history row" is one submitted batch's worth of replies to the
     // same group question -- standalone questions group by their own id,
@@ -348,10 +351,18 @@ export const reply = new Hono<UserEnv>()
     // reply from the same POST /reply call shares the same repliedAt, so
     // (repliedAt, groupKey) uniquely identifies one row.
     const groupKey = sql<number>`coalesce(${replyTable.parentId}, ${replyTable.questionId})`;
+    // With onlyWrong, this condition applies to every query below,
+    // including the final row fetch -- so a GROUP question's correct
+    // children are dropped from its `children` array even when at least
+    // one sibling was wrong (which is what keeps the group's row on the
+    // page at all).
+    const userConditions = [eq(replyTable.userId, user.id)];
+    if (onlyWrong) userConditions.push(lt(replyTable.score, 10));
+
     const groupRows = await db
       .select({ repliedAt: replyTable.repliedAt, groupKey })
       .from(replyTable)
-      .where(eq(replyTable.userId, user.id))
+      .where(and(...userConditions))
       .groupBy(replyTable.repliedAt, groupKey)
       .orderBy(desc(replyTable.repliedAt))
       .limit(limit)
@@ -362,7 +373,7 @@ export const reply = new Hono<UserEnv>()
         total: sql<number>`count(distinct ${replyTable.repliedAt}, coalesce(${replyTable.parentId}, ${replyTable.questionId}))`,
       })
       .from(replyTable)
-      .where(eq(replyTable.userId, user.id));
+      .where(and(...userConditions));
 
     if (groupRows.length === 0) return c.json({ data: [], paginate: genPagination(total, limit, offset) });
 
@@ -370,7 +381,7 @@ export const reply = new Hono<UserEnv>()
     const rows = await db
       .select()
       .from(replyTable)
-      .where(and(eq(replyTable.userId, user.id), inArray(replyTable.repliedAt, [...repliedAtByTime.values()])))
+      .where(and(...userConditions, inArray(replyTable.repliedAt, [...repliedAtByTime.values()])))
       .orderBy(desc(replyTable.repliedAt));
 
     // Preserves this page's group order/membership -- the repliedAt IN
