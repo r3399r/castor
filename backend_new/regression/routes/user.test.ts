@@ -11,15 +11,29 @@ import {
 import { eq } from 'drizzle-orm';
 import { app } from 'src/app';
 import { closeDb, getDb } from 'src/db/client';
-import { userTable } from 'src/db/schema';
+import {
+  categoryTable,
+  conceptGroupTable,
+  conceptTable,
+  subjectCategoryTable,
+  subjectTable,
+  userConceptStatTable,
+  userStatHistoryTable,
+  userTable,
+} from 'src/db/schema';
 import { ADMIN_EMAILS } from 'src/middleware/adminAuth';
 
 // The admin gate is exercised end-to-end in its own describe block below;
 // every other test just needs reads to succeed, so default the mocked
 // Firebase verification to the admin identity. verifyIdTokenFull backs
-// POST /sync's own (non-admin) identity check.
-vi.mock('src/lib/firebaseAdmin', () => ({ verifyIdToken: vi.fn(), verifyIdTokenFull: vi.fn() }));
-import { verifyIdToken, verifyIdTokenFull } from 'src/lib/firebaseAdmin';
+// POST /sync's own (non-admin) identity check; verifyIdTokenUid backs
+// /stats and /history's requireUser gate.
+vi.mock('src/lib/firebaseAdmin', () => ({
+  verifyIdToken: vi.fn(),
+  verifyIdTokenFull: vi.fn(),
+  verifyIdTokenUid: vi.fn(),
+}));
+import { verifyIdToken, verifyIdTokenFull, verifyIdTokenUid } from 'src/lib/firebaseAdmin';
 
 type UserDto = {
   id: number;
@@ -31,7 +45,30 @@ type UserDto = {
 };
 
 const clearTable = async () => {
-  await getDb().delete(userTable);
+  const db = getDb();
+  await db.delete(userConceptStatTable);
+  await db.delete(userStatHistoryTable);
+  await db.delete(conceptTable);
+  await db.delete(conceptGroupTable);
+  await db.delete(subjectCategoryTable);
+  await db.delete(subjectTable);
+  await db.delete(categoryTable);
+  await db.delete(userTable);
+};
+
+// /stats and /history resolve the caller via requireUser (firebase_uid ->
+// user row), separate from both the admin allowlist and /sync's own
+// identity check -- this seeds that row.
+const seedUser = async () => {
+  const db = getDb();
+  const [{ insertId: userId }] = await db.insert(userTable).values({
+    firebaseUid: 'fixture-uid',
+    email: 'fixture-user@example.com',
+    name: 'fixture user',
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
+  return userId;
 };
 
 describe('user routes', () => {
@@ -239,6 +276,180 @@ describe('user routes', () => {
 
       const rows = await getDb().select().from(userTable).where(eq(userTable.firebaseUid, 'returning-uid'));
       expect(rows).toHaveLength(1);
+    });
+  });
+
+  describe('GET /stats', () => {
+    it('rejects with 401 when there is no valid identity', async () => {
+      vi.mocked(verifyIdTokenUid).mockResolvedValue(null);
+      const res = await app.request('/api/user/stats');
+      expect(res.status).toBe(401);
+    });
+
+    it('returns an empty array when the user has no concept stats', async () => {
+      await seedUser();
+      vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+
+      const res = await app.request('/api/user/stats');
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual([]);
+    });
+
+    it('computes weighted mastery per concept group and includes untouched groups at mastery 0', async () => {
+      const userId = await seedUser();
+      vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+      const db = getDb();
+
+      const [{ insertId: categoryId }] = await db.insert(categoryTable).values({ name: 'fixture category', createdAt: new Date() });
+      const [{ insertId: subjectId }] = await db.insert(subjectTable).values({ name: 'fixture subject', createdAt: new Date() });
+      await db.insert(subjectCategoryTable).values({ subjectId, categoryId });
+      const [{ insertId: groupA }] = await db.insert(conceptGroupTable).values({ name: 'group a', subjectId, createdAt: new Date() });
+      const [{ insertId: groupB }] = await db.insert(conceptGroupTable).values({ name: 'group b', subjectId, createdAt: new Date() });
+      const [{ insertId: concept1 }] = await db.insert(conceptTable).values({ name: 'c1', conceptGroupId: groupA, numberOfQuestions: 3, createdAt: new Date() });
+      const [{ insertId: concept2 }] = await db.insert(conceptTable).values({ name: 'c2', conceptGroupId: groupA, numberOfQuestions: 1, createdAt: new Date() });
+      await db.insert(conceptTable).values({ name: 'c3', conceptGroupId: groupB, numberOfQuestions: 2, createdAt: new Date() });
+      await db.insert(userConceptStatTable).values([
+        { userId, conceptId: concept1, mastery: 6, createdAt: new Date(), updatedAt: new Date() },
+        { userId, conceptId: concept2, mastery: 2, createdAt: new Date(), updatedAt: new Date() },
+      ]);
+
+      const res = await app.request('/api/user/stats');
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as {
+        id: number;
+        name: string;
+        category: { id: number; name: string }[];
+        conceptGroup: { id: number; name: string; mastery: number; numberOfQuestions: number }[];
+      }[];
+      expect(body).toHaveLength(1);
+      expect(body[0]).toMatchObject({ id: subjectId, name: 'fixture subject' });
+      expect(body[0].category).toEqual([{ id: categoryId, name: 'fixture category' }]);
+      const cgA = body[0].conceptGroup.find((g) => g.id === groupA)!;
+      const cgB = body[0].conceptGroup.find((g) => g.id === groupB)!;
+      // (6*3 + 2*1) / (3+1) = 5
+      expect(cgA).toMatchObject({ name: 'group a', mastery: 5, numberOfQuestions: 4 });
+      expect(cgB).toMatchObject({ name: 'group b', mastery: 0, numberOfQuestions: 2 });
+    });
+  });
+
+  describe('GET /history', () => {
+    const dateNDaysAgo = (n: number) => new Date(Date.now() - n * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+    it('rejects with 401 when there is no valid identity', async () => {
+      vi.mocked(verifyIdTokenUid).mockResolvedValue(null);
+      const res = await app.request('/api/user/history');
+      expect(res.status).toBe(401);
+    });
+
+    it('returns zero-value defaults when the user has no history rows', async () => {
+      await seedUser();
+      vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+
+      const res = await app.request('/api/user/history');
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({
+        totalAttempts: 0,
+        overallAccuracy: 0,
+        streakDays: 0,
+        overallDailyMastery: [],
+        subjectHistory: [],
+        activityMap: [],
+      });
+    });
+
+    it('aggregates attempts/accuracy, computes a 2-day streak, and reports per-day activity', async () => {
+      const userId = await seedUser();
+      vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+      const db = getDb();
+      const [{ insertId: subjectId }] = await db.insert(subjectTable).values({ name: 'fixture subject', createdAt: new Date() });
+      const [{ insertId: groupId }] = await db.insert(conceptGroupTable).values({ name: 'group', subjectId, createdAt: new Date() });
+      await db.insert(conceptTable).values({ name: 'concept', conceptGroupId: groupId, numberOfQuestions: 5, createdAt: new Date() });
+
+      const yesterday = dateNDaysAgo(1);
+      const today = dateNDaysAgo(0);
+      await db.insert(userStatHistoryTable).values([
+        { userId, subjectId, date: yesterday, weightedMastery: 4, dailyAttempts: 2, dailyCorrect: 10, createdAt: new Date(), updatedAt: new Date() },
+        { userId, subjectId, date: today, weightedMastery: 6, dailyAttempts: 3, dailyCorrect: 20, createdAt: new Date(), updatedAt: new Date() },
+      ]);
+
+      const res = await app.request('/api/user/history');
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as {
+        totalAttempts: number;
+        overallAccuracy: number;
+        streakDays: number;
+        overallDailyMastery: { date: string; weightedMastery: number }[];
+        subjectHistory: { subjectId: number; subjectName: string; dailyStats: { date: string; weightedMastery: number }[] }[];
+        activityMap: { date: string; count: number }[];
+      };
+      expect(body.totalAttempts).toBe(5);
+      // (10 + 20) / 5 / 10 * 100 = 60
+      expect(body.overallAccuracy).toBeCloseTo(60, 10);
+      expect(body.streakDays).toBe(2);
+      expect(body.overallDailyMastery.map((d) => d.date)).toEqual([yesterday, today]);
+      expect(body.overallDailyMastery.map((d) => d.weightedMastery)).toEqual([4, 6]);
+      expect(body.activityMap).toEqual([
+        { date: yesterday, count: 2 },
+        { date: today, count: 3 },
+      ]);
+      expect(body.subjectHistory).toHaveLength(1);
+      expect(body.subjectHistory[0]).toMatchObject({ subjectId, subjectName: 'fixture subject' });
+      expect(body.subjectHistory[0].dailyStats.map((d) => d.weightedMastery)).toEqual([4, 6]);
+    });
+
+    it('carries the last known mastery forward across gap days with no activity', async () => {
+      const userId = await seedUser();
+      vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+      const db = getDb();
+      const [{ insertId: subjectId }] = await db.insert(subjectTable).values({ name: 'gap subject', createdAt: new Date() });
+      const [{ insertId: groupId }] = await db.insert(conceptGroupTable).values({ name: 'group', subjectId, createdAt: new Date() });
+      await db.insert(conceptTable).values({ name: 'concept', conceptGroupId: groupId, numberOfQuestions: 5, createdAt: new Date() });
+
+      const threeDaysAgo = dateNDaysAgo(3);
+      const today = dateNDaysAgo(0);
+      await db.insert(userStatHistoryTable).values([
+        { userId, subjectId, date: threeDaysAgo, weightedMastery: 4, dailyAttempts: 1, dailyCorrect: 5, createdAt: new Date(), updatedAt: new Date() },
+        { userId, subjectId, date: today, weightedMastery: 8, dailyAttempts: 1, dailyCorrect: 9, createdAt: new Date(), updatedAt: new Date() },
+      ]);
+
+      const res = await app.request('/api/user/history');
+      const body = (await res.json()) as {
+        streakDays: number;
+        overallDailyMastery: { date: string; weightedMastery: number }[];
+      };
+      // Not consecutive with today (a 2-day gap in between) -- streak
+      // still counts today itself, just doesn't extend past it.
+      expect(body.streakDays).toBe(1);
+      expect(body.overallDailyMastery).toHaveLength(4);
+      expect(body.overallDailyMastery.map((d) => d.date)).toEqual([
+        threeDaysAgo,
+        dateNDaysAgo(2),
+        dateNDaysAgo(1),
+        today,
+      ]);
+      // carried forward on the two gap days
+      expect(body.overallDailyMastery.map((d) => d.weightedMastery)).toEqual([4, 4, 4, 8]);
+    });
+
+    it('reports a streak of 0 when the most recent activity is older than yesterday', async () => {
+      const userId = await seedUser();
+      vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+      const db = getDb();
+      const [{ insertId: subjectId }] = await db.insert(subjectTable).values({ name: 'stale subject', createdAt: new Date() });
+      await db.insert(userStatHistoryTable).values({
+        userId,
+        subjectId,
+        date: dateNDaysAgo(3),
+        weightedMastery: 5,
+        dailyAttempts: 1,
+        dailyCorrect: 5,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      const res = await app.request('/api/user/history');
+      const body = (await res.json()) as { streakDays: number };
+      expect(body.streakDays).toBe(0);
     });
   });
 
