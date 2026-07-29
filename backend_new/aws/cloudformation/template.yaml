@@ -41,6 +41,19 @@ Resources:
             Action: sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        # POST /question calls events:EnableRule on the Facebook auto-post
+        # rule after creating a question, to arm it -- only EnableRule,
+        # not DisableRule; that half only ever runs from FacebookFunction
+        # (see FacebookExecutionRole) once it runs out of questions to post.
+        - PolicyName: !Sub ${Project}-${TargetEnvr}-api-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - events:EnableRule
+                Resource: !Sub arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/${Project}-${TargetEnvr}-facebook
 
   RestApi:
     Type: AWS::Serverless::Api
@@ -56,7 +69,13 @@ Resources:
       Runtime: nodejs22.x
       FunctionName: !Sub ${Project}-${TargetEnvr}-api
       Role: !GetAtt ApiExecutionRole.Arn
-      CodeUri: ../../dist
+      # Own bundle, deliberately separate from FacebookFunction's --
+      # they used to share dist/index.js, which meant this function's
+      # cold start had to load facebook.ts's require('@sparticuz/chromium')
+      # too. That package is `--external` (provided only by
+      # FacebookFunction's Chromium layer), so loading it here without
+      # the layer attached threw ImportModuleError on every invocation.
+      CodeUri: ../../dist/api
       MemorySize: 256
       Timeout: 30
       Environment:
@@ -75,6 +94,108 @@ Resources:
             RestApiId: !Ref RestApi
             Path: /{proxy+}
             Method: ANY
+
+  #####################################################################
+  ##### Facebook auto-post: polls for the oldest question that has  #####
+  ##### content but hasn't been posted yet, renders it to an image   #####
+  ##### via headless Chromium, and posts it to the FB page. Runs on  #####
+  ##### its own EventBridge schedule rather than every-request like  #####
+  ##### the API function -- disarms itself (State: DISABLED here,    #####
+  ##### then events:DisableRule when it runs dry) so it isn't        #####
+  ##### polling every 10 minutes with nothing to do; POST /question  #####
+  ##### re-arms it via events:EnableRule after creating a question.   #####
+  #####################################################################
+  FacebookExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${Project}-${TargetEnvr}-facebook-execution-role
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: !Sub ${Project}-${TargetEnvr}-facebook-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:DeleteObject
+                Resource: !Sub arn:aws:s3:::${Project}-public-bucket/*
+              - Effect: Allow
+                Action:
+                  - events:EnableRule
+                  - events:DisableRule
+                # Built from the rule's predictable name rather than
+                # !GetAtt EventBridgeFacebook.Arn -- that would make this
+                # role depend on the rule, the rule's Target depends on
+                # FacebookFunction, and FacebookFunction's Role depends
+                # back on this role, a circular dependency CloudFormation
+                # refuses to deploy.
+                Resource: !Sub arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/${Project}-${TargetEnvr}-facebook
+
+  ChromiumLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: !Sub ${Project}-${TargetEnvr}-chromium
+      ContentUri: ../../chromium-arm64.zip
+      CompatibleRuntimes:
+        - nodejs22.x
+      CompatibleArchitectures:
+        - arm64
+      RetentionPolicy: Delete
+
+  FacebookFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Architectures: [arm64]
+      Handler: index.facebook
+      Runtime: nodejs22.x
+      FunctionName: !Sub ${Project}-${TargetEnvr}-facebook
+      Role: !GetAtt FacebookExecutionRole.Arn
+      CodeUri: ../../dist/facebook
+      MemorySize: 1024
+      Timeout: 60
+      Layers:
+        - !Ref ChromiumLayer
+      Environment:
+        Variables:
+          ENVR: !Sub ${TargetEnvr}
+          PROJECT: !Sub ${Project}
+          DB_HOST:
+            Fn::ImportValue: !Sub celestial-studio-${TargetEnvr}-db-endpoint
+          DB_PWD: !Sub '{{resolve:ssm:mysql-${TargetEnvr}-${Project}-pwd}}'
+          DB_POOL_SIZE: '1'
+          S3_BUCKET: !Sub ${Project}-public-bucket
+          FB_PAGE_ID: '352343371286540'
+          FB_ACCESS_TOKEN: !Sub '{{resolve:ssm:${Project}-fb-access-token}}'
+
+  InvokePermissionFacebook:
+    Type: AWS::Lambda::Permission
+    DependsOn: [FacebookFunction]
+    Properties:
+      FunctionName: !Sub ${Project}-${TargetEnvr}-facebook
+      Action: 'lambda:InvokeFunction'
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt EventBridgeFacebook.Arn
+
+  EventBridgeFacebook:
+    Type: AWS::Events::Rule
+    DependsOn: [FacebookFunction]
+    Properties:
+      Name: !Sub ${Project}-${TargetEnvr}-facebook
+      ScheduleExpression: cron(*/10 * * * ? *)
+      State: DISABLED
+      Targets:
+        - Arn: !GetAtt FacebookFunction.Arn
+          Id: !Sub ${Project}-${TargetEnvr}-facebook
+
   #########################################
   ##### Cloudfront and Route53 config #####
   #########################################

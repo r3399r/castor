@@ -18,6 +18,7 @@ import {
   tagTable,
   userConceptStatTable,
 } from 'src/db/schema';
+import { enableFacebookEventBridge } from 'src/lib/facebookEventBridge';
 import { DEFAULT_LIMIT, genPagination, MAX_LIMIT } from 'src/lib/paginator';
 import { UserEnv } from 'src/middleware/requireUser';
 import { TransactionEnv } from 'src/middleware/transaction';
@@ -756,6 +757,12 @@ export const question = new Hono<UserEnv>()
       results.push(
         await createOneQuestion(db, data.subjectId, data.examId, item)
       );
+
+    // Arms the Facebook auto-post polling rule (it disarms itself once it
+    // runs out of unposted questions) -- once per batch rather than once
+    // per question, since re-enabling an already-enabled rule is a no-op
+    // anyway.
+    await enableFacebookEventBridge();
 
     return c.json(results, 201);
   })

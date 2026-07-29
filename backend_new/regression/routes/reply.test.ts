@@ -27,6 +27,11 @@ import { ADMIN_EMAILS } from 'src/middleware/adminAuth';
 vi.mock('src/lib/firebaseAdmin', () => ({ verifyIdToken: vi.fn(), verifyIdTokenUid: vi.fn() }));
 import { verifyIdToken, verifyIdTokenUid } from 'src/lib/firebaseAdmin';
 
+// The fixture questions created here go through the same POST /question
+// that fires off enableFacebookEventBridge -- mocked for the same reason
+// as in question.test.ts.
+vi.mock('src/lib/facebookEventBridge', () => ({ enableFacebookEventBridge: vi.fn() }));
+
 type QuestionDto = {
   id: number;
   uuid: string;

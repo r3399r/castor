@@ -21,7 +21,7 @@ export default defineConfig({
       // logic. Coverage on them mostly measures "did esbuild include this
       // line", not "did we test the behavior" -- excluded for signal, not
       // to hide untested code.
-      exclude: ['src/index.ts', 'src/lambda/api.ts'],
+      exclude: ['src/lambda/api.ts', 'src/lambda/facebook.ts'],
     },
   },
 });

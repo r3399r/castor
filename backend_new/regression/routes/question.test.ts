@@ -39,6 +39,12 @@ import { ADMIN_EMAILS } from 'src/middleware/adminAuth';
 vi.mock('src/lib/firebaseAdmin', () => ({ verifyIdToken: vi.fn(), verifyIdTokenUid: vi.fn() }));
 import { verifyIdToken, verifyIdTokenUid } from 'src/lib/firebaseAdmin';
 
+// POST /question fires-and-forgets a call to arm the Facebook auto-post
+// EventBridge rule -- mocked so these tests don't make a real (if
+// harmless, since the rule name never matches a real deployed one
+// locally) network call to AWS on every question creation.
+vi.mock('src/lib/facebookEventBridge', () => ({ enableFacebookEventBridge: vi.fn() }));
+
 type QuestionDto = {
   id: number;
   uuid: string;

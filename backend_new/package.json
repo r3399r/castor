@@ -5,7 +5,9 @@
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.tools.json --noEmit",
     "clean": "del-cli dist -f",
-    "build": "esbuild src/index.ts --bundle --minify --platform=node --target=node22 --outfile=dist/index.js",
+    "build": "run-p build:api build:facebook",
+    "build:api": "esbuild src/lambda/api.ts --bundle --minify --platform=node --target=node22 --outfile=dist/api/index.js",
+    "build:facebook": "esbuild src/lambda/facebook.ts --bundle --minify --platform=node --target=node22 --external:@sparticuz/chromium --outfile=dist/facebook/index.js",
     "pre:deploy": "run-s clean typecheck build",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
@@ -18,12 +20,16 @@
     "test:coverage": "vitest run --coverage --coverage.reportsDirectory=coverage/combined"
   },
   "dependencies": {
+    "@aws-sdk/client-eventbridge": "^3.906.0",
+    "@aws-sdk/client-s3": "^3.906.0",
     "@castor/shared": "*",
     "@hono/zod-validator": "^0.4.3",
+    "@sparticuz/chromium": "^148.0.0",
     "drizzle-orm": "^0.45.2",
     "firebase-admin": "^13.10.0",
     "hono": "^4.6.14",
     "mysql2": "^3.15.1",
+    "puppeteer-core": "^25.0.4",
     "zod": "^3.24.1"
   },
   "devDependencies": {
