@@ -5,9 +5,10 @@
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.tools.json --noEmit",
     "clean": "del-cli dist -f",
-    "build": "run-p build:api build:facebook",
+    "build": "run-p build:api build:facebook build:housekeep",
     "build:api": "esbuild src/lambda/api.ts --bundle --minify --platform=node --target=node22 --outfile=dist/api/index.js",
     "build:facebook": "esbuild src/lambda/facebook.ts --bundle --minify --platform=node --target=node22 --external:@sparticuz/chromium --outfile=dist/facebook/index.js",
+    "build:housekeep": "esbuild src/lambda/housekeep.ts --bundle --minify --platform=node --target=node22 --outfile=dist/housekeep/index.js",
     "pre:deploy": "run-s clean typecheck build",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",

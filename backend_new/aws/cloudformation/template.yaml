@@ -196,6 +196,66 @@ Resources:
         - Arn: !GetAtt FacebookFunction.Arn
           Id: !Sub ${Project}-${TargetEnvr}-facebook
 
+  #####################################################################
+  ##### Daily housekeeping: trims reply/pending_reply so they don't  #####
+  ##### grow forever. Runs unconditionally on its own schedule (no    #####
+  ##### enable/disable dance like Facebook's) -- just DB access, no   #####
+  ##### extra AWS permissions needed beyond basic execution.          #####
+  #####################################################################
+  HousekeepExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${Project}-${TargetEnvr}-housekeep-execution-role
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  HousekeepFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Architectures: [arm64]
+      Handler: index.housekeep
+      Runtime: nodejs22.x
+      FunctionName: !Sub ${Project}-${TargetEnvr}-housekeep
+      Role: !GetAtt HousekeepExecutionRole.Arn
+      CodeUri: ../../dist/housekeep
+      MemorySize: 256
+      Timeout: 30
+      Environment:
+        Variables:
+          ENVR: !Sub ${TargetEnvr}
+          PROJECT: !Sub ${Project}
+          DB_HOST:
+            Fn::ImportValue: !Sub celestial-studio-${TargetEnvr}-db-endpoint
+          DB_PWD: !Sub '{{resolve:ssm:mysql-${TargetEnvr}-${Project}-pwd}}'
+          DB_POOL_SIZE: '1'
+
+  InvokePermissionHousekeep:
+    Type: AWS::Lambda::Permission
+    DependsOn: [HousekeepFunction]
+    Properties:
+      FunctionName: !Sub ${Project}-${TargetEnvr}-housekeep
+      Action: 'lambda:InvokeFunction'
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt EventBridgeHousekeep.Arn
+
+  EventBridgeHousekeep:
+    Type: AWS::Events::Rule
+    DependsOn: [HousekeepFunction]
+    Properties:
+      Name: !Sub ${Project}-${TargetEnvr}-housekeep
+      ScheduleExpression: cron(5 20 * * ? *)
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt HousekeepFunction.Arn
+          Id: !Sub ${Project}-${TargetEnvr}-housekeep
+
   #########################################
   ##### Cloudfront and Route53 config #####
   #########################################
