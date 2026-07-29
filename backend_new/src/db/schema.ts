@@ -1,6 +1,7 @@
 import {
   AnyMySqlColumn,
   boolean,
+  date,
   datetime,
   double,
   int,
@@ -291,6 +292,25 @@ export const userConceptStatTable = mysqlTable('user_concept_stat', {
   lastAttemptAt: datetime('last_attempt_at', { mode: 'date', fsp: 3 }),
   weightedSum: double('weighted_sum').notNull().default(0),
   decaySum: double('decay_sum').notNull().default(0),
+  createdAt: datetime('created_at', { mode: 'date', fsp: 3 }),
+  updatedAt: datetime('updated_at', { mode: 'date', fsp: 3 }),
+});
+
+// One row per (user, subject, day) -- daily rollup that POST /reply
+// upserts after every batch, and that the not-yet-ported user-history
+// endpoint (GET /user/history in the legacy backend) will read from.
+export const userStatHistoryTable = mysqlTable('user_stat_history', {
+  id: int('id', { unsigned: true }).autoincrement().primaryKey(),
+  userId: int('user_id', { unsigned: true })
+    .notNull()
+    .references(() => userTable.id),
+  subjectId: int('subject_id', { unsigned: true })
+    .notNull()
+    .references(() => subjectTable.id),
+  date: date('date', { mode: 'string' }).notNull(),
+  weightedMastery: double('weighted_mastery'),
+  dailyAttempts: int('daily_attempts', { unsigned: true }).notNull().default(0),
+  dailyCorrect: double('daily_correct').notNull().default(0),
   createdAt: datetime('created_at', { mode: 'date', fsp: 3 }),
   updatedAt: datetime('updated_at', { mode: 'date', fsp: 3 }),
 });

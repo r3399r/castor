@@ -11,6 +11,7 @@ import { filterDimension } from 'src/routes/filterDimension';
 import { filterOption } from 'src/routes/filterOption';
 import { info } from 'src/routes/info';
 import { question } from 'src/routes/question';
+import { reply } from 'src/routes/reply';
 import { subject } from 'src/routes/subject';
 import { tag } from 'src/routes/tag';
 import { user } from 'src/routes/user';
@@ -48,6 +49,9 @@ export const app = new Hono()
   .use('/api/question/*', transaction)
   .use('/api/question/adaptive', requireUser)
   .route('/api/question', question)
+  .use('/api/reply/*', transaction)
+  .use('/api/reply/*', requireUser)
+  .route('/api/reply', reply)
   .onError((err, c) => {
     console.error(err);
     const { status, body } = toErrorResponse(err);

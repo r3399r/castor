@@ -118,7 +118,7 @@ export const questionAdaptiveQuerySchema = z.object({
   count: z.coerce.number().int().positive().max(50).optional().default(1),
 });
 
-type AdaptiveChildDto = {
+export type QuestionDetailChildDto = {
   id: number;
   type: string;
   sortOrder: number | null;
@@ -129,7 +129,7 @@ type AdaptiveChildDto = {
   adjustedDifficulty: number;
 };
 
-type AdaptiveQuestionDto = {
+export type QuestionDetailDto = {
   id: number;
   uuid: string;
   subjectId: number;
@@ -145,16 +145,17 @@ type AdaptiveQuestionDto = {
   exam: { id: number; name: string }[];
   tag: { id: number; name: string }[];
   concept: { id: number; name: string; conceptGroup: { id: number; name: string } }[];
-  children: AdaptiveChildDto[];
+  children: QuestionDetailChildDto[];
 };
 
 // Builds full nested DTOs only for the ids passed in -- the adaptive
 // selection below deliberately keeps its candidate-scoring queries to
 // just question.id, and only calls this once, for the small final set of
 // chosen ids, rather than eager-loading every candidate it examines
-// along the way.
-const buildQuestionDtos = async (db: Db, ids: number[]) => {
-  const dtoById = new Map<number, AdaptiveQuestionDto>();
+// along the way. Exported for reuse by /reply, which needs the same
+// nested exam/tag/concept shape for its history listing.
+export const buildQuestionDtos = async (db: Db, ids: number[]) => {
+  const dtoById = new Map<number, QuestionDetailDto>();
   if (ids.length === 0) return dtoById;
 
   const rows = await db.select().from(questionTable).where(inArray(questionTable.id, ids));
@@ -186,7 +187,7 @@ const buildQuestionDtos = async (db: Db, ids: number[]) => {
     .innerJoin(conceptGroupTable, eq(conceptGroupTable.id, conceptTable.conceptGroupId))
     .where(inArray(questionConceptTable.questionId, ids));
 
-  const childrenByParent = new Map<number, AdaptiveChildDto[]>();
+  const childrenByParent = new Map<number, QuestionDetailChildDto[]>();
   for (const child of childRows) {
     const list = childrenByParent.get(child.parentId!) ?? [];
     list.push({
@@ -213,7 +214,7 @@ const buildQuestionDtos = async (db: Db, ids: number[]) => {
     list.push({ id: link.id, name: link.name });
     tagsByQuestion.set(link.questionId, list);
   }
-  const conceptsByQuestion = new Map<number, AdaptiveQuestionDto['concept']>();
+  const conceptsByQuestion = new Map<number, QuestionDetailDto['concept']>();
   for (const link of conceptLinks) {
     const list = conceptsByQuestion.get(link.questionId) ?? [];
     list.push({
