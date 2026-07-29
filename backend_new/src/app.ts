@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { toErrorResponse } from 'src/lib/errorResponse';
-import { adminAuth, requireAdmin } from 'src/middleware/adminAuth';
+import { adminAuth } from 'src/middleware/adminAuth';
 import { requireUser } from 'src/middleware/requireUser';
 import { transaction } from 'src/middleware/transaction';
 import { category } from 'src/routes/category';
@@ -42,7 +42,6 @@ export const app = new Hono()
   .use('/api/filter-option/*', adminAuth)
   .use('/api/filter-option/*', transaction)
   .route('/api/filter-option', filterOption)
-  .use('/api/user/*', requireAdmin)
   .use('/api/user/*', transaction)
   .route('/api/user', user)
   .use('/api/question/*', adminAuth)

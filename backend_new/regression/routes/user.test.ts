@@ -8,6 +8,7 @@ import {
   it,
   vi,
 } from 'vitest';
+import { eq } from 'drizzle-orm';
 import { app } from 'src/app';
 import { closeDb, getDb } from 'src/db/client';
 import { userTable } from 'src/db/schema';
@@ -15,9 +16,10 @@ import { ADMIN_EMAILS } from 'src/middleware/adminAuth';
 
 // The admin gate is exercised end-to-end in its own describe block below;
 // every other test just needs reads to succeed, so default the mocked
-// Firebase verification to the admin identity.
-vi.mock('src/lib/firebaseAdmin', () => ({ verifyIdToken: vi.fn() }));
-import { verifyIdToken } from 'src/lib/firebaseAdmin';
+// Firebase verification to the admin identity. verifyIdTokenFull backs
+// POST /sync's own (non-admin) identity check.
+vi.mock('src/lib/firebaseAdmin', () => ({ verifyIdToken: vi.fn(), verifyIdTokenFull: vi.fn() }));
+import { verifyIdToken, verifyIdTokenFull } from 'src/lib/firebaseAdmin';
 
 type UserDto = {
   id: number;
@@ -158,6 +160,85 @@ describe('user routes', () => {
     it('rejects an invalid sort column with 400', async () => {
       const res = await app.request('/api/user?sort=bogus');
       expect(res.status).toBe(400);
+    });
+  });
+
+  describe('POST /sync', () => {
+    const postSync = () => app.request('/api/user/sync', { method: 'POST' });
+
+    it('rejects with 401 when there is no valid identity', async () => {
+      vi.mocked(verifyIdTokenFull).mockResolvedValue(null);
+      const res = await postSync();
+      expect(res.status).toBe(401);
+    });
+
+    it('creates a new user row on first sign-in', async () => {
+      vi.mocked(verifyIdTokenFull).mockResolvedValue({
+        uid: 'new-uid',
+        email: 'new@example.com',
+        name: 'New User',
+        picture: 'https://example.com/new.png',
+      });
+
+      const res = await postSync();
+      expect(res.status).toBe(201);
+      const body = (await res.json()) as UserDto;
+      expect(body).toMatchObject({
+        firebaseUid: 'new-uid',
+        email: 'new@example.com',
+        name: 'New User',
+        avatar: 'https://example.com/new.png',
+      });
+      expect(body.lastLoginAt).toEqual(expect.any(String));
+
+      const rows = await getDb().select().from(userTable).where(eq(userTable.firebaseUid, 'new-uid'));
+      expect(rows).toHaveLength(1);
+    });
+
+    it('succeeds for a non-admin identity -- /sync is not gated by the admin allowlist', async () => {
+      vi.mocked(verifyIdTokenFull).mockResolvedValue({
+        uid: 'ordinary-uid',
+        email: 'ordinary@example.com',
+        name: 'Ordinary User',
+        picture: null,
+      });
+
+      const res = await postSync();
+      expect(res.status).toBe(201);
+    });
+
+    it('refreshes only lastLoginAt for a returning user, leaving other fields untouched', async () => {
+      const [{ insertId }] = await getDb().insert(userTable).values({
+        firebaseUid: 'returning-uid',
+        email: 'original@example.com',
+        name: 'Original Name',
+        avatar: 'https://example.com/original.png',
+        lastLoginAt: new Date('2020-01-01T00:00:00Z'),
+        createdAt: new Date('2020-01-01T00:00:00Z'),
+        updatedAt: new Date('2020-01-01T00:00:00Z'),
+      });
+      // Firebase-side profile changed since the row was created -- sync
+      // should not overwrite the stored name/email/avatar with these.
+      vi.mocked(verifyIdTokenFull).mockResolvedValue({
+        uid: 'returning-uid',
+        email: 'changed@example.com',
+        name: 'Changed Name',
+        picture: 'https://example.com/changed.png',
+      });
+
+      const res = await postSync();
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as UserDto;
+      expect(body).toMatchObject({
+        id: insertId,
+        email: 'original@example.com',
+        name: 'Original Name',
+        avatar: 'https://example.com/original.png',
+      });
+      expect(new Date(body.lastLoginAt!).getTime()).toBeGreaterThan(new Date('2020-01-01T00:00:00Z').getTime());
+
+      const rows = await getDb().select().from(userTable).where(eq(userTable.firebaseUid, 'returning-uid'));
+      expect(rows).toHaveLength(1);
     });
   });
 

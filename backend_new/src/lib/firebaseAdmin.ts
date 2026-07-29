@@ -18,18 +18,16 @@ const getAuth = () => {
 };
 
 /**
- * Returns the verified token's email, or null if the token is missing,
- * expired, or otherwise fails verification -- callers decide what that
- * means (401 vs 403), this just answers "who, if anyone".
+ * Verifies the raw Firebase ID token (no "Bearer " prefix, matching the
+ * frontend's convention) and returns the decoded token, or null if it's
+ * missing, expired, or otherwise fails verification. The three exports
+ * below each just project the field(s) their caller needs off of this.
  */
-export const verifyIdToken = async (
-  token: string | undefined
-): Promise<string | null> => {
+const verifyFirebaseToken = async (token: string | undefined) => {
   if (!token) return null;
 
   try {
-    const decoded = await getAuth().verifyIdToken(token);
-    return decoded.email ?? null;
+    return await getAuth().verifyIdToken(token);
   } catch (error) {
     console.error('Invalid Firebase token', error);
     return null;
@@ -37,21 +35,46 @@ export const verifyIdToken = async (
 };
 
 /**
- * Returns the verified token's Firebase uid, or null if the token is
- * missing, expired, or otherwise fails verification -- for resolving
+ * Returns the verified token's email, or null -- callers decide what
+ * that means (401 vs 403), this just answers "who, if anyone".
+ */
+export const verifyIdToken = async (token: string | undefined): Promise<string | null> => {
+  const decoded = await verifyFirebaseToken(token);
+  return decoded?.email ?? null;
+};
+
+/**
+ * Returns the verified token's Firebase uid, or null -- for resolving
  * *which* app user (by firebase_uid) is asking, as opposed to
  * verifyIdToken's admin-allowlist email check.
  */
-export const verifyIdTokenUid = async (
-  token: string | undefined
-): Promise<string | null> => {
-  if (!token) return null;
+export const verifyIdTokenUid = async (token: string | undefined): Promise<string | null> => {
+  const decoded = await verifyFirebaseToken(token);
+  return decoded?.uid ?? null;
+};
 
-  try {
-    const decoded = await getAuth().verifyIdToken(token);
-    return decoded.uid;
-  } catch (error) {
-    console.error('Invalid Firebase token', error);
-    return null;
-  }
+export type VerifiedIdentity = {
+  uid: string;
+  email: string | null;
+  name: string | null;
+  picture: string | null;
+};
+
+/**
+ * Returns everything the user-sync endpoint needs to create or refresh a
+ * user row (uid plus the profile fields Firebase carries on the token),
+ * or null if verification fails.
+ */
+export const verifyIdTokenFull = async (
+  token: string | undefined
+): Promise<VerifiedIdentity | null> => {
+  const decoded = await verifyFirebaseToken(token);
+  if (!decoded) return null;
+
+  return {
+    uid: decoded.uid,
+    email: decoded.email ?? null,
+    name: decoded.name ?? null,
+    picture: decoded.picture ?? null,
+  };
 };
