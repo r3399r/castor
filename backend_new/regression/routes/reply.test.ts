@@ -3,6 +3,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { app } from 'src/app';
 import { closeDb, getDb } from 'src/db/client';
 import {
+  categoryTable,
   conceptGroupTable,
   conceptTable,
   examSubjectTable,
@@ -13,6 +14,7 @@ import {
   questionTable,
   questionTagTable,
   replyTable,
+  subjectCategoryTable,
   subjectTable,
   tagTable,
   userConceptStatTable,
@@ -173,7 +175,9 @@ const clearTables = async () => {
   await db.delete(tagTable);
   await db.delete(examSubjectTable);
   await db.delete(examTable);
+  await db.delete(subjectCategoryTable);
   await db.delete(subjectTable);
+  await db.delete(categoryTable);
   await db.delete(userTable);
 };
 
@@ -518,28 +522,123 @@ describe('reply routes', () => {
       expect(body.paginate).toMatchObject({ total: 0, totalPages: 1 });
     });
 
-    describe('?onlyWrong=true', () => {
-      it('excludes a fully-correct standalone answer', async () => {
+    describe('?categoryId=', () => {
+      it('only returns replies for subjects linked to the given category', async () => {
         await seedUser();
         vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
         const { subjectId, examId, conceptId } = await seedFixture();
-        const correctQ = await createQuestion(subjectId, examId, { answer: 'A', conceptIds: [conceptId] });
-        const wrongQ = await createQuestion(subjectId, examId, { answer: 'A', conceptIds: [conceptId] });
+        const q1 = await createQuestion(subjectId, examId, { answer: 'A', conceptIds: [conceptId] });
+
+        const db = getDb();
+        const [{ insertId: categoryId }] = await db
+          .insert(categoryTable)
+          .values({ name: 'fixture category', createdAt: new Date() });
+        await db.insert(subjectCategoryTable).values({ categoryId, subjectId });
+
+        const [{ insertId: otherSubjectId }] = await db
+          .insert(subjectTable)
+          .values({ name: 'other subject', createdAt: new Date() });
+        await db.insert(examSubjectTable).values({ examId, subjectId: otherSubjectId });
+        const [{ insertId: otherGroupId }] = await db
+          .insert(conceptGroupTable)
+          .values({ name: 'other group', subjectId: otherSubjectId, createdAt: new Date() });
+        const [{ insertId: otherConceptId }] = await db
+          .insert(conceptTable)
+          .values({ name: 'other concept', conceptGroupId: otherGroupId, createdAt: new Date() });
+        const q2 = await createQuestion(otherSubjectId, examId, { answer: 'A', conceptIds: [otherConceptId] });
+        // otherSubjectId is deliberately left out of subject_category -- it
+        // belongs to no category, so it must never match a categoryId filter.
 
         await postReply([
-          { questionId: correctQ.id, repliedAnswer: 'A' },
-          { questionId: wrongQ.id, repliedAnswer: 'B' },
+          { questionId: q1.id, repliedAnswer: 'A' },
+          { questionId: q2.id, repliedAnswer: 'A' },
         ]);
 
-        const res = await getReplyList('?onlyWrong=true');
+        const res = await getReplyList(`?categoryId=${categoryId}`);
         expect(res.status).toBe(200);
         const body = (await res.json()) as { data: ReplyGroupDto[]; paginate: { total: number } };
         expect(body.paginate.total).toBe(1);
-        expect(body.data).toHaveLength(1);
-        expect(body.data[0].children[0].questionId).toBe(wrongQ.id);
+        expect(body.data[0].children[0].questionId).toBe(q1.id);
       });
 
-      it('keeps a GROUP row but drops its correct children, keeping only the wrong ones', async () => {
+      it('returns an empty page for a category with no linked subjects', async () => {
+        await seedUser();
+        vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+        const { subjectId, examId, conceptId } = await seedFixture();
+        const q = await createQuestion(subjectId, examId, { answer: 'A', conceptIds: [conceptId] });
+        await postReply([{ questionId: q.id, repliedAnswer: 'A' }]);
+
+        const db = getDb();
+        const [{ insertId: emptyCategoryId }] = await db
+          .insert(categoryTable)
+          .values({ name: 'empty category', createdAt: new Date() });
+
+        const res = await getReplyList(`?categoryId=${emptyCategoryId}`);
+        const body = (await res.json()) as { data: ReplyGroupDto[]; paginate: { total: number } };
+        expect(body.data).toEqual([]);
+        expect(body.paginate.total).toBe(0);
+      });
+    });
+
+    describe('?subjectId=', () => {
+      it('only returns replies belonging to the given subject', async () => {
+        await seedUser();
+        vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+        const { subjectId, examId, conceptId } = await seedFixture();
+        const q1 = await createQuestion(subjectId, examId, { answer: 'A', conceptIds: [conceptId] });
+
+        const db = getDb();
+        const [{ insertId: otherSubjectId }] = await db
+          .insert(subjectTable)
+          .values({ name: 'other subject', createdAt: new Date() });
+        await db.insert(examSubjectTable).values({ examId, subjectId: otherSubjectId });
+        const [{ insertId: otherGroupId }] = await db
+          .insert(conceptGroupTable)
+          .values({ name: 'other group', subjectId: otherSubjectId, createdAt: new Date() });
+        const [{ insertId: otherConceptId }] = await db
+          .insert(conceptTable)
+          .values({ name: 'other concept', conceptGroupId: otherGroupId, createdAt: new Date() });
+        const q2 = await createQuestion(otherSubjectId, examId, { answer: 'A', conceptIds: [otherConceptId] });
+
+        await postReply([
+          { questionId: q1.id, repliedAnswer: 'A' },
+          { questionId: q2.id, repliedAnswer: 'A' },
+        ]);
+
+        const res = await getReplyList(`?subjectId=${subjectId}`);
+        expect(res.status).toBe(200);
+        const body = (await res.json()) as { data: ReplyGroupDto[]; paginate: { total: number } };
+        expect(body.paginate.total).toBe(1);
+        expect(body.data[0].children[0].questionId).toBe(q1.id);
+      });
+    });
+
+    describe('?examIds=', () => {
+      it("only returns replies whose top-level question is linked to the given exam", async () => {
+        await seedUser();
+        vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+        const { subjectId, examId, conceptId } = await seedFixture();
+        const db = getDb();
+        const [{ insertId: otherExamId }] = await db
+          .insert(examTable)
+          .values({ name: 'other exam', createdAt: new Date() });
+        await db.insert(examSubjectTable).values({ examId: otherExamId, subjectId });
+
+        const q1 = await createQuestion(subjectId, examId, { answer: 'A', conceptIds: [conceptId] });
+        const q2 = await createQuestion(subjectId, otherExamId, { answer: 'A', conceptIds: [conceptId] });
+
+        await postReply([
+          { questionId: q1.id, repliedAnswer: 'A' },
+          { questionId: q2.id, repliedAnswer: 'A' },
+        ]);
+
+        const res = await getReplyList(`?examIds=${examId}`);
+        const body = (await res.json()) as { data: ReplyGroupDto[]; paginate: { total: number } };
+        expect(body.paginate.total).toBe(1);
+        expect(body.data[0].children[0].questionId).toBe(q1.id);
+      });
+
+      it("keeps every child of a matching GROUP question, since the exam link lives only on the group's top-level row", async () => {
         await seedUser();
         vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
         const { subjectId, examId, conceptId } = await seedFixture();
@@ -549,48 +648,35 @@ describe('reply routes', () => {
         ]);
 
         await postReply([
-          { questionId: child1.id, repliedAnswer: 'A' }, // correct
-          { questionId: child2.id, repliedAnswer: 'B' }, // wrong
+          { questionId: child1.id, repliedAnswer: 'A' },
+          { questionId: child2.id, repliedAnswer: 'B' },
         ]);
 
-        const res = await getReplyList('?onlyWrong=true');
-        const body = (await res.json()) as { data: ReplyGroupDto[]; paginate: { total: number } };
-        expect(body.paginate.total).toBe(1);
-        expect(body.data).toHaveLength(1);
-        expect(body.data[0].parentQuestion?.id).toBe(group.id);
-        expect(body.data[0].children.map((c) => c.questionId)).toEqual([child2.id]);
-      });
-
-      it('returns an empty page when every answer is correct', async () => {
-        await seedUser();
-        vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
-        const { subjectId, examId, conceptId } = await seedFixture();
-        const q = await createQuestion(subjectId, examId, { answer: 'A', conceptIds: [conceptId] });
-        await postReply([{ questionId: q.id, repliedAnswer: 'A' }]);
-
-        const res = await getReplyList('?onlyWrong=true');
-        const body = (await res.json()) as { data: ReplyGroupDto[]; paginate: { total: number } };
-        expect(body.data).toEqual([]);
-        expect(body.paginate.total).toBe(0);
-      });
-
-      it('treats a partial score (e.g. MULTIPLE) as wrong', async () => {
-        await seedUser();
-        vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
-        const { subjectId, examId, conceptId } = await seedFixture();
-        // correct = OXOX; one mismatch -> partial score of 5, not 10
-        const q = await createQuestion(subjectId, examId, {
-          type: 'MULTIPLE',
-          options: 'A|B|C|D',
-          answer: 'OXOX',
-          conceptIds: [conceptId],
-        });
-        await postReply([{ questionId: q.id, repliedAnswer: 'OXOO' }]);
-
-        const res = await getReplyList('?onlyWrong=true');
+        const res = await getReplyList(`?examIds=${examId}`);
         const body = (await res.json()) as { data: ReplyGroupDto[] };
         expect(body.data).toHaveLength(1);
-        expect(body.data[0].children[0].score).toBe(5);
+        expect(body.data[0].parentQuestion?.id).toBe(group.id);
+        expect(body.data[0].children.map((c) => c.questionId).sort()).toEqual([child1.id, child2.id].sort());
+      });
+    });
+
+    describe('?tagIds=', () => {
+      it('only returns replies whose top-level question carries the given tag', async () => {
+        await seedUser();
+        vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+        const { subjectId, examId, tagId, conceptId } = await seedFixture();
+        const q1 = await createQuestion(subjectId, examId, { answer: 'A', tagIds: [tagId], conceptIds: [conceptId] });
+        const q2 = await createQuestion(subjectId, examId, { answer: 'A', conceptIds: [conceptId] });
+
+        await postReply([
+          { questionId: q1.id, repliedAnswer: 'A' },
+          { questionId: q2.id, repliedAnswer: 'A' },
+        ]);
+
+        const res = await getReplyList(`?tagIds=${tagId}`);
+        const body = (await res.json()) as { data: ReplyGroupDto[]; paginate: { total: number } };
+        expect(body.paginate.total).toBe(1);
+        expect(body.data[0].children[0].questionId).toBe(q1.id);
       });
     });
   });

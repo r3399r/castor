@@ -104,7 +104,9 @@ export const questionCountQuerySchema = z.object({
   tagIds: z.string().optional(),
 });
 
-const parseIdList = (value: string | undefined) =>
+// Exported for reuse by /reply, which resolves the same comma-joined
+// exam/tag id lists to question-id sets for its own filtering.
+export const parseIdList = (value: string | undefined) =>
   value ? value.split(',').map(Number) : [];
 
 // A generous but bounded upper limit -- the legacy endpoint had no cap at

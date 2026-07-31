@@ -54,17 +54,31 @@ describe('replyListQuerySchema', () => {
     expect(replyListQuerySchema.safeParse({ offset: '-1' }).success).toBe(false);
   });
 
-  it('accepts onlyWrong=true', () => {
-    const result = replyListQuerySchema.safeParse({ onlyWrong: 'true' });
-    expect(result.success && result.data.onlyWrong).toBe('true');
+  it('coerces categoryId from a query string', () => {
+    const result = replyListQuerySchema.safeParse({ categoryId: '7' });
+    expect(result.success && result.data.categoryId).toBe(7);
   });
 
-  it('leaves onlyWrong undefined when omitted', () => {
+  it('rejects a non-positive categoryId', () => {
+    expect(replyListQuerySchema.safeParse({ categoryId: '0' }).success).toBe(false);
+  });
+
+  it('coerces subjectId from a query string', () => {
+    const result = replyListQuerySchema.safeParse({ subjectId: '3' });
+    expect(result.success && result.data.subjectId).toBe(3);
+  });
+
+  it('leaves subjectId undefined when omitted', () => {
     const result = replyListQuerySchema.safeParse({});
-    expect(result.success && result.data.onlyWrong).toBeUndefined();
+    expect(result.success && result.data.subjectId).toBeUndefined();
   });
 
-  it('rejects onlyWrong=false (only the literal "true" is accepted; omit for "off")', () => {
-    expect(replyListQuerySchema.safeParse({ onlyWrong: 'false' }).success).toBe(false);
+  it('rejects a non-positive subjectId', () => {
+    expect(replyListQuerySchema.safeParse({ subjectId: '0' }).success).toBe(false);
+  });
+
+  it('accepts examIds and tagIds as comma-joined id strings', () => {
+    const result = replyListQuerySchema.safeParse({ examIds: '1,2', tagIds: '3,4' });
+    expect(result.success && result.data).toMatchObject({ examIds: '1,2', tagIds: '3,4' });
   });
 });

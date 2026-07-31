@@ -1,5 +1,5 @@
 import { zValidator } from '@hono/zod-validator';
-import { and, desc, eq, inArray, lt, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import {
@@ -7,14 +7,17 @@ import {
   conceptTable,
   pendingReplyTable,
   questionConceptTable,
+  questionExamTable,
   questionTable,
+  questionTagTable,
   replyTable,
+  subjectCategoryTable,
   subjectTable,
   userConceptStatTable,
   userStatHistoryTable,
 } from 'src/db/schema';
 import { DEFAULT_LIMIT, genPagination, MAX_LIMIT } from 'src/lib/paginator';
-import { buildQuestionDtos, QuestionDetailDto } from 'src/routes/question';
+import { buildQuestionDtos, parseIdList, QuestionDetailDto } from 'src/routes/question';
 import { UserEnv } from 'src/middleware/requireUser';
 import { TransactionEnv } from 'src/middleware/transaction';
 
@@ -30,9 +33,10 @@ export const replyBodySchema = z.array(replyItemSchema).min(1);
 export const replyListQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(MAX_LIMIT).optional().default(DEFAULT_LIMIT),
   offset: z.coerce.number().int().min(0).optional().default(0),
-  // Literal 'true' only (not z.coerce.boolean(), which treats the string
-  // "false" as truthy) -- omit the param entirely for "off".
-  onlyWrong: z.enum(['true']).optional(),
+  categoryId: z.coerce.number().int().positive().optional(),
+  subjectId: z.coerce.number().int().positive().optional(),
+  examIds: z.string().optional(),
+  tagIds: z.string().optional(),
 });
 
 // TRUE_FALSE and SINGLE were two identical exact-match functions in the
@@ -340,10 +344,12 @@ export const reply = new Hono<UserEnv>()
     return c.json(responses);
   })
   .get('/', zValidator('query', replyListQuerySchema), async (c) => {
-    const { limit, offset, onlyWrong } = c.req.valid('query');
+    const { limit, offset, categoryId, subjectId, examIds, tagIds } = c.req.valid('query');
     const user = c.get('user');
     const db = c.get('db');
-    console.log(`GET /api/reply userId=${user.id} limit=${limit} offset=${offset} onlyWrong=${onlyWrong ?? ''}`);
+    console.log(
+      `GET /api/reply userId=${user.id} limit=${limit} offset=${offset} categoryId=${categoryId ?? ''} subjectId=${subjectId ?? ''} examIds=${examIds ?? ''} tagIds=${tagIds ?? ''}`
+    );
 
     // A "history row" is one submitted batch's worth of replies to the
     // same group question -- standalone questions group by their own id,
@@ -351,13 +357,49 @@ export const reply = new Hono<UserEnv>()
     // reply from the same POST /reply call shares the same repliedAt, so
     // (repliedAt, groupKey) uniquely identifies one row.
     const groupKey = sql<number>`coalesce(${replyTable.parentId}, ${replyTable.questionId})`;
-    // With onlyWrong, this condition applies to every query below,
-    // including the final row fetch -- so a GROUP question's correct
-    // children are dropped from its `children` array even when at least
-    // one sibling was wrong (which is what keeps the group's row on the
-    // page at all).
+    // Every filter below applies to every query further down (the group
+    // listing, the total count, and the final row fetch), same as the
+    // legacy onlyWrong condition did -- so a page's rows and its total
+    // always agree.
     const userConditions = [eq(replyTable.userId, user.id)];
-    if (onlyWrong) userConditions.push(lt(replyTable.score, 10));
+    if (subjectId !== undefined) userConditions.push(eq(replyTable.subjectId, subjectId));
+
+    // Resolved to a subject-id set (rather than joining subject_category
+    // directly) so a subject linked to the category more than once -- not
+    // possible given the composite PK, but keeps this the same shape as
+    // every other filter here -- is still only counted once. inArray([])
+    // safely compiles to `false` (drizzle-orm), so an unknown/empty
+    // category just yields zero rows rather than an SQL error.
+    if (categoryId !== undefined) {
+      const links = await db
+        .select({ subjectId: subjectCategoryTable.subjectId })
+        .from(subjectCategoryTable)
+        .where(eq(subjectCategoryTable.categoryId, categoryId));
+      userConditions.push(inArray(replyTable.subjectId, links.map((l) => l.subjectId)));
+    }
+
+    // exam/tag links only ever exist on a question's top-level (parentless)
+    // row -- a GROUP question's children never get their own -- so matches
+    // are resolved against groupKey (the row's top-level question id)
+    // rather than replyTable.questionId directly. This mirrors
+    // question/count's per-filter id-set resolution in question.ts.
+    const examIdList = parseIdList(examIds);
+    if (examIdList.length > 0) {
+      const links = await db
+        .select({ questionId: questionExamTable.questionId })
+        .from(questionExamTable)
+        .where(inArray(questionExamTable.examId, examIdList));
+      userConditions.push(inArray(groupKey, links.map((l) => l.questionId)));
+    }
+
+    const tagIdList = parseIdList(tagIds);
+    if (tagIdList.length > 0) {
+      const links = await db
+        .select({ questionId: questionTagTable.questionId })
+        .from(questionTagTable)
+        .where(inArray(questionTagTable.tagId, tagIdList));
+      userConditions.push(inArray(groupKey, links.map((l) => l.questionId)));
+    }
 
     const groupRows = await db
       .select({ repliedAt: replyTable.repliedAt, groupKey })

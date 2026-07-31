@@ -226,7 +226,12 @@ export type PostReplyResponse = {
   fbPostId: string | null
 }[]
 
-export type GetReplyParams = PaginationParams;
+export type GetReplyParams = PaginationParams & {
+  categoryId?: string;
+  subjectId?: string;
+  examIds?: string;
+  tagIds?: string;
+};
 
 export type ReplyGroup = {
   repliedAt: string;
