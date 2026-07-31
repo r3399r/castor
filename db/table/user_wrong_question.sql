@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS castor.user_wrong_question (
+    id INT UNSIGNED AUTO_INCREMENT,
+    user_id INT UNSIGNED NOT NULL,
+    question_id INT UNSIGNED NOT NULL,
+    parent_id INT UNSIGNED NULL,
+    subject_id INT UNSIGNED NOT NULL,
+    score DOUBLE NOT NULL DEFAULT 0,
+    wrong_count INT UNSIGNED NOT NULL DEFAULT 1,
+    last_wrong_at DATETIME(3) NOT NULL,
+    note TEXT NULL,
+    created_at DATETIME(3) NULL,
+    updated_at DATETIME(3) NULL,
+    PRIMARY KEY (id),
+    FOREIGN KEY (user_id) REFERENCES user(id),
+    FOREIGN KEY (question_id) REFERENCES question(id),
+    FOREIGN KEY (parent_id) REFERENCES question(id),
+    FOREIGN KEY (subject_id) REFERENCES subject(id),
+    UNIQUE KEY unique_user_question (user_id, question_id),
+    INDEX idx_user_subject (user_id, subject_id)
+);

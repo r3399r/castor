@@ -243,6 +243,33 @@ export type ReplyGroup = {
 
 export type GetReplyResponse = Paginate<ReplyGroup>
 
+export type WrongQuestion = {
+  id: number;
+  parentQuestion: Question | null;
+  question: Question;
+  subject: { id: number; name: string };
+  subjectId: number;
+  score: number;
+  wrongCount: number;
+  lastWrongAt: string | null;
+  note: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+};
+
+export type GetWrongQuestionParams = PaginationParams & {
+  categoryId?: string;
+  subjectId?: string;
+  examIds?: string;
+  tagIds?: string;
+};
+
+export type GetWrongQuestionResponse = Paginate<WrongQuestion>;
+
+export type PutWrongQuestionNoteRequest = { note: string | null };
+
+export type PutWrongQuestionNoteResponse = { id: number; note: string | null; updatedAt: string | null };
+
 export type PostPreviewRequest = { text: string; imageUrl: string }
 
 export type PostPreviewResponse = {

@@ -20,6 +20,7 @@ import {
   userConceptStatTable,
   userStatHistoryTable,
   userTable,
+  userWrongQuestionTable,
 } from 'src/db/schema';
 import { ADMIN_EMAILS } from 'src/middleware/adminAuth';
 
@@ -162,6 +163,7 @@ const createGroupQuestion = async (
 const clearTables = async () => {
   const db = getDb();
   await db.delete(pendingReplyTable);
+  await db.delete(userWrongQuestionTable);
   await db.delete(replyTable);
   await db.delete(userConceptStatTable);
   await db.delete(userStatHistoryTable);
@@ -434,6 +436,117 @@ describe('reply routes', () => {
       const body = (await res.json()) as PostReplyResponse;
       expect(body).toHaveLength(1);
       expect(body[0].questionId).toBe(q.id);
+    });
+
+    it('adds a user_wrong_question row when the answer scores below 10', async () => {
+      const userId = await seedUser();
+      vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+      const { subjectId, examId, conceptId } = await seedFixture();
+      const q = await createQuestion(subjectId, examId, { answer: 'A', conceptIds: [conceptId] });
+
+      await postReply([{ questionId: q.id, repliedAnswer: 'B' }]);
+
+      const db = getDb();
+      const rows = await db
+        .select()
+        .from(userWrongQuestionTable)
+        .where(eq(userWrongQuestionTable.questionId, q.id));
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({ userId, questionId: q.id, parentId: null, subjectId, score: 0, wrongCount: 1, note: null });
+      expect(rows[0].lastWrongAt).toBeInstanceOf(Date);
+    });
+
+    it('does not add a user_wrong_question row for a fully-correct answer', async () => {
+      await seedUser();
+      vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+      const { subjectId, examId, conceptId } = await seedFixture();
+      const q = await createQuestion(subjectId, examId, { answer: 'A', conceptIds: [conceptId] });
+
+      await postReply([{ questionId: q.id, repliedAnswer: 'A' }]);
+
+      const db = getDb();
+      const rows = await db
+        .select()
+        .from(userWrongQuestionTable)
+        .where(eq(userWrongQuestionTable.questionId, q.id));
+      expect(rows).toEqual([]);
+    });
+
+    it('records a GROUP question child as wrong with parentId set to the group', async () => {
+      await seedUser();
+      vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+      const { subjectId, examId, conceptId } = await seedFixture();
+      const [group, child1, child2] = await createGroupQuestion(subjectId, examId, [conceptId], [
+        { answer: 'A', options: 'A|B' },
+        { answer: 'A', options: 'A|B' },
+      ]);
+
+      await postReply([
+        { questionId: child1.id, repliedAnswer: 'A' }, // correct
+        { questionId: child2.id, repliedAnswer: 'B' }, // wrong
+      ]);
+
+      const db = getDb();
+      const rows = await db.select().from(userWrongQuestionTable).where(eq(userWrongQuestionTable.subjectId, subjectId));
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({ questionId: child2.id, parentId: group.id });
+    });
+
+    it('bumps wrongCount, score, and lastWrongAt without touching the row id, note, or createdAt when answered wrong again', async () => {
+      await seedUser();
+      vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+      const { subjectId, examId, conceptId } = await seedFixture();
+      // correct = OXOX; the two wrong answers below deliberately land on
+      // different partial scores (5, then 0) so the test can tell the row
+      // is really being recomputed from the latest attempt, not just left
+      // alone or reset to a fixed value.
+      const q = await createQuestion(subjectId, examId, {
+        type: 'MULTIPLE',
+        options: 'A|B|C|D',
+        answer: 'OXOX',
+        conceptIds: [conceptId],
+      });
+
+      await postReply([{ questionId: q.id, repliedAnswer: 'OXOO' }]); // 1 mismatch -> score 5
+      const db = getDb();
+      const [firstRow] = await db
+        .select()
+        .from(userWrongQuestionTable)
+        .where(eq(userWrongQuestionTable.questionId, q.id));
+      expect(firstRow).toMatchObject({ score: 5, wrongCount: 1 });
+      await db.update(userWrongQuestionTable).set({ note: 'remember this one' }).where(eq(userWrongQuestionTable.id, firstRow.id));
+
+      await postReply([{ questionId: q.id, repliedAnswer: 'XXOO' }]); // 2 mismatches -> score 0
+
+      const rows = await db.select().from(userWrongQuestionTable).where(eq(userWrongQuestionTable.questionId, q.id));
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({ id: firstRow.id, score: 0, wrongCount: 2, note: 'remember this one' });
+      expect(rows[0].createdAt?.getTime()).toBe(firstRow.createdAt?.getTime());
+      expect(rows[0].lastWrongAt.getTime()).toBeGreaterThanOrEqual(firstRow.lastWrongAt.getTime());
+    });
+
+    it('leaves the user_wrong_question row (including score/wrongCount/lastWrongAt) unchanged after a later correct answer', async () => {
+      await seedUser();
+      vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+      const { subjectId, examId, conceptId } = await seedFixture();
+      const q = await createQuestion(subjectId, examId, { answer: 'A', conceptIds: [conceptId] });
+
+      await postReply([{ questionId: q.id, repliedAnswer: 'B' }]);
+      const db = getDb();
+      const [wrongRow] = await db
+        .select()
+        .from(userWrongQuestionTable)
+        .where(eq(userWrongQuestionTable.questionId, q.id));
+
+      await postReply([{ questionId: q.id, repliedAnswer: 'A' }]);
+
+      const rows = await db
+        .select()
+        .from(userWrongQuestionTable)
+        .where(eq(userWrongQuestionTable.questionId, q.id));
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({ id: wrongRow.id, score: wrongRow.score, wrongCount: wrongRow.wrongCount });
+      expect(rows[0].lastWrongAt.getTime()).toBe(wrongRow.lastWrongAt.getTime());
     });
   });
 

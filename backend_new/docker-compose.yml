@@ -31,6 +31,7 @@ services:
       - ../db/table/reply.sql:/docker-entrypoint-initdb.d/18_reply.sql:ro
       - ../db/table/user_concept_stat.sql:/docker-entrypoint-initdb.d/19_user_concept_stat.sql:ro
       - ../db/table/user_stat_history.sql:/docker-entrypoint-initdb.d/20_user_stat_history.sql:ro
+      - ../db/table/user_wrong_question.sql:/docker-entrypoint-initdb.d/21_user_wrong_question.sql:ro
     healthcheck:
       test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost', '-u', 'root', '-proot']
       interval: 5s

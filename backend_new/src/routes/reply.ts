@@ -15,6 +15,7 @@ import {
   subjectTable,
   userConceptStatTable,
   userStatHistoryTable,
+  userWrongQuestionTable,
 } from 'src/db/schema';
 import { DEFAULT_LIMIT, genPagination, MAX_LIMIT } from 'src/lib/paginator';
 import { buildQuestionDtos, parseIdList, QuestionDetailDto } from 'src/routes/question';
@@ -186,6 +187,51 @@ const upsertStatHistory = async (
   }
 };
 
+// Auto-added the first time a question scores below 10. A later wrong
+// attempt at the same question updates score/wrongCount/lastWrongAt in
+// place (matches user_wrong_question's UNIQUE KEY on (userId,
+// questionId): there's never more than one row to update) so the row
+// always reflects the most recent wrong answer -- but a later *correct*
+// answer never calls this at all (see the call site's `score < 10`
+// guard), so it can't reset or delete anything here. note and createdAt
+// are the only fields this never touches; removing an entry, or
+// attaching a note to it, is only ever done by the user via
+// wrongQuestion.ts.
+const upsertWrongQuestion = async (
+  db: Db,
+  userId: number,
+  questionId: number,
+  parentId: number | null,
+  subjectId: number,
+  score: number,
+  wrongAt: Date
+) => {
+  const [existing] = await db
+    .select({ id: userWrongQuestionTable.id, wrongCount: userWrongQuestionTable.wrongCount })
+    .from(userWrongQuestionTable)
+    .where(and(eq(userWrongQuestionTable.userId, userId), eq(userWrongQuestionTable.questionId, questionId)));
+
+  if (existing) {
+    await db
+      .update(userWrongQuestionTable)
+      .set({ score, wrongCount: existing.wrongCount + 1, lastWrongAt: wrongAt, updatedAt: wrongAt })
+      .where(eq(userWrongQuestionTable.id, existing.id));
+    return;
+  }
+
+  await db.insert(userWrongQuestionTable).values({
+    userId,
+    questionId,
+    parentId,
+    subjectId,
+    score,
+    wrongCount: 1,
+    lastWrongAt: wrongAt,
+    createdAt: wrongAt,
+    updatedAt: wrongAt,
+  });
+};
+
 type ReplyGroupDto = {
   repliedAt: string;
   parentQuestion: QuestionDetailDto | null;
@@ -301,6 +347,17 @@ export const reply = new Hono<UserEnv>()
       if (parentQuestion)
         for (const conceptId of conceptIdsByQuestion.get(parentQuestion.id) ?? []) conceptIds.add(conceptId);
       for (const conceptId of conceptIds) await upsertConceptStat(db, user.id, conceptId, score);
+
+      if (score < 10)
+        await upsertWrongQuestion(
+          db,
+          user.id,
+          question.id,
+          parentQuestion ? parentQuestion.id : null,
+          question.subjectId,
+          score,
+          repliedAt
+        );
 
       const entry = subjectBatch.get(question.subjectId) ?? { attempts: 0, correct: 0 };
       entry.attempts += 1;

@@ -296,6 +296,41 @@ export const userConceptStatTable = mysqlTable('user_concept_stat', {
   updatedAt: datetime('updated_at', { mode: 'date', fsp: 3 }),
 });
 
+// A user-curated "wrong question" list. Rows are added elsewhere (not in
+// this file) when the user gets a question wrong, but are never removed
+// automatically just because a later attempt at the same question scores
+// correctly -- only an explicit user action deletes a row (or leaves it,
+// optionally with a note attached). At most one row per (userId,
+// questionId) -- enforced by a UNIQUE KEY in db/table/user_wrong_question.sql,
+// unlike user_concept_stat/pending_reply below, whose analogous
+// one-row-per-user invariant is only app-enforced. score/wrongCount/
+// lastWrongAt are updated on every subsequent wrong attempt at the same
+// question (never on a correct one), so they always reflect the most
+// recent wrong answer and how many times it's happened -- note and
+// createdAt are the only fields a later wrong attempt leaves untouched.
+export const userWrongQuestionTable = mysqlTable('user_wrong_question', {
+  id: int('id', { unsigned: true }).autoincrement().primaryKey(),
+  userId: int('user_id', { unsigned: true })
+    .notNull()
+    .references(() => userTable.id),
+  questionId: int('question_id', { unsigned: true })
+    .notNull()
+    .references(() => questionTable.id),
+  // Mirrors reply.parentId -- set when questionId is a GROUP question's
+  // child, so wrong entries belonging to the same group can be found and
+  // displayed together without joining back through question.
+  parentId: int('parent_id', { unsigned: true }).references(() => questionTable.id),
+  subjectId: int('subject_id', { unsigned: true })
+    .notNull()
+    .references(() => subjectTable.id),
+  score: double('score').notNull().default(0),
+  wrongCount: int('wrong_count', { unsigned: true }).notNull().default(1),
+  lastWrongAt: datetime('last_wrong_at', { mode: 'date', fsp: 3 }).notNull(),
+  note: text('note'),
+  createdAt: datetime('created_at', { mode: 'date', fsp: 3 }),
+  updatedAt: datetime('updated_at', { mode: 'date', fsp: 3 }),
+});
+
 // One row per (user, subject, day) -- daily rollup that POST /reply
 // upserts after every batch, and that the not-yet-ported user-history
 // endpoint (GET /user/history in the legacy backend) will read from.
