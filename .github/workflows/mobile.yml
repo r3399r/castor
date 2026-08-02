@@ -1,0 +1,69 @@
+name: Mobile CI
+
+# Only runs when mobile/ actually changes (or on demand) -- macOS runners
+# cost 10x the Linux runner-minutes on private repos, so this shouldn't fire
+# on every push to dev the way DEV/PROD do for the web app.
+on:
+  push:
+    branches: [dev]
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/mobile.yml'
+  workflow_dispatch:
+
+defaults:
+  run:
+    working-directory: mobile
+
+env:
+  FLUTTER_VERSION: '3.44.8'
+
+jobs:
+  analyze-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+
+  build-android:
+    needs: analyze-and-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter build apk --debug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: castor-mobile-debug-apk
+          path: mobile/build/app/outputs/flutter-apk/app-debug.apk
+
+  build-ios:
+    needs: analyze-and-test
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      # --no-codesign because there's no Apple Developer signing set up yet
+      # (see mobile/README.md) -- this only proves the app compiles cleanly
+      # against real Xcode. The resulting .app is NOT installable on a
+      # physical iPad; that needs a signed .ipa, which needs a paid Apple
+      # Developer Program membership plus certificates/provisioning
+      # profiles wired in as repo secrets.
+      - run: flutter build ios --release --no-codesign
