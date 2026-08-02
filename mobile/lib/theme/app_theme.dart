@@ -47,10 +47,5 @@ ThemeData buildAppTheme() {
         fontWeight: FontWeight.bold,
       ),
     ),
-    navigationBarTheme: const NavigationBarThemeData(
-      backgroundColor: AppColors.beige200,
-      indicatorColor: AppColors.blue700Faded,
-      elevation: 0,
-    ),
   );
 }

@@ -9,7 +9,7 @@ const navItems = [
   // { label: '題庫', href: '/question' },
   { label: '智慧練習', href: '/adaptive' },
   { label: '作答記錄', href: '/reply' },
-  { label: '錯題本', href: '/wrong' },
+  { label: '禮物盒', href: '/box' },
   { label: '學習分析', href: '/analysis' },
 ]
 

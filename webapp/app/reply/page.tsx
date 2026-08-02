@@ -1,6 +1,6 @@
 import AuthGuard from '@/components/AuthGuard'
 import Navbar from '@/components/Navbar'
-import ReplyClient from './ReplyClient'
+import ReplyTabsClient from './ReplyTabsClient'
 
 export default function ReplyPage() {
   return (
@@ -11,7 +11,7 @@ export default function ReplyPage() {
       <div className="px-4 md:px-10 lg:px-[70px]">
         <div className="mx-auto max-w-[1120px]">
           <AuthGuard>
-            <ReplyClient />
+            <ReplyTabsClient />
           </AuthGuard>
         </div>
       </div>

@@ -3,25 +3,27 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../widgets/coming_soon_notice.dart';
 
-/// Mirrors webapp/app/user/UserClient.tsx.
+/// Mirrors webapp/app/user/UserClient.tsx -- the user's own profile (avatar,
+/// email, editable name, sign-out), not the learning-analysis page (that's
+/// analysis_page.dart now, matching the web app's /analysis route).
 class UserPage extends StatelessWidget {
   const UserPage({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('學習分析')),
+      appBar: AppBar(title: const Text('個人資料')),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(20),
           children: const [
             Text(
-              '查看你的學習表現與各科目熟練度。',
+              '管理你的頭像、暱稱與帳號設定。',
               style: TextStyle(fontSize: 14, color: AppColors.black500, height: 1.5),
             ),
             SizedBox(height: 20),
             ComingSoonNotice(
-              message: '學習分析尚未串接 API。之後這裡會顯示答題歷史、正確率、連續天數與各科目熟練度圖表。',
+              message: '個人資料尚未串接 API。之後這裡會顯示你的頭像、Email，並可以編輯暱稱、登出帳號。',
             ),
           ],
         ),
