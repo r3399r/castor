@@ -32,6 +32,12 @@ export const userListQuerySchema = z.object({
   order: z.enum(['asc', 'desc']).optional().default('asc'),
 });
 
+// Trimmed server-side (not just relying on the frontend) so a name that's
+// all whitespace can't sneak through as "set".
+export const userUpdateMeBodySchema = z.object({
+  name: z.string().trim().min(1).max(255),
+});
+
 type DailyMastery = { date: string; weightedMastery: number };
 
 // A user's current streak, counted back from the most recent recorded
@@ -331,9 +337,28 @@ export const user = new Hono<UserEnv>()
       activityMap,
     });
   })
-  // Registered after the other static routes (/sync, /stats, /history) --
-  // as a dynamic segment, this would otherwise swallow requests to any of
-  // them (Hono matches routes in registration order, not by specificity).
+  // The signed-in user's own profile -- unlike GET /:id below, this needs
+  // no admin check since it can only ever read the caller's own row.
+  .get('/me', requireUser, async (c) => {
+    const user = c.get('user');
+    console.log(`GET /api/user/me userId=${user.id}`);
+    return c.json(user);
+  })
+  // Name is the only self-editable field -- email/avatar/firebaseUid stay
+  // whatever POST /sync last set them to from the Firebase identity.
+  .put('/me', requireUser, zValidator('json', userUpdateMeBodySchema), async (c) => {
+    const user = c.get('user');
+    const { name } = c.req.valid('json');
+    console.log(`PUT /api/user/me userId=${user.id}`);
+    const db = c.get('db');
+
+    await db.update(userTable).set({ name, updatedAt: new Date() }).where(eq(userTable.id, user.id));
+    const [updated] = await db.select().from(userTable).where(eq(userTable.id, user.id));
+    return c.json(updated);
+  })
+  // Registered after the other static routes (/sync, /stats, /history, /me)
+  // -- as a dynamic segment, this would otherwise swallow requests to any
+  // of them (Hono matches routes in registration order, not by specificity).
   .get('/:id', requireAdmin, async (c) => {
     const id = c.req.param('id');
     console.log(`GET /api/user/${id}`);

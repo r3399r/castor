@@ -343,6 +343,12 @@ export type GetUserStatsResponse = StatsSubject[];
 
 export type PostUserSyncResponse = User;
 
+export type GetUserMeResponse = User;
+
+export type PutUserMeRequest = { name: string };
+
+export type PutUserMeResponse = User;
+
 export type GetInfoResponse = {
   categoryCount: number;
   subjectCount: number;

@@ -453,6 +453,97 @@ describe('user routes', () => {
     });
   });
 
+  describe('GET /me', () => {
+    it('rejects with 401 when there is no valid identity', async () => {
+      vi.mocked(verifyIdTokenUid).mockResolvedValue(null);
+      const res = await app.request('/api/user/me');
+      expect(res.status).toBe(401);
+    });
+
+    it("returns the caller's own profile", async () => {
+      const userId = await seedUser();
+      vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+
+      const res = await app.request('/api/user/me');
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as UserDto;
+      expect(body).toMatchObject({
+        id: userId,
+        firebaseUid: 'fixture-uid',
+        email: 'fixture-user@example.com',
+        name: 'fixture user',
+      });
+    });
+  });
+
+  describe('PUT /me', () => {
+    const putMe = (name: string) =>
+      app.request('/api/user/me', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
+
+    it('rejects with 401 when there is no valid identity', async () => {
+      vi.mocked(verifyIdTokenUid).mockResolvedValue(null);
+      const res = await putMe('New Name');
+      expect(res.status).toBe(401);
+    });
+
+    it('updates the name and returns the updated profile', async () => {
+      const userId = await seedUser();
+      vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+
+      const res = await putMe('Updated Name');
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as UserDto;
+      expect(body).toMatchObject({ id: userId, name: 'Updated Name' });
+
+      const rows = await getDb().select().from(userTable).where(eq(userTable.id, userId));
+      expect(rows[0].name).toBe('Updated Name');
+    });
+
+    it('trims surrounding whitespace', async () => {
+      await seedUser();
+      vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+
+      const res = await putMe('  Spacey Name  ');
+      const body = (await res.json()) as UserDto;
+      expect(body.name).toBe('Spacey Name');
+    });
+
+    it('rejects a whitespace-only name with 400', async () => {
+      await seedUser();
+      vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+
+      const res = await putMe('   ');
+      expect(res.status).toBe(400);
+    });
+
+    it('rejects a name over 255 characters with 400', async () => {
+      await seedUser();
+      vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+
+      const res = await putMe('a'.repeat(256));
+      expect(res.status).toBe(400);
+    });
+
+    it("does not affect another user's row", async () => {
+      const userId = await seedUser();
+      const [{ insertId: otherId }] = await getDb()
+        .insert(userTable)
+        .values({ firebaseUid: 'other-uid', email: 'other@example.com', name: 'Other Name' });
+      vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+
+      await putMe('My New Name');
+
+      const rows = await getDb().select().from(userTable).where(eq(userTable.id, otherId));
+      expect(rows[0].name).toBe('Other Name');
+      const mine = await getDb().select().from(userTable).where(eq(userTable.id, userId));
+      expect(mine[0].name).toBe('My New Name');
+    });
+  });
+
   describe('admin auth gate', () => {
     it('rejects a GET with 401 when there is no valid identity', async () => {
       vi.mocked(verifyIdToken).mockResolvedValue(null);
