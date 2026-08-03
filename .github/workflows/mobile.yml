@@ -1,8 +1,11 @@
 name: Mobile CI
 
-# Only runs when mobile/ actually changes (or on demand) -- macOS runners
-# cost 10x the Linux runner-minutes on private repos, so this shouldn't fire
-# on every push to dev the way DEV/PROD do for the web app.
+# analyze-and-test runs on every push to dev that touches mobile/ (or on
+# demand) so lint/test feedback stays fast. build-android and build-ios are
+# gated to workflow_dispatch only (see each job's `if`) -- macOS runners cost
+# 10x the Linux runner-minutes on private repos, so we don't want a full
+# build firing on every dev commit, just when someone actually wants an
+# installable artifact.
 on:
   push:
     branches: [dev]
@@ -10,6 +13,10 @@ on:
       - 'mobile/**'
       - '.github/workflows/mobile.yml'
   workflow_dispatch:
+
+concurrency:
+  group: mobile-ci-${{ github.ref }}
+  cancel-in-progress: true
 
 defaults:
   run:
@@ -34,6 +41,7 @@ jobs:
 
   build-android:
     needs: analyze-and-test
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -51,6 +59,7 @@ jobs:
 
   build-ios:
     needs: analyze-and-test
+    if: github.event_name == 'workflow_dispatch'
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4

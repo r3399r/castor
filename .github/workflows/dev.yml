@@ -3,9 +3,19 @@
 name: DEV
 
 # Controls when the workflow will run
+# deploy.sh only deploys backend_new (the webapp S3 sync is commented out),
+# so only re-run this on changes that actually affect that deploy -- not on
+# every push to dev (e.g. mobile/ or webapp-only changes shouldn't trigger it).
 on:
   push:
     branches: [ dev ]
+    paths:
+      - 'backend_new/**'
+      - 'deploy.sh'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/dev.yml'
+  workflow_dispatch:
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
