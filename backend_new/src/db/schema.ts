@@ -1,5 +1,6 @@
 import {
   AnyMySqlColumn,
+  bigint,
   boolean,
   date,
   datetime,
@@ -172,6 +173,7 @@ export const questionTable = mysqlTable('question', {
   // behavioral gain.
   attempCount: int('attemp_count', { unsigned: true }).notNull().default(0),
   scoringTotal: double('scoring_total').notNull().default(0),
+  durationTotalMs: bigint('duration_total_ms', { mode: 'number', unsigned: true }).notNull().default(0),
   adjustedDifficulty: double('adjusted_difficulty').notNull(),
   createdAt: datetime('created_at', { mode: 'date', fsp: 3 }),
   updatedAt: datetime('updated_at', { mode: 'date', fsp: 3 }),
@@ -268,6 +270,7 @@ export const replyTable = mysqlTable('reply', {
   parentId: int('parent_id', { unsigned: true }).references(() => questionTable.id),
   score: double('score').notNull().default(0),
   repliedAnswer: varchar('replied_answer', { length: 255 }),
+  durationMs: int('duration_ms', { unsigned: true }),
   repliedAt: datetime('replied_at', { mode: 'date', fsp: 3 }).notNull(),
   createdAt: datetime('created_at', { mode: 'date', fsp: 3 }),
   updatedAt: datetime('updated_at', { mode: 'date', fsp: 3 }),

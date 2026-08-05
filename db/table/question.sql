@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS castor.question (
     difficulty TINYINT UNSIGNED NOT NULL, -- 1~10
     attemp_count INT UNSIGNED NOT NULL DEFAULT 0,
     scoring_total DOUBLE NOT NULL DEFAULT 0, -- scoring_rate = scoring_total / attemp_count
+    duration_total_ms BIGINT UNSIGNED NOT NULL DEFAULT 0, -- avg_duration_ms = duration_total_ms / attemp_count
     adjusted_difficulty DOUBLE NOT NULL, -- difficulty adjusted by user reply
     created_at DATETIME(3) NULL,
     updated_at DATETIME(3) NULL,

@@ -27,6 +27,7 @@ type Db = TransactionEnv['Variables']['db'];
 const replyItemSchema = z.object({
   questionId: z.number().int().positive(),
   repliedAnswer: z.string(),
+  durationMs: z.number().int().nonnegative().optional(),
 });
 
 export const replyBodySchema = z.array(replyItemSchema).min(1);
@@ -320,6 +321,7 @@ export const reply = new Hono<UserEnv>()
       // object, and only the final value gets written.
       question.attempCount += 1;
       question.scoringTotal += score;
+      question.durationTotalMs += item.durationMs ?? 0;
       const weight = Math.min(1, question.attempCount / 1068);
       question.adjustedDifficulty =
         weight * (10 - question.scoringTotal / question.attempCount) + (1 - weight) * question.difficulty;
@@ -338,6 +340,7 @@ export const reply = new Hono<UserEnv>()
         parentId: parentQuestion ? parentQuestion.id : null,
         score,
         repliedAnswer: item.repliedAnswer,
+        durationMs: item.durationMs ?? null,
         repliedAt,
         createdAt: repliedAt,
         updatedAt: repliedAt,
@@ -373,6 +376,7 @@ export const reply = new Hono<UserEnv>()
         .set({
           attempCount: q.attempCount,
           scoringTotal: q.scoringTotal,
+          durationTotalMs: q.durationTotalMs,
           adjustedDifficulty: q.adjustedDifficulty,
           updatedAt: repliedAt,
         })

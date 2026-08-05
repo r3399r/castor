@@ -308,6 +308,30 @@ export default function AdaptiveClient() {
   const [showLeaveModal, setShowLeaveModal] = useState(false)
   const [loading, setLoading] = useState(false)
 
+  // Single-question view: currentIndex is a page index into adaptiveQuestion
+  // (a GROUP question and all its children share one page). Dwell time is
+  // tracked in refs, not state, so accumulating it on every render/tick
+  // doesn't trigger re-renders -- it's only read when leaving a page.
+  const [currentIndex, setCurrentIndex] = useState(0)
+  const pageEnteredAtRef = useRef<number>(Date.now())
+  const pageTimeMsRef = useRef<Map<number, number>>(new Map())
+
+  const flushCurrentPageTime = () => {
+    const now = Date.now()
+    const elapsed = now - pageEnteredAtRef.current
+    pageTimeMsRef.current.set(currentIndex, (pageTimeMsRef.current.get(currentIndex) ?? 0) + elapsed)
+    pageEnteredAtRef.current = now
+  }
+
+  const goTo = (idx: number) => {
+    if (idx < 0 || idx >= adaptiveQuestion.length || idx === currentIndex) return
+    flushCurrentPageTime()
+    setCurrentIndex(idx)
+  }
+
+  const currentQuestion = adaptiveQuestion[currentIndex]
+  const currentOffset = responseOffsets[currentIndex] ?? 0
+
   const totalScore = useMemo(() => replyResponse?.reduce((sum, r) => sum + r.score, 0) ?? 0, [replyResponse])
   const correctCount = useMemo(() => replyResponse?.filter((r) => r.score > 0).length ?? 0, [replyResponse])
   const wrongCount = useMemo(() => replyResponse?.filter((r) => r.score <= 0).length ?? 0, [replyResponse])
@@ -417,6 +441,9 @@ export default function AdaptiveClient() {
     setReplyResponse(null)
     setResponseOffsets([])
     setRepliedAnswer(new Map())
+    setCurrentIndex(0)
+    pageTimeMsRef.current = new Map()
+    pageEnteredAtRef.current = Date.now()
     setLoading(true)
     try {
       const results = await apiFetch<GetQuestionAdaptiveResponse>('question/adaptive', {
@@ -436,20 +463,23 @@ export default function AdaptiveClient() {
 
   const onSubmit = async () => {
     if (!canSubmit) return
+    flushCurrentPageTime()
     setLoading(true)
     try {
       const payload: PostReplyRequest = []
       const offsets: number[] = []
-      for (const q of adaptiveQuestion) {
+      adaptiveQuestion.forEach((q, qi) => {
         offsets.push(payload.length)
+        const pageMs = pageTimeMsRef.current.get(qi) ?? 0
         if (q.type === 'GROUP') {
+          const childMs = Math.round(pageMs / q.children.length)
           for (const child of q.children) {
-            payload.push({ questionId: child.id, repliedAnswer: repliedAnswer.get(child.id) ?? '' })
+            payload.push({ questionId: child.id, repliedAnswer: repliedAnswer.get(child.id) ?? '', durationMs: childMs })
           }
         } else {
-          payload.push({ questionId: q.id, repliedAnswer: repliedAnswer.get(q.id) ?? '' })
+          payload.push({ questionId: q.id, repliedAnswer: repliedAnswer.get(q.id) ?? '', durationMs: pageMs })
         }
-      }
+      })
       const res = await apiPost<PostReplyResponse, PostReplyRequest>('reply', payload)
       setReplyResponse(res)
       setResponseOffsets(offsets)
@@ -487,6 +517,9 @@ export default function AdaptiveClient() {
     setReplyResponse(null)
     setResponseOffsets([])
     setRepliedAnswer(new Map())
+    setCurrentIndex(0)
+    pageTimeMsRef.current = new Map()
+    pageEnteredAtRef.current = Date.now()
     setSelectedFilterOptionByDim({})
     setSelectedExamIds([])
     setSelectedConceptIds([])
@@ -870,118 +903,169 @@ export default function AdaptiveClient() {
         <div className="flex items-center justify-center py-20 text-sm text-black-500">選題中…</div>
       )}
 
-      {adaptiveQuestion.length > 0 && (
+      {adaptiveQuestion.length > 0 && currentQuestion && (
         <div>
-          <MathJax dynamic>
-            <div className="flex flex-col gap-[40px]">
-            {adaptiveQuestion.map((question, qi) => {
-              const offset = responseOffsets[qi] ?? 0
-              return (
-                <div key={question.id} className="overflow-hidden rounded-lg border border-brown-700 bg-white/60">
-                  <div className="border-b border-[#E3D1C5] px-5 pt-3 pb-2">
-                    {/* 題號 + 難易度（同一行）*/}
-                    <div className="flex items-center justify-between gap-3 sm:hidden">
-                      <span className="shrink-0 font-bold text-blue-700">
-                        <span className="text-[20px]">Q{qi + 1}</span>
-                        <span className="text-base"> / {numQuestionsTarget}</span>
-                      </span>
-                      <DifficultyStars value={question.adjustedDifficulty} />
-                    </div>
-                    {/* 標籤（第二行，mobile only）*/}
-                    <div className="mt-1.5 flex flex-wrap gap-2 sm:hidden">
-                      <Chip label={typeLabel[question.type] ?? question.type} />
-                      {question.exam.map((e) => (
-                        <Chip key={e.id} label={e.name} color={tagColors.exam} />
-                      ))}
-                      {question.concept.map((c) => (
-                        <Chip
-                          key={c.id}
-                          label={c.conceptGroup.name === c.name ? c.name : c.conceptGroup.name + '-' + c.name}
-                          color={tagColors.concept}
-                        />
-                      ))}
-                      {question.tag.map((t) => (
-                        <Chip key={t.id} label={t.name} color={tagColors.tag} />
-                      ))}
-                    </div>
-                    {/* Desktop：題號 + 標籤靠左，難易度靠右 */}
-                    <div className="hidden sm:flex sm:items-start sm:justify-between sm:gap-3">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="shrink-0 font-bold text-blue-700">
-                          <span className="text-[20px]">Q{qi + 1}</span>
-                          <span className="text-base"> / {numQuestionsTarget}</span>
-                        </span>
-                        <Chip label={typeLabel[question.type] ?? question.type} />
-                        {question.exam.map((e) => (
-                          <Chip key={e.id} label={e.name} color={tagColors.exam} />
-                        ))}
-                        {question.concept.map((c) => (
-                          <Chip
-                            key={c.id}
-                            label={c.conceptGroup.name === c.name ? c.name : c.conceptGroup.name + '-' + c.name}
-                            color={tagColors.concept}
-                          />
-                        ))}
-                        {question.tag.map((t) => (
-                          <Chip key={t.id} label={t.name} color={tagColors.tag} />
-                        ))}
-                      </div>
-                      <DifficultyStars value={question.adjustedDifficulty} />
-                    </div>
-                  </div>
+          {/* 導覽列：上一題／跳題／下一題 -- 可自由前後切換，不受作答狀態限制 */}
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <button
+              onClick={() => goTo(currentIndex - 1)}
+              disabled={currentIndex === 0}
+              className="flex shrink-0 items-center gap-1 rounded-md border border-brown-300 px-3 py-1.5 text-sm font-medium text-black-700 transition hover:bg-beige-200 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M10 3L5 8L10 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              上一題
+            </button>
 
-                  <div className="flex flex-col gap-4 px-5 lg:px-[40px] py-7">
-                    {question.content && (
-                      <div
-                        dangerouslySetInnerHTML={{ __html: question.content }}
-                        className="prose max-w-none text-[18px] font-medium text-black-800 [&>*:last-child]:mb-0"
+            <div className="flex flex-wrap items-center justify-center gap-1.5">
+              {adaptiveQuestion.map((q, i) => {
+                const off = responseOffsets[i] ?? 0
+                const leafResults = q.type === 'GROUP'
+                  ? q.children.map((_, ci) => replyResponse?.[off + ci])
+                  : [replyResponse?.[off]]
+                const graded = !!replyResponse && leafResults.every((r) => !!r)
+                const anyWrong = graded && leafResults.some((r) => (r?.score ?? 0) <= 0)
+                const answered = q.type === 'GROUP'
+                  ? q.children.every((c) => repliedAnswer.has(c.id))
+                  : repliedAnswer.has(q.id)
+                return (
+                  <button
+                    key={q.id}
+                    onClick={() => goTo(i)}
+                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md border-2 text-sm font-bold transition ${
+                      i === currentIndex
+                        ? 'border-blue-700 bg-blue-700/10 text-blue-700'
+                        : graded
+                          ? anyWrong
+                            ? 'border-orange-700/60 bg-orange-700/10 text-orange-700'
+                            : 'border-green-700/60 bg-green-700/10 text-green-700'
+                          : answered
+                            ? 'border-brown-700 bg-beige-200 text-black-700'
+                            : 'border-brown-300 bg-white/60 text-black-500 hover:border-brown-700'
+                    }`}
+                  >
+                    {i + 1}
+                  </button>
+                )
+              })}
+            </div>
+
+            <button
+              onClick={() => goTo(currentIndex + 1)}
+              disabled={currentIndex === adaptiveQuestion.length - 1}
+              className="flex shrink-0 items-center gap-1 rounded-md border border-brown-300 px-3 py-1.5 text-sm font-medium text-black-700 transition hover:bg-beige-200 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              下一題
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M6 3L11 8L6 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+          </div>
+
+          <MathJax dynamic>
+            <div className="overflow-hidden rounded-lg border border-brown-700 bg-white/60">
+              <div className="border-b border-[#E3D1C5] px-5 pt-3 pb-2">
+                {/* 題號 + 難易度（同一行）*/}
+                <div className="flex items-center justify-between gap-3 sm:hidden">
+                  <span className="shrink-0 font-bold text-blue-700">
+                    <span className="text-[20px]">Q{currentIndex + 1}</span>
+                    <span className="text-base"> / {numQuestionsTarget}</span>
+                  </span>
+                  <DifficultyStars value={currentQuestion.adjustedDifficulty} />
+                </div>
+                {/* 標籤（第二行，mobile only）*/}
+                <div className="mt-1.5 flex flex-wrap gap-2 sm:hidden">
+                  <Chip label={typeLabel[currentQuestion.type] ?? currentQuestion.type} />
+                  {currentQuestion.exam.map((e) => (
+                    <Chip key={e.id} label={e.name} color={tagColors.exam} />
+                  ))}
+                  {currentQuestion.concept.map((c) => (
+                    <Chip
+                      key={c.id}
+                      label={c.conceptGroup.name === c.name ? c.name : c.conceptGroup.name + '-' + c.name}
+                      color={tagColors.concept}
+                    />
+                  ))}
+                  {currentQuestion.tag.map((t) => (
+                    <Chip key={t.id} label={t.name} color={tagColors.tag} />
+                  ))}
+                </div>
+                {/* Desktop：題號 + 標籤靠左，難易度靠右 */}
+                <div className="hidden sm:flex sm:items-start sm:justify-between sm:gap-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="shrink-0 font-bold text-blue-700">
+                      <span className="text-[20px]">Q{currentIndex + 1}</span>
+                      <span className="text-base"> / {numQuestionsTarget}</span>
+                    </span>
+                    <Chip label={typeLabel[currentQuestion.type] ?? currentQuestion.type} />
+                    {currentQuestion.exam.map((e) => (
+                      <Chip key={e.id} label={e.name} color={tagColors.exam} />
+                    ))}
+                    {currentQuestion.concept.map((c) => (
+                      <Chip
+                        key={c.id}
+                        label={c.conceptGroup.name === c.name ? c.name : c.conceptGroup.name + '-' + c.name}
+                        color={tagColors.concept}
                       />
-                    )}
-                    {question.answer && (
+                    ))}
+                    {currentQuestion.tag.map((t) => (
+                      <Chip key={t.id} label={t.name} color={tagColors.tag} />
+                    ))}
+                  </div>
+                  <DifficultyStars value={currentQuestion.adjustedDifficulty} />
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-4 px-5 lg:px-[40px] py-7">
+                {currentQuestion.content && (
+                  <div
+                    dangerouslySetInnerHTML={{ __html: currentQuestion.content }}
+                    className="prose max-w-none text-[18px] font-medium text-black-800 [&>*:last-child]:mb-0"
+                  />
+                )}
+                {currentQuestion.answer && (
+                  <AnswerInput
+                    question={currentQuestion}
+                    answer={repliedAnswer.get(currentQuestion.id) ?? ''}
+                    onAnswer={(val) =>
+                      setRepliedAnswer((prev) => new Map(prev).set(currentQuestion.id, val))
+                    }
+                    disabled={!!replyResponse}
+                    correctAnswer={replyResponse?.[currentOffset]?.correctAnswer}
+                  />
+                )}
+              </div>
+
+              {currentQuestion.type !== 'GROUP' && replyResponse?.[currentOffset] && (
+                <ResultBox result={replyResponse[currentOffset]} />
+              )}
+
+              {currentQuestion.type === 'GROUP' &&
+                currentQuestion.children.map((child, i) => (
+                  <Fragment key={child.id}>
+                    <div className="flex flex-col gap-4 border-t border-brown-300 px-5 lg:px-[40px] pt-5 pb-7">
+                      {child.content && (
+                        <div
+                          dangerouslySetInnerHTML={{ __html: child.content }}
+                          className="prose prose-sm max-w-none"
+                        />
+                      )}
                       <AnswerInput
-                        question={question}
-                        answer={repliedAnswer.get(question.id) ?? ''}
+                        question={child}
+                        answer={repliedAnswer.get(child.id) ?? ''}
                         onAnswer={(val) =>
-                          setRepliedAnswer((prev) => new Map(prev).set(question.id, val))
+                          setRepliedAnswer((prev) => new Map(prev).set(child.id, val))
                         }
                         disabled={!!replyResponse}
-                        correctAnswer={replyResponse?.[offset]?.correctAnswer}
+                        correctAnswer={replyResponse?.[currentOffset + i]?.correctAnswer}
                       />
+                    </div>
+                    {replyResponse?.[currentOffset + i] && (
+                      <ResultBox result={replyResponse[currentOffset + i]} />
                     )}
-                  </div>
-
-                  {question.type !== 'GROUP' && replyResponse?.[offset] && (
-                    <ResultBox result={replyResponse[offset]} />
-                  )}
-
-                  {question.type === 'GROUP' &&
-                    question.children.map((child, i) => (
-                      <Fragment key={child.id}>
-                        <div className="flex flex-col gap-4 border-t border-brown-300 px-5 lg:px-[40px] pt-5 pb-7">
-                          {child.content && (
-                            <div
-                              dangerouslySetInnerHTML={{ __html: child.content }}
-                              className="prose prose-sm max-w-none"
-                            />
-                          )}
-                          <AnswerInput
-                            question={child}
-                            answer={repliedAnswer.get(child.id) ?? ''}
-                            onAnswer={(val) =>
-                              setRepliedAnswer((prev) => new Map(prev).set(child.id, val))
-                            }
-                            disabled={!!replyResponse}
-                            correctAnswer={replyResponse?.[offset + i]?.correctAnswer}
-                          />
-                        </div>
-                        {replyResponse?.[offset + i] && (
-                          <ResultBox result={replyResponse[offset + i]} />
-                        )}
-                      </Fragment>
-                    ))}
-                </div>
-              )
-            })}
+                  </Fragment>
+                ))}
             </div>
           </MathJax>
         </div>

@@ -216,7 +216,7 @@ export type PostTagRequest = {
   name: string;
 };
 
-export type PostReplyRequest = { questionId: number; repliedAnswer: string }[]
+export type PostReplyRequest = { questionId: number; repliedAnswer: string; durationMs?: number }[]
 
 export type PostReplyResponse = {
   questionId: number

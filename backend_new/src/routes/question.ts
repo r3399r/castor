@@ -703,8 +703,25 @@ export const question = new Hono<UserEnv>()
         .values(newPendingIds.map((questionId) => ({ questionId, userId: user.id, createdAt: now, updatedAt: now })));
     }
 
+    // The user hasn't answered these yet -- unlike /reply's history view
+    // and /wrongQuestion's review view (both look back at *already*
+    // answered questions), the real answer must never reach the client
+    // here. Masking rather than nulling it out preserves what the
+    // frontend actually depends on -- truthiness (whether to render an
+    // answer input at all) and, for FILL questions, the blank count via
+    // answer.length -- without leaking the content.
+    const maskAnswer = (answer: string | null) => (answer === null ? null : '•'.repeat(answer.length));
     const dtoById = await buildQuestionDtos(db, selectedIds);
-    return c.json(selectedIds.map((id) => dtoById.get(id)!));
+    return c.json(
+      selectedIds.map((id) => {
+        const dto = dtoById.get(id)!;
+        return {
+          ...dto,
+          answer: maskAnswer(dto.answer),
+          children: dto.children.map((child) => ({ ...child, answer: maskAnswer(child.answer) })),
+        };
+      })
+    );
   })
   .get('/:id', async (c) => {
     const id = Number(c.req.param('id'));
