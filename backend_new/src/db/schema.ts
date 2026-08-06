@@ -1,6 +1,5 @@
 import {
   AnyMySqlColumn,
-  bigint,
   boolean,
   date,
   datetime,
@@ -173,8 +172,12 @@ export const questionTable = mysqlTable('question', {
   // behavioral gain.
   attempCount: int('attemp_count', { unsigned: true }).notNull().default(0),
   scoringTotal: double('scoring_total').notNull().default(0),
-  durationTotalMs: bigint('duration_total_ms', { mode: 'number', unsigned: true }).notNull().default(0),
   adjustedDifficulty: double('adjusted_difficulty').notNull(),
+  // 5th percentile of reply.durationMs for this question -- unlike
+  // attempCount/scoringTotal, this isn't incrementally maintained per
+  // reply (a percentile can't be updated that way), so it stays NULL
+  // until some future batch job computes it.
+  durationP5Ms: int('duration_p5_ms', { unsigned: true }),
   createdAt: datetime('created_at', { mode: 'date', fsp: 3 }),
   updatedAt: datetime('updated_at', { mode: 'date', fsp: 3 }),
 });

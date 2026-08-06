@@ -321,7 +321,6 @@ export const reply = new Hono<UserEnv>()
       // object, and only the final value gets written.
       question.attempCount += 1;
       question.scoringTotal += score;
-      question.durationTotalMs += item.durationMs ?? 0;
       const weight = Math.min(1, question.attempCount / 1068);
       question.adjustedDifficulty =
         weight * (10 - question.scoringTotal / question.attempCount) + (1 - weight) * question.difficulty;
@@ -376,7 +375,6 @@ export const reply = new Hono<UserEnv>()
         .set({
           attempCount: q.attempCount,
           scoringTotal: q.scoringTotal,
-          durationTotalMs: q.durationTotalMs,
           adjustedDifficulty: q.adjustedDifficulty,
           updatedAt: repliedAt,
         })
