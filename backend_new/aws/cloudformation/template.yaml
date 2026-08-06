@@ -256,6 +256,69 @@ Resources:
         - Arn: !GetAtt HousekeepFunction.Arn
           Id: !Sub ${Project}-${TargetEnvr}-housekeep
 
+  #####################################################################
+  ##### Daily question-stat job: recomputes question-level stats     #####
+  ##### derived from reply history -- currently just the 5th-        #####
+  ##### percentile answer duration (question.duration_p5_ms) from    #####
+  ##### reply.duration_ms, named generically since more question-    #####
+  ##### level stats are expected to land here over time. cron(0 19   #####
+  ##### * * ? *) UTC = 03:00 Taiwan time, same reasoning as           #####
+  ##### Housekeep's schedule.                                        #####
+  #####################################################################
+  QuestionStatExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${Project}-${TargetEnvr}-question-stat-execution-role
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  QuestionStatFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Architectures: [arm64]
+      Handler: index.questionStat
+      Runtime: nodejs22.x
+      FunctionName: !Sub ${Project}-${TargetEnvr}-question-stat
+      Role: !GetAtt QuestionStatExecutionRole.Arn
+      CodeUri: ../../dist/questionStat
+      MemorySize: 256
+      Timeout: 60
+      Environment:
+        Variables:
+          ENVR: !Sub ${TargetEnvr}
+          PROJECT: !Sub ${Project}
+          DB_HOST:
+            Fn::ImportValue: !Sub celestial-studio-${TargetEnvr}-db-endpoint
+          DB_PWD: !Sub '{{resolve:ssm:mysql-${TargetEnvr}-${Project}-pwd}}'
+          DB_POOL_SIZE: '1'
+
+  InvokePermissionQuestionStat:
+    Type: AWS::Lambda::Permission
+    DependsOn: [QuestionStatFunction]
+    Properties:
+      FunctionName: !Sub ${Project}-${TargetEnvr}-question-stat
+      Action: 'lambda:InvokeFunction'
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt EventBridgeQuestionStat.Arn
+
+  EventBridgeQuestionStat:
+    Type: AWS::Events::Rule
+    DependsOn: [QuestionStatFunction]
+    Properties:
+      Name: !Sub ${Project}-${TargetEnvr}-question-stat
+      ScheduleExpression: cron(0 19 * * ? *)
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt QuestionStatFunction.Arn
+          Id: !Sub ${Project}-${TargetEnvr}-question-stat
+
   #########################################
   ##### Cloudfront and Route53 config #####
   #########################################
