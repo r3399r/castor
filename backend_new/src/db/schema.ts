@@ -235,6 +235,11 @@ export const userTable = mysqlTable('user', {
   email: varchar('email', { length: 255 }),
   name: varchar('name', { length: 255 }),
   avatar: text('avatar'),
+  // Spendable balance -- decreases when spent. Distinct from
+  // lifetimePoints (below) so spending never hurts leaderboard rank.
+  totalPoints: int('total_points', { unsigned: true }).notNull().default(0),
+  // Only ever increases; leaderboard ranks on this, not totalPoints.
+  lifetimePoints: int('lifetime_points', { unsigned: true }).notNull().default(0),
   lastLoginAt: datetime('last_login_at', { mode: 'date', fsp: 3 }),
   createdAt: datetime('created_at', { mode: 'date', fsp: 3 }),
   updatedAt: datetime('updated_at', { mode: 'date', fsp: 3 }),
@@ -272,6 +277,7 @@ export const replyTable = mysqlTable('reply', {
     .references(() => userTable.id),
   parentId: int('parent_id', { unsigned: true }).references(() => questionTable.id),
   score: double('score').notNull().default(0),
+  awardedPoints: int('awarded_points', { unsigned: true }).notNull().default(0),
   repliedAnswer: varchar('replied_answer', { length: 255 }),
   durationMs: int('duration_ms', { unsigned: true }),
   repliedAt: datetime('replied_at', { mode: 'date', fsp: 3 }).notNull(),
@@ -352,6 +358,27 @@ export const userStatHistoryTable = mysqlTable('user_stat_history', {
   weightedMastery: double('weighted_mastery'),
   dailyAttempts: int('daily_attempts', { unsigned: true }).notNull().default(0),
   dailyCorrect: double('daily_correct').notNull().default(0),
+  // Earn-only, unaffected by spending -- same reasoning as
+  // userTable.lifetimePoints.
+  dailyPoints: int('daily_points', { unsigned: true }).notNull().default(0),
   createdAt: datetime('created_at', { mode: 'date', fsp: 3 }),
   updatedAt: datetime('updated_at', { mode: 'date', fsp: 3 }),
+});
+
+// Ledger of every point movement -- earned from a reply (type =
+// EARN_REPLY, replyId set) or spent (type = SPEND_*, replyId null).
+// amount is signed (positive = earned, negative = spent) so SUM(amount)
+// can be reconciled against userTable.totalPoints as a sanity check.
+// balanceAfter is a denormalized snapshot so "what was my balance at
+// this point" doesn't require replaying the whole ledger.
+export const pointTransactionTable = mysqlTable('point_transaction', {
+  id: int('id', { unsigned: true }).autoincrement().primaryKey(),
+  userId: int('user_id', { unsigned: true })
+    .notNull()
+    .references(() => userTable.id),
+  type: varchar('type', { length: 255 }).notNull(),
+  amount: int('amount').notNull(),
+  replyId: int('reply_id', { unsigned: true }).references(() => replyTable.id),
+  balanceAfter: int('balance_after', { unsigned: true }).notNull(),
+  createdAt: datetime('created_at', { mode: 'date', fsp: 3 }),
 });

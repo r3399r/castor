@@ -4,6 +4,8 @@ CREATE TABLE IF NOT EXISTS castor.user (
     email VARCHAR(255) NULL,
     name VARCHAR(255) NULL,
     avatar TEXT NULL,
+    total_points INT UNSIGNED NOT NULL DEFAULT 0, -- spendable balance; decreases when spent
+    lifetime_points INT UNSIGNED NOT NULL DEFAULT 0, -- only ever increases; leaderboard ranks on this
     last_login_at DATETIME(3) NULL,
     created_at DATETIME(3) NULL,
     updated_at DATETIME(3) NULL,

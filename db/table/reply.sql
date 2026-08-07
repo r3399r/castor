@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS castor.reply (
     user_id INT UNSIGNED NOT NULL,
     parent_id INT UNSIGNED NULL,
     score DOUBLE NOT NULL DEFAULT 0,
+    awarded_points INT UNSIGNED NOT NULL DEFAULT 0,
     replied_answer VARCHAR(255) NULL,
     duration_ms INT UNSIGNED NULL,
     replied_at DATETIME(3) NOT NULL,

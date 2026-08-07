@@ -6,6 +6,7 @@ import {
   conceptGroupTable,
   conceptTable,
   pendingReplyTable,
+  pointTransactionTable,
   questionConceptTable,
   questionExamTable,
   questionTable,
@@ -15,6 +16,7 @@ import {
   subjectTable,
   userConceptStatTable,
   userStatHistoryTable,
+  userTable,
   userWrongQuestionTable,
 } from 'src/db/schema';
 import { DEFAULT_LIMIT, genPagination, MAX_LIMIT } from 'src/lib/paginator';
@@ -73,14 +75,36 @@ const calcScore = (type: string, replied: string, correct: string) => {
   }
 };
 
+// Points reward the *gap* between a question's difficulty and the
+// user's mastery at the concepts it covers, not the raw score --
+// answering something far above your current level is worth more than
+// something far below it. Elo-style expected-score formula: E is the
+// "expected probability of success" given that gap, scaled by
+// POINTS_MASTERY_SCALE (mastery/difficulty both live on a 0-10 scale
+// here, unlike chess's 0-2400 ratings, hence the much smaller constant).
+// POINTS_BASE is awarded at E=0.5 (mastery == difficulty, a fair coin
+// flip), rising to 2x for a near-impossible win and falling toward 0 for
+// a near-certain one. No penalty for wrong answers -- score already
+// carries that signal, and points just scale by score/10, so score=0
+// naturally yields 0 points without a separate branch.
+const POINTS_BASE = 100;
+const POINTS_MASTERY_SCALE = 2.5;
+const calcAwardedPoints = (questionMastery: number, adjustedDifficulty: number, score: number): number => {
+  const gap = questionMastery - adjustedDifficulty;
+  const expected = 1 / (1 + Math.pow(10, -gap / POINTS_MASTERY_SCALE));
+  return Math.round(POINTS_BASE * 2 * (1 - expected) * (score / 10));
+};
+
 // Concept mastery is an exponentially-decayed blend of three signals:
 // accuracy (lifetime), recent performance (decayed toward recent
 // attempts), and exposure (how many attempts have accumulated at all,
 // saturating at 20). Must run sequentially per concept -- if the same
 // concept is touched twice in one batch (two questions on the same
 // concept answered together), the second update needs to see the
-// first's effect, not race it.
-const upsertConceptStat = async (db: Db, userId: number, conceptId: number, score: number) => {
+// first's effect, not race it. Returns the newly computed mastery so
+// the points calculation's in-memory mastery snapshot (masteryByConcept
+// in the POST handler below) can stay consistent within one batch too.
+const upsertConceptStat = async (db: Db, userId: number, conceptId: number, score: number): Promise<number> => {
   const [existing] = await db
     .select()
     .from(userConceptStatTable)
@@ -107,6 +131,7 @@ const upsertConceptStat = async (db: Db, userId: number, conceptId: number, scor
       .update(userConceptStatTable)
       .set({ attemptCount, scoringTotal, lastAttemptAt: now, weightedSum, decaySum, mastery, updatedAt: now })
       .where(eq(userConceptStatTable.id, existing.id));
+    return mastery;
   } else {
     const exposure = (10 * Math.log10(2)) / Math.log10(21);
     const mastery = 0.5 * score + 0.3 * score + 0.2 * exposure;
@@ -123,6 +148,7 @@ const upsertConceptStat = async (db: Db, userId: number, conceptId: number, scor
       createdAt: now,
       updatedAt: now,
     });
+    return mastery;
   }
 };
 
@@ -136,7 +162,8 @@ const upsertStatHistory = async (
   userId: number,
   subjectId: number,
   batchAttempts: number,
-  batchScore: number
+  batchScore: number,
+  batchPoints: number
 ) => {
   const today = new Date().toISOString().slice(0, 10);
 
@@ -171,6 +198,7 @@ const upsertStatHistory = async (
         weightedMastery,
         dailyAttempts: existing.dailyAttempts + batchAttempts,
         dailyCorrect: existing.dailyCorrect + batchScore,
+        dailyPoints: existing.dailyPoints + batchPoints,
         updatedAt: now,
       })
       .where(eq(userStatHistoryTable.id, existing.id));
@@ -182,6 +210,7 @@ const upsertStatHistory = async (
       weightedMastery,
       dailyAttempts: batchAttempts,
       dailyCorrect: batchScore,
+      dailyPoints: batchPoints,
       createdAt: now,
       updatedAt: now,
     });
@@ -279,6 +308,41 @@ export const reply = new Hono<UserEnv>()
       conceptIdsByQuestion.set(link.questionId, list);
     }
 
+    // Mastery snapshot and per-concept weights for the points calculation
+    // below -- fetched once before the loop mutates anything, so every
+    // item's reward reflects skill *going into* this batch, not skill
+    // updated by an earlier item in the same batch (masteryByConcept is
+    // still kept in sync as upsertConceptStat runs per item, so a concept
+    // touched twice in one batch behaves consistently with the mastery
+    // table it's read from).
+    const allConceptIds = [...new Set(conceptLinks.map((l) => l.conceptId))];
+    const conceptWeightRows = await db
+      .select({ id: conceptTable.id, numberOfQuestions: conceptTable.numberOfQuestions })
+      .from(conceptTable)
+      .where(inArray(conceptTable.id, allConceptIds));
+    const numberOfQuestionsByConcept = new Map(conceptWeightRows.map((c) => [c.id, c.numberOfQuestions]));
+    const masteryRows = await db
+      .select({ conceptId: userConceptStatTable.conceptId, mastery: userConceptStatTable.mastery })
+      .from(userConceptStatTable)
+      .where(and(eq(userConceptStatTable.userId, user.id), inArray(userConceptStatTable.conceptId, allConceptIds)));
+    const masteryByConcept = new Map(masteryRows.map((r) => [r.conceptId, r.mastery]));
+
+    // Cold start: a concept with no user_concept_stat row yet falls back
+    // to this question's own adjustedDifficulty (gap = 0, expected = 0.5)
+    // rather than 0 -- defaulting to 0 would fabricate a huge fake gap
+    // and wildly inflate a brand-new user's very first points.
+    const calcQuestionMastery = (conceptIds: Set<number>, adjustedDifficulty: number): number => {
+      let weightedSum = 0;
+      let totalWeight = 0;
+      for (const conceptId of conceptIds) {
+        const weight = numberOfQuestionsByConcept.get(conceptId) ?? 1;
+        const mastery = masteryByConcept.get(conceptId) ?? adjustedDifficulty;
+        weightedSum += mastery * weight;
+        totalWeight += weight;
+      }
+      return totalWeight > 0 ? weightedSum / totalWeight : adjustedDifficulty;
+    };
+
     // Answering a question means it's no longer "in flight" -- clear any
     // pending_reply rows for whichever of these questions the user had
     // pending (bulk delete, rather than the legacy version's per-row
@@ -299,13 +363,15 @@ export const reply = new Hono<UserEnv>()
       repliedAnswer: string;
       correctAnswer: string;
       score: number;
+      awardedPoints: number;
       fbPostId: string | null;
     }[] = [];
     const replyRows: (typeof replyTable.$inferInsert)[] = [];
     // Keyed by subjectId -- "correct" mirrors the legacy field name
     // (dailyCorrect), but it's actually the sum of scores (0-10 each),
     // not a count of correct answers.
-    const subjectBatch = new Map<number, { attempts: number; correct: number }>();
+    const subjectBatch = new Map<number, { attempts: number; correct: number; points: number }>();
+    let userPointsBatch = 0;
 
     for (const item of items) {
       const question = questionMap.get(item.questionId);
@@ -313,6 +379,19 @@ export const reply = new Hono<UserEnv>()
       const parentQuestion = question.parentId ? questionMap.get(question.parentId) ?? null : null;
 
       const score = calcScore(question.type, item.repliedAnswer, question.answer ?? '');
+
+      const conceptIds = new Set<number>(conceptIdsByQuestion.get(question.id) ?? []);
+      if (parentQuestion)
+        for (const conceptId of conceptIdsByQuestion.get(parentQuestion.id) ?? []) conceptIds.add(conceptId);
+
+      // Snapshot mastery/difficulty as they stood going into this attempt
+      // -- computed before question.adjustedDifficulty is nudged by this
+      // same answer just below, so the reward reflects how hard the
+      // question looked beforehand, not after this outcome already
+      // adjusted it.
+      const questionMastery = calcQuestionMastery(conceptIds, question.adjustedDifficulty);
+      const awardedPoints = calcAwardedPoints(questionMastery, question.adjustedDifficulty, score);
+      userPointsBatch += awardedPoints;
 
       // Mutated in-memory and persisted once after the loop below (rather
       // than awaiting a write per item) -- if the same question appears
@@ -330,6 +409,7 @@ export const reply = new Hono<UserEnv>()
         repliedAnswer: item.repliedAnswer,
         correctAnswer: question.answer ?? '',
         score,
+        awardedPoints,
         fbPostId: parentQuestion ? parentQuestion.fbPostId : question.fbPostId,
       });
       replyRows.push({
@@ -338,6 +418,7 @@ export const reply = new Hono<UserEnv>()
         userId: user.id,
         parentId: parentQuestion ? parentQuestion.id : null,
         score,
+        awardedPoints,
         repliedAnswer: item.repliedAnswer,
         durationMs: item.durationMs ?? null,
         repliedAt,
@@ -345,10 +426,10 @@ export const reply = new Hono<UserEnv>()
         updatedAt: repliedAt,
       });
 
-      const conceptIds = new Set<number>(conceptIdsByQuestion.get(question.id) ?? []);
-      if (parentQuestion)
-        for (const conceptId of conceptIdsByQuestion.get(parentQuestion.id) ?? []) conceptIds.add(conceptId);
-      for (const conceptId of conceptIds) await upsertConceptStat(db, user.id, conceptId, score);
+      for (const conceptId of conceptIds) {
+        const newMastery = await upsertConceptStat(db, user.id, conceptId, score);
+        masteryByConcept.set(conceptId, newMastery);
+      }
 
       if (score < 10)
         await upsertWrongQuestion(
@@ -361,9 +442,10 @@ export const reply = new Hono<UserEnv>()
           repliedAt
         );
 
-      const entry = subjectBatch.get(question.subjectId) ?? { attempts: 0, correct: 0 };
+      const entry = subjectBatch.get(question.subjectId) ?? { attempts: 0, correct: 0, points: 0 };
       entry.attempts += 1;
       entry.correct += score;
+      entry.points += awardedPoints;
       subjectBatch.set(question.subjectId, entry);
     }
 
@@ -381,7 +463,62 @@ export const reply = new Hono<UserEnv>()
         .where(eq(questionTable.id, id));
     }
 
-    if (replyRows.length > 0) await db.insert(replyTable).values(replyRows);
+    if (replyRows.length > 0) {
+      const [{ insertId: firstReplyId }] = await db.insert(replyTable).values(replyRows);
+
+      // A single multi-row INSERT gets a contiguous block of auto-increment
+      // ids from InnoDB -- true even under the default interleaved lock
+      // mode, since the row count is known upfront for a plain VALUES-list
+      // insert -- so row i's id is always firstReplyId + i, in the same
+      // order as replyRows, without a second round-trip to look them up.
+      const now = new Date();
+      const pointTransactionRows: (typeof pointTransactionTable.$inferInsert)[] = [];
+      replyRows.forEach((row, i) => {
+        const awarded = row.awardedPoints ?? 0;
+        if (awarded <= 0) return;
+        pointTransactionRows.push({
+          userId: row.userId,
+          type: 'EARN_REPLY',
+          amount: awarded,
+          replyId: firstReplyId + i,
+          // Filled in below once the running total is known -- placeholder
+          // here just to satisfy the insert type.
+          balanceAfter: 0,
+          createdAt: now,
+        });
+      });
+
+      if (userPointsBatch > 0) {
+        // Read-then-write rather than a locked SELECT ... FOR UPDATE: this
+        // whole handler already runs inside one transaction (see
+        // middleware/transaction.ts), and a single user is never expected
+        // to have two POST /reply requests in flight at once (the frontend
+        // submits one batch at a time) -- the same posture the rest of
+        // this file already takes with question.attempCount, so
+        // balanceAfter is a best-effort audit snapshot, not the source of
+        // truth (userTable.totalPoints, updated atomically below, is).
+        const [currentUser] = await db
+          .select({ totalPoints: userTable.totalPoints })
+          .from(userTable)
+          .where(eq(userTable.id, user.id));
+        let runningBalance = currentUser?.totalPoints ?? 0;
+        for (const row of pointTransactionRows) {
+          runningBalance += row.amount;
+          row.balanceAfter = runningBalance;
+        }
+
+        await db
+          .update(userTable)
+          .set({
+            totalPoints: sql`${userTable.totalPoints} + ${userPointsBatch}`,
+            lifetimePoints: sql`${userTable.lifetimePoints} + ${userPointsBatch}`,
+            updatedAt: repliedAt,
+          })
+          .where(eq(userTable.id, user.id));
+      }
+
+      if (pointTransactionRows.length > 0) await db.insert(pointTransactionTable).values(pointTransactionRows);
+    }
 
     // A GROUP question's own adjustedDifficulty is the average of its
     // children's -- recomputed fresh from the DB (which now reflects the
@@ -397,8 +534,8 @@ export const reply = new Hono<UserEnv>()
       await db.update(questionTable).set({ adjustedDifficulty: avg, updatedAt: repliedAt }).where(eq(questionTable.id, parentId));
     }
 
-    for (const [subjectId, { attempts, correct }] of subjectBatch)
-      await upsertStatHistory(db, user.id, subjectId, attempts, correct);
+    for (const [subjectId, { attempts, correct, points }] of subjectBatch)
+      await upsertStatHistory(db, user.id, subjectId, attempts, correct, points);
 
     return c.json(responses);
   })

@@ -223,6 +223,7 @@ export type PostReplyResponse = {
   repliedAnswer: string
   correctAnswer: string
   score: number
+  awardedPoints: number
   fbPostId: string | null
 }[]
 

@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS castor.user_stat_history (
     weighted_mastery DOUBLE NULL,
     daily_attempts INT UNSIGNED NOT NULL DEFAULT 0,
     daily_correct DOUBLE NOT NULL DEFAULT 0,
+    daily_points INT UNSIGNED NOT NULL DEFAULT 0, -- earn-only, unaffected by spending
     created_at DATETIME(3) NULL,
     updated_at DATETIME(3) NULL,
     PRIMARY KEY (id),

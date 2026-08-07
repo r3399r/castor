@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { app } from 'src/app';
 import { closeDb, getDb } from 'src/db/client';
@@ -9,6 +9,7 @@ import {
   examSubjectTable,
   examTable,
   pendingReplyTable,
+  pointTransactionTable,
   questionConceptTable,
   questionExamTable,
   questionTable,
@@ -57,6 +58,7 @@ type PostReplyResponse = {
   repliedAnswer: string;
   correctAnswer: string;
   score: number;
+  awardedPoints: number;
   fbPostId: string | null;
 }[];
 
@@ -164,6 +166,7 @@ const clearTables = async () => {
   const db = getDb();
   await db.delete(pendingReplyTable);
   await db.delete(userWrongQuestionTable);
+  await db.delete(pointTransactionTable);
   await db.delete(replyTable);
   await db.delete(userConceptStatTable);
   await db.delete(userStatHistoryTable);
@@ -317,6 +320,186 @@ describe('reply routes', () => {
         parentId: null,
         score: 10,
         repliedAnswer: 'A',
+      });
+    });
+
+    describe('points', () => {
+      it('awards the 100-point baseline on a cold-start correct answer (mastery defaults to the question difficulty)', async () => {
+        await seedUser();
+        vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+        const { subjectId, examId, conceptId } = await seedFixture();
+        const q = await createQuestion(subjectId, examId, { difficulty: 5, answer: 'A', conceptIds: [conceptId] });
+
+        const res = await postReply([{ questionId: q.id, repliedAnswer: 'A' }]);
+        const body = (await res.json()) as PostReplyResponse;
+        expect(body[0].awardedPoints).toBe(100);
+
+        const db = getDb();
+        const [replyRow] = await db.select().from(replyTable).where(eq(replyTable.questionId, q.id));
+        expect(replyRow.awardedPoints).toBe(100);
+      });
+
+      it('awards fewer than baseline points when mastery is far above the question difficulty (an easy win)', async () => {
+        const userId = await seedUser();
+        vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+        const { subjectId, examId, conceptId } = await seedFixture();
+        const q = await createQuestion(subjectId, examId, { difficulty: 5, answer: 'A', conceptIds: [conceptId] });
+        const db = getDb();
+        await db.insert(userConceptStatTable).values({
+          userId,
+          conceptId,
+          attemptCount: 5,
+          scoringTotal: 50,
+          lastAttemptAt: new Date(),
+          weightedSum: 50,
+          decaySum: 5,
+          mastery: 10,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+
+        // gap = 10 - 5 = 5 -> expected ~= 0.9901 -> points = 200*(1-0.9901) ~= 1.98 -> round to 2
+        const res = await postReply([{ questionId: q.id, repliedAnswer: 'A' }]);
+        const body = (await res.json()) as PostReplyResponse;
+        expect(body[0].awardedPoints).toBe(2);
+      });
+
+      it('awards more than baseline points when mastery is far below the question difficulty (a hard win)', async () => {
+        const userId = await seedUser();
+        vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+        const { subjectId, examId, conceptId } = await seedFixture();
+        const q = await createQuestion(subjectId, examId, { difficulty: 5, answer: 'A', conceptIds: [conceptId] });
+        const db = getDb();
+        await db.insert(userConceptStatTable).values({
+          userId,
+          conceptId,
+          attemptCount: 5,
+          scoringTotal: 0,
+          lastAttemptAt: new Date(),
+          weightedSum: 0,
+          decaySum: 5,
+          mastery: 0,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+
+        // gap = 0 - 5 = -5 -> expected ~= 0.0099 -> points = 200*(1-0.0099) ~= 198.02 -> round to 198
+        const res = await postReply([{ questionId: q.id, repliedAnswer: 'A' }]);
+        const body = (await res.json()) as PostReplyResponse;
+        expect(body[0].awardedPoints).toBe(198);
+      });
+
+      it('awards 0 points for a wrong answer regardless of the mastery/difficulty gap', async () => {
+        const userId = await seedUser();
+        vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+        const { subjectId, examId, conceptId } = await seedFixture();
+        const q = await createQuestion(subjectId, examId, { difficulty: 5, answer: 'A', conceptIds: [conceptId] });
+        const db = getDb();
+        await db.insert(userConceptStatTable).values({
+          userId,
+          conceptId,
+          attemptCount: 5,
+          scoringTotal: 0,
+          lastAttemptAt: new Date(),
+          weightedSum: 0,
+          decaySum: 5,
+          mastery: 0,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+
+        const res = await postReply([{ questionId: q.id, repliedAnswer: 'B' }]);
+        const body = (await res.json()) as PostReplyResponse;
+        expect(body[0].awardedPoints).toBe(0);
+      });
+
+      it('scales partial-credit points proportionally to score', async () => {
+        await seedUser();
+        vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+        const { subjectId, examId, conceptId } = await seedFixture();
+        // correct = OXOX, one mismatch -> score 5 (see the MULTIPLE scoring test above)
+        const q = await createQuestion(subjectId, examId, {
+          type: 'MULTIPLE',
+          options: 'A|B|C|D',
+          answer: 'OXOX',
+          conceptIds: [conceptId],
+        });
+
+        // cold start -> baseline 100 at score 10, so score 5 should give half: 50
+        const res = await postReply([{ questionId: q.id, repliedAnswer: 'OXOO' }]);
+        const body = (await res.json()) as PostReplyResponse;
+        expect(body[0].score).toBe(5);
+        expect(body[0].awardedPoints).toBe(50);
+      });
+
+      it('updates user.totalPoints/lifetimePoints, user_stat_history.dailyPoints, and inserts a point_transaction row', async () => {
+        const userId = await seedUser();
+        vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+        const { subjectId, examId, conceptId } = await seedFixture();
+        const q = await createQuestion(subjectId, examId, { difficulty: 5, answer: 'A', conceptIds: [conceptId] });
+
+        await postReply([{ questionId: q.id, repliedAnswer: 'A' }]);
+
+        const db = getDb();
+        const [replyRow] = await db.select().from(replyTable).where(eq(replyTable.questionId, q.id));
+        expect(replyRow.awardedPoints).toBe(100);
+
+        const [updatedUser] = await db.select().from(userTable).where(eq(userTable.id, userId));
+        expect(updatedUser.totalPoints).toBe(100);
+        expect(updatedUser.lifetimePoints).toBe(100);
+
+        const today = new Date().toISOString().slice(0, 10);
+        const [history] = await db
+          .select()
+          .from(userStatHistoryTable)
+          .where(
+            and(
+              eq(userStatHistoryTable.userId, userId),
+              eq(userStatHistoryTable.subjectId, subjectId),
+              eq(userStatHistoryTable.date, today)
+            )
+          );
+        expect(history.dailyPoints).toBe(100);
+
+        const transactions = await db
+          .select()
+          .from(pointTransactionTable)
+          .where(eq(pointTransactionTable.userId, userId));
+        expect(transactions).toHaveLength(1);
+        expect(transactions[0]).toMatchObject({
+          type: 'EARN_REPLY',
+          amount: 100,
+          replyId: replyRow.id,
+          balanceAfter: 100,
+        });
+      });
+
+      it('accumulates totalPoints/lifetimePoints and balanceAfter across multiple POST /reply calls', async () => {
+        const userId = await seedUser();
+        vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+        const { subjectId, examId, conceptId } = await seedFixture();
+        const q1 = await createQuestion(subjectId, examId, { difficulty: 5, answer: 'A', conceptIds: [conceptId] });
+        const q2 = await createQuestion(subjectId, examId, { difficulty: 5, answer: 'A', conceptIds: [conceptId] });
+
+        await postReply([{ questionId: q1.id, repliedAnswer: 'A' }]);
+        await postReply([{ questionId: q2.id, repliedAnswer: 'A' }]);
+
+        const db = getDb();
+        const [updatedUser] = await db.select().from(userTable).where(eq(userTable.id, userId));
+        // Not necessarily 200 -- the second reply's mastery snapshot reflects
+        // the first reply's upsertConceptStat update, so its gap (and thus
+        // its points) differ from the first's cold-start 100. Just assert
+        // the running total actually accumulated rather than being reset.
+        expect(updatedUser.totalPoints).toBeGreaterThan(100);
+        expect(updatedUser.lifetimePoints).toBe(updatedUser.totalPoints);
+
+        const transactions = await db
+          .select()
+          .from(pointTransactionTable)
+          .where(eq(pointTransactionTable.userId, userId))
+          .orderBy(pointTransactionTable.id);
+        expect(transactions).toHaveLength(2);
+        expect(transactions[1].balanceAfter).toBe(updatedUser.totalPoints);
       });
     });
 
