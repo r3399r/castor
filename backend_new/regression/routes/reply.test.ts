@@ -501,6 +501,72 @@ describe('reply routes', () => {
         expect(transactions).toHaveLength(2);
         expect(transactions[1].balanceAfter).toBe(updatedUser.totalPoints);
       });
+
+      describe('anti-farming (too-fast answers)', () => {
+        it('awards 0 points when answered under the 2s floor, even with no duration_p5_ms yet', async () => {
+          await seedUser();
+          vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+          const { subjectId, examId, conceptId } = await seedFixture();
+          // Fresh question -> durationP5Ms is still null (only the nightly
+          // questionStat job sets it), so only the flat 2s floor applies.
+          const q = await createQuestion(subjectId, examId, { difficulty: 5, answer: 'A', conceptIds: [conceptId] });
+
+          const res = await postReply([{ questionId: q.id, repliedAnswer: 'A', durationMs: 500 }]);
+          const body = (await res.json()) as PostReplyResponse;
+          expect(body[0].score).toBe(10);
+          expect(body[0].awardedPoints).toBe(0);
+        });
+
+        it('awards 0 points when answered faster than 80% of duration_p5_ms, even above the 2s floor', async () => {
+          await seedUser();
+          vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+          const { subjectId, examId, conceptId } = await seedFixture();
+          const q = await createQuestion(subjectId, examId, { difficulty: 5, answer: 'A', conceptIds: [conceptId] });
+          const db = getDb();
+          // p5 = 10000ms -> threshold = max(10000*0.8, 2000) = 8000ms
+          await db.update(questionTable).set({ durationP5Ms: 10000 }).where(eq(questionTable.id, q.id));
+
+          const res = await postReply([{ questionId: q.id, repliedAnswer: 'A', durationMs: 7999 }]);
+          const body = (await res.json()) as PostReplyResponse;
+          expect(body[0].awardedPoints).toBe(0);
+        });
+
+        it('awards normal points once answered at or above the duration_p5_ms threshold', async () => {
+          await seedUser();
+          vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+          const { subjectId, examId, conceptId } = await seedFixture();
+          const q = await createQuestion(subjectId, examId, { difficulty: 5, answer: 'A', conceptIds: [conceptId] });
+          const db = getDb();
+          await db.update(questionTable).set({ durationP5Ms: 10000 }).where(eq(questionTable.id, q.id));
+
+          const res = await postReply([{ questionId: q.id, repliedAnswer: 'A', durationMs: 8000 }]);
+          const body = (await res.json()) as PostReplyResponse;
+          expect(body[0].awardedPoints).toBe(100);
+        });
+
+        it('does not zero points when durationMs is omitted entirely', async () => {
+          await seedUser();
+          vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+          const { subjectId, examId, conceptId } = await seedFixture();
+          const q = await createQuestion(subjectId, examId, { difficulty: 5, answer: 'A', conceptIds: [conceptId] });
+
+          const res = await postReply([{ questionId: q.id, repliedAnswer: 'A' }]);
+          const body = (await res.json()) as PostReplyResponse;
+          expect(body[0].awardedPoints).toBe(100);
+        });
+
+        it('still awards 0 (not negative) points for a fast wrong answer', async () => {
+          await seedUser();
+          vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+          const { subjectId, examId, conceptId } = await seedFixture();
+          const q = await createQuestion(subjectId, examId, { difficulty: 5, answer: 'A', conceptIds: [conceptId] });
+
+          const res = await postReply([{ questionId: q.id, repliedAnswer: 'B', durationMs: 100 }]);
+          const body = (await res.json()) as PostReplyResponse;
+          expect(body[0].score).toBe(0);
+          expect(body[0].awardedPoints).toBe(0);
+        });
+      });
     });
 
     it('sets parentId and fbPostId from the parent for a GROUP question child', async () => {

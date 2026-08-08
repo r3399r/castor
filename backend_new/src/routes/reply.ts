@@ -95,6 +95,24 @@ const calcAwardedPoints = (questionMastery: number, adjustedDifficulty: number, 
   return Math.round(POINTS_BASE * 2 * (1 - expected) * (score / 10));
 };
 
+// Anti-farming: an answer given faster than 80% of this question's own
+// typical (5th-percentile) response time reads as a reflexive/uninformed
+// guess rather than a real attempt, so it earns no points -- MIN_ANSWER_MS
+// is an absolute floor on top of that, since a brand-new question has no
+// duration_p5_ms data yet (durationP5Ms null falls back to just this flat
+// floor). Only zeroes the reward; scoring, mastery, and wrong-question
+// tracking all still happen normally -- a wrong answer was never
+// penalized to begin with, this just denies farming easy correct ones.
+// durationMs missing entirely (an older/other caller) isn't treated as
+// suspicious -- there's nothing to compare against.
+const MIN_ANSWER_MS = 2000;
+const FAST_ANSWER_P5_RATIO = 0.8;
+const isTooFastForPoints = (durationP5Ms: number | null, durationMs: number | undefined): boolean => {
+  if (durationMs === undefined) return false;
+  const threshold = Math.max((durationP5Ms ?? 0) * FAST_ANSWER_P5_RATIO, MIN_ANSWER_MS);
+  return durationMs < threshold;
+};
+
 // Concept mastery is an exponentially-decayed blend of three signals:
 // accuracy (lifetime), recent performance (decayed toward recent
 // attempts), and exposure (how many attempts have accumulated at all,
@@ -390,7 +408,9 @@ export const reply = new Hono<UserEnv>()
       // question looked beforehand, not after this outcome already
       // adjusted it.
       const questionMastery = calcQuestionMastery(conceptIds, question.adjustedDifficulty);
-      const awardedPoints = calcAwardedPoints(questionMastery, question.adjustedDifficulty, score);
+      const awardedPoints = isTooFastForPoints(question.durationP5Ms, item.durationMs)
+        ? 0
+        : calcAwardedPoints(questionMastery, question.adjustedDifficulty, score);
       userPointsBatch += awardedPoints;
 
       // Mutated in-memory and persisted once after the loop below (rather
