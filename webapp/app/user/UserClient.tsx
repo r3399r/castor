@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
+import { Coins } from 'lucide-react'
 import { apiFetch, apiPut } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import type { GetUserMeResponse, PutUserMeRequest, PutUserMeResponse } from '@/types/api'
@@ -122,6 +124,19 @@ export default function UserClient() {
         >
           登出
         </button>
+      </div>
+
+      <div className="mt-4 flex items-center justify-between gap-4 rounded-lg border border-brown-300 bg-white/40 p-6">
+        <div className="flex items-center gap-3">
+          <Coins size={28} strokeWidth={1.5} className="text-amber-700" />
+          <div>
+            <p className="text-sm text-black-500">累積積分</p>
+            <p className="text-2xl font-bold text-amber-700">{me.lifetimePoints}</p>
+          </div>
+        </div>
+        <Link href="/user/wallet" className="text-sm text-blue-700 hover:underline">
+          查看紀錄
+        </Link>
       </div>
     </div>
   )

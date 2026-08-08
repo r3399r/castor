@@ -15,6 +15,7 @@ import { reply } from 'src/routes/reply';
 import { subject } from 'src/routes/subject';
 import { tag } from 'src/routes/tag';
 import { user } from 'src/routes/user';
+import { wallet } from 'src/routes/wallet';
 import { wrongQuestion } from 'src/routes/wrongQuestion';
 
 export const app = new Hono()
@@ -55,6 +56,9 @@ export const app = new Hono()
   .use('/api/wrong-question/*', transaction)
   .use('/api/wrong-question/*', requireUser)
   .route('/api/wrong-question', wrongQuestion)
+  .use('/api/wallet/*', transaction)
+  .use('/api/wallet/*', requireUser)
+  .route('/api/wallet', wallet)
   .onError((err, c) => {
     console.error(err);
     const { status, body } = toErrorResponse(err);

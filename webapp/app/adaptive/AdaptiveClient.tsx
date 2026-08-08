@@ -1,7 +1,7 @@
 'use client'
 
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
-import { Goal, BookOpenText, Brain, FunnelPlus, NotebookPen } from 'lucide-react'
+import { Goal, BookOpenText, Brain, Coins, FunnelPlus, NotebookPen } from 'lucide-react'
 import { apiFetch, apiPost } from '@/lib/api'
 import Chip, { tagColors } from '@/components/Chip'
 import DifficultyStars from '@/components/DifficultyStars'
@@ -335,6 +335,10 @@ export default function AdaptiveClient() {
   const totalScore = useMemo(() => replyResponse?.reduce((sum, r) => sum + r.score, 0) ?? 0, [replyResponse])
   const correctCount = useMemo(() => replyResponse?.filter((r) => r.score > 0).length ?? 0, [replyResponse])
   const wrongCount = useMemo(() => replyResponse?.filter((r) => r.score <= 0).length ?? 0, [replyResponse])
+  const totalAwardedPoints = useMemo(
+    () => replyResponse?.reduce((sum, r) => sum + r.awardedPoints, 0) ?? 0,
+    [replyResponse],
+  )
 
   const showConceptGroupHeader = useMemo(
     () => conceptGroupList.some((cg) => cg.concepts.length > 1),
@@ -1162,6 +1166,10 @@ export default function AdaptiveClient() {
                     {totalScore}
                     <span className="absolute bottom-3 left-full ml-1 text-base font-normal text-black-700">分</span>
                   </span>
+                </div>
+                <div className="mt-1 flex items-center justify-center gap-1 text-sm font-semibold text-amber-700">
+                  <Coins size={16} strokeWidth={2.5} />
+                  +{totalAwardedPoints} 積分
                 </div>
                 <hr className="mt-2 border-brown-700" />
               </div>

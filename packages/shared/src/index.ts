@@ -96,6 +96,8 @@ export type User = {
   email: string | null;
   name: string | null;
   avatar: string | null;
+  totalPoints: number;
+  lifetimePoints: number;
   lastLoginAt: string | null;
   createdAt: string | null;
   updatedAt: string | null;
@@ -270,6 +272,19 @@ export type GetWrongQuestionResponse = Paginate<WrongQuestion>;
 export type PutWrongQuestionNoteRequest = { note: string | null };
 
 export type PutWrongQuestionNoteResponse = { id: number; note: string | null; updatedAt: string | null };
+
+export type PointTransaction = {
+  id: number;
+  type: string;
+  amount: number;
+  replyId: number | null;
+  balanceAfter: number;
+  createdAt: string | null;
+};
+
+export type GetWalletParams = PaginationParams;
+
+export type GetWalletResponse = Paginate<PointTransaction>;
 
 export type PostPreviewRequest = { text: string; imageUrl: string }
 
