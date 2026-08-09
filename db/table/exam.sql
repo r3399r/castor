@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS castor.exam (
     id INT UNSIGNED AUTO_INCREMENT,
     name VARCHAR(255) NOT NULL,
-    created_at DATETIME(3) NULL,
+    created_at DATETIME(3) NULL DEFAULT CURRENT_TIMESTAMP(3),
     PRIMARY KEY (id),
     UNIQUE (name)
 );

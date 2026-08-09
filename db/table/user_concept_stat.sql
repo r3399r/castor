@@ -8,8 +8,8 @@ CREATE TABLE IF NOT EXISTS castor.user_concept_stat (
     last_attempt_at DATETIME(3) NULL, -- for RecentPerformance
     weighted_sum DOUBLE NOT NULL DEFAULT 0, -- sum of (score * decay), for RecentPerformance
     decay_sum DOUBLE NOT NULL DEFAULT 0,    -- sum of decay, for RecentPerformance
-    created_at DATETIME(3) NULL,
-    updated_at DATETIME(3) NULL,
+    created_at DATETIME(3) NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at DATETIME(3) NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
     PRIMARY KEY (id),
     FOREIGN KEY (user_id) REFERENCES user(id),
     FOREIGN KEY (concept_id) REFERENCES concept(id),

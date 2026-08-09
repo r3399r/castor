@@ -7,8 +7,8 @@ CREATE TABLE IF NOT EXISTS castor.user (
     total_points INT UNSIGNED NOT NULL DEFAULT 0, -- spendable balance; decreases when spent
     lifetime_points INT UNSIGNED NOT NULL DEFAULT 0, -- only ever increases; leaderboard ranks on this
     last_login_at DATETIME(3) NULL,
-    created_at DATETIME(3) NULL,
-    updated_at DATETIME(3) NULL,
+    created_at DATETIME(3) NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at DATETIME(3) NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
     PRIMARY KEY (id),
     UNIQUE (email),
     UNIQUE (firebase_uid)

@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS castor.concept (
     name VARCHAR(255) NOT NULL,
     concept_group_id INT UNSIGNED NOT NULL,
     number_of_questions INT UNSIGNED NOT NULL DEFAULT 0,
-    created_at DATETIME(3) NULL,
+    created_at DATETIME(3) NULL DEFAULT CURRENT_TIMESTAMP(3),
     PRIMARY KEY (id),
     UNIQUE (name, concept_group_id),
     FOREIGN KEY (concept_group_id) REFERENCES concept_group(id)

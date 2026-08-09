@@ -7,8 +7,8 @@ CREATE TABLE IF NOT EXISTS castor.user_stat_history (
     daily_attempts INT UNSIGNED NOT NULL DEFAULT 0,
     daily_correct DOUBLE NOT NULL DEFAULT 0,
     daily_points INT UNSIGNED NOT NULL DEFAULT 0, -- earn-only, unaffected by spending
-    created_at DATETIME(3) NULL,
-    updated_at DATETIME(3) NULL,
+    created_at DATETIME(3) NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at DATETIME(3) NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
     PRIMARY KEY (id),
     FOREIGN KEY (user_id) REFERENCES user(id),
     FOREIGN KEY (subject_id) REFERENCES subject(id),

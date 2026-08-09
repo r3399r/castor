@@ -15,8 +15,8 @@ CREATE TABLE IF NOT EXISTS castor.question (
     scoring_total DOUBLE NOT NULL DEFAULT 0, -- scoring_rate = scoring_total / attemp_count
     adjusted_difficulty DOUBLE NOT NULL, -- difficulty adjusted by user reply
     duration_p5_ms INT UNSIGNED NULL, -- 5th percentile of reply.duration_ms for this question; NULL until computed in batch
-    created_at DATETIME(3) NULL,
-    updated_at DATETIME(3) NULL,
+    created_at DATETIME(3) NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at DATETIME(3) NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
     PRIMARY KEY (id),
     UNIQUE (uuid),
     FOREIGN KEY (subject_id) REFERENCES castor.subject(id),
