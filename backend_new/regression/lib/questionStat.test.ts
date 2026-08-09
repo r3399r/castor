@@ -56,7 +56,8 @@ const insertReply = async (
   userId: number,
   subjectId: number,
   questionId: number,
-  durationMs: number | null
+  durationMs: number | null,
+  repliedAt = new Date()
 ) => {
   const db = getDb();
   const now = new Date();
@@ -67,7 +68,7 @@ const insertReply = async (
     score: 10,
     repliedAnswer: 'A',
     durationMs,
-    repliedAt: now,
+    repliedAt,
     createdAt: now,
     updatedAt: now,
   });
@@ -140,5 +141,35 @@ describe('questionStat', () => {
 
     expect(await getDurationP5(questionA)).toBe(500);
     expect(await getDurationP5(questionB)).toBe(900);
+  });
+
+  it('skips a question whose only replies are outside the lookback window', async () => {
+    const { userId, subjectId } = await seedFixture();
+    const questionId = await seedQuestion(subjectId);
+    const fiveDaysAgo = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000);
+    await insertReply(userId, subjectId, questionId, 500, fiveDaysAgo);
+
+    await computeQuestionStats(getDb());
+
+    // Not recomputed -- no reply in the last LOOKBACK_DAYS, so this
+    // question was never selected for reprocessing.
+    expect(await getDurationP5(questionId)).toBeNull();
+  });
+
+  it('recomputes using the full reply history, not just the recent window, once a question is selected', async () => {
+    const { userId, subjectId } = await seedFixture();
+    const questionId = await seedQuestion(subjectId);
+    const fiveDaysAgo = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000);
+    // Old reply (outside the lookback window) plus one recent reply --
+    // the recent one makes this question selected for reprocessing, but
+    // the percentile itself should still be computed over both.
+    await insertReply(userId, subjectId, questionId, 100, fiveDaysAgo);
+    await insertReply(userId, subjectId, questionId, 200);
+
+    await computeQuestionStats(getDb());
+
+    // Same 105 as the "linearly interpolates" test above -- confirms the
+    // old reply's duration was included, not just the recent one's.
+    expect(await getDurationP5(questionId)).toBe(105);
   });
 });

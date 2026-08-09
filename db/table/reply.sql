@@ -16,5 +16,6 @@ CREATE TABLE IF NOT EXISTS castor.reply (
     FOREIGN KEY (subject_id) REFERENCES subject(id),
     FOREIGN KEY (user_id) REFERENCES user(id),
     FOREIGN KEY (parent_id) REFERENCES question(id),
-    INDEX idx_subject_user_created_at (subject_id, user_id, created_at)
+    INDEX idx_subject_user_created_at (subject_id, user_id, created_at),
+    INDEX idx_replied_at (replied_at)
 );
