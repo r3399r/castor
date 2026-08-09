@@ -32,7 +32,7 @@ export default function HomeFeature() {
         <div className="mt-10 grid grid-cols-1 gap-10 xl:mt-16 xl:grid-cols-2 xl:items-center xl:gap-12">
           <div className="flex justify-center">
             <img
-              src="/charts.svg"
+              src="/pic-charts.png"
               alt="觀念熟悉度分析示意圖"
               className="w-full max-w-[480px]"
             />
