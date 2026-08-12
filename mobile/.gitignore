@@ -28,3 +28,9 @@ migrate_working_dir/
 .pub-cache/
 .pub/
 /build/
+
+# Firebase config -- per-environment API keys, not committed (see
+# mobile/README.md "5. Firebase / Google Sign-In setup"). CI materializes
+# these from repo secrets instead.
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist

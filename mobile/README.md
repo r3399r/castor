@@ -1,23 +1,32 @@
 # castor_mobile
 
 Flutter mobile app for Castor (iOS/Android), mirroring `webapp`'s pages.
-No backend calls are wired up yet -- every tab is a static placeholder.
+Google login (Firebase Auth, same account system as `webapp`) gates the
+whole app -- see "5. Firebase / Google Sign-In setup" below, required
+before the app will run. Beyond sign-in itself, no other backend calls are
+wired up yet -- every tab is still a static placeholder.
 
 ## What's here
 
 ```
 mobile/
   lib/
-    main.dart              # MaterialApp entry point
+    main.dart              # MaterialApp entry point + Firebase init + auth gate
+    config.dart             # API base URL
     theme/app_theme.dart   # colors ported from webapp/app/globals.css
+    services/
+      auth_service.dart      # Google Sign-In + Firebase Auth wrapper
+      api_client.dart        # HTTP client, mirrors webapp/lib/api.ts's auth header convention
     widgets/
       root_shell.dart          # bottom NavigationBar + IndexedStack across tabs
       coming_soon_notice.dart  # shared "not wired up yet" placeholder card
     pages/
+      login_page.dart     # Google sign-in screen, shown when signed out
       adaptive_page.dart  # mirrors webapp/app/adaptive (智慧練習) -- also the home tab
-      reply_page.dart     # mirrors webapp/app/reply (作答記錄)
-      wrong_page.dart     # mirrors webapp/app/wrong (錯題本)
-      user_page.dart      # mirrors webapp/app/user (學習分析)
+      reply_tabs_page.dart # mirrors webapp/app/reply + /wrong (作答記錄, 2 inner tabs)
+      analysis_page.dart  # mirrors webapp/app/analysis (學習分析)
+      box_page.dart       # mirrors webapp/app/box (禮物盒)
+      user_page.dart      # mirrors webapp/app/user (個人資料, incl. sign-out)
   test/widget_test.dart
   android/               # generated via `flutter create`, standard Gradle project
   ios/                   # generated via `flutter create`, standard Xcode project
@@ -48,10 +57,16 @@ generated, already exclude the genuinely-derivable bits inside them --
 - `flutter pub get` -- resolves cleanly
 - `flutter analyze` -- **no issues found**
 - `flutter test` -- **all tests passed** (`test/widget_test.dart`)
-- `flutter build apk --debug` -- **builds successfully**
-- Installed on a real Android emulator and launched -- renders correctly,
-  opens directly into 智慧練習, and tapping bottom nav destinations
-  switches pages as expected.
+- `flutter build apk --debug` -- **fails with a clear error** until
+  `android/app/google-services.json` exists (see "5. Firebase / Google
+  Sign-In setup"); confirmed it fails at exactly that point and nothing
+  else, with the config file missing.
+- Not yet re-verified end-to-end on a real emulator since the login gate
+  was added -- that needs a real `google-services.json` (step 5 below)
+  first. Before the login gate, this was confirmed working (opened
+  directly into 智慧練習, bottom nav switching worked); the underlying
+  `RootShell` behavior itself is unchanged and still covered by
+  `test/widget_test.dart`, just no longer the thing shown at cold launch.
 
 ## 1. Install Flutter
 
@@ -137,3 +152,46 @@ flutter run -d <deviceId>   # deviceId from `flutter devices`
 
 While it's running: press `r` for hot reload, `R` for hot restart, `q` to
 quit.
+
+## 5. Firebase / Google Sign-In setup
+
+The app won't build/run without this -- `Firebase.initializeApp()` in
+`main.dart` throws at startup if these native config files are missing.
+Both native app identifiers already exist in this repo (`android/app/build.gradle.kts`'s
+`applicationId`, `ios/Runner.xcodeproj`'s `PRODUCT_BUNDLE_IDENTIFIER`); they
+just need to be registered as apps under the **same Firebase project**
+`webapp` uses (see `webapp/lib/firebase.ts`'s `NEXT_PUBLIC_FIREBASE_PROJECT_ID`).
+
+1. Install the [Firebase CLI](https://firebase.google.com/docs/cli) and the
+   [FlutterFire CLI](https://firebase.google.com/docs/flutter/setup) if you
+   don't have them: `dart pub global activate flutterfire_cli`.
+2. From `mobile/`, run `flutterfire configure` and select the existing web
+   project. This registers the Android/iOS app IDs above (if not already
+   registered) and downloads:
+   - `android/app/google-services.json`
+   - `ios/Runner/GoogleService-Info.plist`
+
+   Neither file is committed (see `.gitignore`) since they contain
+   per-environment API keys -- every developer running this app needs their
+   own copy from Firebase console access, same as `webapp/.env`.
+3. **iOS only**: open `GoogleService-Info.plist`, copy its `REVERSED_CLIENT_ID`
+   value, and add it as a URL scheme in `ios/Runner/Info.plist`:
+   ```xml
+   <key>CFBundleURLTypes</key>
+   <array>
+     <dict>
+       <key>CFBundleURLSchemes</key>
+       <array>
+         <string>PASTE_REVERSED_CLIENT_ID_HERE</string>
+       </array>
+     </dict>
+   </array>
+   ```
+   Required for `google_sign_in`'s OAuth redirect back into the app; without
+   it, the Google account picker opens but never returns control to Castor.
+4. **CI only**: `.github/workflows/mobile.yml`'s `build-android`/`build-ios`
+   jobs materialize both files from repo secrets (`GOOGLE_SERVICES_JSON`,
+   `GOOGLE_SERVICE_INFO_PLIST`) before building -- add those secrets (base64
+   of each file's contents) under the repo's Actions settings, mirroring how
+   `dev.yml` already writes `webapp/.env` from `NEXT_PUBLIC_FIREBASE_*`
+   secrets.
