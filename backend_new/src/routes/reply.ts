@@ -5,6 +5,7 @@ import { z } from 'zod';
 import {
   conceptGroupTable,
   conceptTable,
+  durationGlobalStatTable,
   pendingReplyTable,
   pointTransactionTable,
   questionConceptTable,
@@ -82,17 +83,59 @@ const calcScore = (type: string, replied: string, correct: string) => {
 // "expected probability of success" given that gap, scaled by
 // POINTS_MASTERY_SCALE (mastery/difficulty both live on a 0-10 scale
 // here, unlike chess's 0-2400 ratings, hence the much smaller constant).
-// POINTS_BASE is awarded at E=0.5 (mastery == difficulty, a fair coin
+// POINTS_BASE is the result at E=0.5 (mastery == difficulty, a fair coin
 // flip), rising to 2x for a near-impossible win and falling toward 0 for
 // a near-certain one. No penalty for wrong answers -- score already
 // carries that signal, and points just scale by score/10, so score=0
-// naturally yields 0 points without a separate branch.
+// naturally yields 0 points without a separate branch. Deliberately
+// unrounded -- this is the base value time-weight (below) still has to
+// multiply; awardedPoints only rounds once, after that.
 const POINTS_BASE = 100;
 const POINTS_MASTERY_SCALE = 2.5;
-const calcAwardedPoints = (questionMastery: number, adjustedDifficulty: number, score: number): number => {
+const calcBasePoints = (questionMastery: number, adjustedDifficulty: number, score: number): number => {
   const gap = questionMastery - adjustedDifficulty;
   const expected = 1 / (1 + Math.pow(10, -gap / POINTS_MASTERY_SCALE));
-  return Math.round(POINTS_BASE * 2 * (1 - expected) * (score / 10));
+  return POINTS_BASE * 2 * (1 - expected) * (score / 10);
+};
+
+// Time weight rewards questions/subjects that inherently take longer to
+// answer, so a slow-but-equally-"difficulty 5"-rated math question isn't
+// worth the same as a quick vocab one. Two independently-clamped layers,
+// multiplied together rather than compared as one combined ratio -- a
+// single flat ratio would let a subject far from the platform average
+// swallow up all its individual questions' clamped range, flattening the
+// within-subject differentiation the question-level layer exists for.
+//   withinSubjectRatio: this question vs typical for its own subject.
+//   subjectMultiplier: this subject vs the platform-wide typical.
+// Any missing/insufficient-sample input (NULL from questionStat.ts, or no
+// duration_global_stat row yet) falls back to neutral (1.0) for that
+// layer -- untrusted data should never distort the reward, only trusted
+// data should. Bounds intentionally asymmetric: the question-level clamp
+// (0.5~2.0) is a meaningful behavioral range that actually gets hit; the
+// subject-level clamp (0.1~10) is deliberately wide -- a pure safety net
+// against corrupted data, not a shaping constraint -- because a tight
+// subject-level clamp breaks "same points-per-hour regardless of which
+// subject you practice" (the ratio is throughput-neutral by construction
+// when unclamped: more questions-per-hour at a proportionally lower
+// per-question weight exactly cancels out).
+const WITHIN_SUBJECT_CLAMP: [number, number] = [0.5, 2.0];
+const SUBJECT_MULTIPLIER_CLAMP: [number, number] = [0.1, 10];
+const clamp = (value: number, [min, max]: [number, number]): number => Math.min(max, Math.max(min, value));
+
+const calcTimeWeight = (
+  questionMedianMs: number | null,
+  subjectMedianMs: number | null,
+  globalMedianMs: number | null
+): number => {
+  const withinSubjectRatio =
+    questionMedianMs != null && subjectMedianMs != null
+      ? clamp(questionMedianMs / subjectMedianMs, WITHIN_SUBJECT_CLAMP)
+      : 1.0;
+  const subjectMultiplier =
+    subjectMedianMs != null && globalMedianMs != null
+      ? clamp(subjectMedianMs / globalMedianMs, SUBJECT_MULTIPLIER_CLAMP)
+      : 1.0;
+  return withinSubjectRatio * subjectMultiplier;
 };
 
 // Anti-farming: an answer given faster than 80% of this question's own
@@ -361,6 +404,21 @@ export const reply = new Hono<UserEnv>()
       return totalWeight > 0 ? weightedSum / totalWeight : adjustedDifficulty;
     };
 
+    // Time-weight inputs -- subject medians for every subject touched by
+    // this batch, plus the single platform-wide anchor. Both are missing/
+    // null-safe (calcTimeWeight falls back to neutral), covering both "no
+    // duration_global_stat row yet" (brand new deployment) and "this
+    // subject/question hasn't hit its minimum sample size yet"
+    // (questionStat.ts leaves durationMedianMs NULL either way).
+    const subjectIds = [...new Set(questions.map((q) => q.subjectId))];
+    const subjectRows = await db
+      .select({ id: subjectTable.id, durationMedianMs: subjectTable.durationMedianMs })
+      .from(subjectTable)
+      .where(inArray(subjectTable.id, subjectIds));
+    const subjectMedianById = new Map(subjectRows.map((s) => [s.id, s.durationMedianMs]));
+    const [globalStat] = await db.select({ medianMs: durationGlobalStatTable.medianMs }).from(durationGlobalStatTable);
+    const globalMedianMs = globalStat?.medianMs ?? null;
+
     // Answering a question means it's no longer "in flight" -- clear any
     // pending_reply rows for whichever of these questions the user had
     // pending (bulk delete, rather than the legacy version's per-row
@@ -408,9 +466,14 @@ export const reply = new Hono<UserEnv>()
       // question looked beforehand, not after this outcome already
       // adjusted it.
       const questionMastery = calcQuestionMastery(conceptIds, question.adjustedDifficulty);
+      const timeWeight = calcTimeWeight(
+        question.durationMedianMs,
+        subjectMedianById.get(question.subjectId) ?? null,
+        globalMedianMs
+      );
       const awardedPoints = isTooFastForPoints(question.durationP5Ms, item.durationMs)
         ? 0
-        : calcAwardedPoints(questionMastery, question.adjustedDifficulty, score);
+        : Math.round(calcBasePoints(questionMastery, question.adjustedDifficulty, score) * timeWeight);
       userPointsBatch += awardedPoints;
 
       // Mutated in-memory and persisted once after the loop below (rather

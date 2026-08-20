@@ -110,7 +110,13 @@ describe('subject routes', () => {
     const listBody = (await listRes.json()) as {
       data: (SubjectDto & { categories: string | null })[];
     };
-    expect(listBody.data).toEqual([{ ...created, categories: null }]);
+    // GET / (admin list) only selects the columns its UI needs -- not the
+    // full row POST returns, so durationMedianMs (an internal stat, never
+    // part of this list's DTO) is deliberately absent here.
+    const { durationMedianMs: _durationMedianMs, ...createdWithoutDurationMedian } = created as SubjectDto & {
+      durationMedianMs: number | null;
+    };
+    expect(listBody.data).toEqual([{ ...createdWithoutDurationMedian, categories: null }]);
   });
 
   it('shows a comma-separated list of linked category names', async () => {

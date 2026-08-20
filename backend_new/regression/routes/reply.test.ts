@@ -6,6 +6,7 @@ import {
   categoryTable,
   conceptGroupTable,
   conceptTable,
+  durationGlobalStatTable,
   examSubjectTable,
   examTable,
   pendingReplyTable,
@@ -164,6 +165,7 @@ const createGroupQuestion = async (
 
 const clearTables = async () => {
   const db = getDb();
+  await db.delete(durationGlobalStatTable);
   await db.delete(pendingReplyTable);
   await db.delete(userWrongQuestionTable);
   await db.delete(pointTransactionTable);
@@ -565,6 +567,113 @@ describe('reply routes', () => {
           const body = (await res.json()) as PostReplyResponse;
           expect(body[0].score).toBe(0);
           expect(body[0].awardedPoints).toBe(0);
+        });
+      });
+
+      describe('time-weight', () => {
+        it('applies only the subject multiplier when the question is typical for its subject', async () => {
+          const userId = await seedUser();
+          vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+          const { subjectId, examId, conceptId } = await seedFixture();
+          const q = await createQuestion(subjectId, examId, { difficulty: 5, answer: 'A', conceptIds: [conceptId] });
+          const db = getDb();
+          await db.insert(durationGlobalStatTable).values({ medianMs: 20000 });
+          await db.update(subjectTable).set({ durationMedianMs: 60000 }).where(eq(subjectTable.id, subjectId));
+          await db.update(questionTable).set({ durationMedianMs: 60000 }).where(eq(questionTable.id, q.id));
+
+          // Cold start (gap=0) -> basePoints=100. withinSubjectRatio =
+          // 60000/60000 = 1.0. subjectMultiplier = clamp(60000/20000=3.0,
+          // 0.1, 10) = 3.0. timeWeight = 3.0 -> 300.
+          const res = await postReply([{ questionId: q.id, repliedAnswer: 'A' }]);
+          const body = (await res.json()) as PostReplyResponse;
+          expect(body[0].awardedPoints).toBe(300);
+
+          const [updatedUser] = await db.select().from(userTable).where(eq(userTable.id, userId));
+          expect(updatedUser.totalPoints).toBe(300);
+        });
+
+        it('combines the within-subject ratio and subject multiplier when both differ from 1', async () => {
+          await seedUser();
+          vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+          const { subjectId, examId, conceptId } = await seedFixture();
+          const q = await createQuestion(subjectId, examId, { difficulty: 5, answer: 'A', conceptIds: [conceptId] });
+          const db = getDb();
+          await db.insert(durationGlobalStatTable).values({ medianMs: 20000 });
+          await db.update(subjectTable).set({ durationMedianMs: 60000 }).where(eq(subjectTable.id, subjectId));
+          await db.update(questionTable).set({ durationMedianMs: 90000 }).where(eq(questionTable.id, q.id));
+
+          // withinSubjectRatio = clamp(90000/60000=1.5, 0.5, 2.0) = 1.5.
+          // subjectMultiplier = clamp(60000/20000=3.0, 0.1, 10) = 3.0.
+          // timeWeight = 1.5*3.0 = 4.5 -> basePoints(100) * 4.5 = 450.
+          const res = await postReply([{ questionId: q.id, repliedAnswer: 'A' }]);
+          const body = (await res.json()) as PostReplyResponse;
+          expect(body[0].awardedPoints).toBe(450);
+        });
+
+        it('clamps the subject multiplier at the wide [0.1, 10] safety bounds', async () => {
+          await seedUser();
+          vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+          const { subjectId, examId, conceptId } = await seedFixture();
+          const q = await createQuestion(subjectId, examId, { difficulty: 5, answer: 'A', conceptIds: [conceptId] });
+          const db = getDb();
+          await db.insert(durationGlobalStatTable).values({ medianMs: 20000 });
+          // Natural ratio would be 1,000,000/20,000 = 50 -- clamped to 10.
+          await db.update(subjectTable).set({ durationMedianMs: 1000000 }).where(eq(subjectTable.id, subjectId));
+          await db.update(questionTable).set({ durationMedianMs: 1000000 }).where(eq(questionTable.id, q.id));
+
+          const res = await postReply([{ questionId: q.id, repliedAnswer: 'A' }]);
+          const body = (await res.json()) as PostReplyResponse;
+          expect(body[0].awardedPoints).toBe(1000);
+        });
+
+        it('clamps the within-subject ratio at [0.5, 2.0] even when the subject multiplier is neutral', async () => {
+          await seedUser();
+          vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+          const { subjectId, examId, conceptId } = await seedFixture();
+          const q = await createQuestion(subjectId, examId, { difficulty: 5, answer: 'A', conceptIds: [conceptId] });
+          const db = getDb();
+          await db.insert(durationGlobalStatTable).values({ medianMs: 20000 });
+          await db.update(subjectTable).set({ durationMedianMs: 20000 }).where(eq(subjectTable.id, subjectId));
+          // Natural ratio would be 1,000,000/20,000 = 50 -- clamped to 2.0.
+          await db.update(questionTable).set({ durationMedianMs: 1000000 }).where(eq(questionTable.id, q.id));
+
+          const res = await postReply([{ questionId: q.id, repliedAnswer: 'A' }]);
+          const body = (await res.json()) as PostReplyResponse;
+          expect(body[0].awardedPoints).toBe(200);
+        });
+
+        it('treats a question with no duration_median_ms yet as neutral for the within-subject layer, still applying the subject multiplier', async () => {
+          await seedUser();
+          vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+          const { subjectId, examId, conceptId } = await seedFixture();
+          const q = await createQuestion(subjectId, examId, { difficulty: 5, answer: 'A', conceptIds: [conceptId] });
+          const db = getDb();
+          await db.insert(durationGlobalStatTable).values({ medianMs: 20000 });
+          await db.update(subjectTable).set({ durationMedianMs: 60000 }).where(eq(subjectTable.id, subjectId));
+          // question.durationMedianMs left NULL (never set by createQuestion).
+
+          const res = await postReply([{ questionId: q.id, repliedAnswer: 'A' }]);
+          const body = (await res.json()) as PostReplyResponse;
+          expect(body[0].awardedPoints).toBe(300);
+        });
+
+        it('applies neutral time-weight (1.0) when there is no duration_global_stat row at all', async () => {
+          await seedUser();
+          vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+          const { subjectId, examId, conceptId } = await seedFixture();
+          const q = await createQuestion(subjectId, examId, { difficulty: 5, answer: 'A', conceptIds: [conceptId] });
+          const db = getDb();
+          // Subject/question medians set, but no duration_global_stat row
+          // exists yet (brand-new deployment) -- subjectMultiplier can't
+          // be computed without a global anchor, so it falls back to 1.0.
+          await db.update(subjectTable).set({ durationMedianMs: 60000 }).where(eq(subjectTable.id, subjectId));
+          await db.update(questionTable).set({ durationMedianMs: 90000 }).where(eq(questionTable.id, q.id));
+
+          // withinSubjectRatio = clamp(90000/60000=1.5, 0.5, 2.0) = 1.5.
+          // subjectMultiplier = 1.0 (no global stat). timeWeight = 1.5.
+          const res = await postReply([{ questionId: q.id, repliedAnswer: 'A' }]);
+          const body = (await res.json()) as PostReplyResponse;
+          expect(body[0].awardedPoints).toBe(150);
         });
       });
     });

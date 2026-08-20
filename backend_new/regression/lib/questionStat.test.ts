@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { closeDb, getDb } from 'src/db/client';
 import {
+  durationGlobalStatTable,
   examSubjectTable,
   examTable,
   questionTable,
@@ -13,6 +14,7 @@ import { computeQuestionStats } from 'src/lib/questionStat';
 
 const clearTables = async () => {
   const db = getDb();
+  await db.delete(durationGlobalStatTable);
   await db.delete(replyTable);
   await db.update(questionTable).set({ parentId: null });
   await db.delete(questionTable);
@@ -78,6 +80,31 @@ const getDurationP5 = async (questionId: number) => {
   const db = getDb();
   const [row] = await db.select().from(questionTable).where(eq(questionTable.id, questionId));
   return row.durationP5Ms;
+};
+
+const getQuestionMedian = async (questionId: number) => {
+  const db = getDb();
+  const [row] = await db.select().from(questionTable).where(eq(questionTable.id, questionId));
+  return row.durationMedianMs;
+};
+
+const getSubjectMedian = async (subjectId: number) => {
+  const db = getDb();
+  const [row] = await db.select().from(subjectTable).where(eq(subjectTable.id, subjectId));
+  return row.durationMedianMs;
+};
+
+const getGlobalMedian = async () => {
+  const db = getDb();
+  const [row] = await db.select().from(durationGlobalStatTable);
+  return row?.medianMs ?? null;
+};
+
+// Inserts one reply per duration in `durations`, all against the same
+// question/subject -- lets a test seed exactly N samples without N
+// individual insertReply calls.
+const insertReplies = async (userId: number, subjectId: number, questionId: number, durations: number[]) => {
+  for (const durationMs of durations) await insertReply(userId, subjectId, questionId, durationMs);
 };
 
 describe('questionStat', () => {
@@ -171,5 +198,139 @@ describe('questionStat', () => {
     // Same 105 as the "linearly interpolates" test above -- confirms the
     // old reply's duration was included, not just the recent one's.
     expect(await getDurationP5(questionId)).toBe(105);
+  });
+
+  describe('question-level duration_median_ms', () => {
+    it('leaves duration_median_ms NULL with fewer than MIN_QUESTION_SAMPLES replies, even though duration_p5_ms still gets set', async () => {
+      const { userId, subjectId } = await seedFixture();
+      const questionId = await seedQuestion(subjectId);
+      await insertReplies(userId, subjectId, questionId, [100, 200, 300, 400, 500]); // 5, below the 10 floor
+
+      await computeQuestionStats(getDb());
+
+      expect(await getQuestionMedian(questionId)).toBeNull();
+      expect(await getDurationP5(questionId)).not.toBeNull();
+    });
+
+    it('sets duration_median_ms once there are at least MIN_QUESTION_SAMPLES replies', async () => {
+      const { userId, subjectId } = await seedFixture();
+      const questionId = await seedQuestion(subjectId);
+      // 10 samples, exactly at the floor. Sorted: 100..1000 step 100.
+      // idx = 0.5*(10-1) = 4.5 -> sorted[4]=500, sorted[5]=600 -> 550.
+      await insertReplies(
+        userId,
+        subjectId,
+        questionId,
+        [1000, 900, 800, 700, 600, 500, 400, 300, 200, 100]
+      );
+
+      await computeQuestionStats(getDb());
+
+      expect(await getQuestionMedian(questionId)).toBe(550);
+    });
+  });
+
+  describe('subject-level duration_median_ms', () => {
+    it('leaves subject.duration_median_ms NULL with fewer than MIN_SUBJECT_SAMPLES replies', async () => {
+      const { userId, subjectId } = await seedFixture();
+      const questionId = await seedQuestion(subjectId);
+      const durations = Array.from({ length: 29 }, (_, i) => (i + 1) * 10); // 29, below the 30 floor
+      await insertReplies(userId, subjectId, questionId, durations);
+
+      await computeQuestionStats(getDb());
+
+      expect(await getSubjectMedian(subjectId)).toBeNull();
+    });
+
+    it('sets subject.duration_median_ms once the subject has at least MIN_SUBJECT_SAMPLES replies, aggregated across its questions', async () => {
+      const { userId, subjectId } = await seedFixture();
+      const questionA = await seedQuestion(subjectId);
+      const questionB = await seedQuestion(subjectId);
+      // 15 + 15 = 30 across two questions in the same subject, at the
+      // floor. Combined sorted set is 10..300 step 10 (30 values) ->
+      // idx = 0.5*29 = 14.5 -> sorted[14]=150, sorted[15]=160 -> 155.
+      const first15 = Array.from({ length: 15 }, (_, i) => (i + 1) * 10);
+      const second15 = Array.from({ length: 15 }, (_, i) => (i + 16) * 10);
+      await insertReplies(userId, subjectId, questionA, first15);
+      await insertReplies(userId, subjectId, questionB, second15);
+
+      await computeQuestionStats(getDb());
+
+      expect(await getSubjectMedian(subjectId)).toBe(155);
+    });
+
+    it('resets a previously-qualifying subject back to NULL once its sample count drops below the floor', async () => {
+      const { userId, subjectId } = await seedFixture();
+      const questionId = await seedQuestion(subjectId);
+      const db = getDb();
+      await db.update(subjectTable).set({ durationMedianMs: 999 }).where(eq(subjectTable.id, subjectId));
+      await insertReplies(userId, subjectId, questionId, [100, 200, 300]); // well below 30
+
+      await computeQuestionStats(getDb());
+
+      expect(await getSubjectMedian(subjectId)).toBeNull();
+    });
+
+    it('does not reprocess a subject whose only replies are outside the lookback window', async () => {
+      const { userId, subjectId } = await seedFixture();
+      const questionId = await seedQuestion(subjectId);
+      const db = getDb();
+      await db.update(subjectTable).set({ durationMedianMs: 999 }).where(eq(subjectTable.id, subjectId));
+      const fiveDaysAgo = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000);
+      // 30 old replies -- would qualify by sample count alone, but none
+      // are within LOOKBACK_DAYS, so this subject is never selected for
+      // reprocessing (same lookback tradeoff question-level has always
+      // had; housekeep.test.ts covers the complementary deletion path
+      // that keeps this correct when data actually ages out).
+      for (let i = 0; i < 30; i++) await insertReply(userId, subjectId, questionId, (i + 1) * 10, fiveDaysAgo);
+
+      await computeQuestionStats(getDb());
+
+      // Stays at the old, pre-seeded value -- not reprocessed, not reset.
+      expect(await getSubjectMedian(subjectId)).toBe(999);
+    });
+  });
+
+  describe('duration_global_stat', () => {
+    it('has no row when there is no duration data anywhere', async () => {
+      await seedFixture();
+
+      await computeQuestionStats(getDb());
+
+      expect(await getGlobalMedian()).toBeNull();
+    });
+
+    it('computes the median across every subject combined, not per-subject', async () => {
+      const { userId, subjectId: subjectA } = await seedFixture();
+      const db = getDb();
+      const [{ insertId: subjectB }] = await db
+        .insert(subjectTable)
+        .values({ name: 'fixture subject b', createdAt: new Date() });
+      const questionA = await seedQuestion(subjectA);
+      const questionB = await seedQuestion(subjectB);
+      // Combined: 100, 200, 300, 400 -> idx = 0.5*3 = 1.5 -> 200*0.5+300*0.5 = 250.
+      await insertReplies(userId, subjectA, questionA, [100, 200]);
+      await insertReplies(userId, subjectB, questionB, [300, 400]);
+
+      await computeQuestionStats(getDb());
+
+      expect(await getGlobalMedian()).toBe(250);
+    });
+
+    it('updates the existing row on a later run rather than inserting a second one', async () => {
+      const { userId, subjectId } = await seedFixture();
+      const questionId = await seedQuestion(subjectId);
+      await insertReplies(userId, subjectId, questionId, [100, 200]);
+      await computeQuestionStats(getDb());
+      const firstMedian = await getGlobalMedian();
+
+      await insertReplies(userId, subjectId, questionId, [900, 1000]);
+      await computeQuestionStats(getDb());
+
+      const db = getDb();
+      const rows = await db.select().from(durationGlobalStatTable);
+      expect(rows).toHaveLength(1);
+      expect(rows[0].medianMs).not.toBe(firstMedian);
+    });
   });
 });

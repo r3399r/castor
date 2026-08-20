@@ -28,6 +28,12 @@ export const subjectTable = mysqlTable('subject', {
   id: int('id', { unsigned: true }).autoincrement().primaryKey(),
   name: varchar('name', { length: 255 }).notNull(),
   sortOrder: tinyint('sort_order', { unsigned: true }).notNull().default(0),
+  // Median (p50) of reply.durationMs across every reply to a question in
+  // this subject -- structural half of the points time-weight (reply.ts):
+  // "is this subject inherently slower than the platform average". Same
+  // NULL-until-enough-data semantics as question.durationMedianMs (see
+  // questionStat.ts's MIN_SUBJECT_SAMPLES).
+  durationMedianMs: int('duration_median_ms', { unsigned: true }),
   createdAt: datetime('created_at', { mode: 'date', fsp: 3 }),
 });
 
@@ -178,6 +184,14 @@ export const questionTable = mysqlTable('question', {
   // reply (a percentile can't be updated that way), so it stays NULL
   // until some future batch job computes it.
   durationP5Ms: int('duration_p5_ms', { unsigned: true }),
+  // Median (p50) of reply.durationMs for this question -- feeds the
+  // points time-weight (reply.ts), not the anti-farming check (that's
+  // durationP5Ms). NULL both before the nightly job first runs and
+  // whenever this question has fewer than MIN_QUESTION_SAMPLES durations
+  // (see questionStat.ts) -- a median from a handful of replies is too
+  // noisy to trust, so the job explicitly resets it to NULL rather than
+  // publishing an unstable value.
+  durationMedianMs: int('duration_median_ms', { unsigned: true }),
   createdAt: datetime('created_at', { mode: 'date', fsp: 3 }),
   updatedAt: datetime('updated_at', { mode: 'date', fsp: 3 }),
 });
@@ -381,4 +395,15 @@ export const pointTransactionTable = mysqlTable('point_transaction', {
   replyId: int('reply_id', { unsigned: true }).references(() => replyTable.id),
   balanceAfter: int('balance_after', { unsigned: true }).notNull(),
   createdAt: datetime('created_at', { mode: 'date', fsp: 3 }),
+});
+
+// Single-row table: the platform-wide median (p50) of reply.durationMs,
+// the anchor the points time-weight compares each subject against (see
+// reply.ts). No natural entity to hang this on (unlike question/subject),
+// so it gets its own table rather than a column somewhere -- always
+// exactly one row, upserted by the nightly questionStat.ts job.
+export const durationGlobalStatTable = mysqlTable('duration_global_stat', {
+  id: int('id', { unsigned: true }).autoincrement().primaryKey(),
+  medianMs: int('median_ms', { unsigned: true }).notNull(),
+  updatedAt: datetime('updated_at', { mode: 'date', fsp: 3 }),
 });
