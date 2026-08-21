@@ -568,6 +568,32 @@ describe('reply routes', () => {
           expect(body[0].score).toBe(0);
           expect(body[0].awardedPoints).toBe(0);
         });
+
+        it('persists reply.tooFast=true when the anti-farming gate trips', async () => {
+          await seedUser();
+          vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+          const { subjectId, examId, conceptId } = await seedFixture();
+          const q = await createQuestion(subjectId, examId, { difficulty: 5, answer: 'A', conceptIds: [conceptId] });
+
+          await postReply([{ questionId: q.id, repliedAnswer: 'A', durationMs: 500 }]);
+
+          const db = getDb();
+          const [replyRow] = await db.select().from(replyTable).where(eq(replyTable.questionId, q.id));
+          expect(replyRow.tooFast).toBe(true);
+        });
+
+        it('persists reply.tooFast=false when answered at or above the threshold', async () => {
+          await seedUser();
+          vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+          const { subjectId, examId, conceptId } = await seedFixture();
+          const q = await createQuestion(subjectId, examId, { difficulty: 5, answer: 'A', conceptIds: [conceptId] });
+
+          await postReply([{ questionId: q.id, repliedAnswer: 'A', durationMs: 5000 }]);
+
+          const db = getDb();
+          const [replyRow] = await db.select().from(replyTable).where(eq(replyTable.questionId, q.id));
+          expect(replyRow.tooFast).toBe(false);
+        });
       });
 
       describe('time-weight', () => {

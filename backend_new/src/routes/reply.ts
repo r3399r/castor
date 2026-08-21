@@ -471,7 +471,8 @@ export const reply = new Hono<UserEnv>()
         subjectMedianById.get(question.subjectId) ?? null,
         globalMedianMs
       );
-      const awardedPoints = isTooFastForPoints(question.durationP5Ms, item.durationMs)
+      const tooFast = isTooFastForPoints(question.durationP5Ms, item.durationMs);
+      const awardedPoints = tooFast
         ? 0
         : Math.round(calcBasePoints(questionMastery, question.adjustedDifficulty, score) * timeWeight);
       userPointsBatch += awardedPoints;
@@ -504,6 +505,14 @@ export const reply = new Hono<UserEnv>()
         awardedPoints,
         repliedAnswer: item.repliedAnswer,
         durationMs: item.durationMs ?? null,
+        // Persisted (not just used to zero this reply's own points) so
+        // questionStat.ts can exclude it from future duration_p5_ms/
+        // duration_median_ms computations -- otherwise a flood of
+        // sub-threshold-fast replies (each worth 0 points on its own)
+        // would still drag those stats down, gradually lowering the very
+        // threshold used to detect "too fast" and making the check
+        // easier to beat over time.
+        tooFast,
         repliedAt,
         createdAt: repliedAt,
         updatedAt: repliedAt,

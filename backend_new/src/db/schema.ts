@@ -294,6 +294,14 @@ export const replyTable = mysqlTable('reply', {
   awardedPoints: int('awarded_points', { unsigned: true }).notNull().default(0),
   repliedAnswer: varchar('replied_answer', { length: 255 }),
   durationMs: int('duration_ms', { unsigned: true }),
+  // Set at write time from reply.ts's anti-farming check (durationMs vs
+  // the question's durationP5Ms *as it stood then*, which drifts over
+  // time and can't be reliably reconstructed later). questionStat.ts
+  // excludes tooFast=true rows from duration_p5_ms/duration_median_ms
+  // computation -- otherwise a flood of sub-threshold-fast replies would
+  // still drag those stats down even though each one scored 0 points,
+  // gradually lowering the very threshold used to detect them.
+  tooFast: boolean('too_fast').notNull().default(false),
   repliedAt: datetime('replied_at', { mode: 'date', fsp: 3 }).notNull(),
   createdAt: datetime('created_at', { mode: 'date', fsp: 3 }),
   updatedAt: datetime('updated_at', { mode: 'date', fsp: 3 }),

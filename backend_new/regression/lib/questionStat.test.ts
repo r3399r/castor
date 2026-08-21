@@ -59,7 +59,8 @@ const insertReply = async (
   subjectId: number,
   questionId: number,
   durationMs: number | null,
-  repliedAt = new Date()
+  repliedAt = new Date(),
+  tooFast = false
 ) => {
   const db = getDb();
   const now = new Date();
@@ -70,6 +71,7 @@ const insertReply = async (
     score: 10,
     repliedAnswer: 'A',
     durationMs,
+    tooFast,
     repliedAt,
     createdAt: now,
     updatedAt: now,
@@ -331,6 +333,62 @@ describe('questionStat', () => {
       const rows = await db.select().from(durationGlobalStatTable);
       expect(rows).toHaveLength(1);
       expect(rows[0].medianMs).not.toBe(firstMedian);
+    });
+  });
+
+  describe('tooFast exclusion', () => {
+    it('excludes tooFast=true replies from duration_p5_ms/duration_median_ms at the question level', async () => {
+      const { userId, subjectId } = await seedFixture();
+      const questionId = await seedQuestion(subjectId);
+      // 10 legitimate replies (100..1000) plus a flood of farming attempts
+      // at 1ms each -- if those polluted the stats, p5/median would be
+      // dragged down toward 1.
+      await insertReplies(userId, subjectId, questionId, [1000, 900, 800, 700, 600, 500, 400, 300, 200, 100]);
+      for (let i = 0; i < 20; i++) await insertReply(userId, subjectId, questionId, 1, new Date(), true);
+
+      await computeQuestionStats(getDb());
+
+      // Same 550/145 as the "sets duration_median_ms"/"linearly
+      // interpolates" tests above -- confirms the 20 tooFast replies were
+      // excluded entirely, not just discounted.
+      expect(await getQuestionMedian(questionId)).toBe(550);
+      expect(await getDurationP5(questionId)).toBe(145);
+    });
+
+    it('excludes tooFast=true replies from subject.duration_median_ms', async () => {
+      const { userId, subjectId } = await seedFixture();
+      const questionA = await seedQuestion(subjectId);
+      const questionB = await seedQuestion(subjectId);
+      const first15 = Array.from({ length: 15 }, (_, i) => (i + 1) * 10);
+      const second15 = Array.from({ length: 15 }, (_, i) => (i + 16) * 10);
+      await insertReplies(userId, subjectId, questionA, first15);
+      await insertReplies(userId, subjectId, questionB, second15);
+      for (let i = 0; i < 20; i++) await insertReply(userId, subjectId, questionA, 1, new Date(), true);
+
+      await computeQuestionStats(getDb());
+
+      // Same 155 as the "aggregated across its questions" test above --
+      // the tooFast flood didn't shift the subject median at all.
+      expect(await getSubjectMedian(subjectId)).toBe(155);
+    });
+
+    it('excludes tooFast=true replies from duration_global_stat', async () => {
+      const { userId, subjectId: subjectA } = await seedFixture();
+      const db = getDb();
+      const [{ insertId: subjectB }] = await db
+        .insert(subjectTable)
+        .values({ name: 'fixture subject b', createdAt: new Date() });
+      const questionA = await seedQuestion(subjectA);
+      const questionB = await seedQuestion(subjectB);
+      await insertReplies(userId, subjectA, questionA, [100, 200]);
+      await insertReplies(userId, subjectB, questionB, [300, 400]);
+      for (let i = 0; i < 20; i++) await insertReply(userId, subjectA, questionA, 1, new Date(), true);
+
+      await computeQuestionStats(getDb());
+
+      // Same 250 as the "computes the median across every subject
+      // combined" test above -- the tooFast flood didn't shift it.
+      expect(await getGlobalMedian()).toBe(250);
     });
   });
 });

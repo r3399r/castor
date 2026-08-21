@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(flutter --version)",
+      "Bash(flutter pub *)",
+      "Bash(find \"c:/Users/admin/git/celestialstudio/castor/mobile\" -path \"*google_sign_in-*\" -iname \"*.dart\" 2>/dev/null | grep -v test | head -30 *)",
+      "Read(//c//**)",
+      "Read(//c/Users/admin/AppData/Local/Pub/Cache/hosted/pub.dev/google_sign_in-7.2.0/lib/**)",
+      "Read(//c/Users/admin/AppData/Local/Pub/Cache/hosted/pub.dev/google_sign_in-7.2.0/**)",
+      "Bash(grep -n \"class GoogleAuthProvider\\\\|static AuthCredential credential\\\\|static OAuthCredential credential\" \"C:/Users/admin/AppData/Local/Pub/Cache/hosted/pub.dev/firebase_auth-6.5.7/lib/src/google_auth_provider.dart\" 2>&1 | head -20 *)",
+      "Read(//c/Users/admin/AppData/Local/Pub/Cache/hosted/pub.dev/firebase_auth-6.5.7/lib/src/**)",
+      "Read(//c/Users/admin/AppData/Local/Pub/Cache/hosted/pub.dev/firebase_auth-6.5.7/lib/**)"
+    ]
+  }
+}

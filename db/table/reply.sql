@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS castor.reply (
     awarded_points INT UNSIGNED NOT NULL DEFAULT 0,
     replied_answer VARCHAR(255) NULL,
     duration_ms INT UNSIGNED NULL,
+    too_fast TINYINT NOT NULL DEFAULT 0, -- anti-farming verdict at write time; excluded from questionStat.ts's duration_p5_ms/duration_median_ms computation
     replied_at DATETIME(3) NOT NULL,
     created_at DATETIME(3) NULL DEFAULT CURRENT_TIMESTAMP(3),
     updated_at DATETIME(3) NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),

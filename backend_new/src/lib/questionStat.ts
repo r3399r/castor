@@ -55,7 +55,11 @@ const percentile = (sorted: number[], p: number): number => {
  * history changes for either reason ends up with the same answer. Every
  * requested id gets written, even ones with zero remaining duration data
  * (e.g. every duration-tracked reply to it just got deleted) -- those
- * get explicitly reset to NULL rather than left stale.
+ * get explicitly reset to NULL rather than left stale. Excludes
+ * tooFast=true replies -- reply.ts already zeroed their own points, but
+ * without this exclusion their durations would still drag the computed
+ * percentiles down, gradually lowering the very durationP5Ms threshold
+ * used to flag future too-fast replies.
  */
 export const recomputeQuestionDurationStats = async (db: Db, questionIds: number[]): Promise<number> => {
   if (questionIds.length === 0) return 0;
@@ -63,7 +67,13 @@ export const recomputeQuestionDurationStats = async (db: Db, questionIds: number
   const rows = await db
     .select({ questionId: replyTable.questionId, durationMs: replyTable.durationMs })
     .from(replyTable)
-    .where(and(isNotNull(replyTable.durationMs), inArray(replyTable.questionId, questionIds)));
+    .where(
+      and(
+        isNotNull(replyTable.durationMs),
+        eq(replyTable.tooFast, false),
+        inArray(replyTable.questionId, questionIds)
+      )
+    );
 
   const durationsByQuestion = new Map<number, number[]>();
   for (const row of rows) {
@@ -90,7 +100,8 @@ export const recomputeQuestionDurationStats = async (db: Db, questionIds: number
 /**
  * Same shared-recompute shape as recomputeQuestionDurationStats, one
  * level up -- subject.durationMedianMs across exactly the given subject
- * ids, from whatever reply history currently exists for each.
+ * ids, from whatever reply history currently exists for each. Same
+ * tooFast exclusion for the same reason.
  */
 export const recomputeSubjectDurationStats = async (db: Db, subjectIds: number[]): Promise<number> => {
   if (subjectIds.length === 0) return 0;
@@ -98,7 +109,9 @@ export const recomputeSubjectDurationStats = async (db: Db, subjectIds: number[]
   const rows = await db
     .select({ subjectId: replyTable.subjectId, durationMs: replyTable.durationMs })
     .from(replyTable)
-    .where(and(isNotNull(replyTable.durationMs), inArray(replyTable.subjectId, subjectIds)));
+    .where(
+      and(isNotNull(replyTable.durationMs), eq(replyTable.tooFast, false), inArray(replyTable.subjectId, subjectIds))
+    );
 
   const durationsBySubject = new Map<number, number[]>();
   for (const row of rows) {
@@ -128,13 +141,14 @@ export const recomputeSubjectDurationStats = async (db: Db, subjectIds: number[]
  * same way wouldn't save much. Revisit by deriving it from subject
  * medians instead of rescanning reply if this scan ever becomes the
  * bottleneck -- not done here since that trades away exactness for a
- * cost that hasn't mattered yet.
+ * cost that hasn't mattered yet. Same tooFast exclusion as the two
+ * functions above, for the same reason.
  */
 export const recomputeGlobalDurationStat = async (db: Db): Promise<void> => {
   const rows = await db
     .select({ durationMs: replyTable.durationMs })
     .from(replyTable)
-    .where(isNotNull(replyTable.durationMs));
+    .where(and(isNotNull(replyTable.durationMs), eq(replyTable.tooFast, false)));
   if (rows.length === 0) return;
 
   const sorted = rows.map((r) => r.durationMs!).sort((a, b) => a - b);
