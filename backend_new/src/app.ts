@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { toErrorResponse } from 'src/lib/errorResponse';
 import { adminAuth } from 'src/middleware/adminAuth';
+import { requestLogger } from 'src/middleware/requestLogger';
 import { requireUser } from 'src/middleware/requireUser';
 import { transaction } from 'src/middleware/transaction';
 import { category } from 'src/routes/category';
@@ -21,6 +22,7 @@ import { wallet } from 'src/routes/wallet';
 import { wrongQuestion } from 'src/routes/wrongQuestion';
 
 export const app = new Hono()
+  .use('*', requestLogger)
   .route('/api/info', info)
   .use('/api/category/*', adminAuth)
   .use('/api/category/*', transaction)

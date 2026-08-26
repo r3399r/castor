@@ -54,6 +54,13 @@ Resources:
                 Action:
                   - events:EnableRule
                 Resource: !Sub arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/${Project}-${TargetEnvr}-facebook
+              # Same shared logging queue the legacy backend and spica write
+              # request logs to -- "polaris" is that shared pipeline's own
+              # project name, not this stack's, so it's not ${Project}.
+              - Effect: Allow
+                Action:
+                  - sqs:SendMessage
+                Resource: !Sub arn:aws:sqs:${AWS::Region}:${AWS::AccountId}:polaris-${TargetEnvr}-logger-queue
 
   RestApi:
     Type: AWS::Serverless::Api
@@ -87,6 +94,7 @@ Resources:
           DB_PWD: !Sub '{{resolve:ssm:mysql-${TargetEnvr}-${Project}-pwd}}'
           DB_POOL_SIZE: '2'
           FIREBASE_ADMIN_KEY: !Sub '{{resolve:ssm:${Project}-firebase-admin-key}}'
+          LOGGER_QUEUE_URL: !Sub https://sqs.${AWS::Region}.amazonaws.com/${AWS::AccountId}/polaris-${TargetEnvr}-logger-queue
       Events:
         AnyRoute:
           Type: Api

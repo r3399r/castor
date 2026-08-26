@@ -1,4 +1,5 @@
 import { auth } from '@/lib/firebase'
+import { version } from '../package.json'
 
 const LIMIT = 20
 
@@ -37,6 +38,7 @@ async function request<T>(url: string, init: RequestInit, token?: string): Promi
     'Content-Type': 'application/json',
     Accept: 'application/json',
     Authorization: token ?? getStoredToken(),
+    'x-api-version': version,
   }
   const res = await fetch(url, { ...init, headers })
   if (res.status === 401 && !token) {
