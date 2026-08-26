@@ -9,9 +9,11 @@ import { conceptGroup } from 'src/routes/conceptGroup';
 import { exam } from 'src/routes/exam';
 import { filterDimension } from 'src/routes/filterDimension';
 import { filterOption } from 'src/routes/filterOption';
+import { guardian } from 'src/routes/guardian';
 import { info } from 'src/routes/info';
 import { question } from 'src/routes/question';
 import { reply } from 'src/routes/reply';
+import { store } from 'src/routes/store';
 import { subject } from 'src/routes/subject';
 import { tag } from 'src/routes/tag';
 import { user } from 'src/routes/user';
@@ -59,6 +61,12 @@ export const app = new Hono()
   .use('/api/wallet/*', transaction)
   .use('/api/wallet/*', requireUser)
   .route('/api/wallet', wallet)
+  .use('/api/store/*', transaction)
+  .use('/api/store/*', requireUser)
+  .route('/api/store', store)
+  .use('/api/guardian/*', transaction)
+  .use('/api/guardian/*', requireUser)
+  .route('/api/guardian', guardian)
   .onError((err, c) => {
     console.error(err);
     const { status, body } = toErrorResponse(err);

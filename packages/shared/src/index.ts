@@ -286,6 +286,41 @@ export type GetWalletParams = PaginationParams;
 
 export type GetWalletResponse = Paginate<PointTransaction>;
 
+export type GuardianSpecies = {
+  id: number;
+  code: string;
+  name: string;
+  theme: string;
+  cost: number;
+  owned: boolean;
+};
+
+export type GetStoreSpeciesResponse = { data: GuardianSpecies[]; totalPoints: number };
+
+export type PostStoreRedeemRequest = { speciesId: number };
+
+export type PostStoreRedeemResponse = {
+  guardian: { id: number; speciesId: number; level: number; xp: number };
+  totalPoints: number;
+};
+
+export type Guardian = {
+  id: number;
+  guardianId: number;
+  code: string;
+  name: string;
+  theme: string;
+  level: number;
+  xp: number;
+  nextLevelXp: number | null;
+};
+
+export type GetGuardianResponse = { data: Guardian[]; totalPoints: number };
+
+export type PostGuardianInvestRequest = { points: number };
+
+export type PostGuardianInvestResponse = { guardian: Guardian; totalPoints: number };
+
 export type PostPreviewRequest = { text: string; imageUrl: string }
 
 export type PostPreviewResponse = {

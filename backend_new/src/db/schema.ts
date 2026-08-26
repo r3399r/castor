@@ -405,6 +405,40 @@ export const pointTransactionTable = mysqlTable('point_transaction', {
   createdAt: datetime('created_at', { mode: 'date', fsp: 3 }),
 });
 
+// Store catalog for the box/guardian feature -- one row per redeemable
+// guardian (name/theme/cost mirror what used to be webapp's hardcoded
+// storeEggs mock). No admin CRUD yet; managed by hand via
+// db/script/v1.0.0/insert_guardian.sql and direct SQL updates, same as
+// category's seed data.
+export const guardianTable = mysqlTable('guardian', {
+  id: int('id', { unsigned: true }).autoincrement().primaryKey(),
+  code: varchar('code', { length: 50 }).notNull(),
+  name: varchar('name', { length: 100 }).notNull(),
+  theme: varchar('theme', { length: 100 }).notNull(),
+  cost: int('cost', { unsigned: true }).notNull(),
+  sortOrder: tinyint('sort_order', { unsigned: true }).notNull().default(0),
+  isActive: boolean('is_active').notNull().default(true),
+  createdAt: datetime('created_at', { mode: 'date', fsp: 3 }),
+  updatedAt: datetime('updated_at', { mode: 'date', fsp: 3 }),
+});
+
+// A user's redeemed guardian -- one row per (userId, guardianId), created
+// by POST /store/redeem. Grows via guardian.ts's invest endpoint against
+// a flat, global level-up curve; starts at level 1, xp 0.
+export const userGuardianTable = mysqlTable('user_guardian', {
+  id: int('id', { unsigned: true }).autoincrement().primaryKey(),
+  userId: int('user_id', { unsigned: true })
+    .notNull()
+    .references(() => userTable.id),
+  guardianId: int('guardian_id', { unsigned: true })
+    .notNull()
+    .references(() => guardianTable.id),
+  level: int('level', { unsigned: true }).notNull().default(1),
+  xp: int('xp', { unsigned: true }).notNull().default(0),
+  createdAt: datetime('created_at', { mode: 'date', fsp: 3 }),
+  updatedAt: datetime('updated_at', { mode: 'date', fsp: 3 }),
+});
+
 // Single-row table: the platform-wide median (p50) of reply.durationMs,
 // the anchor the points time-weight compares each subject against (see
 // reply.ts). No natural entity to hang this on (unlike question/subject),
