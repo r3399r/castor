@@ -1,0 +1,68 @@
+[
+  {
+    "name": "desktop",
+    "heroTop": 0,
+    "heroHeight": 359.421875,
+    "headerBottom": 77,
+    "copyTop": 124,
+    "cardTop": 141.34375,
+    "headerPosition": "absolute",
+    "headerBackground": "rgba(0, 0, 0, 0)",
+    "headerZ": "40",
+    "backgroundImage": "linear-gradient(to top, rgb(18, 56, 60), rgba(0, 0, 0, 0) 64px), image-set(url(\"http://127.0.0.1:4173/images/spirit-garden-hero.webp\") 1dppx type(\"image/webp\"), url(\"http://127.0.0.1:4173/images/spirit-garden-hero.png\") 1dppx type(\"image/png\"))",
+    "backgroundSize": "cover, cover",
+    "backgroundPosition": "50% 50%, 50% 50%",
+    "overflow": false,
+    "requests": [
+      "http://127.0.0.1:4173/images/spirit-garden-hero.webp"
+    ]
+  },
+  {
+    "name": "tablet",
+    "heroTop": 0,
+    "heroHeight": 331.859375,
+    "headerBottom": 77,
+    "copyTop": 124,
+    "cardTop": 127.5625,
+    "headerPosition": "absolute",
+    "headerBackground": "rgba(0, 0, 0, 0)",
+    "headerZ": "40",
+    "backgroundImage": "linear-gradient(to top, rgb(18, 56, 60), rgba(0, 0, 0, 0) 64px), image-set(url(\"http://127.0.0.1:4173/images/spirit-garden-hero.webp\") 1dppx type(\"image/webp\"), url(\"http://127.0.0.1:4173/images/spirit-garden-hero.png\") 1dppx type(\"image/png\"))",
+    "backgroundSize": "cover, cover",
+    "backgroundPosition": "50% 50%, 50% 50%",
+    "overflow": false,
+    "requests": [
+      "http://127.0.0.1:4173/images/spirit-garden-hero.webp"
+    ]
+  },
+  {
+    "name": "mobile",
+    "heroTop": 0,
+    "heroHeight": 391.453125,
+    "headerBottom": 77,
+    "copyTop": 108,
+    "cardTop": 275.859375,
+    "headerPosition": "absolute",
+    "headerBackground": "rgba(0, 0, 0, 0)",
+    "headerZ": "40",
+    "backgroundImage": "linear-gradient(to top, rgb(18, 56, 60), rgba(0, 0, 0, 0) 64px), image-set(url(\"http://127.0.0.1:4173/images/spirit-garden-hero.webp\") 1dppx type(\"image/webp\"), url(\"http://127.0.0.1:4173/images/spirit-garden-hero.png\") 1dppx type(\"image/png\"))",
+    "backgroundSize": "cover, cover",
+    "backgroundPosition": "50% 50%, 50% 50%",
+    "overflow": false,
+    "requests": [
+      "http://127.0.0.1:4173/images/spirit-garden-hero.webp"
+    ]
+  },
+  {
+    "liveSignedOut": {
+      "guard": 1,
+      "overflow": false
+    }
+  },
+  {
+    "otherPage": {
+      "boxScope": 0,
+      "navPosition": "relative"
+    }
+  }
+]

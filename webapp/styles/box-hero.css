@@ -1,0 +1,391 @@
+/* Route opt-in: only /box/page.tsx adds .sp-box-page. */
+.sp-box-page {
+  --spirit-garden-edge: #083f41;
+  --spirit-garden-height: 440px;
+  --spirit-garden-page-gradient: linear-gradient(
+    to bottom,
+    #083f41 0%,
+    #15555a 22%,
+    #3f7775 45%,
+    #91aaa0 68%,
+    #d8d9be 84%,
+    #ead7bd 100%
+  );
+  --spirit-balance-surface: rgba(242, 244, 218, 0.94);
+  --spirit-balance-ink: #173f3a;
+  --spirit-balance-gold: #916315;
+  --spirit-balance-border: #dbcc8d;
+  --spirit-balance-leaf: #789256;
+  --spirit-balance-glow:
+    0 0 32px rgba(220, 233, 150, 0.22), 0 14px 32px rgba(3, 30, 29, 0.3);
+  --spirit-garden-header-shade: rgb(16 47 46 / 0.28);
+  --spirit-garden-copy-shade: rgba(4, 38, 39, 0.42);
+  --spirit-garden-copy-mid: rgba(4, 38, 39, 0.25);
+  --spirit-garden-header-height: 76px;
+  --spirit-garden-image: url("/images/spirit-garden-hero.png");
+  /* Until mobile art is provided, crop the original with cover; do not stretch.
+     To replace it later, set this variable to image-set() with
+     /images/spirit-garden-hero-mobile.webp and its PNG fallback. */
+  --spirit-garden-mobile-image: var(--spirit-garden-image);
+  position: relative;
+  background-color: var(--spirit-garden-edge);
+  background-image: var(--spirit-garden-page-gradient);
+  background-position: center bottom;
+  background-size: 100% calc(100% - var(--spirit-garden-height));
+  background-repeat: no-repeat;
+}
+@supports (background-image: image-set(url("image.webp") type("image/webp"))) {
+  .sp-box-page {
+    --spirit-garden-image: image-set(
+      url("/images/spirit-garden-hero.webp") type("image/webp"),
+      url("/images/spirit-garden-hero.png") type("image/png")
+    );
+  }
+}
+.sp-box-page > .sp-navigation {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 40;
+  isolation: isolate;
+  background: transparent;
+}
+/* A light, local scrim behind navigation only, not over the whole painting. */
+.sp-box-page > .sp-navigation::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 -12px;
+  z-index: -1;
+  background: linear-gradient(
+    to bottom,
+    var(--spirit-garden-header-shade),
+    transparent
+  );
+  pointer-events: none;
+}
+.sp-box-page > .sp-navigation nav {
+  border-bottom-color: transparent;
+}
+/* Keep the opened mobile menu readable and inside the viewport.
+   The existing menu contents, state and event handlers stay untouched. */
+.sp-box-page > .sp-navigation nav div.absolute {
+  inset-inline: -20px;
+  left: -20px;
+  right: -20px;
+  background: var(--color-spirit-deep);
+  border-color: var(--spirit-light-line);
+}
+.sp-box-page > .sp-navigation [aria-label="個人資料"] > span {
+  color: var(--color-spirit-on-dark);
+  background: var(--spirit-garden-header-shade);
+  border-color: var(--spirit-light-line);
+}
+.sp-box-page .sp-hero {
+  min-height: var(--spirit-garden-height);
+  background-color: var(--spirit-garden-edge);
+  background-image:
+    linear-gradient(to bottom, transparent 94%, var(--spirit-garden-edge) 100%),
+    var(--spirit-garden-image);
+  background-size: cover;
+  background-position: center bottom;
+  background-repeat: no-repeat;
+  margin-bottom: 0;
+}
+.sp-box-page .sp-hero-inner {
+  /* Hero includes the former header height instead of growing to image ratio. */
+  padding-top: calc(var(--spirit-garden-header-height) + 48px);
+}
+.sp-box-page .sp-hero-copy {
+  position: relative;
+  isolation: isolate;
+}
+.sp-box-page .sp-hero::before {
+  content: "";
+  position: absolute;
+  inset: 76px 0 30%;
+  z-index: 0;
+  background: linear-gradient(to right, var(--spirit-garden-copy-shade) 0%, var(--spirit-garden-copy-mid) 27%, transparent 52%);
+  mask-image: linear-gradient(to bottom, transparent, black 18%, black 70%, transparent);
+  pointer-events: none;
+}
+.sp-box-page .sp-mobile-leaves { display: none; }
+.sp-box-page .sp-hero-copy > p:last-child {
+  color: var(--color-spirit-on-dark);
+}
+.sp-box-page .sp-hero > .sp-hero-decoration,
+.sp-box-page .sp-hero > .sp-painted-divider {
+  display: none;
+}
+/* No pale overlay or narrow transition band: the page gradient starts below
+   the Hero. Only the final 6% of the painting blends into its teal base. */
+.sp-box-page .sp-hero::after {
+  content: none;
+}
+.sp-box-page .sp-balance {
+  --paper-base: #eeebcf;
+  --paper-center: #f7f1d5;
+  --paper-edge: #d8ca91;
+  --paper-border: rgba(174,138,55,.68);
+  --paper-ink: #173f3a;
+  --paper-number: #a56c0a;
+  --paper-secondary: #36554d;
+  position: relative;
+  isolation: isolate;
+  overflow: visible;
+  flex: 0 0 auto;
+  width: clamp(320px, 26vw, 380px);
+  min-width: 0;
+  height: 180px;
+  padding: 24px 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px 14px 8px 12px;
+  border: 1px solid var(--paper-border);
+  color: var(--paper-ink);
+  background:
+    radial-gradient(ellipse at 48% 38%, var(--paper-center) 12%, transparent 76%),
+    radial-gradient(ellipse at 5% 90%, var(--paper-edge), transparent 54%),
+    radial-gradient(ellipse at 100% 0%, var(--paper-edge), transparent 48%),
+    var(--paper-base);
+  box-shadow: 0 14px 30px rgba(3, 35, 34, .32), 0 0 26px rgba(228, 193, 89, .18), inset 0 0 12px rgba(174,138,55,.12), inset 0 0 2px 1px rgba(174,138,55,.18);
+  backdrop-filter: none;
+}
+/* Subtle broad dry-brush variation, confined to the paper rather than text. */
+.sp-box-page .sp-balance::before {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border-radius: inherit;
+  background: linear-gradient(174deg, transparent 14%, rgba(255,251,226,.20) 17%, transparent 21%, transparent 72%, rgba(216,202,145,.12) 76%, transparent 82%);
+  pointer-events: none;
+  z-index: 0;
+}
+@media (width >= 64rem) {
+  .sp-box-page .sp-hero-copy { align-self: flex-start; margin-top: 5.265625px; }
+}
+@media (48rem <= width < 64rem) {
+  .sp-box-page .sp-hero-copy { align-self: flex-start; margin-top: 23px; }
+}
+.sp-box-page .sp-balance > .sp-points-copy {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  text-align: center;
+  min-width: 0;
+}
+.sp-box-page .sp-balance p {
+  color: var(--paper-ink);
+  font-size: 18px;
+  font-weight: 600;
+}
+.sp-box-page .sp-balance strong {
+  color: var(--paper-number);
+  font-size: clamp(56px, 4vw, 76px);
+  line-height: 1.15;
+  white-space: nowrap;
+  background: radial-gradient(ellipse, rgba(239,201,99,.15), transparent 72%);
+}
+.sp-box-page .sp-balance strong span { font-size: 16px; }
+.sp-box-page .sp-balance small { color: var(--paper-secondary); margin-top: 8px; }
+.sp-box-page .sp-points-vine {
+  position: absolute;
+  z-index: 1;
+  height: auto;
+  max-width: none;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+}
+.sp-box-page .sp-points-vine-top { width: 26%; top: -18px; left: -14px; }
+.sp-box-page .sp-points-vine-bottom { width: 56%; bottom: 4px; right: -10px; }
+@media (48rem <= width < 64rem) {
+  .sp-box-page .sp-balance { width: clamp(390px, 48vw, 430px); height: 200px; padding: 20px 28px; border-radius: 10px 12px 9px 11px; }
+  .sp-box-page .sp-points-vine-top { width: 23%; top: -15px; left: -10px; }
+  .sp-box-page .sp-points-vine-bottom { width: 52%; bottom: 3px; right: -8px; }
+}
+@media (width < 48rem) {
+  .sp-box-page .sp-hero-inner { gap: 12px; padding-bottom: 0; }
+  .sp-box-page .sp-balance { width: 100%; height: 135px; padding: 20px 26px; border-radius: 8px 10px 8px 9px; }
+  .sp-box-page .sp-balance > .sp-points-copy { width: 100%; display: grid; grid-template-columns: auto auto; column-gap: 12px; text-align: left; }
+  .sp-box-page .sp-balance strong { font-size: clamp(56px, 12vw, 66px); justify-self: end; }
+  .sp-box-page .sp-balance small { display: block; grid-column: 1 / -1; text-align: center; margin-top: 4px; }
+  .sp-box-page .sp-points-vine-top { width: 18%; top: -12px; left: -7px; }
+  .sp-box-page .sp-points-vine-bottom { width: 30%; max-width: 112px; bottom: 2px; right: -4px; }
+}
+@media (width < 23rem) {
+  .sp-box-page .sp-balance small { display: none; }
+  .sp-box-page .sp-balance { padding-inline: 20px; }
+}
+/* Quiet reading surfaces retain contrast while the gradient remains visible
+   throughout the surrounding content area. */
+.sp-box-page .sp-section-heading {
+  background: var(--spirit-balance-surface);
+  border-radius: var(--spirit-radius-card, 20px);
+  padding-inline: 16px;
+}
+.sp-box-page .sp-section-heading {
+  padding-block: 16px;
+}
+/* Match the 1120px content containers on adaptive/reply/analysis.
+   Their desktop inset is 10px outer margin + 1px border + 70px padding. */
+@media (width >= 64rem) {
+  .sp-box-page {
+    --spirit-box-content-width: 1120px;
+    --spirit-box-desktop-inset: 81px;
+  }
+  .sp-box-page .sp-hero-inner,
+  .sp-box-page .sp-box-content {
+    width: calc(100% - 2 * var(--spirit-box-desktop-inset));
+    max-width: var(--spirit-box-content-width);
+    margin-inline: auto;
+    padding-inline: 0;
+  }
+  .sp-box-page > .sp-navigation {
+    padding-inline: max(
+      var(--spirit-box-desktop-inset),
+      calc((100% - var(--spirit-box-content-width)) / 2)
+    );
+  }
+}
+@media (48rem <= width < 64rem) {
+  .sp-box-page {
+    --spirit-garden-height: 400px;
+    --spirit-garden-copy-shade: rgba(4, 38, 39, 0.34);
+    --spirit-garden-copy-mid: rgba(4, 38, 39, 0.20);
+  }
+}
+/* AuthGuard still controls access. Its loading/login view also needs a painted
+   surface and header clearance when BoxClient (and its Hero) is not mounted. */
+.sp-box-page .sp-box-access:not(:has(.sp-box)) {
+  position: relative;
+  margin-bottom: 0;
+  padding: calc(var(--spirit-garden-header-height) + 48px) 20px 64px;
+  min-height: var(--spirit-garden-height);
+  background: var(--spirit-garden-image) center bottom / cover no-repeat;
+  background-image:
+    linear-gradient(to bottom, transparent 94%, var(--spirit-garden-edge) 100%),
+    var(--spirit-garden-image);
+  background-color: var(--spirit-garden-edge);
+}
+.sp-box-page .sp-box-access:not(:has(.sp-box)) > * {
+  max-width: 640px;
+  margin-inline: auto;
+}
+.sp-box-page .sp-box-access:not(:has(.sp-box)) > .flex {
+  color: var(--color-spirit-on-dark);
+}
+.sp-box-page .sp-box-access:not(:has(.sp-box)) > .flex > span {
+  color: inherit;
+}
+@media (width < 48rem) {
+  .sp-box-page {
+    --spirit-garden-height: 380px;
+  }
+  .sp-box-page .sp-hero,
+  .sp-box-page .sp-box-access:not(:has(.sp-box)) {
+    background-image:
+      linear-gradient(
+        to bottom,
+        transparent 94%,
+        var(--spirit-garden-edge) 100%
+      ),
+      var(--spirit-garden-mobile-image);
+    background-position: center bottom;
+  }
+  .sp-box-page .sp-hero-inner {
+    padding-top: calc(var(--spirit-garden-header-height) + 32px);
+  }
+  .sp-box-page .sp-hero::before {
+    inset: 96px 0 auto;
+    height: 116px;
+    background: linear-gradient(to right, rgba(4, 38, 39, 0.36), rgba(4, 38, 39, 0.16) 40%, transparent 68%);
+  }
+  .sp-box-page .sp-mobile-leaves {
+    display: block;
+    position: absolute;
+    top: 21%;
+    right: 0;
+    width: 30%;
+    max-width: 160px;
+    aspect-ratio: 1.25;
+    z-index: 0;
+    pointer-events: none;
+    /* Independent replaceable transparent artwork; crop to the outer branch
+       for a few broad leaves instead of shrinking the entire long vine. */
+    background: url("/images/spirit-garden-mobile-leaves.webp") right center / cover no-repeat;
+  }
+}
+
+/* The existing tablist retains its keyboard and ARIA behavior. */
+.sp-box-page .sp-tabs {
+  --tab-idle: rgba(9,48,47,.90);
+  --tab-text: #afc3b2;
+  --tab-line: rgba(190,207,184,.42);
+  --tab-active:
+    radial-gradient(ellipse at 38% 35%, rgba(184,203,112,.16) 0%, rgba(184,203,112,.06) 32%, transparent 62%),
+    linear-gradient(180deg, #245b54 0%, #194b47 55%, #123e3d 100%);
+  --tab-active-text: #f2ebcf;
+  --tab-active-line: rgba(190,205,105,.74);
+  --tab-icon: #d7dc82;
+  --tab-dot: #f0d36f;
+  display: grid;
+  grid-template-columns: repeat(3, 180px);
+  justify-content: start;
+  gap: 16px;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+}
+.sp-box-page .sp-tabs button {
+  position: relative;
+  height: 50px;
+  min-width: 0;
+  padding: 0 28px;
+  gap: 10px;
+  border: 1px solid var(--tab-line);
+  border-radius: 999px;
+  background: var(--tab-idle);
+  color: var(--tab-text);
+  white-space: nowrap;
+  font-size: 16px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 6px 14px rgba(2,31,31,.12);
+  transition: background-color 180ms, border-color 180ms, color 180ms, transform 180ms, box-shadow 180ms;
+}
+.sp-box-page .sp-tabs button svg { width: 24px; height: 24px; flex-shrink: 0; stroke-width: 2; }
+.sp-box-page .sp-tabs button[aria-selected='true'] {
+  background: var(--tab-active);
+  color: var(--tab-active-text);
+  border: 1.5px solid var(--tab-active-line);
+  box-shadow: inset 0 1px 0 rgba(241,242,204,.10), inset 0 -5px 10px rgba(3,35,35,.12), 0 8px 18px rgba(2,31,31,.22), 0 0 16px rgba(183,201,108,.16);
+  transform: translateY(-2px);
+}
+.sp-box-page .sp-tabs button[aria-selected='true']:hover { background: var(--tab-active); }
+.sp-box-page .sp-tabs button[aria-selected='true'] svg { color: var(--tab-icon); }
+@media (hover: hover) {
+  .sp-box-page .sp-tabs button:hover {
+    background: #1e5551;
+    border-color: rgba(190,207,124,.55);
+    color: var(--tab-active-text);
+  }
+}
+.sp-box-page .sp-tabs button:focus-visible {
+  outline: 2px solid var(--tab-icon);
+  outline-offset: 4px;
+  box-shadow: 0 0 0 2px #123f3e, 0 0 0 3px var(--tab-dot);
+}
+@media (48rem <= width < 64rem) {
+  .sp-box-page .sp-tabs { grid-template-columns: repeat(3, 164px); gap: 14px; }
+  .sp-box-page .sp-tabs button { height: 46px; padding-inline: 22px; }
+}
+@media (width < 48rem) {
+  .sp-box-page .sp-tabs { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .sp-box-page .sp-tabs button { height: 40px; padding-inline: 4px; gap: 4px; font-size: 14px; letter-spacing: -.025em; }
+  .sp-box-page .sp-tabs button svg { width: 18px; height: 18px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sp-box-page .sp-tabs button { transition: none; }
+  .sp-box-page .sp-tabs button[aria-selected='true'] { transform: translateY(-2px); }
+}

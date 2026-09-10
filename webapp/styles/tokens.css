@@ -1,0 +1,65 @@
+/* Shared visual vocabulary. Existing pages opt in through .spirit-theme. */
+@theme static {
+  --color-spirit-ink: #223e39;
+  --color-spirit-muted: #587069;
+  --color-spirit-forest: #173f3a;
+  --color-spirit-deep: #102f2e;
+  --color-spirit-teal: #227578;
+  --color-spirit-teal-hover: #195e62;
+  --color-spirit-gold: #edc96d;
+  --color-spirit-gold-hover: #e3b84f;
+  --color-spirit-leaf: #507346;
+  --color-spirit-coral: #b45543;
+  --color-spirit-cream: #f6f4e9;
+  --color-spirit-paper: #fffdf6;
+  --color-spirit-mist: #e8eee6;
+  --color-spirit-line: #d4ded0;
+  --color-spirit-on-dark: #f8f5e8;
+  --font-spirit: var(--font-inter, Arial), 'Taipei Sans TC Beta', sans-serif;
+  --text-spirit-micro: 0.6875rem;
+  --text-spirit-caption: 0.75rem;
+  --text-spirit-label: 0.8125rem;
+  --text-spirit-subtitle: 0.9375rem;
+  --text-spirit-heading: 1.25rem;
+  --text-spirit-section: 1.5rem;
+  --text-spirit-character: 1.875rem;
+  --text-spirit-small: 0.875rem;
+  --text-spirit-body: 1rem;
+  --text-spirit-title: 2rem;
+  --spacing-spirit-unit: 0.25rem;
+  --radius-spirit-small: 0.5rem;
+  --radius-spirit-image: 0.625rem;
+  --radius-spirit-control: 0.75rem;
+  --radius-spirit-card: 1.25rem;
+  --radius-spirit-panel: 1.75rem;
+  --shadow-spirit-card: 0 8px 28px rgb(23 63 58 / 0.06);
+  --shadow-spirit-float: 0 20px 64px rgb(23 63 58 / 0.15);
+  /* Existing Tailwind breakpoints, made explicit; no change to other pages. */
+  --breakpoint-sm: 40rem;
+  --breakpoint-md: 48rem;
+  --breakpoint-lg: 64rem;
+  --breakpoint-xl: 80rem;
+  --breakpoint-2xl: 96rem;
+}
+:root {
+  --spirit-surface: var(--color-spirit-paper);
+  --spirit-surface-raised: var(--color-spirit-cream);
+  --spirit-border: 1px solid var(--color-spirit-line);
+  --spirit-focus: var(--color-spirit-teal);
+  --spirit-disabled-opacity: 0.45;
+  --spirit-active-scale: 0.98;
+  --spirit-duration: 180ms;
+  --spirit-space-1: 0.25rem;
+  --spirit-space-2: 0.5rem;
+  --spirit-space-3: 0.75rem;
+  --spirit-space-4: 1rem;
+  --spirit-space-6: 1.5rem;
+  --spirit-space-8: 2rem;
+  --spirit-space-12: 3rem;
+  --spirit-space-16: 4rem;
+  --spirit-overlay: rgb(16 47 46 / 0.65);
+  --spirit-light-line: rgb(248 245 232 / 0.2);
+  --spirit-light-muted: #c6d7cc;
+  --spirit-leaf-silhouette: #386457;
+  --spirit-glow: rgb(237 201 109 / 0.16);
+}
