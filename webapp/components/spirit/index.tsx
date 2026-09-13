@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, type ReactNode } from 'react'
-import { Check, LockKeyhole, Sparkles, Sprout } from 'lucide-react'
+import { Check, Sparkles, Sprout } from 'lucide-react'
 import { Badge, ContentPanel, Progress } from '@/components/ui'
 import {
   spiritCatalog,
@@ -131,12 +131,14 @@ export function SpiritStatusCard({
   xp,
   nextLevelXp,
   children,
+  headerAction,
 }: {
   species: SpiritSpecies
   level: number
   xp: number
   nextLevelXp: number | null
   children?: ReactNode
+  headerAction?: ReactNode
 }) {
   const definition = spiritCatalog[species]
   const complete = level >= 5
@@ -147,14 +149,16 @@ export function SpiritStatusCard({
           <p className="sp-eyebrow">{definition.category}</p>
           <h2>{definition.name}</h2>
         </div>
-        <Badge tone={complete ? 'complete' : 'growth'}>
-          {complete ? (
-            <Check size={14} aria-hidden="true" />
-          ) : (
-            <Sprout size={14} aria-hidden="true" />
-          )}
-          {complete ? '已完成' : '培育中'} · LV{level}
-        </Badge>
+        {headerAction ?? (
+          <Badge tone={complete ? 'complete' : 'growth'}>
+            {complete ? (
+              <Check size={14} aria-hidden="true" />
+            ) : (
+              <Sprout size={14} aria-hidden="true" />
+            )}
+            {complete ? '已完成' : '培育中'} · LV{level}
+          </Badge>
+        )}
       </div>
       <p className="sp-description">
         守護靈會隨著你投入的成長經驗逐步升級，並解鎖新的外觀與棲地內容。
@@ -186,40 +190,64 @@ export function SpiritStatusCard({
 }
 export function GrowthTrack({
   species,
-  selectedLevel,
   unlockedLevel,
-  onSelect,
+  xp,
+  nextLevelXp,
 }: {
   species: SpiritSpecies
-  selectedLevel: number
   unlockedLevel: number
-  onSelect: (level: number) => void
+  xp: number
+  nextLevelXp: number | null
 }) {
+  const progress = nextLevelXp ? Math.min((xp / nextLevelXp) * 100, 100) : 100
+
   return (
     <ol className="sp-growth-track">
-      {[1, 2, 3, 4, 5].map((level) => (
-        <li key={level}>
-          <button
-            type="button"
-            aria-pressed={selectedLevel === level}
-            onClick={() => onSelect(level)}
-            aria-label={`預覽 ${spiritCatalog[species].name} LV${level}${level > unlockedLevel ? '，尚未解鎖' : '，已解鎖'}`}
+      {[1, 2, 3, 4, 5].map((level) => {
+        const locked = level > unlockedLevel
+        const current = level === unlockedLevel
+        return (
+          <li
+            key={level}
+            className={`sp-growth-stage${current ? ' is-current' : ''}${locked ? ' is-locked' : ''}`}
           >
             <span className="sp-growth-image">
-              <SpiritArtwork species={species} level={level} />
-              {level > unlockedLevel && (
-                <span className="sp-lock">
-                  <LockKeyhole size={12} aria-hidden="true" />
-                </span>
+              {locked ? (
+                <>
+                  <img
+                    className="sp-locked-egg"
+                    src="/images/locked-egg.png"
+                    alt=""
+                    aria-hidden="true"
+                    draggable={false}
+                  />
+                  <span
+                    className="locked-egg__question"
+                    aria-hidden="true"
+                  >
+                    ?
+                  </span>
+                </>
+              ) : (
+                <SpiritArtwork species={species} level={level} />
               )}
             </span>
             <strong>LV{level}</strong>
-            <span>
-              {spiritCatalog[species].stages[level - 1] || '成長階段'}
+            <span className="sp-growth-state">
+              {locked
+                ? '尚未解鎖'
+                : current
+                  ? '培育中'
+                  : spiritCatalog[species].stages[level - 1]}
             </span>
-          </button>
-        </li>
-      ))}
+            {current && (
+              <span className="sp-stage-progress" aria-label={`培育進度 ${Math.round(progress)}%`}>
+                <span style={{ width: `${progress}%` }} />
+              </span>
+            )}
+          </li>
+        )
+      })}
     </ol>
   )
 }

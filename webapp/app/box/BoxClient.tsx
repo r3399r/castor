@@ -190,6 +190,31 @@ export default function BoxClient() {
     </div>
   )
 
+  const guardianSelector = (
+    <label className="sp-select sp-guardian-selector">
+      <span>切換守護靈</span>
+      <span className="sp-select-control">
+        <select
+          value={selectedGuardianId}
+          onChange={(event) => {
+            setSelectedGuardianId(event.target.value)
+            setPreviewLevel(null)
+          }}
+        >
+          {guardians.map((item) => (
+            <option key={item.id} value={item.id}>
+              {artworkById[item.id]
+                ? spiritCatalog[artworkById[item.id]!].name
+                : item.name}{' '}
+              · LV{complete ? 5 : item.level}
+            </option>
+          ))}
+        </select>
+        <ChevronDown size={16} aria-hidden="true" />
+      </span>
+    </label>
+  )
+
   return (
     <div className="sp-box">
       <IllustratedHero
@@ -197,8 +222,24 @@ export default function BoxClient() {
         aside={
           <Card className="sp-balance">
             {/* Native images retain the supplied alpha and independent positioning. */}
-            <img className="sp-points-vine sp-points-vine-top" src="/images/points-vine-top-left.png" alt="" aria-hidden="true" draggable={false} width={360} height={290} />
-            <img className="sp-points-vine sp-points-vine-bottom" src="/images/points-vine-bottom-right.png" alt="" aria-hidden="true" draggable={false} width={820} height={340} />
+            <img
+              className="sp-points-vine sp-points-vine-top"
+              src="/images/points-vine-top-left.png"
+              alt=""
+              aria-hidden="true"
+              draggable={false}
+              width={360}
+              height={290}
+            />
+            <img
+              className="sp-points-vine sp-points-vine-bottom"
+              src="/images/points-vine-bottom-right.png"
+              alt=""
+              aria-hidden="true"
+              draggable={false}
+              width={820}
+              height={340}
+            />
             <div className="sp-points-copy">
               <p>目前積分</p>
               <strong>
@@ -231,34 +272,6 @@ export default function BoxClient() {
             <>
               {demoState.hasGuardian ? (
                 <>
-                  <div className="sp-section-heading">
-                    <div>
-                      <p className="sp-eyebrow">YOUR COMPANION</p>
-                      <h2>{complete ? '一段成長，完整綻放' : '正在培育'}</h2>
-                    </div>
-                    <label className="sp-select">
-                      <span>切換守護靈</span>
-                      <span className="sp-select-control">
-                        <select
-                          value={selectedGuardianId}
-                          onChange={(event) => {
-                            setSelectedGuardianId(event.target.value)
-                            setPreviewLevel(null)
-                          }}
-                        >
-                          {guardians.map((item) => (
-                            <option key={item.id} value={item.id}>
-                              {artworkById[item.id]
-                                ? spiritCatalog[artworkById[item.id]!].name
-                                : item.name}{' '}
-                              · LV{complete ? 5 : item.level}
-                            </option>
-                          ))}
-                        </select>
-                        <ChevronDown size={16} aria-hidden="true" />
-                      </span>
-                    </label>
-                  </div>
                   <div className="sp-growing-layout">
                     <div className="sp-companion-art">
                       {species ? (
@@ -278,6 +291,7 @@ export default function BoxClient() {
                     </div>
                     {species ? (
                       <SpiritStatusCard
+                        headerAction={guardianSelector}
                         species={species}
                         level={level}
                         xp={guardian.xp}
@@ -299,11 +313,13 @@ export default function BoxClient() {
                       </SpiritStatusCard>
                     ) : (
                       <ContentPanel className="sp-status">
-                        <p className="sp-eyebrow">{guardian.theme}</p>
-                        <h2>{guardian.name}</h2>
-                        <Badge>
-                          {complete ? '已完成' : '培育中'} · LV{level}
-                        </Badge>
+                        <div className="sp-status-heading">
+                          <div>
+                            <p className="sp-eyebrow">{guardian.theme}</p>
+                            <h2>{guardian.name}</h2>
+                          </div>
+                          {guardianSelector}
+                        </div>
                         <p className="sp-description">
                           守護靈會隨著你投入的成長經驗逐步升級，並解鎖新的外觀與棲地內容。
                         </p>
@@ -325,19 +341,13 @@ export default function BoxClient() {
                   {species && (
                     <ContentPanel className="sp-journey">
                       <div className="sp-section-heading">
-                        <div>
-                          <p className="sp-eyebrow">A LITTLE MORE, EVERY DAY</p>
-                          <h2>你的成長足跡</h2>
-                        </div>
-                        <p className="sp-caption">
-                          五個階段，一路相伴 · 點選預覽外觀
-                        </p>
+                        <h2>成長進度</h2>
                       </div>
                       <GrowthTrack
                         species={species}
-                        selectedLevel={shownLevel}
                         unlockedLevel={level}
-                        onSelect={setPreviewLevel}
+                        xp={guardian.xp}
+                        nextLevelXp={complete ? null : guardian.nextLevelXp}
                       />
                     </ContentPanel>
                   )}
@@ -565,7 +575,15 @@ export default function BoxClient() {
                             }
                           >
                             <span className="sp-collection-art">
-                              {art ? (
+                              {!unlocked ? (
+                                <img
+                                  className="sp-collection-locked-egg"
+                                  src="/images/locked-egg.png"
+                                  alt=""
+                                  aria-hidden="true"
+                                  draggable={false}
+                                />
+                              ) : art ? (
                                 <SpiritArtwork species={art} level={stage} />
                               ) : (
                                 <ArtworkPlaceholder />

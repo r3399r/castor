@@ -389,3 +389,161 @@
   .sp-box-page .sp-tabs button { transition: none; }
   .sp-box-page .sp-tabs button[aria-selected='true'] { transform: translateY(-2px); }
 }
+
+/* Growing selector lives in the status header, without a separate section bar. */
+.sp-box-page .sp-growing-layout .sp-status-heading {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 16px;
+}
+.sp-box-page .sp-guardian-selector {
+  flex: 0 1 210px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  margin-left: auto;
+}
+.sp-box-page .sp-guardian-selector .sp-select-control { width: 100%; }
+.sp-box-page .sp-guardian-selector select { width: 100%; min-height: 50px; }
+@media (48rem <= width < 64rem) {
+  .sp-box-page .sp-guardian-selector { margin-left: 0; }
+}
+@media (width < 48rem) {
+  .sp-box-page .sp-growing-layout .sp-status-heading { flex-direction: column; }
+  .sp-box-page .sp-guardian-selector { flex: initial; width: 100%; margin-left: 0; }
+  .sp-box-page .sp-growing-layout { margin-top: 8px; }
+}
+
+/* One cultivation panel: shared frame, adjacent materials, upright artwork. */
+.sp-box-page .sp-growing-layout {
+  grid-template-columns: minmax(0, .48fr) minmax(0, .52fr);
+  gap: 0;
+  overflow: hidden;
+  border-radius: 30px;
+  border: 1px solid rgba(163, 177, 139, .25);
+  box-shadow: var(--shadow-spirit-float);
+  align-items: stretch;
+}
+.sp-box-page .sp-growing-layout .sp-scene,
+.sp-box-page .sp-growing-layout > .sp-status {
+  border-radius: 0;
+  border: 0;
+  box-shadow: none;
+}
+.sp-box-page .sp-growing-layout > .sp-status {
+  padding: 48px;
+  border-left: 1px solid rgba(163, 177, 139, .25);
+}
+.sp-box-page .sp-growing-layout .sp-artwork-frame,
+.sp-box-page .sp-growing-layout .sp-artwork-frame:hover {
+  transform: none;
+  rotate: 0deg;
+}
+@media (48rem <= width < 64rem) {
+  .sp-box-page .sp-growing-layout { grid-template-columns: minmax(0, .44fr) minmax(0, .56fr); }
+  .sp-box-page .sp-growing-layout > .sp-status { padding: 28px; }
+}
+@media (width < 48rem) {
+  .sp-box-page .sp-growing-layout { grid-template-columns: minmax(0, 1fr); }
+  .sp-box-page .sp-growing-layout > .sp-status {
+    padding: 24px;
+    border-left: 0;
+    border-top: 1px solid rgba(163, 177, 139, .25);
+  }
+}
+
+/* Growth summary uses a clear radius hierarchy at every breakpoint. */
+.sp-box-page .sp-journey {
+  border-radius: 16px;
+}
+.sp-box-page .sp-journey .sp-section-heading {
+  border-radius: 12px;
+}
+.sp-box-page .sp-journey .sp-growth-stage {
+  border-radius: 8px;
+}
+.sp-box-page .sp-journey .sp-growth-image,
+.sp-box-page .sp-journey .sp-growth-image .sp-artwork {
+  border-radius: 8px;
+}
+
+/* Make the learning-to-giving mechanism visible without changing its rules. */
+.sp-box-page .sp-support {
+  position: relative;
+  overflow: hidden;
+  background: #fffaf0;
+  border-color: rgb(66 104 83 / 0.34);
+  border-radius: 16px;
+  box-shadow: 0 12px 34px rgb(23 63 58 / 0.09);
+}
+.sp-box-page .sp-support-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 7fr) minmax(190px, 3fr);
+  align-items: center;
+  gap: 32px;
+}
+.sp-box-page .sp-support-eyebrow {
+  color: var(--color-spirit-teal);
+  font-size: var(--text-spirit-micro);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+}
+.sp-box-page .sp-support-copy h2 {
+  margin-top: 8px;
+  font-size: var(--text-spirit-heading);
+}
+.sp-box-page .sp-support-copy h2 + p {
+  margin-top: 12px;
+  padding-top: 0;
+  border-top: 0;
+  color: var(--color-spirit-muted);
+  font-size: var(--text-spirit-small);
+}
+.sp-box-page .sp-support-result {
+  display: grid;
+  justify-items: center;
+  padding: 20px;
+  border: 1px solid rgb(174 138 55 / 0.28);
+  border-radius: 16px;
+  background: rgb(247 241 213 / 0.72);
+  color: var(--color-spirit-ink);
+  text-align: center;
+}
+.sp-box-page .sp-support-result > svg {
+  margin-bottom: 8px;
+  color: var(--color-spirit-leaf);
+}
+.sp-box-page .sp-support-result > span {
+  font-size: var(--text-spirit-caption);
+  font-weight: 700;
+}
+.sp-box-page .sp-support-result strong {
+  margin-top: 4px;
+  color: #c27a18;
+  font-size: 24px;
+  line-height: 1.1;
+}
+.sp-box-page .sp-support-rules {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: var(--spirit-border);
+}
+.sp-box-page .sp-support-rules p {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  color: var(--color-spirit-muted);
+  font-size: var(--text-spirit-caption);
+}
+@media (width < 48rem) {
+  .sp-box-page .sp-support-summary {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+  }
+  .sp-box-page .sp-support-result {
+    width: 100%;
+  }
+}

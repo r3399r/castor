@@ -548,52 +548,86 @@
 .sp-growth-track {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 20px;
+  gap: 12px;
   list-style: none;
   padding: 0;
 }
-.sp-growth-track button {
+.sp-growth-stage {
   display: flex;
   flex-direction: column;
   align-items: center;
-  width: 100%;
-  padding: 8px;
-  border: 2px solid transparent;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--color-spirit-line);
   border-radius: var(--radius-spirit-control);
-  transition:
-    background var(--spirit-duration),
-    transform var(--spirit-duration);
+  background: color-mix(in srgb, var(--color-spirit-cream) 78%, transparent);
 }
-.sp-growth-track button:hover {
-  background: var(--color-spirit-mist);
-  transform: translateY(-2px);
-}
-.sp-growth-track button[aria-pressed='true'] {
+.sp-growth-stage.is-current {
   border-color: var(--color-spirit-teal);
   background: var(--color-spirit-mist);
+  box-shadow: 0 0 18px rgb(44 124 121 / 0.12);
+}
+.sp-growth-stage.is-locked {
+  color: var(--color-spirit-muted);
+  background: color-mix(in srgb, var(--color-spirit-paper) 68%, transparent);
 }
 .sp-growth-image {
   position: relative;
-  display: block;
+  display: grid;
+  place-items: center;
   width: 100%;
   max-width: 130px;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: var(--radius-spirit-image);
 }
 .sp-growth-track strong {
   margin-top: 10px;
   font-size: var(--text-spirit-caption);
 }
-.sp-growth-track button > span:last-child {
+.sp-growth-state {
   font-size: var(--text-spirit-micro);
   color: var(--color-spirit-muted);
 }
-.sp-lock {
+.is-current .sp-growth-state {
+  color: var(--color-spirit-teal);
+  font-weight: 700;
+}
+.sp-locked-egg {
+  display: block;
+  width: 84%;
+  height: 84%;
+  object-fit: contain;
+  user-select: none;
+}
+.locked-egg__question {
   position: absolute;
-  bottom: 4px;
-  right: 4px;
-  border-radius: 6px;
-  padding: 4px;
-  background: var(--color-spirit-paper);
-  color: var(--color-spirit-muted);
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-fredoka), "Fredoka", sans-serif;
+  font-size: clamp(32px, 3.5vw, 52px);
+  font-weight: 600;
+  line-height: 1;
+  color: #aaa294;
+  transform: translateY(-2%);
+  pointer-events: none;
+  user-select: none;
+}
+.sp-stage-progress {
+  display: block;
+  width: 100%;
+  height: 4px;
+  margin-top: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--color-spirit-line);
+}
+.sp-stage-progress > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-spirit-teal);
 }
 .sp-support {
   margin-top: 28px;
@@ -807,9 +841,15 @@
   box-shadow: var(--shadow-spirit-card);
 }
 .sp-collection-art {
-  display: block;
+  display: grid;
+  place-items: center;
   position: relative;
+  width: 100%;
+  aspect-ratio: 1;
   background: var(--color-spirit-mist);
+}
+.sp-collection-card:disabled .sp-collection-art {
+  background: #f6f1df;
 }
 .sp-collection-art .sp-artwork {
   border-radius: 0;
@@ -818,8 +858,14 @@
   opacity: 0.3;
   filter: saturate(0.3);
 }
-.sp-collection-card:disabled .sp-artwork-placeholder > * {
-  visibility: hidden;
+.sp-collection-locked-egg {
+  display: block;
+  width: 74%;
+  margin-inline: auto;
+  aspect-ratio: 1;
+  object-fit: contain;
+  opacity: 1;
+  user-select: none;
 }
 .sp-collection-lock {
   position: absolute;
@@ -828,10 +874,11 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 5px;
+  color: #788a83;
   font-size: var(--text-spirit-micro);
   font-weight: 700;
-  color: var(--color-spirit-deep);
+  pointer-events: none;
 }
 .sp-collection-label {
   display: flex;
@@ -1063,10 +1110,14 @@
     gap: 0;
   }
   .sp-growth-track {
-    gap: 2px;
-  }
-  .sp-growth-track button {
-    padding: 4px 2px;
+    grid-template-columns: repeat(5, 112px);
+    gap: 8px;
+    margin-inline: -20px;
+    padding-inline: 20px;
+    padding-bottom: 8px;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scrollbar-width: thin;
   }
   .sp-growth-image .sp-artwork {
     border-radius: 5px;
@@ -1074,13 +1125,8 @@
   .sp-growth-track strong {
     font-size: var(--text-spirit-micro);
   }
-  .sp-growth-track button > span:last-child {
+  .sp-growth-state {
     font-size: 0.625rem;
-  }
-  .sp-lock {
-    bottom: 1px;
-    right: 1px;
-    padding: 2px;
   }
   .sp-store-grid {
     gap: 16px;
@@ -1163,7 +1209,6 @@
     transition: none !important;
     scroll-behavior: auto !important;
   }
-  .sp-growth-track button:hover,
   .sp-collection-card:hover:not(:disabled),
   .sp-button:active:not(:disabled) {
     transform: none;
