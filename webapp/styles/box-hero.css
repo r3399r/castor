@@ -222,7 +222,7 @@
    throughout the surrounding content area. */
 .sp-box-page .sp-section-heading {
   background: var(--spirit-balance-surface);
-  border-radius: var(--spirit-radius-card, 20px);
+  border-radius: 16px;
   padding-inline: 16px;
 }
 .sp-box-page .sp-section-heading {
@@ -421,7 +421,7 @@
   grid-template-columns: minmax(0, .48fr) minmax(0, .52fr);
   gap: 0;
   overflow: hidden;
-  border-radius: 30px;
+  border-radius: 16px;
   border: 1px solid rgba(163, 177, 139, .25);
   box-shadow: var(--shadow-spirit-float);
   align-items: stretch;
@@ -431,6 +431,13 @@
   border-radius: 0;
   border: 0;
   box-shadow: none;
+}
+.sp-box-page .sp-growing-layout .sp-artwork-placeholder {
+  border-radius: 0;
+}
+.sp-box-page .sp-growing-layout .sp-scene figcaption {
+  font-size: 24px;
+  font-weight: 700;
 }
 .sp-box-page .sp-growing-layout > .sp-status {
   padding: 48px;

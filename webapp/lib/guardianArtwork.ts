@@ -16,31 +16,31 @@ export type SpiritDefinition = {
 }
 export const spiritCatalog: Record<SpiritSpecies, SpiritDefinition> = {
   cat: {
-    name: '貓守護靈',
+    name: '貓精靈',
     category: '兒少、家庭與婦幼',
     tone: 'forest',
     stages: [],
   },
   otter: {
-    name: '水獺守護靈',
+    name: '水獺精靈',
     category: '身心障礙與神經發展',
     tone: 'sky',
     stages: [],
   },
   dog: {
-    name: '狗守護靈',
+    name: '狗精靈',
     category: '高齡長照與失智照護',
     tone: 'forest',
     stages: [],
   },
   rabbit: {
-    name: '兔子守護靈',
+    name: '兔子精靈',
     category: '疾病醫療、心理與善終',
     tone: 'forest',
     stages: [],
   },
   dolphin: {
-    name: '海豚守護靈',
+    name: '海豚精靈',
     category: '人權、法治、性別與社區',
     tone: 'sky',
     stages: [],

@@ -2,7 +2,7 @@
 export const guardians = [
   {
     id: 'forest',
-    name: '森林守護靈',
+    name: '森林精靈',
     theme: '森林保育',
     level: 2,
     xp: 68,
@@ -18,7 +18,7 @@ export const guardians = [
   },
   {
     id: 'ocean',
-    name: '海洋守護靈',
+    name: '海洋精靈',
     theme: '海洋保育',
     level: 1,
     xp: 24,
@@ -56,13 +56,13 @@ export const storeEggs = [
 ] as const
 
 export const collectionSeries = [
-  { id: 'forest', name: '森林守護靈', theme: '森林保育', unlockedLevel: 2 },
-  { id: 'ocean', name: '海洋守護靈', theme: '海洋保育', unlockedLevel: 1 },
+  { id: 'forest', name: '森林精靈', theme: '森林保育', unlockedLevel: 2 },
+  { id: 'ocean', name: '海洋精靈', theme: '海洋保育', unlockedLevel: 1 },
   {
     id: 'wisdom',
     name: '彩羽鳥靈',
     theme: '教育翻轉、人文與藝術',
     unlockedLevel: 1,
   },
-  { id: 'animal', name: '毛孩守護靈', theme: '動物救援', unlockedLevel: 0 },
+  { id: 'animal', name: '毛孩精靈', theme: '動物救援', unlockedLevel: 0 },
 ] as const

@@ -161,7 +161,7 @@ export function SpiritStatusCard({
         )}
       </div>
       <p className="sp-description">
-        守護靈會隨著你投入的成長經驗逐步升級，並解鎖新的外觀與棲地內容。
+        精靈會隨著你投入的成長經驗逐步升級，並解鎖新的外觀與棲地內容。
       </p>
       <div className="sp-progress-heading">
         <span>成長經驗</span>
@@ -273,15 +273,39 @@ export function IllustratedEmptyState({
   children,
   action,
   species = 'deer',
+  lockedEgg = false,
 }: {
   title: string
   children: ReactNode
   action?: ReactNode
   species?: SpiritSpecies
+  lockedEgg?: boolean
 }) {
   return (
     <ContentPanel className="sp-empty">
-      <SpiritScene species={species} level={1} />
+      {lockedEgg ? (
+        <figure className="sp-scene sp-empty-egg-scene">
+          <div className="sp-scene-decoration" aria-hidden="true">
+            <Foliage />
+            <span className="sp-mote" />
+          </div>
+          <div className="sp-artwork-frame sp-empty-egg-frame">
+            <img
+              className="sp-empty-egg"
+              src="/images/locked-egg.png"
+              alt="尚未兌換的精靈蛋"
+              width={1254}
+              height={1254}
+              draggable={false}
+            />
+            <span className="sp-empty-egg-question" aria-hidden="true">
+              ?
+            </span>
+          </div>
+        </figure>
+      ) : (
+        <SpiritScene species={species} level={1} />
+      )}
       <div>
         <p className="sp-eyebrow">每段成長，都從這裡開始</p>
         <h2>{title}</h2>

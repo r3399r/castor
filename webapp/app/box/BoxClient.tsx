@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import {
+  ArrowRight,
   BookOpen,
   Check,
   ChevronDown,
@@ -66,8 +67,8 @@ const tabs = [
 const steps = [
   ['完成練習', '完成題目並累積學習成果'],
   ['累積積分', '把每次練習轉換成可使用的積分'],
-  ['兌換蛋', '在精靈商店選擇喜歡的守護靈'],
-  ['培育守護靈', '投入積分，解鎖不同成長階段'],
+  ['兌換蛋', '在精靈商店選擇喜歡的精靈'],
+  ['培育精靈', '投入積分，解鎖不同成長階段'],
   ['解鎖公益支持', '滿級後支持相應主題的公益計畫'],
 ]
 function ArtworkPlaceholder() {
@@ -120,11 +121,11 @@ export default function BoxClient() {
         <h3>投入積分</h3>
       </div>
       <p className="sp-description">
-        選擇要投入的積分，增加這隻守護靈的成長經驗。
+        選擇要投入的積分，增加這隻精靈的成長經驗。
       </p>
       {availablePoints === 0 && (
         <p className="sp-inline-notice">
-          目前沒有可分配的積分。完成更多練習後，就能繼續培育這隻守護靈。
+          目前沒有可分配的積分。完成更多練習後，就能繼續培育這隻精靈。
         </p>
       )}
       <div className="sp-invest-controls">
@@ -192,7 +193,7 @@ export default function BoxClient() {
 
   const guardianSelector = (
     <label className="sp-select sp-guardian-selector">
-      <span>切換守護靈</span>
+      <span>切換精靈</span>
       <span className="sp-select-control">
         <select
           value={selectedGuardianId}
@@ -279,11 +280,7 @@ export default function BoxClient() {
                           species={species}
                           level={shownLevel}
                           priority
-                          caption={
-                            shownLevel !== level
-                              ? `LV${shownLevel} · 成長外觀預覽${shownLevel > level ? '，尚未解鎖' : ''}`
-                              : `LV${level} · ${spiritCatalog[species].stages[level - 1]} — 每一份努力，都在悄悄生長`
-                          }
+                          caption={`LV${shownLevel}`}
                         />
                       ) : (
                         <ArtworkPlaceholder />
@@ -298,7 +295,7 @@ export default function BoxClient() {
                         nextLevelXp={complete ? null : guardian.nextLevelXp}
                       >
                         {complete ? (
-                          <RewardBanner title="守護靈已完成培育">
+                          <RewardBanner title="精靈已完成培育">
                             LV1～LV5 的成長足跡，已收入你的圖鑑。
                             <Button
                               variant="secondary"
@@ -321,7 +318,7 @@ export default function BoxClient() {
                           {guardianSelector}
                         </div>
                         <p className="sp-description">
-                          守護靈會隨著你投入的成長經驗逐步升級，並解鎖新的外觀與棲地內容。
+                          精靈會隨著你投入的成長經驗逐步升級，並解鎖新的外觀與棲地內容。
                         </p>
                         <Progress
                           label="成長經驗"
@@ -355,7 +352,8 @@ export default function BoxClient() {
               ) : (
                 <>
                   <IllustratedEmptyState
-                    title="還沒有正在培育的守護靈"
+                    title="還沒有正在培育的精靈"
+                    lockedEgg
                     action={
                       <>
                         <a
@@ -373,15 +371,23 @@ export default function BoxClient() {
                       </>
                     }
                   >
-                    完成題目累積積分，兌換第一顆蛋，開始培育你的守護靈。
+                    完成題目累積積分，兌換第一顆蛋，開始培育你的精靈。
                   </IllustratedEmptyState>
                   <ContentPanel className="sp-how">
                     <p className="sp-eyebrow">HOW IT WORKS</p>
-                    <h2>培育守護靈的旅程</h2>
+                    <h2>培育精靈的旅程</h2>
                     <ol>
                       {steps.map(([title, description], index) => (
                         <li key={title}>
                           <span>0{index + 1}</span>
+                          {index < steps.length - 1 && (
+                            <ArrowRight
+                              className="sp-how-arrow"
+                              size={16}
+                              strokeWidth={1.8}
+                              aria-hidden="true"
+                            />
+                          )}
                           <h3>{title}</h3>
                           <p>{description}</p>
                         </li>
@@ -397,7 +403,7 @@ export default function BoxClient() {
               <div className="sp-section-heading">
                 <div>
                   <p className="sp-eyebrow">A NEW BEGINNING</p>
-                  <h2>選擇一顆守護靈之蛋</h2>
+                  <h2>選擇一顆精靈之蛋</h2>
                   <p className="sp-description">
                     使用練習累積的積分兌換蛋，選擇你想支持的公益主題，開始一段新的培育旅程。
                   </p>
@@ -444,7 +450,7 @@ export default function BoxClient() {
                           </Badge>
                         </div>
                         <p className="sp-description">
-                          孵化並培育這顆蛋，逐步解鎖守護靈與牠的專屬棲地。
+                          孵化並培育這顆蛋，逐步解鎖精靈與牠的專屬棲地。
                         </p>
                         <div className="sp-store-purchase">
                           <div className="sp-progress-heading">
@@ -483,21 +489,15 @@ export default function BoxClient() {
                   )
                 })}
               </div>
-              <ContentPanel className="sp-note">
-                <h3>兌換前請留意</h3>
-                <p>
-                  目前為前端版面示意，商品價格與積分規則尚未定案。所有兌換按鈕皆不會扣除積分或建立守護靈。
-                </p>
-              </ContentPanel>
             </>
           ) : (
             <>
               <div className="sp-section-heading">
                 <div>
                   <p className="sp-eyebrow">THE GROWTH COLLECTION</p>
-                  <h2>我的守護靈圖鑑</h2>
+                  <h2>我的精靈圖鑑</h2>
                   <p className="sp-description">
-                    收藏每一隻守護靈的成長足跡。已解鎖的階段可以點擊放大查看。
+                    收藏每一隻精靈的成長足跡。已解鎖的階段可以點擊放大查看。
                   </p>
                 </div>
                 <Badge tone="growth">
@@ -515,14 +515,14 @@ export default function BoxClient() {
               {!demoState.hasGuardian && (
                 <IllustratedEmptyState
                   title="你的圖鑑還是空的"
-                  species="bird"
+                  lockedEgg
                   action={
                     <Button onClick={() => setActiveTab('store')}>
                       前往精靈商店
                     </Button>
                   }
                 >
-                  兌換並培育守護靈後，每個解鎖的成長階段都會收藏在這裡。
+                  兌換並培育精靈後，每個解鎖的成長階段都會收藏在這裡。
                 </IllustratedEmptyState>
               )}
               {displayedCollection.map((series) => {
@@ -608,13 +608,6 @@ export default function BoxClient() {
                   </ContentPanel>
                 )
               })}
-              <ContentPanel className="sp-note">
-                <h3>圖鑑會持續成長</h3>
-                <p>
-                  每當守護靈升到新的階段，對應的角色與棲地圖片就會永久收入圖鑑。圖片與解鎖內容目前皆為
-                  Demo。
-                </p>
-              </ContentPanel>
             </>
           )}
         </main>
@@ -666,7 +659,7 @@ export default function BoxClient() {
             label="本次兌換"
           />
           <p className="sp-caption">
-            目前為前端 Demo，確認後不會實際扣除積分或新增守護靈。
+            目前為前端 Demo，確認後不會實際扣除積分或新增精靈。
           </p>
           <div className="sp-dialog-actions">
             <Button variant="secondary" onClick={() => setEggToExchange(null)}>
@@ -723,7 +716,7 @@ export default function BoxClient() {
             )}
           </div>
           <p className="sp-description">
-            這是守護靈第 {collectionPreview.level}{' '}
+            這是精靈第 {collectionPreview.level}{' '}
             階段的收藏圖片。正式角色圖與階段故事將在美術內容確認後補上。
           </p>
         </Modal>

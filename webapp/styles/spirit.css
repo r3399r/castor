@@ -725,8 +725,48 @@
   align-items: center;
   gap: 40px;
 }
+.sp-panel.sp-empty {
+  border-radius: 16px;
+}
 .sp-empty .sp-scene {
   padding: 20px;
+}
+.sp-empty .sp-empty-egg-scene {
+  padding: 0;
+  background: transparent;
+}
+.sp-empty-egg-scene .sp-scene-decoration {
+  display: none;
+}
+.sp-empty-egg-frame {
+  position: relative;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  padding-block: 40px;
+  transform: none;
+}
+.sp-empty-egg {
+  display: block;
+  width: 48%;
+  aspect-ratio: 1;
+  object-fit: contain;
+  border-radius: var(--radius-spirit-image);
+  user-select: none;
+}
+.sp-empty-egg-question {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #aaa294;
+  font-family: var(--font-fredoka), "Fredoka", sans-serif;
+  font-size: clamp(48px, 5vw, 72px);
+  font-weight: 600;
+  line-height: 1;
+  transform: translateY(-2%);
+  pointer-events: none;
+  user-select: none;
 }
 .sp-actions {
   display: flex;
@@ -740,14 +780,25 @@
 .sp-how ol {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 20px;
+  gap: 36px;
   margin-top: 24px;
   list-style: none;
   padding: 0;
 }
+.sp-how li {
+  position: relative;
+  min-width: 0;
+}
 .sp-how li > span {
   color: var(--color-spirit-teal);
-  font-size: var(--text-spirit-caption);
+  font-size: 20px;
+  font-weight: 700;
+}
+.sp-how-arrow {
+  position: absolute;
+  top: 5px;
+  right: -28px;
+  color: var(--color-spirit-teal);
 }
 .sp-how h3 {
   font-size: var(--text-spirit-subtitle);
@@ -766,10 +817,18 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  border: 0;
+  border-radius: 16px;
 }
 .sp-store-art {
   padding: 24px 48px;
   background: var(--color-spirit-mist);
+}
+.sp-store-card .sp-store-art {
+  padding: 0;
+}
+.sp-store-art .sp-artwork {
+  border-radius: 0;
 }
 .sp-artwork-placeholder {
   min-height: 100px;
@@ -820,6 +879,7 @@
 }
 .sp-collection-series {
   margin-top: 28px;
+  border-radius: 16px;
 }
 .sp-collection-grid {
   display: grid;
@@ -1156,6 +1216,7 @@
   .sp-empty {
     grid-template-columns: minmax(0, 1fr);
     gap: 24px;
+    padding-top: 40px;
   }
   .sp-empty .sp-scene {
     max-width: 280px;
@@ -1163,6 +1224,7 @@
   }
   .sp-how ol {
     grid-template-columns: minmax(0, 1fr);
+    gap: 44px;
   }
   .sp-how li {
     padding-left: 40px;
@@ -1172,6 +1234,13 @@
     position: absolute;
     left: 0;
     top: 8px;
+  }
+  .sp-how-arrow {
+    top: auto;
+    right: auto;
+    bottom: -32px;
+    left: 2px;
+    transform: rotate(90deg);
   }
 }
 @media (width < 40rem) {
