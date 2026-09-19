@@ -2,7 +2,7 @@
 
 Guidance for AI coding agents (Claude Code, Codex, Cursor, etc.) working in this repository.
 
-## Repo layout
+## Project structure
 
 npm workspaces monorepo (`webapp`, `backend`, `backend_new`, `packages/*`):
 
@@ -12,7 +12,60 @@ npm workspaces monorepo (`webapp`, `backend`, `backend_new`, `packages/*`):
 - `mobile/` — Flutter app.
 - `db/` — raw SQL table definitions (`db/table/*.sql`), also used to seed the local Docker MySQL for `backend_new` tests.
 - `packages/shared` (`@castor/shared`) — TS shared between `backend_new` and `webapp`.
-- `deploy.sh` — deploys `backend_new` (CloudFormation) from CI; webapp S3 sync is currently commented out.
+- `deploy.sh` — deploys `backend_new` (CloudFormation) and syncs the webapp SSG output to S3, from CI. Sections get commented out from time to time to deploy only one side — read it before assuming what a deploy does.
+
+## Rules
+
+### General
+
+- Read existing code before modifying it.
+- Do not modify unrelated files.
+- Do not introduce dependencies without explaining why.
+- Keep changes focused on the assigned task.
+- This is a workspaces monorepo: install dependencies from the repo root, not inside a workspace.
+- Do not commit secrets. `.env.local` / `webapp/.env.*` are local-only; `webapp/.env.example` is the template to update when a new variable is added.
+
+### Database
+
+- Schema changes must be made in `db/table/*.sql`, and the matching Drizzle definitions in `backend_new/src/db/schema.ts` must be updated in the same change — the two are hand-kept in sync and regression tests seed from `db/table/`.
+- Do not modify production database structure directly.
+- Data backfills/seeds belong in `db/script/<version>/`, not in application code.
+- `backend/` (legacy) entities in `src/model/entity/` are not the source of truth; do not add tables there.
+
+### Backend
+
+- Do new backend work in `backend_new/`. Treat `backend/` as legacy — change it only when the task explicitly targets it.
+- API contracts must stay backward compatible unless the task explicitly requires a breaking change; `webapp/` and `mobile/` both consume them.
+- Validate request input with zod in the route file, and throw `HttpError` subclasses from `src/model/error/` rather than returning ad-hoc error responses.
+- Do not bypass the middleware chain in `src/app.ts` (`adminAuth` / `requireAdmin` / `transaction` / `requireUser`). New routes go behind the same chain as comparable existing routes.
+- Do not open your own DB connection — use the `db` from the request context (`c.get('db')`) so work stays inside the request transaction.
+- Adding a new Lambda entrypoint means updating `package.json` build scripts *and* `aws/cloudformation/template.yaml`.
+- Run `npm run typecheck` and `npm run test:unit` before declaring backend work done; run `npm test` when touching routes or DB access.
+
+### Frontend
+
+- Use existing components and patterns in `webapp/components/` before creating new ones.
+- Keep the App Router split: `page.tsx` stays a server component, interactive logic goes in the sibling `*Client.tsx`.
+- Call the API through `webapp/lib/api.ts`; do not hand-roll `fetch` calls or re-implement auth-header handling.
+- Keep response types in `webapp/types/api.ts` (or `packages/shared`) in step with backend changes.
+- The webapp is exported as a static site and synced to S3 — do not add server-only Next.js features (route handlers, SSR-only APIs, middleware) without flagging it.
+
+### Mobile
+
+- `mobile/` is Flutter. Do not edit generated platform scaffolding under `mobile/android/` or `mobile/ios/` unless the task is specifically about native config.
+- Follow the existing `lib/pages` / `lib/widgets` / `lib/theme` split.
+
+### Git
+
+- Work only on the assigned branch. `dev` is the default/main branch.
+- Do not reset, rebase, force-push, or rewrite other people's commits.
+- Do not modify unrelated features.
+- Do not commit build output (`dist/`, `out/`, `.next/`, `node_modules/`).
+
+### Deploy
+
+- Do not run `deploy.sh` or any `aws` command unless explicitly asked — it targets real infrastructure.
+- CI workflows live in `.github/workflows/`. Note that `dev.yml` intentionally deploys to the `prod` stack, so the workflow name does not tell you which environment it hits.
 
 ## Commands
 
@@ -35,7 +88,7 @@ Regression tests share one MySQL pool and truncate tables between cases, so `vit
 webapp: `npm run dev` / `build` / `lint` from `webapp/`.
 Root: `npm run dev` starts the webapp via `next dev webapp`.
 
-Deploy: `./deploy.sh <env>` (run from repo root, requires AWS creds) — builds+typechecks `backend_new`, packages/deploys its CloudFormation stack. Note: as of writing, `dev.yml` intentionally deploys to the `prod` stack (no real users yet; a proper dev/prod split is planned post-launch) — don't assume the workflow name matches the env it targets.
+Deploy: `./deploy.sh <env>` (run from repo root, requires AWS creds) — builds+typechecks `backend_new`, packages/deploys its CloudFormation stack, then builds and syncs the webapp to S3. `dev.yml` deploying to the `prod` stack is deliberate (no real users yet; a proper dev/prod split is planned post-launch).
 
 ## backend_new architecture
 
