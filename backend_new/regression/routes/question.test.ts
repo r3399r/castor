@@ -45,6 +45,13 @@ import { verifyIdToken, verifyIdTokenUid } from 'src/lib/firebaseAdmin';
 // locally) network call to AWS on every question creation.
 vi.mock('src/lib/facebookEventBridge', () => ({ enableFacebookEventBridge: vi.fn() }));
 
+// POST /question/image's only external dependency -- mocked so the suite
+// exercises the concept resolution, output validation and id filtering
+// around the model call without spending a real Gemini request (or
+// needing an API key) on every run.
+vi.mock('src/lib/genai', () => ({ generateJsonFromImages: vi.fn() }));
+import { generateJsonFromImages } from 'src/lib/genai';
+
 type QuestionDto = {
   id: number;
   uuid: string;
@@ -85,6 +92,17 @@ const putQuestion = (id: number | string, body: unknown) =>
 const deleteQuestion = (id: number | string) =>
   app.request(`/api/question/${id}`, { method: 'DELETE' });
 
+// 1x1 transparent PNG -- the route never decodes it (that's the model's
+// job), it just has to survive base64 validation.
+const PNG_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAAAAAA6fptVAAAACklEQVR4nGMAAQAABQAB';
+
+const postQuestionImage = (body: unknown) =>
+  app.request('/api/question/image', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
 const getQuestionTag = (id: number | string) => app.request(`/api/question/${id}/tag`);
 
 const putQuestionTag = (id: number | string, body: unknown) =>
@@ -107,6 +125,17 @@ const putQuestionConcept = (id: number | string, body: unknown) =>
 // Creates one question in its own batch call and returns its flat row --
 // convenient for GET/PUT/DELETE tests that just need an existing question,
 // not the batch machinery itself.
+const putQuestionEnabled = (id: number | string, body: unknown) =>
+  app.request(`/api/question/${id}/enabled`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+// Questions are created disabled (admin review gate), but almost every
+// test below is about something else and wants a question a user could
+// actually be served -- so this enables by default. Pass enabled: false
+// to keep a question in its as-created state.
 const createQuestion = async (
   subjectId: number,
   examId: number,
@@ -118,8 +147,10 @@ const createQuestion = async (
     difficulty: number;
     conceptIds: number[];
     tagIds: number[];
+    enabled: boolean;
   }> & { conceptIds: number[] }
 ) => {
+  const { enabled = true, ...questionOverrides } = overrides;
   const res = await postQuestions({
     subjectId,
     examId,
@@ -130,12 +161,14 @@ const createQuestion = async (
         options: 'A|B',
         answer: 'A',
         difficulty: 5,
-        ...overrides,
+        ...questionOverrides,
       },
     ],
   });
   const body = (await res.json()) as QuestionDto[][];
-  return body[0][0];
+  const question = body[0][0];
+  if (enabled) await putQuestionEnabled(question.id, { enabled: true });
+  return question;
 };
 
 const clearTables = async () => {
@@ -599,7 +632,7 @@ describe('question routes', () => {
 
     it('excludes GROUP question children from the count', async () => {
       const { subjectId, examId, conceptId } = await seedFixture();
-      await postQuestions({
+      const created = await postQuestions({
         subjectId,
         examId,
         questions: [
@@ -613,6 +646,11 @@ describe('question routes', () => {
           },
         ],
       });
+      // /count only counts enabled questions, and questions are created
+      // disabled -- this case is about children not being counted, so the
+      // group has to get past the review gate first.
+      const group = ((await created.json()) as QuestionDto[][])[0][0];
+      await putQuestionEnabled(group.id, { enabled: true });
 
       const res = await getQuestionCount(`?subjectId=${subjectId}`);
       expect(await res.json()).toEqual({ total: 1 });
@@ -1112,6 +1150,444 @@ describe('question routes', () => {
       vi.mocked(verifyIdToken).mockResolvedValue(null);
 
       const res = await deleteQuestion(1);
+      expect(res.status).toBe(401);
+    });
+  });
+
+  describe('PUT /:id/enabled', () => {
+    it('creates questions disabled', async () => {
+      const { subjectId, examId, conceptId } = await seedFixture();
+      const q = await createQuestion(subjectId, examId, {
+        conceptIds: [conceptId],
+        enabled: false,
+      });
+
+      const res = await getQuestion(q.id);
+      expect(((await res.json()) as { enabled: boolean }).enabled).toBe(false);
+    });
+
+    it('enables and disables a question', async () => {
+      const { subjectId, examId, conceptId } = await seedFixture();
+      const q = await createQuestion(subjectId, examId, {
+        conceptIds: [conceptId],
+        enabled: false,
+      });
+
+      expect((await putQuestionEnabled(q.id, { enabled: true })).status).toBe(200);
+      let body = (await (await getQuestion(q.id)).json()) as { enabled: boolean };
+      expect(body.enabled).toBe(true);
+
+      expect((await putQuestionEnabled(q.id, { enabled: false })).status).toBe(200);
+      body = (await (await getQuestion(q.id)).json()) as { enabled: boolean };
+      expect(body.enabled).toBe(false);
+    });
+
+    it("carries a group's children along with it", async () => {
+      const { subjectId, examId, conceptId } = await seedFixture();
+      const res = await postQuestions({
+        subjectId,
+        examId,
+        questions: [
+          {
+            type: 'GROUP',
+            content: 'group stem',
+            difficulty: 5,
+            conceptIds: [conceptId],
+            childQuestions: [
+              {
+                type: 'SINGLE',
+                sortOrder: 0,
+                content: 'child',
+                options: 'A|B',
+                answer: 'A',
+                difficulty: 5,
+              },
+            ],
+          },
+        ],
+      });
+      const created = (await res.json()) as QuestionDto[][];
+      const parent = created[0][0];
+      const child = created[0][1];
+
+      await putQuestionEnabled(parent.id, { enabled: true });
+
+      const db = getDb();
+      const [childRow] = await db
+        .select()
+        .from(questionTable)
+        .where(eq(questionTable.id, child.id));
+      expect(childRow.enabled).toBe(true);
+    });
+
+    it('refuses to toggle a child on its own', async () => {
+      const { subjectId, examId, conceptId } = await seedFixture();
+      const res = await postQuestions({
+        subjectId,
+        examId,
+        questions: [
+          {
+            type: 'GROUP',
+            content: 'group stem',
+            difficulty: 5,
+            conceptIds: [conceptId],
+            childQuestions: [
+              {
+                type: 'SINGLE',
+                sortOrder: 0,
+                content: 'child',
+                options: 'A|B',
+                answer: 'A',
+                difficulty: 5,
+              },
+            ],
+          },
+        ],
+      });
+      const child = ((await res.json()) as QuestionDto[][])[0][1];
+
+      expect((await putQuestionEnabled(child.id, { enabled: true })).status).toBe(400);
+    });
+
+    it('returns 404 for an unknown question', async () => {
+      expect((await putQuestionEnabled(999999, { enabled: true })).status).toBe(404);
+    });
+
+    it('rejects a non-boolean enabled with 400', async () => {
+      const { subjectId, examId, conceptId } = await seedFixture();
+      const q = await createQuestion(subjectId, examId, { conceptIds: [conceptId] });
+
+      expect((await putQuestionEnabled(q.id, { enabled: 'yes' })).status).toBe(400);
+    });
+
+    it('rejects with 401 when there is no valid identity', async () => {
+      vi.mocked(verifyIdToken).mockResolvedValue(null);
+
+      expect((await putQuestionEnabled(1, { enabled: true })).status).toBe(401);
+    });
+
+    it('shows the flag on the admin list', async () => {
+      const { subjectId, examId, conceptId } = await seedFixture();
+      await createQuestion(subjectId, examId, { conceptIds: [conceptId], enabled: false });
+
+      const body = (await (await getQuestionList()).json()) as {
+        data: { enabled: boolean }[];
+      };
+      expect(body.data[0].enabled).toBe(false);
+    });
+  });
+
+  describe('the enabled gate on user-facing reads', () => {
+    it('does not serve a disabled question from /adaptive', async () => {
+      const { subjectId, examId, conceptId } = await seedFixture();
+      await seedUser();
+      vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+      await createQuestion(subjectId, examId, { conceptIds: [conceptId], enabled: false });
+
+      const res = await getAdaptive(`?subjectId=${subjectId}&count=1`);
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual([]);
+    });
+
+    it('serves it once enabled', async () => {
+      const { subjectId, examId, conceptId } = await seedFixture();
+      await seedUser();
+      vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+      const q = await createQuestion(subjectId, examId, {
+        conceptIds: [conceptId],
+        enabled: false,
+      });
+
+      expect(await (await getAdaptive(`?subjectId=${subjectId}&count=1`)).json()).toEqual([]);
+
+      await putQuestionEnabled(q.id, { enabled: true });
+      const body = (await (await getAdaptive(`?subjectId=${subjectId}&count=1`)).json()) as {
+        id: number;
+      }[];
+      expect(body.map((d) => d.id)).toEqual([q.id]);
+    });
+
+    it('excludes disabled questions from /count', async () => {
+      const { subjectId, examId, conceptId } = await seedFixture();
+      await createQuestion(subjectId, examId, { conceptIds: [conceptId] });
+      await createQuestion(subjectId, examId, { conceptIds: [conceptId], enabled: false });
+
+      const body = (await (await getQuestionCount(`?subjectId=${subjectId}`)).json()) as {
+        total: number;
+      };
+      expect(body.total).toBe(1);
+    });
+
+    it('keeps a disabled question visible in reply history', async () => {
+      // Disabling is a forward-looking gate, not a retraction -- a user who
+      // already answered a question must keep seeing it in their history.
+      const { subjectId, examId, conceptId } = await seedFixture();
+      const userId = await seedUser();
+      const q = await createQuestion(subjectId, examId, { conceptIds: [conceptId] });
+
+      const db = getDb();
+      const now = new Date();
+      await db.insert(replyTable).values({
+        questionId: q.id,
+        subjectId,
+        userId,
+        repliedAnswer: 'A',
+        score: 1,
+        repliedAt: now,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      await putQuestionEnabled(q.id, { enabled: false });
+
+      vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+      const res = await app.request('/api/reply');
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as {
+        data: { children: { questionId: number }[] }[];
+      };
+      expect(
+        body.data.some((group) => group.children.some((child) => child.questionId === q.id))
+      ).toBe(true);
+    });
+  });
+
+  describe('POST /image', () => {
+    // Nothing in vitest.config.ts resets mocks between cases, so the call
+    // assertions below ("the model was never reached") would otherwise see
+    // calls left over from earlier cases in this block.
+    beforeEach(() => {
+      vi.mocked(generateJsonFromImages).mockReset();
+    });
+
+    it('returns the extracted questions and passes the concept list to the model', async () => {
+      const { subjectId, conceptId } = await seedFixture();
+      vi.mocked(generateJsonFromImages).mockResolvedValue(
+        JSON.stringify([
+          {
+            type: 'SINGLE',
+            content: '<p>1 + 1 = ?</p>',
+            options: 'A|B|C|D',
+            answer: 'B',
+            difficulty: 2,
+            conceptIds: [conceptId],
+          },
+        ])
+      );
+
+      const res = await postQuestionImage({
+        subjectId,
+        images: [{ mimeType: 'image/png', data: PNG_BASE64 }],
+      });
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({
+        subjectId,
+        questions: [
+          {
+            type: 'SINGLE',
+            content: '<p>1 + 1 = ?</p>',
+            options: 'A|B|C|D',
+            answer: 'B',
+            difficulty: 2,
+            conceptIds: [conceptId],
+          },
+        ],
+      });
+
+      // The subject's concepts reach the model as the prompt's
+      // "name=id" form, which is what it picks conceptIds out of.
+      const [, prompt, images, schema] = vi.mocked(generateJsonFromImages).mock.calls[0];
+      expect(prompt).toContain('一道題目');
+      expect(prompt).toContain(`fixture concept=${conceptId}`);
+      expect(prompt).toContain('fixture subject');
+      expect(images).toEqual([{ mimeType: 'image/png', data: PNG_BASE64 }]);
+      // Structured output is what keeps the reply parseable -- a call that
+      // forgot the schema would still pass every other assertion here.
+      expect(schema).toMatchObject({ type: 'array' });
+    });
+
+    it('appends an optional note to the prompt', async () => {
+      const { subjectId } = await seedFixture();
+      vi.mocked(generateJsonFromImages).mockResolvedValue('[]');
+
+      await postQuestionImage({
+        subjectId,
+        images: [{ mimeType: 'image/png', data: PNG_BASE64 }],
+        note: 'the answer is B',
+      });
+
+      const [, prompt] = vi.mocked(generateJsonFromImages).mock.calls[0];
+      expect(prompt).toContain('the answer is B');
+    });
+
+    it('tells the model to merge several crops into one question', async () => {
+      const { subjectId } = await seedFixture();
+      vi.mocked(generateJsonFromImages).mockResolvedValue('[]');
+
+      await postQuestionImage({
+        subjectId,
+        images: [
+          { mimeType: 'image/png', data: PNG_BASE64 },
+          { mimeType: 'image/png', data: PNG_BASE64 },
+        ],
+      });
+
+      // Several crops of one long question being split back into several
+      // questions is the failure that costs the admin a re-run, so the
+      // count and the merge instruction both have to reach the model.
+      const [, prompt] = vi.mocked(generateJsonFromImages).mock.calls[0];
+      expect(prompt).toContain('2');
+      expect(prompt).toContain('同一道題目');
+    });
+
+    it('rejects more than 3 images with 400', async () => {
+      const { subjectId } = await seedFixture();
+
+      const res = await postQuestionImage({
+        subjectId,
+        images: Array.from({ length: 4 }, () => ({
+          mimeType: 'image/png',
+          data: PNG_BASE64,
+        })),
+      });
+      expect(res.status).toBe(400);
+      expect(generateJsonFromImages).not.toHaveBeenCalled();
+    });
+
+    it('drops concept ids that do not belong to the subject', async () => {
+      const { subjectId, conceptId } = await seedFixture();
+      vi.mocked(generateJsonFromImages).mockResolvedValue(
+        JSON.stringify([
+          {
+            type: 'SINGLE',
+            content: '<p>x</p>',
+            options: 'A|B',
+            answer: 'A',
+            difficulty: 5,
+            conceptIds: [conceptId, conceptId + 9999],
+          },
+        ])
+      );
+
+      const res = await postQuestionImage({
+        subjectId,
+        images: [{ mimeType: 'image/png', data: PNG_BASE64 }],
+      });
+      const body = (await res.json()) as { questions: { conceptIds: number[] }[] };
+      expect(body.questions[0].conceptIds).toEqual([conceptId]);
+    });
+
+    it('normalizes away the null options/answer on a GROUP question', async () => {
+      const { subjectId, conceptId } = await seedFixture();
+      vi.mocked(generateJsonFromImages).mockResolvedValue(
+        JSON.stringify([
+          {
+            type: 'GROUP',
+            content: '<p>group stem</p>',
+            options: null,
+            answer: null,
+            difficulty: 5,
+            conceptIds: [conceptId],
+            childQuestions: [
+              {
+                type: 'SINGLE',
+                sortOrder: 0,
+                content: '<p>child</p>',
+                options: 'A|B|C|D',
+                answer: 'A',
+                difficulty: 5,
+              },
+            ],
+          },
+        ])
+      );
+
+      const res = await postQuestionImage({
+        subjectId,
+        images: [{ mimeType: 'image/png', data: PNG_BASE64 }],
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as {
+        questions: { options?: string; answer?: string; childQuestions: unknown[] }[];
+      };
+      expect(body.questions[0].options).toBeUndefined();
+      expect(body.questions[0].answer).toBeUndefined();
+      expect(body.questions[0].childQuestions).toHaveLength(1);
+    });
+
+    it('returns 502 when the model replies with something that is not JSON', async () => {
+      const { subjectId } = await seedFixture();
+      vi.mocked(generateJsonFromImages).mockResolvedValue('sorry, I cannot read this paper');
+
+      const res = await postQuestionImage({
+        subjectId,
+        images: [{ mimeType: 'image/png', data: PNG_BASE64 }],
+      });
+      expect(res.status).toBe(502);
+      expect(await res.json()).toMatchObject({ code: 'AI_INVALID_JSON' });
+    });
+
+    it('returns 502 when the model replies with JSON of the wrong shape', async () => {
+      const { subjectId } = await seedFixture();
+      vi.mocked(generateJsonFromImages).mockResolvedValue(
+        JSON.stringify([{ type: 'ESSAY', content: '<p>essay</p>', difficulty: 5 }])
+      );
+
+      const res = await postQuestionImage({
+        subjectId,
+        images: [{ mimeType: 'image/png', data: PNG_BASE64 }],
+      });
+      expect(res.status).toBe(502);
+      expect(await res.json()).toMatchObject({ code: 'AI_INVALID_SHAPE' });
+    });
+
+    it('returns 404 for an unknown subject without calling the model', async () => {
+      const res = await postQuestionImage({
+        subjectId: 999999,
+        images: [{ mimeType: 'image/png', data: PNG_BASE64 }],
+      });
+      expect(res.status).toBe(404);
+      expect(generateJsonFromImages).not.toHaveBeenCalled();
+    });
+
+    it('returns 400 for a subject with no concepts without calling the model', async () => {
+      const db = getDb();
+      const [{ insertId: subjectId }] = await db
+        .insert(subjectTable)
+        .values({ name: 'conceptless subject', createdAt: new Date() });
+
+      const res = await postQuestionImage({
+        subjectId,
+        images: [{ mimeType: 'image/png', data: PNG_BASE64 }],
+      });
+      expect(res.status).toBe(400);
+      expect(generateJsonFromImages).not.toHaveBeenCalled();
+    });
+
+    it('rejects an empty images array with 400', async () => {
+      const { subjectId } = await seedFixture();
+
+      const res = await postQuestionImage({ subjectId, images: [] });
+      expect(res.status).toBe(400);
+    });
+
+    it('rejects an unsupported mime type with 400', async () => {
+      const { subjectId } = await seedFixture();
+
+      const res = await postQuestionImage({
+        subjectId,
+        images: [{ mimeType: 'image/gif', data: PNG_BASE64 }],
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it('rejects with 401 when there is no valid identity', async () => {
+      vi.mocked(verifyIdToken).mockResolvedValue(null);
+
+      const res = await postQuestionImage({
+        subjectId: 1,
+        images: [{ mimeType: 'image/png', data: PNG_BASE64 }],
+      });
       expect(res.status).toBe(401);
     });
   });

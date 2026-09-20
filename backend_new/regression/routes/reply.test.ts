@@ -131,7 +131,15 @@ const createQuestion = async (
     ],
   });
   const body = (await res.json()) as QuestionDto[][];
-  return body[0][0];
+  const question = body[0][0];
+  // Questions are created disabled (admin review gate) and this suite is
+  // about what happens once a user can actually be served one.
+  await app.request(`/api/question/${question.id}/enabled`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enabled: true }),
+  });
+  return question;
 };
 
 const createGroupQuestion = async (

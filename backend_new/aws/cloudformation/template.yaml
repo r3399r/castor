@@ -95,6 +95,10 @@ Resources:
           DB_POOL_SIZE: '2'
           FIREBASE_ADMIN_KEY: !Sub '{{resolve:ssm:${Project}-firebase-admin-key}}'
           LOGGER_QUEUE_URL: !Sub https://sqs.${AWS::Region}.amazonaws.com/${AWS::AccountId}/polaris-${TargetEnvr}-logger-queue
+          # POST /question/image transcribes an uploaded paper via Gemini.
+          # Same SSM parameter the legacy backend's preview endpoint reads
+          # -- one key, one place to rotate it.
+          GOOGLE_GENAI_API_KEY: !Sub '{{resolve:ssm:${Project}-google-genai-api-key}}'
       Events:
         AnyRoute:
           Type: Api

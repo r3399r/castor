@@ -40,6 +40,7 @@ npm workspaces monorepo (`webapp`, `backend`, `backend_new`, `packages/*`):
 - Do not bypass the middleware chain in `src/app.ts` (`adminAuth` / `requireAdmin` / `transaction` / `requireUser`). New routes go behind the same chain as comparable existing routes.
 - Do not open your own DB connection — use the `db` from the request context (`c.get('db')`) so work stays inside the request transaction.
 - Adding a new Lambda entrypoint means updating `package.json` build scripts *and* `aws/cloudformation/template.yaml`.
+- `POST /question/image` transcribes a screenshot of one question via Gemini (up to 3 crops of the same question per request). Its prompt is `QUESTION.md` at the repo root, mirrored verbatim into `backend_new/src/lib/questionPrompt.ts` because the bundled Lambda has no repo files at runtime — edit both together. Running it locally needs `GOOGLE_GENAI_API_KEY` in `backend_new/.env.local`; the regression suite mocks `src/lib/genai` so it does not.
 - Run `npm run typecheck` and `npm run test:unit` before declaring backend work done; run `npm test` when touching routes or DB access.
 
 ### Frontend

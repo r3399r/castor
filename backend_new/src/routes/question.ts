@@ -19,10 +19,15 @@ import {
   userConceptStatTable,
 } from 'src/db/schema';
 import { enableFacebookEventBridge } from 'src/lib/facebookEventBridge';
+import { generateJsonFromImages } from 'src/lib/genai';
 import { DEFAULT_LIMIT, genPagination, MAX_LIMIT } from 'src/lib/paginator';
+import {
+  buildQuestionExtractPrompt,
+  QUESTION_EXTRACT_INSTRUCTION,
+} from 'src/lib/questionPrompt';
 import { UserEnv } from 'src/middleware/requireUser';
 import { TransactionEnv } from 'src/middleware/transaction';
-import { BadRequestError, NotFoundError } from 'src/model/error';
+import { BadGatewayError, BadRequestError, NotFoundError } from 'src/model/error';
 
 type Db = TransactionEnv['Variables']['db'];
 
@@ -82,6 +87,136 @@ export const questionTagBodySchema = z.object({
 export const questionConceptBodySchema = z.object({
   conceptIds: z.array(z.number().int().positive()).min(1),
 });
+
+export const questionEnabledBodySchema = z.object({
+  enabled: z.boolean(),
+});
+
+// What Gemini accepts as inline image data, minus the video/audio types
+// that make no sense for a question. application/pdf stays in the list
+// because a screenshot pasted into a PDF viewer, or a one-page export of
+// a single question, is the same job as a PNG of it.
+const QUESTION_IMAGE_MIME_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/heic',
+  'image/heif',
+  'application/pdf',
+] as const;
+
+// One upload is one question, but not necessarily one image: a long
+// question is often screenshotted in two or three crops (stem, then
+// options), and the prompt tells the model to merge them. Three is enough
+// for that and far below what would trouble API Gateway's 10MB body cap,
+// which base64's 4/3 inflation would otherwise bring into play. Rejecting
+// oversize here turns an opaque gateway-level 413 into a normal 400.
+const MAX_QUESTION_IMAGES = 3;
+const MAX_QUESTION_IMAGE_BASE64_LENGTH = 2_500_000;
+
+// Browsers hand back either a bare base64 string or a full data URL
+// depending on how the file was read, and both are normalized here
+// rather than pushed onto every caller. Whitespace goes too: base64 from
+// a line-wrapping encoder is still valid input, just not to Gemini.
+const base64ImageSchema = z
+  .string()
+  .min(1)
+  .max(MAX_QUESTION_IMAGE_BASE64_LENGTH)
+  .transform((value) => value.replace(/^data:[^;,]*;base64,/, '').replace(/\s+/g, ''))
+  .refine((value) => value.length > 0 && /^[A-Za-z0-9+/]+={0,2}$/.test(value), {
+    message: 'data must be base64 or a base64 data URL',
+  });
+
+export const questionImageBodySchema = z.object({
+  subjectId: z.number().int().positive(),
+  images: z
+    .array(
+      z.object({
+        mimeType: z.enum(QUESTION_IMAGE_MIME_TYPES),
+        data: base64ImageSchema,
+      })
+    )
+    .min(1)
+    .max(MAX_QUESTION_IMAGES),
+  // Per-question notes the static prompt can't anticipate. Optional.
+  note: z.string().max(1000).optional(),
+});
+
+// The shape the extraction prompt (QUESTION.md) promises back. It is
+// deliberately looser than questionItemSchema above: this endpoint
+// produces a *draft* for an admin to review in the preview page, so a
+// question the model couldn't assign a concept to should still come back
+// for editing rather than sink the whole paper. `.nullish()` throughout
+// because the prompt's GROUP example emits explicit nulls for the fields
+// that don't apply to a group parent.
+const aiChildQuestionSchema = z.object({
+  type: z.enum(['SINGLE', 'MULTIPLE', 'TRUE_FALSE', 'FILL']),
+  sortOrder: z.number().int().min(0),
+  content: z.string().min(1),
+  options: z.string().min(1),
+  answer: z.string().min(1),
+  difficulty: z.number().int().min(1).max(10),
+});
+
+const aiQuestionSchema = z.object({
+  type: z.enum(['GROUP', 'SINGLE', 'MULTIPLE', 'TRUE_FALSE', 'FILL']),
+  content: z.string().min(1),
+  options: z.string().nullish(),
+  answer: z.string().nullish(),
+  difficulty: z.number().int().min(1).max(10),
+  conceptIds: z.array(z.number().int()).nullish(),
+  childQuestions: z.array(aiChildQuestionSchema).nullish(),
+});
+
+// Exported for the unit test -- it's the contract with the model, and
+// the thing most likely to drift when QUESTION.md gets edited.
+export const questionImageAiSchema = z.array(aiQuestionSchema);
+
+// The same contract again, as the JSON Schema handed to the model so it
+// can only *emit* this shape in the first place -- questionImageAiSchema
+// above stays as the check on what actually comes back, since structured
+// output constrains the grammar but the endpoint still shouldn't trust an
+// upstream service blindly. The two are hand-kept in sync; edit together.
+//
+// Written out rather than derived from the zod schema because zod 3 has no
+// JSON Schema export, and the converters' output (with its $schema, $refs
+// and nullable unions) strays outside the subset Gemini's responseJsonSchema
+// accepts. Nullable fields are modelled as simply "not required" here --
+// that subset has no clean nullable, and the zod schema's .nullish()
+// tolerates an explicit null anyway if one slips through.
+const QUESTION_TYPE_ENUM = ['GROUP', 'SINGLE', 'MULTIPLE', 'TRUE_FALSE', 'FILL'];
+const CHILD_QUESTION_TYPE_ENUM = ['SINGLE', 'MULTIPLE', 'TRUE_FALSE', 'FILL'];
+
+export const questionImageResponseJsonSchema = {
+  type: 'array',
+  items: {
+    type: 'object',
+    properties: {
+      type: { type: 'string', enum: QUESTION_TYPE_ENUM },
+      content: { type: 'string' },
+      options: { type: 'string' },
+      answer: { type: 'string' },
+      difficulty: { type: 'integer', minimum: 1, maximum: 10 },
+      conceptIds: { type: 'array', items: { type: 'integer' } },
+      childQuestions: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            type: { type: 'string', enum: CHILD_QUESTION_TYPE_ENUM },
+            sortOrder: { type: 'integer', minimum: 0 },
+            content: { type: 'string' },
+            options: { type: 'string' },
+            answer: { type: 'string' },
+            difficulty: { type: 'integer', minimum: 1, maximum: 10 },
+          },
+          required: ['type', 'sortOrder', 'content', 'options', 'answer', 'difficulty'],
+        },
+      },
+    },
+    required: ['type', 'content', 'difficulty'],
+  },
+};
 
 const QUESTION_SORT_COLUMNS = {
   id: questionTable.id,
@@ -348,6 +483,10 @@ const createOneQuestion = async (
     answer: item.answer ?? null,
     difficulty: item.difficulty,
     adjustedDifficulty: item.difficulty,
+    // Disabled until an admin reviews it -- see PUT /:id/enabled. Set
+    // explicitly rather than left to the column default so the intent is
+    // visible at the only place questions are created.
+    enabled: false,
     createdAt: now,
     updatedAt: now,
   });
@@ -375,6 +514,12 @@ const createOneQuestion = async (
       parentId: questionId,
       fbPostId: null,
       isGroup: false,
+      // Mirrors the parent (which is always false here), and PUT
+      // /:id/enabled keeps them in step afterwards. Nothing filters
+      // children on it -- they're only ever reached through the parent --
+      // but a child row contradicting its parent would be a trap for the
+      // next query written against this table.
+      enabled: false,
       type: child.type,
       sortOrder: child.sortOrder,
       content: child.content,
@@ -424,6 +569,7 @@ export const question = new Hono<UserEnv>()
         answer: questionTable.answer,
         difficulty: questionTable.difficulty,
         isGroup: questionTable.isGroup,
+        enabled: questionTable.enabled,
         childCount: sql<number>`(
           SELECT COUNT(*) FROM question c WHERE c.parent_id = question.id
         )`,
@@ -444,8 +590,15 @@ export const question = new Hono<UserEnv>()
     );
     const db = c.get('db');
 
-    // Same shape as GET / -- top-level questions only.
-    const conditions = [isNull(questionTable.parentId), eq(questionTable.subjectId, subjectId)];
+    // Same shape as GET / -- top-level questions only -- plus the enabled
+    // gate, because this number is what the practice page shows as "how
+    // many questions are available"; counting questions /adaptive would
+    // then refuse to serve would make it lie.
+    const conditions = [
+      isNull(questionTable.parentId),
+      eq(questionTable.enabled, true),
+      eq(questionTable.subjectId, subjectId),
+    ];
 
     // Each filter is resolved to a question-id set first (rather than
     // joining the link tables directly), so a question matching multiple
@@ -660,6 +813,10 @@ export const question = new Hono<UserEnv>()
 
         const baseConditions = [
           isNull(questionTable.parentId),
+          // The review gate. Applied to the candidate queries rather than
+          // to the final selection so a disabled question never displaces
+          // an enabled one it would have outranked on difficulty.
+          eq(questionTable.enabled, true),
           eq(questionTable.subjectId, subjectId),
           inArray(questionTable.id, allowedIds),
         ];
@@ -785,6 +942,83 @@ export const question = new Hono<UserEnv>()
 
     return c.json(results, 201);
   })
+  // Draft-generation, not persistence: takes a screenshot of one question
+  // and hands back the array an admin then reviews (and edits) in the
+  // preview page before POSTing it to / above. Still an array, because a
+  // GROUP plus its children is one element and the result is meant to drop
+  // straight into POST /'s `questions` field. Nothing is written here,
+  // which is why it returns 200 with no ids rather than 201 -- the same
+  // screenshot can be re-run as many times as it takes to get a usable
+  // draft.
+  .post('/image', zValidator('json', questionImageBodySchema), async (c) => {
+    const { subjectId, images, note } = c.req.valid('json');
+    console.log(`POST /api/question/image subjectId=${subjectId} images=${images.length}`);
+    const db = c.get('db');
+
+    const [subject] = await db
+      .select()
+      .from(subjectTable)
+      .where(eq(subjectTable.id, subjectId));
+    if (subject === undefined) throw new NotFoundError(`subject ${subjectId} not found`);
+
+    // Resolved from the DB rather than accepted from the client: the
+    // prompt makes the model pick conceptIds out of this list, so the
+    // same list doubles as the allowlist its answer is filtered against
+    // below.
+    const concepts = await db
+      .select({ id: conceptTable.id, name: conceptTable.name })
+      .from(conceptTable)
+      .innerJoin(conceptGroupTable, eq(conceptGroupTable.id, conceptTable.conceptGroupId))
+      .where(eq(conceptGroupTable.subjectId, subjectId));
+    // The extraction prompt refuses to start without a concept list, so
+    // there's nothing to gain by spending an AI call to find that out.
+    if (concepts.length === 0)
+      throw new BadRequestError(`subject ${subjectId} has no concepts to assign questions to`);
+
+    const raw = await generateJsonFromImages(
+      QUESTION_EXTRACT_INSTRUCTION,
+      buildQuestionExtractPrompt(subject.name, concepts, images.length, note),
+      images,
+      questionImageResponseJsonSchema
+    );
+
+    let payload: unknown;
+    try {
+      payload = JSON.parse(raw);
+    } catch {
+      // Truncated: the opening of a malformed reply is enough to
+      // diagnose it, and the rest is unbounded model output.
+      console.error('AI response was not valid JSON', raw.slice(0, 1000));
+      throw new BadGatewayError('AI response was not valid JSON', 'AI_INVALID_JSON');
+    }
+
+    const parsed = questionImageAiSchema.safeParse(payload);
+    if (!parsed.success) {
+      console.error('AI response did not match the question schema', parsed.error.issues);
+      throw new BadGatewayError(
+        'AI response did not match the expected question format',
+        'AI_INVALID_SHAPE'
+      );
+    }
+
+    // Hallucinated concept ids are dropped rather than rejected -- the
+    // admin re-picks concepts in the preview page anyway, so a bad id is
+    // not worth failing an otherwise good transcription over. Nulls are
+    // flattened to undefined here so the result can be handed straight to
+    // POST / as its `questions` array.
+    const validConceptIds = new Set(concepts.map((concept) => concept.id));
+    const questions = parsed.data.map((item) => ({
+      type: item.type,
+      content: item.content,
+      options: item.options ?? undefined,
+      answer: item.answer ?? undefined,
+      difficulty: item.difficulty,
+      conceptIds: (item.conceptIds ?? []).filter((id) => validConceptIds.has(id)),
+      childQuestions: item.childQuestions ?? undefined,
+    }));
+
+    return c.json({ subjectId, questions });
+  })
   .put('/:id', zValidator('json', questionUpdateBodySchema), async (c) => {
     const db = c.get('db');
     const id = Number(c.req.param('id'));
@@ -862,6 +1096,42 @@ export const question = new Hono<UserEnv>()
       .where(eq(questionTagTable.questionId, id));
 
     return c.json({ tagIds: links.map((l) => l.tagId) });
+  })
+  // Its own endpoint rather than a field on PUT /:id, for the same reason
+  // tag/concept have theirs: the admin list toggles this on a row without
+  // having the rest of the question loaded to send back.
+  .put('/:id/enabled', zValidator('json', questionEnabledBodySchema), async (c) => {
+    const db = c.get('db');
+    const id = Number(c.req.param('id'));
+    const { enabled } = c.req.valid('json');
+    console.log(`PUT /api/question/${id}/enabled enabled=${enabled}`);
+
+    const [found] = await db.select().from(questionTable).where(eq(questionTable.id, id));
+    if (found === undefined) throw new NotFoundError(`question ${id} not found`);
+    // A child is only ever reached through its parent, so toggling one on
+    // its own would have no effect a user could see -- better to say so
+    // than to accept the write and appear to have done something.
+    if (found.parentId !== null)
+      throw new BadRequestError('a child question follows its parent; enable the group instead');
+
+    const now = new Date();
+    await db
+      .update(questionTable)
+      .set({ enabled, updatedAt: now })
+      .where(eq(questionTable.id, id));
+    // Keeps a group's children from contradicting it (see createOneQuestion).
+    await db
+      .update(questionTable)
+      .set({ enabled, updatedAt: now })
+      .where(eq(questionTable.parentId, id));
+
+    // The auto-post rule disarms itself when it runs out of postable
+    // questions, and since questions are now created disabled, creation
+    // alone no longer gives it anything to do -- enabling is the moment
+    // that does. Best-effort, same as in POST /.
+    if (enabled) await enableFacebookEventBridge();
+
+    return c.json({ id, enabled });
   })
   .put('/:id/tag', zValidator('json', questionTagBodySchema), async (c) => {
     const db = c.get('db');

@@ -166,6 +166,12 @@ export const questionTable = mysqlTable('question', {
   ),
   fbPostId: varchar('fb_post_id', { length: 255 }),
   isGroup: boolean('is_group').notNull().default(false),
+  // Admin review gate -- see db/table/question.sql. Created false; only
+  // question/adaptive, question/count and the Facebook auto-poster filter
+  // on it, and only on top-level rows. Reply history and wrong-question
+  // review deliberately do not: a question disabled after the fact must
+  // not erase what a user already answered.
+  enabled: boolean('enabled').notNull().default(false),
   type: varchar('type', { length: 255 }).notNull(),
   sortOrder: int('sort_order'),
   content: text('content'),

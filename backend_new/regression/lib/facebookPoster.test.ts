@@ -78,7 +78,7 @@ const seedFixture = async () => {
 
 const insertQuestion = async (
   subjectId: number,
-  overrides: Partial<{ content: string | null; fbPostId: string | null; parentId: number | null; sortOrder: number | null }> = {}
+  overrides: Partial<{ content: string | null; fbPostId: string | null; parentId: number | null; sortOrder: number | null; enabled: boolean }> = {}
 ) => {
   const db = getDb();
   const now = new Date();
@@ -88,6 +88,10 @@ const insertQuestion = async (
     parentId: overrides.parentId ?? null,
     fbPostId: overrides.fbPostId ?? null,
     isGroup: false,
+    // The poster only picks up enabled questions (they are created
+    // disabled and wait for an admin review); these tests are about what
+    // it does once a question is postable, so default to enabled.
+    enabled: overrides.enabled ?? true,
     type: 'SINGLE',
     sortOrder: overrides.sortOrder ?? null,
     content: overrides.content === undefined ? 'question content' : overrides.content,
@@ -195,6 +199,35 @@ describe('facebookPoster', () => {
 
       const [updated] = await getDb().select().from(questionTable).where(eq(questionTable.id, validId));
       expect(updated.fbPostId).toBe('p_2');
+    });
+
+    it('never posts a disabled question, picking the next enabled one instead', async () => {
+      // The page is public, so a question that has not passed admin review
+      // must not be auto-posted -- and since questions are created
+      // disabled, this is the common case, not an edge one.
+      const { subjectId } = await seedFixture();
+      await insertQuestion(subjectId, { content: '<p>unreviewed</p>', enabled: false });
+      const enabledId = await insertQuestion(subjectId, { content: '<p>reviewed</p>' });
+
+      vi.mocked(htmlToS3Url).mockResolvedValue({ url: 'https://s3.example.com/img.png', key: 'k' });
+      vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ post_id: 'p_3' }), { status: 200 }));
+
+      await processNextQuestion(getDb());
+
+      const [posted] = await getDb().select().from(questionTable).where(eq(questionTable.id, enabledId));
+      expect(posted.fbPostId).toBe('p_3');
+    });
+
+    it('disables the rule when every remaining question is disabled', async () => {
+      const { subjectId } = await seedFixture();
+      await insertQuestion(subjectId, { content: '<p>unreviewed</p>', enabled: false });
+
+      await processNextQuestion(getDb());
+
+      expect(sendMock.mock.calls[0][0]).toMatchObject({
+        __command: 'DisableRuleCommand',
+      });
+      expect(htmlToS3Url).not.toHaveBeenCalled();
     });
 
     it("never independently posts a GROUP question's child", async () => {

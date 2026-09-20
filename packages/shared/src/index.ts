@@ -73,6 +73,11 @@ export type Question = {
   parentId: number | null;
   fbPostId: string | null;
   isGroup: boolean;
+  // Admin review gate: false until an admin enables the question. Users
+  // only ever receive enabled questions from /question/adaptive, so this
+  // is effectively always true on anything the practice UI sees -- it
+  // matters on the admin list, which shows both.
+  enabled: boolean;
   type: 'GROUP' | 'SINGLE' | 'MULTIPLE' | 'TRUE_FALSE' | 'FILL';
   sortOrder: number | null;
   content: string | null;

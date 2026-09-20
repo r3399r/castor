@@ -18,6 +18,7 @@ type QuestionRow = {
   answer: string | null
   difficulty: number
   isGroup: boolean
+  enabled: boolean
   childCount: number
 }
 
@@ -70,6 +71,7 @@ export default function QuestionClient() {
   const [editError, setEditError] = useState<string | null>(null)
 
   const [deletingId, setDeletingId] = useState<number | null>(null)
+  const [togglingId, setTogglingId] = useState<number | null>(null)
 
   const load = async (
     targetPage: number,
@@ -159,6 +161,27 @@ export default function QuestionClient() {
     }
   }
 
+  const handleToggleEnabled = async (row: QuestionRow) => {
+    const next = !row.enabled
+    if (next && !confirm('確定這題沒問題，要開放給使用者練習嗎？')) return
+
+    setTogglingId(row.id)
+    // Optimistic: the list is re-fetched on failure anyway, and waiting a
+    // round trip to tick a checkbox makes reviewing a page of questions
+    // feel broken.
+    setQuestions((rows) =>
+      (rows ?? []).map((r) => (r.id === row.id ? { ...r, enabled: next } : r))
+    )
+    try {
+      await apiPut(`question/${row.id}/enabled`, { enabled: next })
+    } catch {
+      alert(next ? '啟用失敗，請稍後再試。' : '停用失敗，請稍後再試。')
+      await load(page, sortColumn, sortDirection)
+    } finally {
+      setTogglingId(null)
+    }
+  }
+
   const handleDelete = async (id: number) => {
     if (!confirm('確定要刪除這個題目嗎？若為題組，子題也會一併刪除。')) return
 
@@ -201,7 +224,8 @@ export default function QuestionClient() {
     <div className="pb-[70px]">
       <h1 className="mt-[60px] mb-6 text-3xl font-bold text-blue-700">題目管理</h1>
       <p className="mb-6 text-sm text-black-500">
-        題目透過「新增題目」流程建立，此頁面僅供檢視、編輯與刪除。
+        題目透過「新增題目」流程建立，此頁面僅供檢視、編輯與刪除。新建立的題目預設為停用，
+        按下綠色的「啟用」後使用者才會練習到該題；顯示「停用」的題目則代表目前已啟用。
       </p>
 
       <div className="mt-4 overflow-x-auto rounded-lg border border-brown-300 bg-white/40">
@@ -388,20 +412,38 @@ export default function QuestionClient() {
                       <td className="px-4 py-3 text-black-700">{contentSnippet(row.content)}</td>
                       <td className="px-4 py-3 text-black-500">{row.difficulty}</td>
                       <td className="px-4 py-3">
-                        <div className="flex justify-end gap-2">
+                        <div className="flex justify-end gap-2 whitespace-nowrap">
+                          {/* Doubles as the status indicator, which is why
+                              there is no separate 狀態 column: a row offering
+                              「啟用」 is currently disabled, one offering
+                              「停用」 is live. The disabled case is filled
+                              rather than outlined so a page of unreviewed
+                              questions is scannable at a glance. */}
+                          <button
+                            onClick={() => handleToggleEnabled(row)}
+                            disabled={togglingId === row.id}
+                            title={row.enabled ? '目前已啟用，點擊停用' : '目前停用中，點擊啟用'}
+                            className={`rounded-md border px-3 py-1.5 text-xs transition disabled:opacity-50 ${
+                              row.enabled
+                                ? 'border-brown-300 text-black-700 hover:bg-beige-200'
+                                : 'border-green-700 bg-green-700 font-medium text-white hover:bg-green-800'
+                            }`}
+                          >
+                            {togglingId === row.id ? '…' : row.enabled ? '停用' : '啟用'}
+                          </button>
                           <button
                             onClick={() => startEdit(row)}
                             disabled={loadingEditId === row.id}
                             className="rounded-md border border-brown-300 px-3 py-1.5 text-xs text-black-700 transition hover:bg-beige-200 disabled:opacity-50"
                           >
-                            {loadingEditId === row.id ? '載入中…' : '編輯'}
+                            {loadingEditId === row.id ? '…' : '編輯'}
                           </button>
                           <button
                             onClick={() => handleDelete(row.id)}
                             disabled={deletingId === row.id}
                             className="rounded-md border border-red-200 px-3 py-1.5 text-xs text-red-600 transition hover:bg-red-50 disabled:opacity-50"
                           >
-                            {deletingId === row.id ? '刪除中…' : '刪除'}
+                            {deletingId === row.id ? '…' : '刪除'}
                           </button>
                         </div>
                       </td>

@@ -3,6 +3,10 @@ import {
   questionAdaptiveQuerySchema,
   questionBodySchema,
   questionConceptBodySchema,
+  questionEnabledBodySchema,
+  questionImageAiSchema,
+  questionImageBodySchema,
+  questionImageResponseJsonSchema,
   questionTagBodySchema,
   questionUpdateBodySchema,
 } from 'src/routes/question';
@@ -233,5 +237,270 @@ describe('questionAdaptiveQuerySchema', () => {
       tagIds: '5,6',
     });
     expect(result.success).toBe(true);
+  });
+});
+
+const PNG_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAAAAAA6fptVAAAACklEQVR4nGMAAQAABQAB';
+
+const validImageBody = {
+  subjectId: 1,
+  images: [{ mimeType: 'image/png', data: PNG_BASE64 }],
+};
+
+describe('questionImageBodySchema', () => {
+  it('accepts a minimal valid body with one image', () => {
+    expect(questionImageBodySchema.safeParse(validImageBody).success).toBe(true);
+  });
+
+  it('accepts an optional note', () => {
+    const result = questionImageBodySchema.safeParse({ ...validImageBody, note: '答案在最後一頁' });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts application/pdf as a mime type', () => {
+    const result = questionImageBodySchema.safeParse({
+      ...validImageBody,
+      images: [{ mimeType: 'application/pdf', data: PNG_BASE64 }],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('strips a data URL prefix off the base64 payload', () => {
+    const result = questionImageBodySchema.safeParse({
+      ...validImageBody,
+      images: [{ mimeType: 'image/png', data: `data:image/png;base64,${PNG_BASE64}` }],
+    });
+    expect(result.success && result.data.images[0].data).toBe(PNG_BASE64);
+  });
+
+  it('strips whitespace out of line-wrapped base64', () => {
+    const wrapped = `${PNG_BASE64.slice(0, 20)}\n${PNG_BASE64.slice(20)}`;
+    const result = questionImageBodySchema.safeParse({
+      ...validImageBody,
+      images: [{ mimeType: 'image/png', data: wrapped }],
+    });
+    expect(result.success && result.data.images[0].data).toBe(PNG_BASE64);
+  });
+
+  it('rejects an unsupported mime type', () => {
+    const result = questionImageBodySchema.safeParse({
+      ...validImageBody,
+      images: [{ mimeType: 'image/gif', data: PNG_BASE64 }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a payload that is not base64', () => {
+    const result = questionImageBodySchema.safeParse({
+      ...validImageBody,
+      images: [{ mimeType: 'image/png', data: 'not base64!!' }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects an empty images array', () => {
+    expect(questionImageBodySchema.safeParse({ ...validImageBody, images: [] }).success).toBe(false);
+  });
+
+  it('accepts up to 3 images, for a question screenshotted in several crops', () => {
+    const result = questionImageBodySchema.safeParse({
+      ...validImageBody,
+      images: Array.from({ length: 3 }, () => ({ mimeType: 'image/png', data: PNG_BASE64 })),
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects more than 3 images', () => {
+    const result = questionImageBodySchema.safeParse({
+      ...validImageBody,
+      images: Array.from({ length: 4 }, () => ({ mimeType: 'image/png', data: PNG_BASE64 })),
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a missing subjectId', () => {
+    expect(questionImageBodySchema.safeParse({ images: validImageBody.images }).success).toBe(false);
+  });
+});
+
+describe('questionImageAiSchema', () => {
+  it('accepts the flat question shape QUESTION.md specifies', () => {
+    const result = questionImageAiSchema.safeParse([
+      {
+        type: 'SINGLE',
+        content: '<p>1 + 1 = ?</p>',
+        options: 'A|B|C|D',
+        answer: 'B',
+        difficulty: 2,
+        conceptIds: [1],
+      },
+    ]);
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts the GROUP shape, whose options/answer are explicit nulls', () => {
+    const result = questionImageAiSchema.safeParse([
+      {
+        type: 'GROUP',
+        content: '<p>閱讀下文</p>',
+        options: null,
+        answer: null,
+        difficulty: 5,
+        conceptIds: [],
+        childQuestions: [
+          {
+            type: 'SINGLE',
+            sortOrder: 0,
+            content: '<p>子題</p>',
+            options: 'A|B|C|D',
+            answer: 'A',
+            difficulty: 5,
+          },
+        ],
+      },
+    ]);
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts a question with conceptIds omitted entirely', () => {
+    const result = questionImageAiSchema.safeParse([
+      { type: 'FILL', content: '<p>填空</p>', options: '1|2|3', answer: '301', difficulty: 8 },
+    ]);
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts an empty array (a paper with nothing recognizable on it)', () => {
+    expect(questionImageAiSchema.safeParse([]).success).toBe(true);
+  });
+
+  it('rejects an object instead of an array', () => {
+    expect(questionImageAiSchema.safeParse({ type: 'SINGLE' }).success).toBe(false);
+  });
+
+  it('rejects an unknown question type', () => {
+    const result = questionImageAiSchema.safeParse([
+      { type: 'ESSAY', content: '<p>申論</p>', difficulty: 5 },
+    ]);
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a difficulty outside 1-10', () => {
+    const result = questionImageAiSchema.safeParse([
+      { type: 'SINGLE', content: '<p>x</p>', options: 'A|B', answer: 'A', difficulty: 11 },
+    ]);
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects empty content', () => {
+    const result = questionImageAiSchema.safeParse([
+      { type: 'SINGLE', content: '', options: 'A|B', answer: 'A', difficulty: 5 },
+    ]);
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a child question missing sortOrder', () => {
+    const result = questionImageAiSchema.safeParse([
+      {
+        type: 'GROUP',
+        content: '<p>題組</p>',
+        difficulty: 5,
+        childQuestions: [
+          { type: 'SINGLE', content: '<p>子題</p>', options: 'A|B', answer: 'A', difficulty: 5 },
+        ],
+      },
+    ]);
+    expect(result.success).toBe(false);
+  });
+});
+
+// The JSON Schema handed to the model and the zod schema that checks its
+// reply are two hand-written copies of one contract. These assert they
+// still agree, so editing one without the other fails here rather than in
+// production as an AI_INVALID_SHAPE 502.
+describe('questionImageResponseJsonSchema', () => {
+  const itemSchema = questionImageResponseJsonSchema.items;
+  const childSchema = itemSchema.properties.childQuestions.items;
+
+  const minimalFromRequired = (type: string) => ({
+    type,
+    content: '<p>x</p>',
+    difficulty: 5,
+  });
+
+  it('accepts under zod every question type the JSON schema allows', () => {
+    for (const type of itemSchema.properties.type.enum) {
+      const result = questionImageAiSchema.safeParse([minimalFromRequired(type)]);
+      expect(result.success, `type ${type}`).toBe(true);
+    }
+  });
+
+  it('agrees with zod on the child question types', () => {
+    for (const type of childSchema.properties.type.enum) {
+      const result = questionImageAiSchema.safeParse([
+        {
+          ...minimalFromRequired('GROUP'),
+          childQuestions: [
+            {
+              type,
+              sortOrder: 0,
+              content: '<p>child</p>',
+              options: 'A|B',
+              answer: 'A',
+              difficulty: 5,
+            },
+          ],
+        },
+      ]);
+      expect(result.success, `child type ${type}`).toBe(true);
+    }
+  });
+
+  it('marks exactly the fields zod requires as required', () => {
+    // Everything else is optional in zod (.nullish() or omitted), so the
+    // model is free to leave it out.
+    expect(itemSchema.required).toEqual(['type', 'content', 'difficulty']);
+    expect(childSchema.required).toEqual([
+      'type',
+      'sortOrder',
+      'content',
+      'options',
+      'answer',
+      'difficulty',
+    ]);
+  });
+
+  it('agrees with zod on the difficulty bounds', () => {
+    const { minimum, maximum } = itemSchema.properties.difficulty;
+    expect(questionImageAiSchema.safeParse([{ ...minimalFromRequired('SINGLE'), difficulty: minimum }]).success).toBe(true);
+    expect(questionImageAiSchema.safeParse([{ ...minimalFromRequired('SINGLE'), difficulty: maximum }]).success).toBe(true);
+    expect(questionImageAiSchema.safeParse([{ ...minimalFromRequired('SINGLE'), difficulty: minimum - 1 }]).success).toBe(false);
+    expect(questionImageAiSchema.safeParse([{ ...minimalFromRequired('SINGLE'), difficulty: maximum + 1 }]).success).toBe(false);
+  });
+
+  it('stays inside the subset of JSON Schema that responseJsonSchema supports', () => {
+    // $ref/$defs/nullable unions are the usual output of a zod converter
+    // and the usual cause of a rejected request -- assert the hand-written
+    // schema never grows them.
+    const serialized = JSON.stringify(questionImageResponseJsonSchema);
+    for (const unsupported of ['$schema', '$ref', '$defs', 'nullable', 'allOf', 'not']) {
+      expect(serialized, unsupported).not.toContain(unsupported);
+    }
+  });
+});
+
+describe('questionEnabledBodySchema', () => {
+  it('accepts enabled true and false', () => {
+    expect(questionEnabledBodySchema.safeParse({ enabled: true }).success).toBe(true);
+    expect(questionEnabledBodySchema.safeParse({ enabled: false }).success).toBe(true);
+  });
+
+  it('rejects a missing enabled', () => {
+    expect(questionEnabledBodySchema.safeParse({}).success).toBe(false);
+  });
+
+  it('rejects a non-boolean enabled, including the strings a form might send', () => {
+    for (const enabled of ['true', 'false', 1, 0, null]) {
+      expect(questionEnabledBodySchema.safeParse({ enabled }).success, String(enabled)).toBe(false);
+    }
   });
 });

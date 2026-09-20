@@ -5,6 +5,12 @@ CREATE TABLE IF NOT EXISTS castor.question (
     parent_id INT UNSIGNED NULL,
     fb_post_id VARCHAR(255) NULL,
     is_group TINYINT NOT NULL DEFAULT 0,
+    -- Admin review gate: questions are created disabled and only reach
+    -- users (question/adaptive, question/count, the Facebook auto-poster)
+    -- once an admin has checked them and flipped this on. A group's
+    -- children carry the same value as their parent, but only the parent
+    -- is ever filtered on -- children are reached through it.
+    enabled TINYINT NOT NULL DEFAULT 0,
     type VARCHAR(255) NOT NULL, -- GROUP, SINGLE, MULTIPLE, TRUE_FALSE, FILL
     sort_order INT NULL, -- for GROUP
     content TEXT NULL,
