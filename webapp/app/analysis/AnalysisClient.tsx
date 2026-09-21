@@ -43,11 +43,13 @@ function cutoffDate(days: number): string {
 function StatCard({
   label,
   value,
+  unit,
   sub,
   tone = 'blue',
 }: {
   label: string
   value: string | number
+  unit: string
   sub?: string
   tone?: 'blue' | 'orange' | 'green'
 }) {
@@ -56,22 +58,16 @@ function StatCard({
     orange: styles.summaryClay,
     green: styles.summarySage,
   }[tone]
-  const percentValue = typeof value === 'string' && value.endsWith('%')
-
   return (
     <div className={`${styles.summaryCard} ${toneClass}`}>
-      <span className={styles.summaryLabel}>{label}</span>
-      <span className={styles.summaryValue}>
-        {percentValue ? (
-          <>
-            {value.slice(0, -1)}
-            <span className={styles.summaryUnit}>%</span>
-          </>
-        ) : (
-          value
-        )}
-      </span>
-      {sub && <span className={styles.summarySub}>{sub}</span>}
+      <div className={styles.summaryHeading}>
+        <span className={styles.summaryLabel}>{label}</span>
+      </div>
+      <div className={styles.summaryValueRow}>
+        <span className={styles.summaryValue}>{value}</span>
+        <span className={styles.summaryUnit}>{unit}</span>
+      </div>
+      <span className={styles.summarySub} aria-hidden={!sub}>{sub ?? ''}</span>
     </div>
   )
 }
@@ -459,14 +455,15 @@ export default function AnalysisClient() {
               <AnalysisHeaderLandscape />
             </div>
             <div className={styles.summaryGrid}>
-              <StatCard label="總刷題數" value={history.totalAttempts} sub="題" tone="blue" />
+              <StatCard label="總刷題數" value={history.totalAttempts} unit="題" tone="blue" />
               <StatCard
                 label="總得分率"
-                value={`${Math.round(history.overallAccuracy)}%`}
+                value={Math.round(history.overallAccuracy)}
+                unit="%"
                 sub="平均正確率"
                 tone="orange"
               />
-              <StatCard label="連續天數" value={history.streakDays} sub="天" tone="green" />
+              <StatCard label="連續天數" value={history.streakDays} unit="天" tone="green" />
             </div>
           </section>
           <HistorySection history={history} />
