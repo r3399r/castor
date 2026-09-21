@@ -152,6 +152,17 @@
   .site-header__content > div button {
     padding-inline: 12px;
   }
+  .site-header__content > div button.site-header__menu-toggle {
+    width: 32px;
+    height: 32px;
+    flex: 0 0 32px;
+    padding: 0;
+  }
+  .site-header__menu-toggle svg {
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+  }
 }
 
 .spirit-theme {
