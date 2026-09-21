@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { apiFetch, apiPost } from '@/lib/api'
 import MultiSelectField from '@/components/MultiSelectField'
+import QuestionImageUpload from '@/components/QuestionImageUpload'
+import { takeQuestionDraft } from '@/lib/questionDraft'
 import { MathJax } from 'better-react-mathjax'
 
 type SubjectDetail = {
@@ -195,6 +197,11 @@ export default function SubjectNewQuestionClient() {
       .then(setSubject)
       .catch(() => setError('無法載入科目資料。'))
       .finally(() => setLoading(false))
+
+    // Picks up a draft recognised on the question management page. Reading
+    // it consumes it, so a refresh won't clobber edits made since.
+    const draft = takeQuestionDraft(subjectId)
+    if (draft !== null) setQuestionsInput(draft)
   }, [subjectId])
 
   if (loading) {
@@ -291,6 +298,21 @@ export default function SubjectNewQuestionClient() {
           )}
         </div>
       </div>
+
+      <hr className="my-6 border-brown-300" />
+
+      {/* Fills the textarea below rather than submitting on its own: the
+          model produces a draft, and the existing preview/validation/tag
+          pickers are exactly the review step that draft needs before it
+          becomes a question. */}
+      <QuestionImageUpload
+        subjectId={subject.id}
+        onQuestions={(json) => {
+          setQuestionsInput(json)
+          setSubmitStatus({})
+          setBatchError(null)
+        }}
+      />
 
       <hr className="my-6 border-brown-300" />
 

@@ -2,6 +2,9 @@ import { auth } from '@/lib/firebase'
 import { version } from '../package.json'
 
 const LIMIT = 20
+// Mirrors backend_new's paginator MAX_LIMIT -- for the handful of places
+// that need a whole list (a picker), not a page of one.
+const MAX_LIMIT = 1000
 
 type Params = Record<string, string | number | undefined>
 
@@ -69,4 +72,4 @@ async function apiDelete<T = void>(path: string, token?: string): Promise<T> {
   return request<T>(`/api/${path}`, { method: 'DELETE' }, token)
 }
 
-export { apiFetch, apiPost, apiPut, apiDelete, LIMIT }
+export { apiFetch, apiPost, apiPut, apiDelete, LIMIT, MAX_LIMIT }
