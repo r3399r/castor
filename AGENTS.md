@@ -51,6 +51,100 @@ npm workspaces monorepo (`webapp`, `backend`, `backend_new`, `packages/*`):
 - Keep response types in `webapp/types/api.ts` (or `packages/shared`) in step with backend changes.
 - The webapp is exported as a static site and synced to S3 — do not add server-only Next.js features (route handlers, SSR-only APIs, middleware) without flagging it.
 
+#### UI design system and current redesign state
+
+The forest-themed UI redesign is merged into `dev`. It currently covers the shared header and foundations, the gift box page at `/box`, and the learning analysis page at `/analysis`. The home page, smart practice page at `/adaptive`, and answer history page at `/reply` also use the aligned shared header without the old outer page frame or 10px viewport margin.
+
+Keep UI-only work frontend-only unless the task explicitly requires otherwise. Do not change APIs, backend calculations, authentication, permissions, routes, question data, statistics logic, or existing interactions while refining visual presentation.
+
+**Visual direction**
+
+- The product is a mature learning experience set in a warm fantasy world where learning energy nurtures spirits.
+- Use deep teal forest tones, glassy blue-green, leaf green, warm gold, cream, and restrained coral accents.
+- Illustration style is flat acrylic or opaque gouache, based on the existing deer and bird artwork.
+- Keep question, answer, form, table, chart, and dense data areas clean and comfortable for long reading sessions.
+- Avoid childish game styling, generic high-saturation SaaS dashboards, dense decoration behind text, cold heavy shadows, and pasted-on illustrations.
+- Decorative visual layers must remain subtle, use `pointer-events: none`, and stay below interactive content.
+
+**Shared files and components**
+
+- Design tokens: `webapp/styles/tokens.css`
+- Shared header and spirit UI styles: `webapp/styles/spirit.css`
+- `/box` layout and hero styles: `webapp/styles/box-hero.css`
+- `/analysis` page-specific styles: `webapp/app/analysis/analysis.module.css`
+- Shared UI components: `webapp/components/ui/index.tsx`
+- Shared spirit components: `webapp/components/spirit/index.tsx`
+- Spirit catalog and artwork lookup: `webapp/lib/guardianArtwork.ts`
+
+Reuse these foundations instead of duplicating colors, spacing, radii, surfaces, and interaction states. If a shared component needs page-specific treatment, add an explicit page class or variant rather than changing every consumer.
+
+**Shared header**
+
+- The standard header uses a solid deep-teal background, the low-contrast `header-pencil-hatching-02.webp` texture, a warm-cream logo, gold active state, gold avatar border, and pathname-based navigation state.
+- Standard header content aligns to the same `1120px` maximum-width container used by page content, with responsive horizontal insets of 16px, 40px, and 70px.
+- Header heights are approximately 80px desktop, 70px tablet, and 62px mobile.
+- The mobile menu icon remains 32px square; do not let general button padding shrink its SVG.
+- `/box` is the exception: its header is transparent and absolutely positioned over the hero, but its height and logo/menu alignment must remain consistent with the standard header.
+- Preserve keyboard `focus-visible` styling separately from the active navigation underline.
+
+**Gift box page (`/box`)**
+
+- The hero uses `/images/spirit-garden-hero.webp` with `cover` and `center bottom`, preserving the lower vine, leaves, eggs, and flowers.
+- The page background transitions from deep teal into a warm cream tone.
+- The points display is a compact parchment-style plaque with independent vine decorations.
+- The three tabs are independent dark-teal capsules with accessible tab semantics and responsive sizing.
+- The cultivation view is one connected panel: dark forest spirit display on the left and warm cream controls on the right, stacked on mobile.
+- The growth summary shows LV1-LV5. Future stages use the shared locked egg and must not load unreleased character artwork.
+- The collection and store always display all seven public-interest categories. Redeemed or in-progress categories sort first; locked categories remain visible afterward.
+- The public-support panel explains that completing LV5 triggers a platform contribution and highlights `NT$10`; do not implement or change contribution logic as part of UI work.
+
+**Learning analysis page (`/analysis`)**
+
+- The page uses one continuous low-saturation vertical background gradient from warm cream through sage and misty blue-green to muted lavender. Do not restart the gradient per section.
+- Its title/summary scene, cards, chart styles, and RWD rules are page-scoped in `analysis.module.css`; do not leak them into other routes.
+- The landscape element currently points to `/images/learning-history-header-landscape-05.webp` but is intentionally hidden with `opacity: 0` pending further art-direction work. Do not re-enable or replace it without an explicit request.
+- The three summary cards retain real values and calculations. They use 180px desktop, 170px tablet, and 155px mobile heights; mobile stacks them in one column.
+- Summary card values and units stay on one baseline. Cards retain subtle borders, 12px radii, and no shadows.
+- Large chart/data cards retain their own 16px radii and subtle borders. Do not change chart types, content order, filters, or data behavior during visual-only work.
+
+**Spirit categories**
+
+| Public-interest category | Spirit | Artwork status | Store egg name |
+| --- | --- | --- | --- |
+| 兒少、家庭與婦幼 | 貓 | Pending | 暖陽之蛋 |
+| 身心障礙與神經發展 | 水獺 | Pending | 星光之蛋 |
+| 高齡長照與失智照護 | 狗 | Pending | 長青之蛋 |
+| 疾病醫療、心理與善終 | 兔子 | Pending | 療癒之蛋 |
+| 人權、法治、性別與社區 | 海豚 | Pending | 共鳴之蛋 |
+| 教育翻轉、人文與藝術 | 鳥 | LV1-LV5 available | 智慧之蛋 |
+| 生態環境與動物福利 | 鹿 | LV1-LV5 available | 森林之蛋 |
+
+Until the other five artwork sets exist, their store and locked collection states use the shared egg asset rather than substitute character artwork. Keep spirit artwork data-driven; do not hard-code the UI to deer or bird.
+
+**Image asset policy**
+
+- Runtime raster images in `webapp/public/` use WebP and application code must reference the `.webp` paths.
+- Original PNG sources for runtime assets live outside the public web root under `webapp/source-assets/png/`, preserving their relative directory structure.
+- Do not reference `webapp/source-assets/` from browser code; it is not publicly served.
+- Only commit original PNGs that correspond to assets actually used by the application. Do not commit unused PNG or generated WebP variants unless requested.
+- Current guardian artwork is under `webapp/public/illustrations/guardians/{bird,deer}/lv1.webp` through `lv5.webp`.
+- Shared runtime assets include `/images/locked-egg.webp`, `/images/points-vine-top-left.webp`, `/images/points-vine-bottom-right.webp`, and `/images/spirit-garden-mobile-leaves.webp`.
+
+**Responsive and accessibility requirements**
+
+- Verify desktop, tablet, and mobile layouts without horizontal scrolling, image distortion, clipped text, overlap, or blocked controls.
+- Keep visible keyboard focus, ARIA tab semantics, pathname-based active navigation, and full clickable control areas.
+- Support `prefers-reduced-motion` for optional movement.
+- Locked eggs use `object-fit: contain` and never reveal future character images.
+- For scoped UI changes, run:
+
+```bash
+node_modules/.bin/tsc -p webapp/tsconfig.json --noEmit --incremental false
+git diff --check
+```
+
+The configured frontend lint command is not currently a reliable validation signal. Do not claim full lint success unless the setup is repaired and runs non-interactively.
+
 ### Mobile
 
 - `mobile/` is Flutter. Do not edit generated platform scaffolding under `mobile/android/` or `mobile/ios/` unless the task is specifically about native config.
