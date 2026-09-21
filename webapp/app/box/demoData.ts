@@ -35,34 +35,98 @@ export const demoStates = [
 ] as const
 
 export const storeEggs = [
-  { id: 'forest', name: '森林之蛋', theme: '森林保育', cost: 20, owned: true },
-  { id: 'ocean', name: '海洋之蛋', theme: '海洋保育', cost: 30, owned: true },
-  { id: 'animal', name: '毛孩之蛋', theme: '動物救援', cost: 35, owned: false },
   {
-    id: 'warmth',
-    name: '暖光之蛋',
-    theme: '無家者援助',
+    id: 'children',
+    name: '暖陽之蛋',
+    theme: '兒少、家庭與婦幼',
+    cost: 20,
+    owned: false,
+  },
+  {
+    id: 'neurodevelopment',
+    name: '星光之蛋',
+    theme: '身心障礙與神經發展',
+    cost: 25,
+    owned: false,
+  },
+  {
+    id: 'eldercare',
+    name: '長青之蛋',
+    theme: '高齡長照與失智照護',
+    cost: 30,
+    owned: false,
+  },
+  {
+    id: 'healthcare',
+    name: '療癒之蛋',
+    theme: '疾病醫療、心理與善終',
+    cost: 35,
+    owned: false,
+  },
+  {
+    id: 'rights',
+    name: '共鳴之蛋',
+    theme: '人權、法治、性別與社區',
     cost: 40,
     owned: false,
   },
-  { id: 'wisdom', name: '智慧之蛋', theme: '教育公益', cost: 45, owned: false },
   {
-    id: 'healing',
-    name: '療癒之蛋',
-    theme: '醫療援助',
-    cost: 50,
+    id: 'wisdom',
+    name: '智慧之蛋',
+    theme: '教育翻轉、人文與藝術',
+    cost: 45,
     owned: false,
+  },
+  {
+    id: 'forest',
+    name: '森林之蛋',
+    theme: '生態環境與動物福利',
+    cost: 50,
+    owned: true,
   },
 ] as const
 
 export const collectionSeries = [
-  { id: 'forest', name: '森林精靈', theme: '森林保育', unlockedLevel: 2 },
-  { id: 'ocean', name: '海洋精靈', theme: '海洋保育', unlockedLevel: 1 },
+  {
+    id: 'children',
+    name: '貓精靈',
+    theme: '兒少、家庭與婦幼',
+    unlockedLevel: 0,
+  },
+  {
+    id: 'neurodevelopment',
+    name: '水獺精靈',
+    theme: '身心障礙與神經發展',
+    unlockedLevel: 0,
+  },
+  {
+    id: 'eldercare',
+    name: '狗精靈',
+    theme: '高齡長照與失智照護',
+    unlockedLevel: 0,
+  },
+  {
+    id: 'healthcare',
+    name: '兔子精靈',
+    theme: '疾病醫療、心理與善終',
+    unlockedLevel: 0,
+  },
+  {
+    id: 'rights',
+    name: '海豚精靈',
+    theme: '人權、法治、性別與社區',
+    unlockedLevel: 0,
+  },
   {
     id: 'wisdom',
     name: '彩羽鳥靈',
     theme: '教育翻轉、人文與藝術',
     unlockedLevel: 1,
   },
-  { id: 'animal', name: '毛孩精靈', theme: '動物救援', unlockedLevel: 0 },
+  {
+    id: 'forest',
+    name: '森林鹿靈',
+    theme: '生態環境與動物福利',
+    unlockedLevel: 2,
+  },
 ] as const

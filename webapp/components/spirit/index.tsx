@@ -216,7 +216,7 @@ export function GrowthTrack({
                 <>
                   <img
                     className="sp-locked-egg"
-                    src="/images/locked-egg.png"
+                    src="/images/locked-egg.webp"
                     alt=""
                     aria-hidden="true"
                     draggable={false}
@@ -292,7 +292,7 @@ export function IllustratedEmptyState({
           <div className="sp-artwork-frame sp-empty-egg-frame">
             <img
               className="sp-empty-egg"
-              src="/images/locked-egg.png"
+              src="/images/locked-egg.webp"
               alt="尚未兌換的精靈蛋"
               width={1254}
               height={1254}

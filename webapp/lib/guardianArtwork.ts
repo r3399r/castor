@@ -63,6 +63,6 @@ export const spiritCatalog: Record<SpiritSpecies, SpiritDefinition> = {
 export function spiritImage(species: SpiritSpecies, level: number) {
   const root = spiritCatalog[species].artwork
   return root
-    ? `${root}/lv${Math.max(1, Math.min(5, Math.trunc(level)))}.png`
+    ? `${root}/lv${Math.max(1, Math.min(5, Math.trunc(level)))}.webp`
     : undefined
 }

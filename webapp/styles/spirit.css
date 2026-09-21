@@ -1,3 +1,135 @@
+.site-header {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  width: 100%;
+  border-bottom: 1px solid rgb(225 199 122 / 0.3);
+  background: #234b43;
+  color: #c8cec5;
+}
+.site-header::after {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-image: url("/images/textures/header-pencil-hatching-02.webp");
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  content: "";
+  opacity: 0.26;
+  pointer-events: none;
+}
+.site-header__nav,
+.site-header__content {
+  position: relative;
+  z-index: 1;
+}
+.site-header__nav {
+  border: 0;
+}
+.site-header__content {
+  width: 100%;
+  min-width: 0;
+  min-height: 80px;
+  gap: 12px;
+}
+.site-header__logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: #f7f0dc;
+  line-height: 1.5;
+}
+.site-header__logo::before {
+  color: #e1c77a;
+  content: "✦";
+  font-size: 0.55rem;
+  line-height: 1;
+}
+.site-header__nav-link,
+.site-header__menu-toggle,
+.site-header button {
+  color: #c8cec5;
+}
+.site-header__nav-link {
+  position: relative;
+}
+.site-header__nav-link:hover,
+.site-header__menu-toggle:hover,
+.site-header button:hover {
+  background: rgb(255 253 248 / 0.08);
+  color: #fffdf8;
+}
+.site-header__nav-link[aria-current="page"] {
+  color: #e1c77a;
+  font-weight: 700;
+}
+.site-header__nav-link[aria-current="page"]::after {
+  position: absolute;
+  bottom: 1px;
+  left: 50%;
+  width: 32px;
+  height: 3px;
+  border-radius: 999px;
+  background: #e1c77a;
+  content: "";
+  transform: translateX(-50%);
+}
+.site-header :is(a, button):focus-visible {
+  outline: 3px solid rgb(225 199 122 / 0.72);
+  outline-offset: 3px;
+}
+.site-header [aria-label="個人資料"] > :is(img, span) {
+  border-width: 2px;
+  border-color: #e1c77a;
+}
+.site-header [aria-label="個人資料"] > span {
+  background: rgb(247 240 220 / 0.1);
+  color: #f7f0dc;
+}
+.site-header__mobile-menu {
+  position: fixed;
+  top: 70px;
+  right: 0;
+  left: 0;
+  border-bottom: 1px solid rgb(225 199 122 / 0.3);
+  background: #234b43;
+}
+@media (width < 64rem) {
+  .site-header__content {
+    min-height: 70px;
+  }
+}
+@media (width < 40rem) {
+  .site-header__content {
+    min-height: 62px;
+  }
+  .site-header__mobile-menu {
+    top: 62px;
+  }
+  .site-header::after {
+    opacity: 0.22;
+  }
+  .site-header__logo {
+    max-width: calc(100% - 112px);
+    font-size: 0.875rem;
+    line-height: 1.2;
+  }
+  .site-header__content > div {
+    flex: 0 0 auto;
+  }
+  .site-header__content > div:nth-of-type(2) {
+    position: absolute;
+    top: 50%;
+    right: 0;
+    transform: translateY(-50%);
+  }
+  .site-header__content > div button {
+    padding-inline: 12px;
+  }
+}
+
 .spirit-theme {
   color: var(--color-spirit-ink);
   font-family: var(--font-spirit);
@@ -40,27 +172,11 @@
   background: var(--color-spirit-cream);
 }
 .sp-navigation {
-  padding: 0 max(1.25rem, calc((100% - 1200px) / 2));
   background: var(--color-spirit-deep);
   color: var(--color-spirit-on-dark);
 }
 .sp-navigation nav {
   border-color: var(--spirit-light-line);
-}
-.sp-navigation nav > div {
-  min-height: 76px;
-}
-.sp-navigation a,
-.sp-navigation button {
-  color: var(--color-spirit-on-dark);
-}
-.sp-navigation a:hover,
-.sp-navigation button:hover {
-  background: var(--spirit-leaf-silhouette);
-}
-.sp-navigation nav > div:first-child > a {
-  font-size: 0.9rem;
-  letter-spacing: 0.025em;
 }
 .sp-navigation nav > div.absolute {
   background: var(--color-spirit-deep);
@@ -826,9 +942,20 @@
 }
 .sp-store-card .sp-store-art {
   padding: 0;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  background: #f6f1df;
 }
 .sp-store-art .sp-artwork {
   border-radius: 0;
+}
+.sp-store-egg {
+  display: block;
+  width: 70%;
+  aspect-ratio: 1;
+  object-fit: contain;
+  user-select: none;
 }
 .sp-artwork-placeholder {
   min-height: 100px;
@@ -1078,14 +1205,6 @@
   }
 }
 @media (width < 48rem) {
-  .sp-navigation {
-    padding-inline: 20px;
-  }
-  .sp-navigation nav > div:first-child > a {
-    max-width: 190px;
-    line-height: 1.5;
-    font-size: var(--text-spirit-caption);
-  }
   .sp-hero-inner {
     padding: 32px 20px 48px;
     flex-direction: column;

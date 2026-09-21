@@ -42,11 +42,10 @@ const artworkById: Partial<Record<string, SpiritSpecies>> = {
   forest: 'deer',
   wisdom: 'bird',
 }
-// Feature the available artwork without removing or changing demo products.
-const illustratedFirst = (a: { id: string }, b: { id: string }) =>
-  Number(Boolean(artworkById[b.id])) - Number(Boolean(artworkById[a.id]))
-const displayedEggs = [...storeEggs].sort(illustratedFirst)
-const displayedCollection = [...collectionSeries].sort(illustratedFirst)
+const displayedEggs = [...storeEggs]
+const displayedCollection = [...collectionSeries].sort(
+  (a, b) => Number(b.unlockedLevel > 0) - Number(a.unlockedLevel > 0),
+)
 const tabs = [
   {
     value: 'growing',
@@ -225,7 +224,7 @@ export default function BoxClient() {
             {/* Native images retain the supplied alpha and independent positioning. */}
             <img
               className="sp-points-vine sp-points-vine-top"
-              src="/images/points-vine-top-left.png"
+              src="/images/points-vine-top-left.webp"
               alt=""
               aria-hidden="true"
               draggable={false}
@@ -234,7 +233,7 @@ export default function BoxClient() {
             />
             <img
               className="sp-points-vine sp-points-vine-bottom"
-              src="/images/points-vine-bottom-right.png"
+              src="/images/points-vine-bottom-right.webp"
               alt=""
               aria-hidden="true"
               draggable={false}
@@ -433,7 +432,12 @@ export default function BoxClient() {
                         {art ? (
                           <SpiritArtwork species={art} level={1} />
                         ) : (
-                          <ArtworkPlaceholder />
+                          <img
+                            className="sp-store-egg"
+                            src="/images/locked-egg.webp"
+                            alt={`${egg.name}，精靈外觀尚未公開`}
+                            draggable={false}
+                          />
                         )}
                       </div>
                       <div className="sp-store-info">
@@ -578,7 +582,7 @@ export default function BoxClient() {
                               {!unlocked ? (
                                 <img
                                   className="sp-collection-locked-egg"
-                                  src="/images/locked-egg.png"
+                                  src="/images/locked-egg.webp"
                                   alt=""
                                   aria-hidden="true"
                                   draggable={false}
@@ -715,10 +719,6 @@ export default function BoxClient() {
               <ArtworkPlaceholder />
             )}
           </div>
-          <p className="sp-description">
-            這是精靈第 {collectionPreview.level}{' '}
-            階段的收藏圖片。正式角色圖與階段故事將在美術內容確認後補上。
-          </p>
         </Modal>
       )}
     </div>

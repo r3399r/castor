@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import NavbarAuthButton from './NavbarAuthButton'
 
@@ -15,7 +16,10 @@ const navItems = [
 
 export default function NavbarMenu() {
   const [open, setOpen] = useState(false)
+  const pathname = usePathname()
   const { user } = useAuth()
+
+  const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`)
 
   return (
     <>
@@ -26,7 +30,8 @@ export default function NavbarMenu() {
             <Link
               key={item.label}
               href={item.href}
-              className="flex h-9 items-center rounded-[6px] px-4 text-sm text-black-500 transition hover:bg-beige-200 hover:text-black-700 focus:text-blue-700 focus:outline-none"
+              aria-current={isActive(item.href) ? 'page' : undefined}
+              className="site-header__nav-link flex h-9 items-center rounded-[6px] px-4 text-sm transition focus:outline-none"
             >
               {item.label}
             </Link>
@@ -44,7 +49,7 @@ export default function NavbarMenu() {
         <NavbarAuthButton />
         {user && (
           <button
-            className="flex h-8 w-8 items-center justify-center text-black-500"
+            className="site-header__menu-toggle flex h-8 w-8 items-center justify-center"
             onClick={() => setOpen((v) => !v)}
             aria-label="選單"
           >
@@ -65,13 +70,14 @@ export default function NavbarMenu() {
       </div>
 
       {open && user && (
-        <div className="absolute -left-4 -right-4 top-full z-50 border-b border-brown-700 bg-beige-100 px-4 py-3 sm:-left-6 sm:-right-6 sm:px-6 lg:hidden">
+        <div className="site-header__mobile-menu absolute -left-4 -right-4 top-full z-50 px-4 py-3 sm:-left-6 sm:-right-6 sm:px-6 lg:hidden">
           <div className="flex flex-col gap-1">
             {navItems.map((item) => (
               <Link
                 key={item.label}
                 href={item.href}
-                className="rounded-[6px] px-4 py-3 text-center text-sm text-black-500 transition hover:text-black-700 focus:text-blue-700 focus:outline-none active:bg-beige-200"
+                aria-current={isActive(item.href) ? 'page' : undefined}
+                className="site-header__nav-link rounded-[6px] px-4 py-3 text-center text-sm transition focus:outline-none"
               >
                 {item.label}
               </Link>

@@ -22,7 +22,7 @@
   --spirit-garden-copy-shade: rgba(4, 38, 39, 0.42);
   --spirit-garden-copy-mid: rgba(4, 38, 39, 0.25);
   --spirit-garden-header-height: 76px;
-  --spirit-garden-image: url("/images/spirit-garden-hero.png");
+  --spirit-garden-image: url("/images/spirit-garden-hero.webp");
   /* Until mobile art is provided, crop the original with cover; do not stretch.
      To replace it later, set this variable to image-set() with
      /images/spirit-garden-hero-mobile.webp and its PNG fallback. */
@@ -34,14 +34,6 @@
   background-size: 100% calc(100% - var(--spirit-garden-height));
   background-repeat: no-repeat;
 }
-@supports (background-image: image-set(url("image.webp") type("image/webp"))) {
-  .sp-box-page {
-    --spirit-garden-image: image-set(
-      url("/images/spirit-garden-hero.webp") type("image/webp"),
-      url("/images/spirit-garden-hero.png") type("image/png")
-    );
-  }
-}
 .sp-box-page > .sp-navigation {
   position: absolute;
   inset: 0 0 auto;
@@ -49,18 +41,31 @@
   isolation: isolate;
   background: transparent;
 }
-/* A light, local scrim behind navigation only, not over the whole painting. */
+.sp-box-page > .sp-navigation .site-header__content {
+  width: calc(100% - 32px);
+  max-width: 1120px;
+  margin-inline: auto;
+}
+@media (width >= 48rem) {
+  .sp-box-page > .sp-navigation .site-header__content {
+    width: calc(100% - 80px);
+  }
+}
+@media (width >= 64rem) {
+  .sp-box-page > .sp-navigation .site-header__content {
+    width: calc(100% - 140px);
+  }
+}
+/* The gift-box navigation sits directly over the hero artwork. */
 .sp-box-page > .sp-navigation::before {
-  content: "";
-  position: absolute;
-  inset: 0 0 -12px;
-  z-index: -1;
-  background: linear-gradient(
-    to bottom,
-    var(--spirit-garden-header-shade),
-    transparent
-  );
-  pointer-events: none;
+  content: none;
+}
+.sp-box-page > .sp-navigation .site-header {
+  border-bottom-color: transparent;
+  background: transparent;
+}
+.sp-box-page > .sp-navigation .site-header::after {
+  content: none;
 }
 .sp-box-page > .sp-navigation nav {
   border-bottom-color: transparent;
@@ -241,12 +246,6 @@
     max-width: var(--spirit-box-content-width);
     margin-inline: auto;
     padding-inline: 0;
-  }
-  .sp-box-page > .sp-navigation {
-    padding-inline: max(
-      var(--spirit-box-desktop-inset),
-      calc((100% - var(--spirit-box-content-width)) / 2)
-    );
   }
 }
 @media (48rem <= width < 64rem) {
@@ -436,8 +435,20 @@
   border-radius: 0;
 }
 .sp-box-page .sp-growing-layout .sp-scene figcaption {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
   font-size: 24px;
   font-weight: 700;
+}
+.sp-box-page .sp-growing-layout .sp-scene figcaption::before,
+.sp-box-page .sp-growing-layout .sp-scene figcaption::after {
+  content: "";
+  width: 44px;
+  height: 1px;
+  background: currentColor;
+  opacity: .55;
 }
 .sp-box-page .sp-growing-layout > .sp-status {
   padding: 48px;
