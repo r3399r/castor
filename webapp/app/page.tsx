@@ -9,19 +9,21 @@ import HomeStatsBar from '@/components/HomeStatsBar'
 
 export default function Home() {
   return (
-    <div className="m-[10px] min-h-[calc(100vh-20px)] border border-brown-700 bg-beige-100">
-        <div className="px-4 sm:px-6">
-          <Navbar />
-          <main>
-            <HomeHero />
-            <HomeStatsBar />
-            <HomeCategories />
-            <HomeFeature />
-            <HomeHighlights />
-            <HomeCTA />
-            <Footer />
-          </main>
-        </div>
+    <div className="min-h-screen bg-beige-100">
+      <div className="standard-site-header">
+        <Navbar />
       </div>
+      <div className="px-4 sm:px-6">
+        <main>
+          <HomeHero />
+          <HomeStatsBar />
+          <HomeCategories />
+          <HomeFeature />
+          <HomeHighlights />
+          <HomeCTA />
+          <Footer />
+        </main>
+      </div>
+    </div>
   )
 }

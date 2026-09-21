@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
+import { Fredoka, Inter } from 'next/font/google'
 import { AuthProvider } from '@/contexts/AuthContext'
 import MathJaxProvider from '@/components/MathJaxProvider'
 import './globals.css'
@@ -7,6 +7,13 @@ import './globals.css'
 const inter = Inter({
   subsets: ['latin'],
   variable: '--font-inter',
+  display: 'swap',
+})
+
+const fredoka = Fredoka({
+  subsets: ['latin'],
+  weight: '600',
+  variable: '--font-fredoka',
   display: 'swap',
 })
 
@@ -18,7 +25,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="zh-TW" className={inter.variable}>
+    <html lang="zh-TW" className={`${inter.variable} ${fredoka.variable}`}>
       <body className="bg-beige-100">
         <MathJaxProvider>
           <AuthProvider>{children}</AuthProvider>

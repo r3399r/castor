@@ -1,0 +1,489 @@
+.page {
+  min-height: 100vh;
+  background: linear-gradient(
+    180deg,
+    #f6f2e8 0%,
+    #e8eadf 30%,
+    #d6e1da 58%,
+    #d7d3e2 80%,
+    #d7d3e2 100%
+  );
+  color: #34423d;
+}
+
+.header {
+  position: relative;
+  z-index: 20;
+  border-bottom: 1px solid rgb(225 199 122 / 0.3);
+  background: #234b43;
+}
+
+.titleBand {
+  position: relative;
+  z-index: 1;
+  overflow-x: clip;
+  overflow-y: visible;
+  height: 160px;
+  background: transparent;
+}
+
+.introScene {
+  position: relative;
+  isolation: isolate;
+  margin-bottom: 32px;
+}
+
+.titleBandInner {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  height: 100%;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 0;
+}
+
+.titleCopy {
+  position: relative;
+  z-index: 2;
+  width: 58%;
+  padding-top: 16px;
+}
+
+.titleLandscape {
+  position: absolute;
+  right: 0;
+  bottom: -62px;
+  z-index: 1;
+  width: 88%;
+  height: 200px;
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(1.6);
+  transform-origin: right bottom;
+}
+
+.titleLandscapeImage {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: right bottom;
+}
+
+.pageTitle {
+  margin: 0;
+  color: #315b50;
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: 0.02em;
+}
+
+.titleCopy p {
+  margin-top: 8px;
+  color: #6f7771;
+  font-size: 0.9375rem;
+}
+
+.content {
+  padding-bottom: 70px;
+}
+
+.sectionTitle {
+  color: #315b50;
+}
+
+.sectionTitle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 40px 0 20px;
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.history {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  margin-bottom: 32px;
+}
+
+.summaryGrid {
+  position: relative;
+  z-index: 3;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 22px;
+  margin-bottom: 8px;
+  transform: translateY(8px);
+}
+
+.card {
+  border: 1px solid rgb(216 208 195 / 0.72);
+  border-radius: 16px;
+  box-shadow: none;
+}
+
+.summaryCard {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  min-width: 0;
+  height: 180px;
+  padding: 28px 30px;
+  border: 1px solid rgb(70 90 75 / 0.12);
+  border-radius: 12px;
+  box-shadow: none;
+}
+
+.summaryWheat {
+  background: #f3e8c5;
+  color: #6b572b;
+}
+
+.summaryClay {
+  background: #efd6cb;
+  color: #92583f;
+}
+
+.summarySage {
+  background: #d8e3d8;
+  color: #3e684d;
+}
+
+.summaryHeading {
+  display: flex;
+  align-items: center;
+}
+
+.summaryLabel {
+  color: #34423d;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.summaryValueRow {
+  display: flex;
+  align-items: baseline;
+  align-self: center;
+  gap: 7px;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.summaryValue {
+  font-size: 3.5rem;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.summaryUnit {
+  color: color-mix(in srgb, currentColor 78%, transparent);
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.summarySub,
+.muted,
+.chartNote {
+  color: #6f7771;
+}
+
+.summarySub {
+  min-height: 1.4em;
+  color: color-mix(in srgb, currentColor 76%, #6f7771);
+  font-size: 0.9375rem;
+  line-height: 1.4;
+}
+
+.card {
+  background: #fffdf8;
+  padding: 32px;
+}
+
+.chartHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.cardTitle {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #34423d;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.cardTitle::before,
+.sectionTitle::before {
+  display: inline-block;
+  width: 18px;
+  height: 3px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: #d1b762;
+  content: "";
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tabGroup {
+  display: flex;
+  overflow: hidden;
+  border: 1px solid #d8d0c3;
+  border-radius: 10px;
+  background: transparent;
+}
+
+.tabButton {
+  min-height: 32px;
+  padding: 5px 12px;
+  border-right: 1px solid #d8d0c3;
+  background: transparent;
+  color: #34423d;
+  font-size: 0.75rem;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+.tabButton:last-child {
+  border-right: 0;
+}
+
+.tabButton:hover {
+  background: #e8eee6;
+  color: #315b50;
+}
+
+.tabButton:focus-visible,
+.legendButton:focus-visible {
+  outline: 3px solid rgb(57 115 101 / 0.35);
+  outline-offset: 2px;
+}
+
+.tabActive,
+.tabActive:hover {
+  background: #315b50;
+  color: #fffdf8;
+}
+
+.legendButton {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 4px;
+}
+
+.bodyText,
+.legendText {
+  color: #34423d;
+}
+
+.masteryValue {
+  color: #315b50;
+}
+
+.masteryTrack {
+  height: 10px;
+  flex: 1;
+  overflow: hidden;
+  border-radius: 2px;
+  background: #e4dfd5;
+}
+
+.masteryFill {
+  height: 100%;
+  border-radius: 2px;
+  background: #397365;
+  transition: width 180ms ease;
+}
+
+.subjectGrid {
+  display: grid;
+  gap: 24px;
+}
+
+.subjectCard {
+  padding-top: 24px;
+  padding-bottom: 32px;
+}
+
+.subjectDivider {
+  border-color: rgb(216 208 195 / 0.75);
+}
+
+.categoryChip {
+  background: #eee4d5;
+  color: #665b4e;
+}
+
+.errorCard {
+  border: 1px solid #d8d0c3;
+  border-radius: 16px;
+  background: #fffdf8;
+  padding: 32px;
+  color: #7a4e42;
+  text-align: center;
+  box-shadow: none;
+}
+
+.errorLink {
+  display: inline-block;
+  margin-top: 16px;
+  color: #315b50;
+  font-size: 0.875rem;
+  text-decoration: underline;
+}
+
+.errorLink:hover {
+  color: #397365;
+}
+
+.calendar {
+  overflow-x: auto;
+  color: #6f7771;
+}
+
+@media (min-width: 48rem) {
+  .subjectGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (40rem <= width < 64rem) {
+  .titleBand {
+    height: 174px;
+  }
+
+  .titleCopy {
+    width: 58%;
+    padding-top: 0;
+  }
+
+  .titleLandscape {
+    top: 20px;
+    right: -10%;
+    bottom: auto;
+    width: 110%;
+    height: 200px;
+    transform: scale(1.22);
+    transform-origin: right bottom;
+  }
+
+  .titleLandscapeImage {
+    object-position: right bottom;
+  }
+
+  .summaryGrid {
+    gap: 20px;
+    margin-bottom: 10px;
+    transform: translateY(10px);
+  }
+
+  .summaryCard {
+    height: 170px;
+    padding: 24px;
+  }
+
+  .summaryValue {
+    font-size: 3.25rem;
+  }
+}
+
+@media (max-width: 47.999rem) {
+  .card {
+    padding: 24px;
+  }
+
+  .summaryCard {
+    padding: 24px;
+  }
+
+  .chartHeader {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 39.999rem) {
+  .titleBand,
+  .titleBandInner {
+    height: 170px;
+  }
+
+  .titleBandInner {
+    padding: 22px 0;
+  }
+
+  .pageTitle {
+    font-size: 1.75rem;
+  }
+
+  .titleCopy p {
+    max-width: 235px;
+    font-size: 0.875rem;
+  }
+
+  .titleCopy {
+    width: min(72%, 250px);
+    align-self: flex-start;
+    padding-top: 12px;
+  }
+
+  .titleLandscape {
+    top: auto;
+    right: auto;
+    bottom: -34px;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    transform: scale(1.35);
+    transform-origin: left bottom;
+  }
+
+  .titleLandscapeImage {
+    object-fit: cover;
+    object-position: 20% 100%;
+  }
+
+  .summaryGrid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+    margin-bottom: 14px;
+    transform: translateY(14px);
+  }
+
+  .summaryCard {
+    height: 155px;
+    padding: 20px 22px;
+  }
+
+  .summaryValue {
+    font-size: 3rem;
+  }
+
+  .card {
+    padding: 20px 16px;
+  }
+
+  .controls {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+}
