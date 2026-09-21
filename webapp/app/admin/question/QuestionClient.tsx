@@ -1,10 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { apiDelete, apiFetch, apiPut, LIMIT } from '@/lib/api'
+import { apiDelete, apiFetch, apiPut, LIMIT, MAX_LIMIT } from '@/lib/api'
 import MultiSelectField from '@/components/MultiSelectField'
 import Pagination from '@/components/Pagination'
+import QuestionImageUpload from '@/components/QuestionImageUpload'
 import SortableTh, { type SortDirection } from '@/components/SortableTh'
+import { saveQuestionDraft } from '@/lib/questionDraft'
 import type { Paginate } from '@/types/api'
 import { MathJax } from 'better-react-mathjax'
 
@@ -36,9 +38,26 @@ type SubjectDetail = {
   conceptGroups: { id: number; name: string; concepts: { id: number; name: string }[] }[]
 }
 
+type SubjectOption = {
+  id: number
+  name: string
+  // Read-only ', '-joined summary of the subject's categories, as GET
+  // /subject already returns it for the subject admin list.
+  categories: string | null
+}
+
 type SortColumn = 'id' | 'subject' | 'type' | 'difficulty'
 
 const QUESTION_TYPES = ['GROUP', 'SINGLE', 'MULTIPLE', 'TRUE_FALSE', 'FILL']
+
+// Subject names repeat across categories -- there is a 數學 under 國中 and
+// another under 高中 -- so the name alone can't identify one. The category
+// goes in the option label rather than in an <optgroup> because a collapsed
+// <select> shows only the chosen option's own text: grouping would
+// disambiguate the open list and then hide the distinction again the moment
+// it closed, which is exactly when it matters.
+const subjectLabel = (subject: SubjectOption) =>
+  `${subject.name}（${subject.categories ?? '未分類'}）`
 
 const contentSnippet = (content: string | null) => {
   if (!content) return '-'
@@ -73,6 +92,11 @@ export default function QuestionClient() {
   const [deletingId, setDeletingId] = useState<number | null>(null)
   const [togglingId, setTogglingId] = useState<number | null>(null)
 
+  // Only for the upload panel -- the list itself already carries a subject
+  // name per row and has no need of the full subject list.
+  const [subjects, setSubjects] = useState<SubjectOption[]>([])
+  const [uploadSubjectId, setUploadSubjectId] = useState('')
+
   const load = async (
     targetPage: number,
     sort: SortColumn,
@@ -99,6 +123,12 @@ export default function QuestionClient() {
 
   useEffect(() => {
     load(1, sortColumn, sortDirection)
+    // MAX_LIMIT rather than the usual page size: this feeds a picker, and
+    // a subject missing from it simply cannot be uploaded to. Failure is
+    // non-fatal -- the panel hides itself and the rest of the page works.
+    apiFetch<Paginate<SubjectOption>>('subject', { limit: MAX_LIMIT })
+      .then((res) => setSubjects(res.data))
+      .catch(() => setSubjects([]))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -227,6 +257,55 @@ export default function QuestionClient() {
         題目透過「新增題目」流程建立，此頁面僅供檢視、編輯與刪除。新建立的題目預設為停用，
         按下綠色的「啟用」後使用者才會練習到該題；顯示「停用」的題目則代表目前已啟用。
       </p>
+
+      {subjects.length > 0 && (
+        <section className="mb-6 rounded-[24px] border border-brown-300 bg-white/40 p-6">
+          <h2 className="mb-1 text-lg font-bold text-black-900">AI 辨識新增題目</h2>
+          <p className="mb-4 text-sm text-black-500">
+            選擇科目並上傳題目截圖，辨識完成後會帶往「新增題目」頁面，在那裡選擇試卷、標籤並確認內容後送出。
+          </p>
+
+          <div className="mb-4 flex flex-col gap-1 sm:max-w-xs">
+            <label className="text-sm font-medium text-black-700">科目</label>
+            <select
+              value={uploadSubjectId}
+              onChange={(e) => setUploadSubjectId(e.target.value)}
+              className="rounded-md border border-brown-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-700"
+            >
+              <option value="">-- 選擇科目 --</option>
+              {subjects.map((subject) => (
+                <option key={subject.id} value={subject.id}>
+                  {subjectLabel(subject)}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {uploadSubjectId === '' ? (
+            <p className="rounded-lg border border-dashed border-brown-300 p-6 text-center text-sm text-black-300">
+              請先選擇科目，AI 才知道要從哪些觀念中挑選。
+            </p>
+          ) : (
+            // Recognising needs only the subject, but everything after it
+            // (exam, tags, per-question validation, the transactional
+            // submit) already lives on the creation page -- so the draft is
+            // handed over rather than that whole flow being rebuilt here.
+            <QuestionImageUpload
+              key={uploadSubjectId}
+              subjectId={Number(uploadSubjectId)}
+              onQuestions={(json) => {
+                const subjectId = Number(uploadSubjectId)
+                // Blocked or full sessionStorage would otherwise drop the
+                // draft on the floor and land them on an empty form with
+                // no clue that a recognition had just succeeded.
+                if (!saveQuestionDraft({ subjectId, json }))
+                  alert('無法暫存辨識結果（瀏覽器儲存空間被封鎖），請在下一頁重新上傳一次。')
+                window.location.href = `/admin/subject/new-question?id=${subjectId}`
+              }}
+            />
+          )}
+        </section>
+      )}
 
       <div className="mt-4 overflow-x-auto rounded-lg border border-brown-300 bg-white/40">
         <table className="w-full text-left text-sm">
