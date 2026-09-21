@@ -6,7 +6,7 @@ import styles from './analysis.module.css'
 export default function AnalysisPage() {
   return (
     <div className={styles.page}>
-      <div className={styles.header}>
+      <div className={`${styles.header} standard-site-header`}>
         <Navbar />
       </div>
       <div className="px-4 md:px-10 lg:px-[70px]">

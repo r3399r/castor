@@ -88,6 +88,20 @@
   background: rgb(247 240 220 / 0.1);
   color: #f7f0dc;
 }
+.standard-site-header {
+  position: relative;
+  z-index: 20;
+  border-bottom: 1px solid rgb(225 199 122 / 0.3);
+  background: #234b43;
+}
+.standard-site-header .site-header {
+  border-bottom: 0;
+}
+.standard-site-header .site-header__content {
+  width: calc(100% - 32px);
+  max-width: 1120px;
+  margin: 0 auto;
+}
 .site-header__mobile-menu {
   position: fixed;
   top: 70px;
@@ -99,6 +113,16 @@
 @media (width < 64rem) {
   .site-header__content {
     min-height: 70px;
+  }
+}
+@media (width >= 48rem) {
+  .standard-site-header .site-header__content {
+    width: calc(100% - 80px);
+  }
+}
+@media (width >= 64rem) {
+  .standard-site-header .site-header__content {
+    width: calc(100% - 140px);
   }
 }
 @media (width < 40rem) {

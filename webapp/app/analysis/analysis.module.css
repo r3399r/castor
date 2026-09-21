@@ -18,16 +18,6 @@
   background: #234b43;
 }
 
-.header :global(.site-header__content) {
-  width: calc(100% - 32px);
-  max-width: 1120px;
-  margin: 0 auto;
-}
-
-.header :global(.site-header) {
-  border-bottom: 0;
-}
-
 .titleBand {
   position: relative;
   z-index: 1;
@@ -377,18 +367,8 @@
 }
 
 @media (min-width: 48rem) {
-  .header :global(.site-header__content) {
-    width: calc(100% - 80px);
-  }
-
   .subjectGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (min-width: 64rem) {
-  .header :global(.site-header__content) {
-    width: calc(100% - 140px);
   }
 }
 
