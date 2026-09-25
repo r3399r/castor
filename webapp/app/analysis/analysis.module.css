@@ -1,13 +1,15 @@
 .page {
-  min-height: 100vh;
-  background: linear-gradient(
+  --learning-page-background: linear-gradient(
     180deg,
-    #f6f2e8 0%,
-    #e8eadf 30%,
-    #d6e1da 58%,
-    #d7d3e2 80%,
-    #d7d3e2 100%
+    #f5f3e9 0%,
+    #eef1e8 30%,
+    #e4ece7 58%,
+    #dae6e2 78%,
+    #cfdfda 100%
   );
+  --learning-footer-background: #3b665c;
+  --learning-footer-link: #f3f1e8;
+  --learning-footer-copyright: #c6d4cd;
   color: #34423d;
 }
 
@@ -88,7 +90,7 @@
 }
 
 .content {
-  padding-bottom: 70px;
+  padding-bottom: 0;
 }
 
 .sectionTitle {

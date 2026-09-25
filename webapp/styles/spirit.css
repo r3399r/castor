@@ -94,6 +94,47 @@
   border-bottom: 1px solid rgb(225 199 122 / 0.3);
   background: #234b43;
 }
+.learning-page {
+  position: relative;
+  isolation: isolate;
+  min-height: 100vh;
+  overflow-x: clip;
+  background: var(
+    --learning-page-background,
+    linear-gradient(
+      180deg,
+      #f7f4ea 0%,
+      #eef1e7 25%,
+      #dfe9e1 50%,
+      #c6d8ce 68%,
+      #a5beb2 84%,
+      #7f9f93 100%
+    )
+  );
+  background-repeat: no-repeat;
+}
+.site-footer--learning {
+  min-height: 0;
+  margin-top: 0;
+  margin-bottom: 0;
+  padding: 34px 24px 26px;
+  border-top: 0;
+  background-color: var(--learning-footer-background, #244a42);
+  color: var(--learning-footer-link, #e1e7dd);
+}
+.site-footer--learning a {
+  color: var(--learning-footer-link, #e1e7dd);
+}
+.site-footer--learning a:hover,
+.site-footer--learning a:focus-visible {
+  color: #f2e7bd;
+}
+.site-footer--learning .site-footer__copyright {
+  color: var(--learning-footer-copyright, #afc1b6);
+}
+.site-footer--learning > :last-child {
+  margin-bottom: 0;
+}
 .standard-site-header .site-header {
   border-bottom: 0;
 }

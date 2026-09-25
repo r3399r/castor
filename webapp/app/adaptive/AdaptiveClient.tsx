@@ -1076,7 +1076,7 @@ export default function AdaptiveClient() {
       )}
 
       {adaptiveQuestion.length > 0 && !replyResponse && (
-        <div className="mt-[40px] mb-[70px] flex lg:justify-end">
+        <div className="mt-[40px] flex lg:justify-end">
           <button
             onClick={onSubmit}
             disabled={!canSubmit || loading}
@@ -1095,7 +1095,7 @@ export default function AdaptiveClient() {
       )}
 
       {replyResponse && (
-        <div className="mt-[40px] mb-[70px] flex flex-wrap justify-end gap-3">
+        <div className="mt-[40px] flex flex-wrap justify-end gap-3">
           <button
             onClick={fetchAdaptive}
             disabled={loading}

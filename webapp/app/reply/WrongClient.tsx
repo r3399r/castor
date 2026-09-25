@@ -289,7 +289,7 @@ export default function WrongClient({
           </MathJax>
 
           {list.paginate.totalPages > 1 && (
-            <div className="mt-6 mb-[70px] flex items-center justify-center gap-3">
+            <div className="mt-6 flex items-center justify-center gap-3">
               <button
                 onClick={() => fetchPage(page - 1)}
                 disabled={page === 1 || loading}
