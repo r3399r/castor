@@ -49,9 +49,12 @@ export default function NavbarMenu() {
         <NavbarAuthButton />
         {user && (
           <button
+            type="button"
             className="site-header__menu-toggle flex h-8 w-8 items-center justify-center"
             onClick={() => setOpen((v) => !v)}
             aria-label="選單"
+            aria-expanded={open}
+            aria-controls="site-header-mobile-menu"
           >
             {open ? (
               <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
@@ -70,13 +73,17 @@ export default function NavbarMenu() {
       </div>
 
       {open && user && (
-        <div className="site-header__mobile-menu absolute -left-4 -right-4 top-full z-50 px-4 py-3 sm:-left-6 sm:-right-6 sm:px-6 lg:hidden">
+        <div
+          id="site-header-mobile-menu"
+          className="site-header__mobile-menu absolute -left-4 -right-4 top-full z-50 px-4 py-3 sm:-left-6 sm:-right-6 sm:px-6 lg:hidden"
+        >
           <div className="flex flex-col gap-1">
             {navItems.map((item) => (
               <Link
                 key={item.label}
                 href={item.href}
                 aria-current={isActive(item.href) ? 'page' : undefined}
+                onClick={() => setOpen(false)}
                 className="site-header__nav-link rounded-[6px] px-4 py-3 text-center text-sm transition focus:outline-none"
               >
                 {item.label}

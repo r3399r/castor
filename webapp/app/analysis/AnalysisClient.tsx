@@ -45,12 +45,14 @@ function StatCard({
   value,
   unit,
   sub,
+  iconSrc,
   tone = 'blue',
 }: {
   label: string
   value: string | number
   unit: string
   sub?: string
+  iconSrc: string
   tone?: 'blue' | 'orange' | 'green'
 }) {
   const toneClass = {
@@ -68,6 +70,7 @@ function StatCard({
         <span className={styles.summaryUnit}>{unit}</span>
       </div>
       <span className={styles.summarySub} aria-hidden={!sub}>{sub ?? ''}</span>
+      <img className={styles.summaryIcon} src={iconSrc} alt="" />
     </div>
   )
 }
@@ -455,15 +458,28 @@ export default function AnalysisClient() {
               <AnalysisHeaderLandscape />
             </div>
             <div className={styles.summaryGrid}>
-              <StatCard label="總刷題數" value={history.totalAttempts} unit="題" tone="blue" />
+              <StatCard
+                label="總刷題數"
+                value={history.totalAttempts}
+                unit="題"
+                iconSrc="/icon-total-questions.svg"
+                tone="blue"
+              />
               <StatCard
                 label="總得分率"
                 value={Math.round(history.overallAccuracy)}
                 unit="%"
                 sub="平均正確率"
+                iconSrc="/icon-accuracy.svg"
                 tone="orange"
               />
-              <StatCard label="連續天數" value={history.streakDays} unit="天" tone="green" />
+              <StatCard
+                label="連續天數"
+                value={history.streakDays}
+                unit="天"
+                iconSrc="/icon-streak-days.svg"
+                tone="green"
+              />
             </div>
           </section>
           <HistorySection history={history} />

@@ -72,7 +72,7 @@ export default function UserClient() {
     <div className="pb-[70px]">
       <h1 className="mt-[60px] mb-6 text-3xl font-bold text-blue-700">個人資料</h1>
 
-      <div className="flex flex-col items-start justify-between gap-4 rounded-lg border border-brown-300 bg-white/40 p-6 sm:flex-row sm:items-center">
+      <div className="flex flex-col items-start justify-between gap-4 rounded-lg border border-brown-300 bg-white p-6 sm:flex-row sm:items-center">
         <div className="flex items-center gap-4">
           {me.avatar ? (
             <img
@@ -126,7 +126,7 @@ export default function UserClient() {
         </button>
       </div>
 
-      <div className="mt-4 flex items-center justify-between gap-4 rounded-lg border border-brown-300 bg-white/40 p-6">
+      <div className="mt-4 flex items-center justify-between gap-4 rounded-lg border border-brown-300 bg-white p-6">
         <div className="flex items-center gap-3">
           <Coins size={28} strokeWidth={1.5} className="text-amber-700" />
           <div>

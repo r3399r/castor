@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 200 200" fill="none" role="img" aria-labelledby="title">
+  <title id="title">總刷題數：疊放的題目紙張</title>
+  <rect width="200" height="200" rx="40" fill="#FFFFFF" fill-opacity=".16"/>
+  <g transform="translate(33.333 33.333) scale(.83333)">
+  <g opacity=".74" stroke="#FFFFFF" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M31 119H27Q20 119 20 112V26Q20 19 27 19H105Q112 19 112 26V34"/>
+    <rect x="41" y="36" width="98" height="110" rx="7"/>
+    <path d="M61 77H116M61 107H116"/>
+  </g>
+  </g>
+</svg>

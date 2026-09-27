@@ -1,7 +1,7 @@
 .site-header {
   position: relative;
   isolation: isolate;
-  overflow: hidden;
+  overflow: visible;
   width: 100%;
   border-bottom: 1px solid rgb(225 199 122 / 0.3);
   background: #234b43;
@@ -134,6 +134,15 @@
 }
 .site-footer--learning > :last-child {
   margin-bottom: 0;
+}
+.learning-page .learning-page-footer-foliage {
+  overflow: visible;
+  height: 80px;
+  margin-top: 0;
+}
+.learning-page .learning-page-footer-foliage > img {
+  position: absolute;
+  bottom: 0;
 }
 .standard-site-header .site-header {
   border-bottom: 0;

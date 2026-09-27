@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 200 200" fill="none" role="img" aria-labelledby="title">
+  <title id="title">總得分率：星星與分段儀表</title>
+  <rect width="200" height="200" rx="40" fill="#FFFFFF" fill-opacity=".16"/>
+  <g transform="translate(33.333 33.333) scale(.83333)">
+  <g opacity=".74" stroke="#FFFFFF" stroke-width="8" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M36 35L42 23L48 35L62 37L52 47L54 60L42 54L30 60L32 47L22 37Z" transform="translate(-11 0)"/>
+    <path d="M74 23L80 11L86 23L100 25L90 35L92 48L80 42L68 48L70 35L60 25Z"/>
+    <path d="M112 35L118 23L124 35L138 37L128 47L130 60L118 54L106 60L108 47L98 37Z" transform="translate(11 0)"/>
+    <path d="M17 140A63 63 0 0 1 143 140H117A37 37 0 0 0 43 140Z"/>
+    <path d="M80 77V100"/>
+    <path d="M80 135L103 91" stroke-width="9"/>
+  </g>
+  </g>
+</svg>

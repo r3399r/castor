@@ -19,7 +19,7 @@ export default function AnalysisPage() {
         </div>
       </div>
       <div className="px-4 sm:px-6">
-        <LearningFooterFoliage />
+        <LearningFooterFoliage className="learning-page-footer-foliage" />
         <Footer variant="learning" />
       </div>
     </div>
