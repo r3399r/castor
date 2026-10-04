@@ -72,7 +72,7 @@ export default function ExamClient() {
       setTotalPages(res.paginate.totalPages)
       setPage(targetPage)
     } catch {
-      setError('無法載入考試列表。')
+      setError('無法載入試卷列表。')
     } finally {
       setLoading(false)
     }
@@ -134,7 +134,7 @@ export default function ExamClient() {
   }
 
   const handleDelete = async (id: number) => {
-    if (!confirm('確定要刪除這個考試嗎？')) return
+    if (!confirm('確定要刪除這個試卷嗎？')) return
 
     setDeletingId(id)
     try {
@@ -211,7 +211,7 @@ export default function ExamClient() {
 
   return (
     <div className="pb-[70px]">
-      <h1 className="mt-[60px] mb-6 text-3xl font-bold text-blue-700">考試管理</h1>
+      <h1 className="mt-[60px] mb-6 text-3xl font-bold text-blue-700">試卷管理</h1>
 
       <form
         onSubmit={handleCreate}
@@ -220,7 +220,7 @@ export default function ExamClient() {
         <input
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
-          placeholder="新增考試名稱"
+          placeholder="新增試卷名稱"
           className="flex-1 rounded-md border border-brown-300 bg-white px-3 py-2 text-sm text-black-900 outline-none focus:border-blue-700"
         />
         <button
@@ -247,7 +247,7 @@ export default function ExamClient() {
             {(exams ?? []).length === 0 && (
               <tr>
                 <td colSpan={4} className="px-4 py-8 text-center text-black-300">
-                  尚無考試
+                  尚無試卷
                 </td>
               </tr>
             )}

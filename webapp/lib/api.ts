@@ -33,6 +33,44 @@ async function parseResponse<T>(res: Response): Promise<T> {
   return res.json() as Promise<T>
 }
 
+/**
+ * Carries the status and the backend's error `code` through to the caller.
+ *
+ * `message` keeps the old `API <status>: <url>` shape on purpose -- a
+ * couple of screens render it verbatim, and callers that only ever needed
+ * the status keep working untouched.
+ */
+class ApiError extends Error {
+  readonly status: number
+  readonly code?: string
+
+  constructor(status: number, url: string, code?: string) {
+    super(`API ${status}: ${url}`)
+    this.name = 'ApiError'
+    this.status = status
+    this.code = code
+  }
+}
+
+/**
+ * Pulls the backend's error `code` off a failed response.
+ *
+ * The backend answers every thrown error with `{status, name, message,
+ * code}`, and `code` is the only thing separating an overloaded AI
+ * provider from a malformed AI reply -- both of which arrive as a bare
+ * 502. Swallowing a parse failure is deliberate: CloudFront and API
+ * Gateway can answer with HTML before the Lambda is ever reached, and
+ * crashing while handling an error is worse than losing the code.
+ */
+async function readErrorCode(res: Response): Promise<string | undefined> {
+  try {
+    const body = (await res.json()) as { code?: unknown }
+    return typeof body.code === 'string' ? body.code : undefined
+  } catch {
+    return undefined
+  }
+}
+
 async function request<T>(url: string, init: RequestInit, token?: string): Promise<T> {
   const headers = {
     'Content-Type': 'application/json',
@@ -45,11 +83,11 @@ async function request<T>(url: string, init: RequestInit, token?: string): Promi
     const newToken = await forceRefreshToken()
     if (newToken) {
       const retry = await fetch(url, { ...init, headers: { ...headers, Authorization: newToken } })
-      if (!retry.ok) throw new Error(`API ${retry.status}: ${url}`)
+      if (!retry.ok) throw new ApiError(retry.status, url, await readErrorCode(retry))
       return parseResponse<T>(retry)
     }
   }
-  if (!res.ok) throw new Error(`API ${res.status}: ${url}`)
+  if (!res.ok) throw new ApiError(res.status, url, await readErrorCode(res))
   return parseResponse<T>(res)
 }
 
@@ -69,4 +107,4 @@ async function apiDelete<T = void>(path: string, token?: string): Promise<T> {
   return request<T>(`/api/${path}`, { method: 'DELETE' }, token)
 }
 
-export { apiFetch, apiPost, apiPut, apiDelete, LIMIT }
+export { apiFetch, apiPost, apiPut, apiDelete, ApiError, LIMIT }

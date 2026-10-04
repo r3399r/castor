@@ -227,6 +227,16 @@ export default function QuestionClient() {
         題目透過「新增題目」流程建立，此頁面僅供檢視、編輯與刪除。新建立的題目預設為停用，
         按下綠色的「啟用」後使用者才會練習到該題；顯示「停用」的題目則代表目前已啟用。
       </p>
+      <p className="mb-6 text-sm text-black-500">
+        要新增題目，請前往{' '}
+        <a
+          href="/admin/subject/"
+          className="font-medium text-blue-700 underline transition hover:text-[#1f3ea3]"
+        >
+          科目管理
+        </a>
+        ，在目標科目那一列按下「新增題目」。
+      </p>
 
       <div className="mt-4 overflow-x-auto rounded-lg border border-brown-300 bg-white/40">
         <table className="w-full text-left text-sm">
