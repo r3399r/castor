@@ -12,7 +12,7 @@ export default function LearningFooterFoliage({ className }: LearningFooterFolia
     >
       <img
         className={styles.image}
-        src="/images/shared/learning-footer-foliage-10.png"
+        src="/images/shared/learning-footer-foliage-12.webp"
         alt=""
         draggable={false}
       />

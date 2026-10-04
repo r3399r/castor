@@ -95,6 +95,7 @@
   background: #234b43;
 }
 .learning-page {
+  --learning-footer-background: #688a77;
   position: relative;
   isolation: isolate;
   min-height: 100vh;
@@ -119,7 +120,7 @@
   margin-bottom: 0;
   padding: 34px 24px 26px;
   border-top: 0;
-  background-color: var(--learning-footer-background, #244a42);
+  background-color: var(--learning-footer-background);
   color: var(--learning-footer-link, #e1e7dd);
 }
 .site-footer--learning a {
@@ -134,15 +135,6 @@
 }
 .site-footer--learning > :last-child {
   margin-bottom: 0;
-}
-.learning-page .learning-page-footer-foliage {
-  overflow: visible;
-  height: 80px;
-  margin-top: 0;
-}
-.learning-page .learning-page-footer-foliage > img {
-  position: absolute;
-  bottom: 0;
 }
 .standard-site-header .site-header {
   border-bottom: 0;
