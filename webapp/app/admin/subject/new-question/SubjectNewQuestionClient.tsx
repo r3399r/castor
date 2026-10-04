@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { apiFetch, apiPost } from '@/lib/api'
 import MultiSelectField from '@/components/MultiSelectField'
+import QuestionImageUpload from '@/components/QuestionImageUpload'
+import { takeQuestionDraft } from '@/lib/questionDraft'
 import { MathJax } from 'better-react-mathjax'
 
 type SubjectDetail = {
@@ -88,6 +90,21 @@ function missingFields(q: QuestionDraft): string[] {
   }
   return problems
 }
+
+/**
+ * The row's database id, shown beside its name.
+ *
+ * These are reference values an admin reads off the screen while hand-
+ * writing or checking question JSON, so they are muted rather than
+ * hidden: present when looked for, quiet when not. `#<id>` matches the
+ * notation the preview below already falls back to for a conceptId whose
+ * name cannot be resolved.
+ */
+const IdTag = ({ id }: { id: number }) => (
+  <span className="ml-1.5 align-middle text-xs font-normal text-black-300 tabular-nums">
+    #{id}
+  </span>
+)
 
 export default function SubjectNewQuestionClient() {
   const searchParams = useSearchParams()
@@ -195,6 +212,11 @@ export default function SubjectNewQuestionClient() {
       .then(setSubject)
       .catch(() => setError('無法載入科目資料。'))
       .finally(() => setLoading(false))
+
+    // Picks up a draft recognised on the question management page. Reading
+    // it consumes it, so a refresh won't clobber edits made since.
+    const draft = takeQuestionDraft(subjectId)
+    if (draft !== null) setQuestionsInput(draft)
   }, [subjectId])
 
   if (loading) {
@@ -239,6 +261,7 @@ export default function SubjectNewQuestionClient() {
                     className="accent-blue-700"
                   />
                   {exam.name}
+                  <IdTag id={exam.id} />
                 </label>
               ))}
             </div>
@@ -252,7 +275,10 @@ export default function SubjectNewQuestionClient() {
           ) : (
             <ul className="space-y-1 text-sm text-black-700">
               {subject.tags.map((tag) => (
-                <li key={tag.id}>{tag.name}</li>
+                <li key={tag.id}>
+                  {tag.name}
+                  <IdTag id={tag.id} />
+                </li>
               ))}
             </ul>
           )}
@@ -278,10 +304,14 @@ export default function SubjectNewQuestionClient() {
               {subject.conceptGroups.map((group) => (
                 <li key={group.id}>
                   <span className="font-medium text-black-900">{group.name}</span>
+                  <IdTag id={group.id} />
                   {group.concepts.length > 0 && (
                     <ul className="ml-4 list-disc text-black-500">
                       {group.concepts.map((concept) => (
-                        <li key={concept.id}>{concept.name}</li>
+                        <li key={concept.id}>
+                          {concept.name}
+                          <IdTag id={concept.id} />
+                        </li>
                       ))}
                     </ul>
                   )}
@@ -294,6 +324,21 @@ export default function SubjectNewQuestionClient() {
 
       <hr className="my-6 border-brown-300" />
 
+      {/* Fills the textarea below rather than submitting on its own: the
+          model produces a draft, and the existing preview/validation/tag
+          pickers are exactly the review step that draft needs before it
+          becomes a question. */}
+      <QuestionImageUpload
+        subjectId={subject.id}
+        onQuestions={(json) => {
+          setQuestionsInput(json)
+          setSubmitStatus({})
+          setBatchError(null)
+        }}
+      />
+
+      <hr className="my-6 border-brown-300" />
+
       <section className="space-y-2">
         <h2 className="text-lg font-bold text-black-900">貼上題目 JSON 陣列</h2>
         <textarea
@@ -303,7 +348,7 @@ export default function SubjectNewQuestionClient() {
             setSubmitStatus({})
             setBatchError(null)
           }}
-          placeholder='[{"type":"SINGLE","content":"...","options":"A|B|C|D","answer":"A","difficulty":5,"conceptIds":[1]}, ...]'
+          placeholder='[{"type":"SINGLE", "content":"...", "options":"A|B|C|D", "answer":"A", "difficulty":5, "conceptIds":[1]}, "tagIds":[1,2], ...]'
           className="h-48 w-full rounded-lg border border-brown-300 p-3 font-mono text-sm"
         />
         {parseError && <p className="text-sm text-red-600">{parseError}</p>}
