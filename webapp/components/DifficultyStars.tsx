@@ -1,5 +1,7 @@
-export default function DifficultyStars({ value }: { value: number }) {
+export default function DifficultyStars({ value, tone = 'default' }: { value: number; tone?: 'default' | 'forest' }) {
   const filled = value / 2
+  const emptyColor = tone === 'forest' ? '#E8DDD0' : '#DBD0C8'
+  const filledColor = tone === 'forest' ? '#D98A2B' : '#5B7FC4'
   return (
     <div className="flex shrink-0 items-center gap-1" aria-label={`難度 ${filled}/5`}>
       <span className="text-xs font-medium text-black-400 whitespace-nowrap">難易度：</span>
@@ -12,8 +14,8 @@ export default function DifficultyStars({ value }: { value: number }) {
               <svg viewBox="0 0 20 20" className="w-5 h-5" fill="none">
                 <path
                   d="M10 2.5l2.06 4.17 4.6.67-3.33 3.24.79 4.58L10 12.77l-4.12 2.19.79-4.58L3.34 7.34l4.6-.67L10 2.5z"
-                  fill="#DBD0C8"
-                  stroke="#DBD0C8"
+                  fill={emptyColor}
+                  stroke={emptyColor}
                   strokeWidth="0.5"
                   strokeLinejoin="round"
                 />
@@ -27,7 +29,7 @@ export default function DifficultyStars({ value }: { value: number }) {
                   <svg viewBox="0 0 20 20" className="w-5 h-5" fill="none">
                     <path
                       d="M10 2.5l2.06 4.17 4.6.67-3.33 3.24.79 4.58L10 12.77l-4.12 2.19.79-4.58L3.34 7.34l4.6-.67L10 2.5z"
-                      fill="#5B7FC4"
+                      fill={filledColor}
                       strokeLinejoin="round"
                     />
                   </svg>

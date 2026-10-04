@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { Goal, BookOpenText, Brain, Coins, FunnelPlus, NotebookPen } from 'lucide-react'
 import { apiFetch, apiPost } from '@/lib/api'
-import Chip, { tagColors } from '@/components/Chip'
+import Chip from '@/components/Chip'
 import DifficultyStars from '@/components/DifficultyStars'
 import type {
   GetQuestionAdaptiveResponse,
@@ -13,6 +13,7 @@ import type {
   Question,
 } from '@/types/api'
 import { MathJax } from 'better-react-mathjax'
+import styles from './adaptive.module.css'
 
 // High enough to fetch every category in one page -- there's no realistic
 // dataset near this size yet.
@@ -54,19 +55,15 @@ function ResultBox({ result }: { result: { correctAnswer: string; score: number;
   return (
     <div className="px-5 pb-5">
       <div
-        className={`rounded-md border px-5 py-4 ${
-          correct ? 'border-green-700/30 bg-green-700/10' : 'border-orange-700/30 bg-orange-700/10'
-        }`}
+        className={`${styles.resultNotice} ${correct ? styles.resultCorrect : styles.resultWrong}`}
       >
         <div className="flex flex-col gap-y-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4 sm:gap-y-1">
           <div
-            className={`flex items-center gap-1.5 text-[18px] font-semibold ${
-              correct ? 'text-green-700' : 'text-orange-700'
-            }`}
+            className={styles.resultHeading}
           >
             {correct ? (
               <>
-                <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-green-700">
+                <span className={styles.resultIcon}>
                   <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
                     <path d="M2 6L5 9L10 3" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
@@ -75,7 +72,7 @@ function ResultBox({ result }: { result: { correctAnswer: string; score: number;
               </>
             ) : (
               <>
-                <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-orange-700">
+                <span className={styles.resultIcon}>
                   <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
                     <path d="M3 3L9 9M9 3L3 9" stroke="white" strokeWidth="2" strokeLinecap="round"/>
                   </svg>
@@ -84,18 +81,18 @@ function ResultBox({ result }: { result: { correctAnswer: string; score: number;
               </>
             )}
           </div>
-          <div className="flex items-center gap-4 sm:contents">
+          <div className="flex flex-wrap items-center gap-4 sm:contents">
             <div className="text-base text-black-700">
-              正確答案：<span className={`inline-block rounded border bg-white/60 px-2 py-0.5 font-semibold ${correct ? 'border-green-700/30' : 'border-orange-700/30'}`}>{result.correctAnswer}</span>
+              正確答案：<span className={styles.resultValue}>{result.correctAnswer}</span>
             </div>
-            <div className="text-base text-black-500">得分：<span className={`inline-block rounded border bg-white/60 px-2 py-0.5 font-semibold ${correct ? 'border-green-700/30' : 'border-orange-700/30'}`}>{result.score}</span></div>
+            <div className="text-base text-black-500">得分：<span className={styles.resultValue}>{result.score}</span></div>
           </div>
           {fbUrl && (
             <a
               href={fbUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-md border border-brown-900 px-3 py-1.5 text-sm font-medium text-brown-900 transition hover:bg-brown-900/10 sm:mt-0 sm:ml-auto sm:w-auto sm:justify-start"
+              className={styles.discussionButton}
             >
               討論區
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -110,7 +107,7 @@ function ResultBox({ result }: { result: { correctAnswer: string; score: number;
 }
 
 const CorrectIcon = () => (
-  <span className="absolute -top-1 -right-1 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-green-700 sm:relative sm:inset-auto sm:ml-auto sm:h-6 sm:w-6">
+  <span className="ml-auto flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#315E50]">
     <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
       <path d="M2 6L5 9L10 3" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
@@ -118,7 +115,7 @@ const CorrectIcon = () => (
 )
 
 const WrongIcon = () => (
-  <span className="absolute -top-1 -right-1 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-orange-700 sm:relative sm:inset-auto sm:ml-auto sm:h-6 sm:w-6">
+  <span className="ml-auto flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#9A5058]">
     <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
       <path d="M3 3L9 9M9 3L3 9" stroke="white" strokeWidth="2" strokeLinecap="round"/>
     </svg>
@@ -142,40 +139,32 @@ function AnswerInput({
   const submitted = !!correctAnswer
 
   const getOptClass = (opt: string) => {
-    const base = 'relative flex flex-1 items-center justify-center rounded-md border-2 p-1 text-[20px] font-bold select-none transition sm:justify-start sm:px-4 sm:py-2.5'
+    const base = styles.answerOption
     if (submitted) {
       const isCorrect = opt === correctAnswer
       const isWrongSelected = opt === answer && opt !== correctAnswer
-      if (isCorrect) return `${base} cursor-default border-2 border-green-700 bg-green-700/10 text-green-700`
-      if (isWrongSelected) return `${base} cursor-default border-2 border-orange-700/60 bg-orange-700/10 text-orange-700`
-      return `${base} cursor-default border-brown-300 bg-beige-200 text-black-400 opacity-40`
+      if (isCorrect) return `${base} ${styles.answerCorrect}`
+      if (isWrongSelected) return `${base} ${styles.answerWrong}`
+      return `${base} ${styles.answerDisabled}`
     }
-    return `${base} cursor-pointer ${
-      opt === answer
-        ? 'border-2 border-blue-700 bg-blue-700/20 text-blue-700'
-        : 'border-[#E3D1C5] bg-beige-200/80 text-black-700 hover:border-brown-700 active:scale-[0.97]'
-    } ${disabled ? 'cursor-not-allowed opacity-60' : ''}`
+    return `${base} ${opt === answer ? styles.answerSelected : ''} ${disabled ? styles.answerDisabled : ''}`
   }
 
   const getTFClass = (val: string) => {
-    const base = 'relative flex flex-1 items-center justify-center rounded-md border-2 p-1 text-[20px] font-bold select-none transition sm:justify-start sm:px-4 sm:py-2.5'
+    const base = styles.answerOption
     if (submitted) {
       const isCorrect = val === correctAnswer
       const isWrongSelected = val === answer && val !== correctAnswer
-      if (isCorrect) return `${base} cursor-default border-2 border-green-700 bg-green-700/10 text-green-700`
-      if (isWrongSelected) return `${base} cursor-default border-2 border-orange-700/60 bg-orange-700/10 text-orange-700`
-      return `${base} cursor-default border-brown-300 bg-beige-200 text-black-400 opacity-40`
+      if (isCorrect) return `${base} ${styles.answerCorrect}`
+      if (isWrongSelected) return `${base} ${styles.answerWrong}`
+      return `${base} ${styles.answerDisabled}`
     }
-    return `${base} cursor-pointer ${
-      val === answer
-        ? 'border-2 border-blue-700 bg-blue-700/20 text-blue-700'
-        : 'border-[#E3D1C5] bg-beige-200/80 text-black-700 hover:border-brown-700 active:scale-[0.97]'
-    } ${disabled ? 'cursor-not-allowed opacity-60' : ''}`
+    return `${base} ${val === answer ? styles.answerSelected : ''} ${disabled ? styles.answerDisabled : ''}`
   }
 
   if (question.type === 'TRUE_FALSE') {
     return (
-      <div className="flex gap-2">
+      <div className={styles.answerGrid}>
         {['True', 'False'].map((val) => (
           <label key={val} className={getTFClass(val)}>
             <input
@@ -198,7 +187,7 @@ function AnswerInput({
 
   if (question.type === 'SINGLE') {
     return (
-      <div className="flex gap-2">
+      <div className={styles.answerGrid}>
         {options.map((opt) => (
           <label key={opt} className={getOptClass(opt)}>
             <input
@@ -222,7 +211,7 @@ function AnswerInput({
   if (question.type === 'MULTIPLE') {
     const base = answer || 'X'.repeat(options.length)
     return (
-      <div className="flex gap-2">
+      <div className={styles.answerGrid}>
         {options.map((opt, i) => (
           <label key={opt} className={getOptClass(opt)}>
             <input
@@ -254,7 +243,7 @@ function AnswerInput({
         {Array.from({ length: blanks }).map((_, i) => (
           <div key={i} className="flex flex-wrap items-center gap-2">
             <span className="text-sm font-bold text-black-700">{i + 1}.</span>
-            {options.map((opt) => (
+            <div className={`${styles.answerGrid} flex-1`}>{options.map((opt) => (
               <label key={opt} className={getOptClass(opt)}>
                 <input
                   type="radio"
@@ -270,7 +259,7 @@ function AnswerInput({
                 />
                 {opt}
               </label>
-            ))}
+            ))}</div>
           </div>
         ))}
       </div>
@@ -280,8 +269,11 @@ function AnswerInput({
   return null
 }
 
-export default function AdaptiveClient() {
-  const [activeTab, setActiveTab] = useState('入學考試')
+export default function AdaptiveClient({
+  onPracticeStateChange,
+}: {
+  onPracticeStateChange?: (active: boolean) => void
+}) {
   const [selectedCategoryId, setSelectedCategoryId] = useState('')
   const [selectedSubjectId, setSelectedSubjectId] = useState('')
   const [selectedExamIds, setSelectedExamIds] = useState<string[]>([])
@@ -306,6 +298,7 @@ export default function AdaptiveClient() {
   const [replyResponse, setReplyResponse] = useState<PostReplyResponse | null>(null)
   const [showResultModal, setShowResultModal] = useState(false)
   const [showLeaveModal, setShowLeaveModal] = useState(false)
+  const [showBottomNav, setShowBottomNav] = useState(false)
   const [loading, setLoading] = useState(false)
 
   // Single-question view: currentIndex is a page index into adaptiveQuestion
@@ -313,8 +306,13 @@ export default function AdaptiveClient() {
   // tracked in refs, not state, so accumulating it on every render/tick
   // doesn't trigger re-renders -- it's only read when leaving a page.
   const [currentIndex, setCurrentIndex] = useState(0)
+  const practiceRootRef = useRef<HTMLDivElement>(null)
+  const questionNavRef = useRef<HTMLDivElement>(null)
+  const questionNumberListRef = useRef<HTMLDivElement>(null)
+  const questionNumberRefs = useRef<Array<HTMLButtonElement | null>>([])
   const pageEnteredAtRef = useRef<number>(Date.now())
   const pageTimeMsRef = useRef<Map<number, number>>(new Map())
+  const submittingRef = useRef(false)
 
   const flushCurrentPageTime = () => {
     const now = Date.now()
@@ -352,6 +350,24 @@ export default function AdaptiveClient() {
       return repliedAnswer.has(q.id)
     })
   }, [adaptiveQuestion, repliedAnswer])
+
+  const firstUnansweredIndex = useMemo(
+    () => adaptiveQuestion.findIndex((q) =>
+      q.type === 'GROUP'
+        ? !q.children.every((child) => repliedAnswer.has(child.id))
+        : !repliedAnswer.has(q.id),
+    ),
+    [adaptiveQuestion, repliedAnswer],
+  )
+
+  useEffect(() => {
+    const list = questionNumberListRef.current
+    const current = questionNumberRefs.current[currentIndex]
+    if (!list || !current) return
+    const nextLeft = current.offsetLeft - (list.clientWidth - current.offsetWidth) / 2
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    list.scrollTo({ left: Math.max(0, nextLeft), behavior: reduceMotion ? 'auto' : 'smooth' })
+  }, [currentIndex])
 
   useEffect(() => {
     apiFetch<Paginate<CategoryOption>>('category', { limit: ALL_ITEMS_LIMIT })
@@ -441,6 +457,7 @@ export default function AdaptiveClient() {
 
   const fetchAdaptive = async () => {
     if (!selectedSubjectId) return
+    onPracticeStateChange?.(true)
     setAdaptiveQuestion([])
     setReplyResponse(null)
     setResponseOffsets([])
@@ -460,13 +477,15 @@ export default function AdaptiveClient() {
       setAdaptiveQuestion(results)
     } catch (e) {
       console.error(e)
+      onPracticeStateChange?.(false)
     } finally {
       setLoading(false)
     }
   }
 
   const onSubmit = async () => {
-    if (!canSubmit) return
+    if (!canSubmit || submittingRef.current) return
+    submittingRef.current = true
     flushCurrentPageTime()
     setLoading(true)
     try {
@@ -491,6 +510,7 @@ export default function AdaptiveClient() {
     } catch (e) {
       console.error(e)
     } finally {
+      submittingRef.current = false
       setLoading(false)
     }
   }
@@ -517,6 +537,7 @@ export default function AdaptiveClient() {
   }, [visibleOptionsByDim])
 
   const onReset = () => {
+    onPracticeStateChange?.(false)
     setAdaptiveQuestion([])
     setReplyResponse(null)
     setResponseOffsets([])
@@ -531,18 +552,85 @@ export default function AdaptiveClient() {
   }
 
   const filtersLocked = adaptiveQuestion.length > 0
+  const isLastQuestion = currentIndex === adaptiveQuestion.length - 1
+
+  const handlePrimaryAction = () => {
+    if (loading) return
+    if (replyResponse) {
+      goTo(currentIndex + 1)
+      return
+    }
+    if (canSubmit) {
+      void onSubmit()
+      return
+    }
+    if (!isLastQuestion) {
+      goTo(currentIndex + 1)
+      return
+    }
+    if (firstUnansweredIndex >= 0) goTo(firstUnansweredIndex)
+  }
+
+  const primaryActionLabel = replyResponse
+    ? '下一題'
+    : canSubmit
+      ? '確認送出'
+      : isLastQuestion
+        ? '前往未答題'
+        : '下一題'
+
+  useEffect(() => {
+    const root = practiceRootRef.current
+    const nav = questionNavRef.current
+    if (!root || !nav || adaptiveQuestion.length === 0) return
+    const updateReservedSpace = () => {
+      root.style.setProperty('--adaptive-mobile-nav-height', `${nav.getBoundingClientRect().height}px`)
+    }
+    updateReservedSpace()
+    const observer = new ResizeObserver(updateReservedSpace)
+    observer.observe(nav)
+    return () => observer.disconnect()
+  }, [adaptiveQuestion.length])
+
+  useEffect(() => {
+    const nav = questionNavRef.current
+    if (!nav || adaptiveQuestion.length === 0) {
+      setShowBottomNav(false)
+      return
+    }
+
+    const wideScreen = window.matchMedia('(min-width: 48rem)')
+    const update = (rect = nav.getBoundingClientRect()) => {
+      setShowBottomNav(wideScreen.matches && rect.bottom <= 0)
+    }
+    const observer = new IntersectionObserver(([entry]) => update(entry.boundingClientRect), { threshold: 0 })
+    const resizeObserver = new ResizeObserver(() => update())
+    const handleBreakpointChange = () => update()
+
+    observer.observe(nav)
+    resizeObserver.observe(nav)
+    wideScreen.addEventListener('change', handleBreakpointChange)
+    update()
+
+    return () => {
+      observer.disconnect()
+      resizeObserver.disconnect()
+      wideScreen.removeEventListener('change', handleBreakpointChange)
+    }
+  }, [adaptiveQuestion.length, currentIndex])
 
   return (
-    <div>
+    <div ref={practiceRootRef} className={adaptiveQuestion.length > 0 ? styles.practiceActive : undefined}>
       {adaptiveQuestion.length === 0 && !loading ? (
-        <>
-          <h1 className="mt-[60px] mb-2 text-3xl font-bold text-blue-700">智慧練習</h1>
-          <p className="mb-10 text-sm text-black-500">制定今天的學習計畫，我們幫你挑出最適合的練習題目。</p>
-        </>
+        <header className={styles.pageHeader}>
+          <h1 className={styles.pageTitle}>智慧練習</h1>
+          <p className={styles.pageSubtitle}>制定今天的學習計畫，我們幫你挑出最適合的練習題目。</p>
+        </header>
       ) : (
         <button
           onClick={() => (!replyResponse ? setShowLeaveModal(true) : onReset())}
-          className="mt-[60px] mb-6 flex items-center gap-2 rounded-lg px-3 py-1.5 text-lg font-bold text-black-700 hover:bg-beige-200 hover:text-black-900 transition cursor-pointer"
+          disabled={loading}
+          className={styles.backButton}
         >
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M16 10H4M4 10L9 5M4 10L9 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -551,95 +639,67 @@ export default function AdaptiveClient() {
         </button>
       )}
 
-      {adaptiveQuestion.length === 0 && !loading && <div className="flex flex-col gap-4">
-        <div className="flex flex-col gap-4">
-          <div className="flex items-center gap-2">
-            <Goal size={20} strokeWidth={2.5} className="text-orange-700/70 shrink-0" />
-            <span className="text-xl font-bold text-black-700">考試類別</span>
+      {adaptiveQuestion.length === 0 && !loading && <div className={styles.settings}>
+        <section className={styles.section}>
+          <div className={styles.sectionHeading}>
+            <Goal size={20} strokeWidth={2.5} className={styles.sectionIcon} />
+            <h2>考試類別</h2>
           </div>
-          <div className={`rounded-lg border border-brown-700 overflow-hidden bg-white/60 ${filtersLocked ? 'pointer-events-none opacity-50' : ''}`}>
-            {/* Mobile tabs */}
-            <div className="flex md:hidden border-b border-brown-700">
-              {(['入學考試', '國家考試', '專技證照'] as const).map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`flex-1 py-3 text-xs font-semibold transition ${
-                    activeTab === tab
-                      ? 'bg-brown-700/20 text-brown-900'
-                      : 'text-black-500 hover:bg-beige-200'
-                  }`}
-                >
-                  {tab}
-                </button>
-              ))}
-            </div>
-          <div className="px-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 md:divide-x divide-brown-700">
-            {/* 入學考試 */}
-            <div className={`${activeTab !== '入學考試' ? 'hidden md:flex' : 'flex'} flex-col gap-3 py-4 md:pt-0 md:pb-6 md:pr-6`}>
-              <span className="border-b border-brown-700 pt-2 pb-2 text-sm font-semibold text-black-700 uppercase tracking-wide hidden md:block">入學考試</span>
-              <div className="mt-2 grid grid-cols-2 md:grid-cols-1 lg:grid-cols-2 gap-3">
+          <div className={`${styles.examGrid} ${filtersLocked ? styles.locked : ''}`}>
+            <div className={`${styles.card} ${styles.examCard}`}>
+              <h3 className={styles.examCardTitle}>入學考試</h3>
+              <div className={styles.optionGrid}>
                 {categoryList.map((c) => (
                   <button
                     key={c.id}
                     onClick={() => setSelectedCategoryId(String(c.id))}
-                    className={`rounded-lg px-4 py-3 text-sm font-medium transition text-left ${
-                      selectedCategoryId === String(c.id)
-                        ? 'border-2 border-blue-700 bg-blue-700/10 text-blue-700'
-                        : 'border border-brown-300 bg-beige-200/80 text-black-900 hover:border-brown-700 active:scale-[0.97]'
-                    }`}
+                    aria-pressed={selectedCategoryId === String(c.id)}
+                    className={`${styles.option} ${styles.categoryTone} ${selectedCategoryId === String(c.id) ? styles.selected : ''}`}
                   >
                     {c.name}
                   </button>
                 ))}
                 {['分科'].map((name) => (
-                  <button key={name} disabled className="rounded-lg border border-brown-300 bg-beige-200/80 px-4 py-3 text-sm font-medium text-black-300 cursor-not-allowed text-left">
+                  <button key={name} disabled className={`${styles.option} ${styles.categoryTone}`}>
                     {name}
                   </button>
                 ))}
               </div>
             </div>
-
-            {/* 國家考試 */}
-            <div className={`${activeTab !== '國家考試' ? 'hidden md:flex' : 'flex'} flex-col gap-3 py-4 md:pt-0 md:pb-6 md:px-6`}>
-              <span className="border-b border-brown-700 pt-2 pb-2 text-sm font-semibold text-black-700 uppercase tracking-wide hidden md:block">國家考試</span>
-              <div className="mt-2 grid grid-cols-2 md:grid-cols-1 lg:grid-cols-2 gap-3">
+            <div className={`${styles.card} ${styles.examCard}`}>
+              <h3 className={styles.examCardTitle}>國家考試</h3>
+              <div className={styles.optionGrid}>
                 {['公務員高考三級', '公務員普考', '初等考試', '司法特考', '地方特考'].map((name) => (
-                  <button key={name} disabled className="rounded-lg border border-brown-300 bg-beige-200/80 px-4 py-3 text-sm font-medium text-black-300 cursor-not-allowed text-left">
+                  <button key={name} disabled className={`${styles.option} ${styles.categoryTone}`}>
                     {name}
                   </button>
                 ))}
               </div>
             </div>
-
-            {/* 專技證照 */}
-            <div className={`${activeTab !== '專技證照' ? 'hidden md:flex' : 'flex'} flex-col gap-3 py-4 md:pt-0 md:pb-6 md:pl-6`}>
-              <span className="border-b border-brown-700 pt-2 pb-2 text-sm font-semibold text-black-700 uppercase tracking-wide hidden md:block">專技證照</span>
-              <div className="mt-2 grid grid-cols-2 md:grid-cols-1 lg:grid-cols-2 gap-3">
+            <div className={`${styles.card} ${styles.examCard}`}>
+              <h3 className={styles.examCardTitle}>專技證照</h3>
+              <div className={styles.optionGrid}>
                 {['護理師執照', '律師執照', '會計師執照'].map((name) => (
-                  <button key={name} disabled className="rounded-lg border border-brown-300 bg-beige-200/80 px-4 py-3 text-sm font-medium text-black-300 cursor-not-allowed text-left">
+                  <button key={name} disabled className={`${styles.option} ${styles.categoryTone}`}>
                     {name}
                   </button>
                 ))}
               </div>
             </div>
           </div>
-          </div>
-          </div>
-        </div>
+        </section>
 
         {selectedCategoryId && filterDimensions.length > 0 && (
-          <div className="flex flex-col gap-4 mt-6">
-            <div className="flex items-center gap-2">
-              <Brain size={20} strokeWidth={2.5} className="text-orange-700/70 shrink-0" />
-              <span className="text-xl font-bold text-black-700">篩選條件</span>
+          <section className={styles.section}>
+            <div className={styles.sectionHeading}>
+              <Brain size={20} strokeWidth={2.5} className={styles.sectionIcon} />
+              <h2>篩選條件</h2>
             </div>
-            <div className={`rounded-lg border border-brown-700 divide-y divide-brown-300 bg-white/60 ${filtersLocked ? 'pointer-events-none opacity-50' : ''}`}>
+            <div className={`${styles.card} ${styles.filterCard} ${filtersLocked ? styles.locked : ''}`}>
               {filterDimensions.map((dim) => (
-                <div key={dim.id} className="px-6 py-4">
-                  <span className="mb-3 block text-sm font-bold text-black-700">{dim.name}</span>
-                  <div className="flex flex-wrap gap-2">
+                <div key={dim.id} className={styles.filterGroup}>
+                  <span className={styles.filterLabel}>{dim.name}</span>
+                  <div className={styles.optionWrap}>
                     {(visibleOptionsByDim[dim.id] ?? dim.options).map((opt) => {
                       const checked = selectedFilterOptionByDim[dim.id] === opt.id
                       return (
@@ -652,11 +712,8 @@ export default function AdaptiveClient() {
                                 : { ...prev, [dim.id]: opt.id },
                             )
                           }
-                          className={`rounded-lg px-4 py-1 text-sm font-medium transition text-left ${
-                            checked
-                              ? 'border-2 border-teal-700 bg-teal-700/10 text-teal-700'
-                              : 'border border-brown-300 bg-beige-200/80 text-black-900 hover:border-brown-700 active:scale-[0.97]'
-                          }`}
+                          aria-pressed={checked}
+                          className={`${styles.option} ${styles.categoryTone} ${checked ? styles.selected : ''}`}
                         >
                           {opt.name}
                         </button>
@@ -666,46 +723,43 @@ export default function AdaptiveClient() {
                 </div>
               ))}
             </div>
-          </div>
+          </section>
         )}
 
         {selectedCategoryId && filteredSubjectList.length > 0 && (
-          <div className="flex flex-col gap-4 mt-6">
-            <div className="flex items-center gap-2">
-              <BookOpenText size={20} strokeWidth={2.5} className="text-orange-700/70 shrink-0" />
-              <span className="text-xl font-bold text-black-700">選擇科目</span>
+          <section className={styles.section}>
+            <div className={styles.sectionHeading}>
+              <BookOpenText size={20} strokeWidth={2.5} className={styles.sectionIcon} />
+              <h2>選擇科目</h2>
             </div>
-            <div className={`rounded-lg border border-brown-700 px-6 py-4 bg-white/60 ${filtersLocked ? 'pointer-events-none opacity-50' : ''}`}>
-              <div className="flex flex-wrap gap-2">
+            <div className={`${styles.card} ${styles.filterGroup} ${filtersLocked ? styles.locked : ''}`}>
+              <div className={styles.optionWrap}>
                 {filteredSubjectList.map((s) => (
                   <button
                     key={s.id}
                     onClick={() => setSelectedSubjectId(String(s.id))}
-                    className={`rounded-lg px-4 py-3 text-sm font-medium transition text-left ${
-                      selectedSubjectId === String(s.id)
-                        ? 'border-2 border-green-700 bg-green-700/10 text-green-700'
-                        : 'border border-brown-300 bg-beige-200/80 text-black-900 hover:border-brown-700 active:scale-[0.97]'
-                    }`}
+                    aria-pressed={selectedSubjectId === String(s.id)}
+                    className={`${styles.option} ${styles.subjectTone} ${selectedSubjectId === String(s.id) ? styles.selected : ''}`}
                   >
                     {s.name}
                   </button>
                 ))}
               </div>
             </div>
-          </div>
+          </section>
         )}
 
         {selectedSubjectId && (examList.length > 0 || conceptGroupList.length > 0 || tagList.length > 0) && (
-          <div className="flex flex-col gap-4 mt-6">
+          <section className={styles.section}>
             <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2">
-                <FunnelPlus size={20} strokeWidth={2.5} className="text-orange-700/70 shrink-0" />
-                <span className="text-xl font-bold text-black-700">進階篩選</span>
+              <div className={styles.sectionHeading}>
+                <FunnelPlus size={20} strokeWidth={2.5} className={styles.sectionIcon} />
+                <h2>進階篩選</h2>
               </div>
               {(selectedExamIds.length > 0 || selectedConceptIds.length > 0 || selectedTagIds.length > 0) && !filtersLocked && (
                 <button
                   onClick={() => { setSelectedExamIds([]); setSelectedConceptIds([]); setSelectedTagIds([]) }}
-                  className="flex items-center gap-1 rounded-md border border-brown-300 px-2.5 py-1 text-sm text-black-500 hover:bg-beige-200 transition"
+                  className={`${styles.clearButton} flex items-center gap-1 rounded-lg px-2.5 py-1 text-sm transition`}
                 >
                   <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M11 3L3 11M3 3L11 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
@@ -714,13 +768,13 @@ export default function AdaptiveClient() {
                 </button>
               )}
             </div>
-            <div className={`rounded-lg border border-brown-700 bg-white/60 ${filtersLocked ? 'pointer-events-none opacity-50' : ''}`}>
+            <div className={`${styles.card} ${styles.filterCard} ${filtersLocked ? styles.locked : ''}`}>
 
               {/* 選擇試卷 */}
               {examList.length > 0 && (
-                <div className="px-6 py-4">
-                  <span className="mb-3 block text-sm font-bold text-black-700">選擇試卷（可複選）</span>
-                  <div className="flex flex-wrap gap-2">
+                <div className={styles.filterGroup}>
+                  <span className={styles.filterLabel}>選擇試卷 <span className={styles.filterHint}>（可複選）</span></span>
+                  <div className={styles.optionWrap}>
                     {examList.map((e) => {
                       const checked = selectedExamIds.includes(String(e.id))
                       return (
@@ -731,11 +785,8 @@ export default function AdaptiveClient() {
                               checked ? prev.filter((x) => x !== String(e.id)) : [...prev, String(e.id)],
                             )
                           }
-                          className={`rounded-lg px-4 py-1 text-sm font-medium transition text-left ${
-                            checked
-                              ? 'border-2 border-purple-700 bg-purple-700/10 text-purple-700'
-                              : 'border border-brown-300 bg-beige-200/80 text-black-900 hover:border-brown-700 active:scale-[0.97]'
-                          }`}
+                          aria-pressed={checked}
+                          className={`${styles.option} ${styles.examTone} ${checked ? styles.selected : ''}`}
                         >
                           {e.name}
                         </button>
@@ -747,19 +798,19 @@ export default function AdaptiveClient() {
 
               {/* 分隔線 */}
               {examList.length > 0 && conceptGroupList.length > 0 && (
-                <hr className="border-brown-300" />
+                <span aria-hidden="true" />
               )}
 
               {/* 選擇觀念 */}
               {conceptGroupList.length > 0 && (
-                <div className="px-6 py-4">
-                  <span className="mb-3 block text-sm font-bold text-black-700">選擇觀念（可複選）</span>
-                  <div className="flex flex-col gap-6">
+                <div className={styles.filterGroup}>
+                  <span className={styles.filterLabel}>選擇觀念 <span className={styles.filterHint}>（可複選）</span></span>
+                  <div className={styles.conceptGroups}>
                     {showConceptGroupHeader
                       ? conceptGroupList.map((cg) => (
-                          <div key={cg.name} className="flex flex-col gap-1.5">
-                            <span className="text-xs font-semibold text-black-500">{cg.name}</span>
-                            <div className="flex flex-wrap gap-2">
+                          <div key={cg.name}>
+                            <span className={styles.conceptTitle}>{cg.name}</span>
+                            <div className={styles.optionWrap}>
                               {cg.concepts.map((c) => {
                                 const checked = selectedConceptIds.includes(String(c.id))
                                 return (
@@ -772,11 +823,8 @@ export default function AdaptiveClient() {
                                           : [...prev, String(c.id)],
                                       )
                                     }
-                                    className={`rounded-full px-4 py-1 text-sm font-medium transition ${
-                                      checked
-                                        ? 'border-2 border-orange-700 bg-orange-700/10 text-orange-700'
-                                        : 'border border-brown-300 bg-beige-200/80 text-black-900 hover:border-brown-700 active:scale-[0.97]'
-                                    }`}
+                                    aria-pressed={checked}
+                                    className={`${styles.pillOption} ${styles.conceptTone} ${checked ? styles.selected : ''}`}
                                   >
                                     {c.name}
                                   </button>
@@ -786,7 +834,7 @@ export default function AdaptiveClient() {
                           </div>
                         ))
                       : (
-                          <div className="flex flex-wrap gap-2">
+                          <div className={styles.optionWrap}>
                             {conceptGroupList.flatMap((cg) =>
                               cg.concepts.map((c) => {
                                 const checked = selectedConceptIds.includes(String(c.id))
@@ -800,11 +848,8 @@ export default function AdaptiveClient() {
                                           : [...prev, String(c.id)],
                                       )
                                     }
-                                    className={`rounded-full px-4 py-1 text-sm font-medium transition ${
-                                      checked
-                                        ? 'border-2 border-orange-700 bg-orange-700/10 text-orange-700'
-                                        : 'border border-brown-300 bg-beige-200/80 text-black-900 hover:border-brown-700 active:scale-[0.97]'
-                                    }`}
+                                    aria-pressed={checked}
+                                    className={`${styles.pillOption} ${styles.conceptTone} ${checked ? styles.selected : ''}`}
                                   >
                                     {c.name}
                                   </button>
@@ -819,14 +864,14 @@ export default function AdaptiveClient() {
 
               {/* 分隔線 */}
               {(examList.length > 0 || conceptGroupList.length > 0) && tagList.length > 0 && (
-                <hr className="border-brown-300" />
+                <span aria-hidden="true" />
               )}
 
               {/* 選擇標籤 */}
               {tagList.length > 0 && (
-                <div className="px-6 py-4">
-                  <span className="mb-3 block text-sm font-bold text-black-700">選擇標籤（可複選）</span>
-                  <div className="flex flex-wrap gap-2">
+                <div className={styles.filterGroup}>
+                  <span className={styles.filterLabel}>選擇標籤 <span className={styles.filterHint}>（可複選）</span></span>
+                  <div className={styles.optionWrap}>
                     {tagList.map((t) => {
                       const checked = selectedTagIds.includes(String(t.id))
                       return (
@@ -837,11 +882,8 @@ export default function AdaptiveClient() {
                               checked ? prev.filter((x) => x !== String(t.id)) : [...prev, String(t.id)],
                             )
                           }
-                          className={`rounded-lg px-4 py-1 text-sm font-medium transition ${
-                            checked
-                              ? 'border-2 border-blue-700 bg-blue-700/10 text-blue-700'
-                              : 'border border-brown-300 bg-beige-200/80 text-black-900 hover:border-brown-700 active:scale-[0.97]'
-                          }`}
+                          aria-pressed={checked}
+                          className={`${styles.pillOption} ${styles.tagTone} ${checked ? styles.selected : ''}`}
                         >
                           {t.name}
                         </button>
@@ -852,28 +894,23 @@ export default function AdaptiveClient() {
               )}
 
             </div>
-          </div>
+          </section>
         )}
 
-        <hr className="my-6 border-brown-300" />
-
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 mb-10">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <NotebookPen size={20} strokeWidth={2.5} className="text-orange-700/70 shrink-0" />
-              <span className="text-xl font-bold text-black-700">練習題數</span>
+        <section className={`${styles.card} ${styles.actionCard}`}>
+          <div className={styles.countGroup}>
+            <div className={styles.sectionHeading}>
+              <NotebookPen size={20} strokeWidth={2.5} className={styles.sectionIcon} />
+              <h2>練習題數</h2>
             </div>
-            <div className="flex gap-2">
+            <div className={styles.segments}>
               {[1, 2, 5, 10].map((n) => (
                 <button
                   key={n}
                   onClick={() => setNumQuestionsTarget(n)}
                   disabled={filtersLocked}
-                  className={`rounded-md px-4 py-1.5 text-sm font-medium transition ${
-                    numQuestionsTarget === n
-                      ? 'border-2 border-blue-700 bg-blue-700/10 text-blue-700'
-                      : 'border border-brown-300 text-black-700 hover:bg-beige-200 active:scale-[0.97]'
-                  } disabled:cursor-not-allowed disabled:opacity-50`}
+                  aria-pressed={numQuestionsTarget === n}
+                  className={`${styles.segmentOption} ${numQuestionsTarget === n ? styles.selected : ''}`}
                 >
                   {n}
                 </button>
@@ -881,14 +918,14 @@ export default function AdaptiveClient() {
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className={styles.startGroup}>
             {questionCount >= 0 && (
-              <span className="text-sm text-black-500">共有 {questionCount} 題符合條件</span>
+              <span className={styles.countText}>共有 {questionCount} 題符合條件</span>
             )}
             <button
               onClick={fetchAdaptive}
               disabled={!selectedSubjectId || filtersLocked || questionCount <= 0 || loading}
-              className="rounded-md bg-blue-700 px-6 py-2.5 text-sm font-bold text-white transition hover:bg-[#1f3ea3] disabled:cursor-not-allowed disabled:opacity-50"
+              className={styles.primaryButton}
             >
               {loading ? '選題中…' : (
                 <span className="flex items-center gap-1.5">
@@ -900,7 +937,7 @@ export default function AdaptiveClient() {
               )}
             </button>
           </div>
-        </div>
+        </section>
       </div>}
 
       {loading && adaptiveQuestion.length === 0 && (
@@ -910,11 +947,11 @@ export default function AdaptiveClient() {
       {adaptiveQuestion.length > 0 && currentQuestion && (
         <div>
           {/* 導覽列：上一題／跳題／下一題 -- 可自由前後切換，不受作答狀態限制 */}
-          <div className="mb-4 flex items-center justify-between gap-3">
+          <div ref={questionNavRef} className={styles.questionNav}>
             <button
               onClick={() => goTo(currentIndex - 1)}
-              disabled={currentIndex === 0}
-              className="flex shrink-0 items-center gap-1 rounded-md border border-brown-300 px-3 py-1.5 text-sm font-medium text-black-700 transition hover:bg-beige-200 disabled:cursor-not-allowed disabled:opacity-40"
+              disabled={currentIndex === 0 || loading}
+              className={styles.navButton}
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M10 3L5 8L10 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -922,7 +959,9 @@ export default function AdaptiveClient() {
               上一題
             </button>
 
-            <div className="flex flex-wrap items-center justify-center gap-1.5">
+            <div className={styles.navCenter}>
+              <div ref={questionNumberListRef} className={styles.questionNumbers}>
+              <div className={styles.questionNumberTrack}>
               {adaptiveQuestion.map((q, i) => {
                 const off = responseOffsets[i] ?? 0
                 const leafResults = q.type === 'GROUP'
@@ -933,99 +972,113 @@ export default function AdaptiveClient() {
                 const answered = q.type === 'GROUP'
                   ? q.children.every((c) => repliedAnswer.has(c.id))
                   : repliedAnswer.has(q.id)
+                const stateLabel = graded
+                  ? anyWrong ? '答錯' : '答對'
+                  : answered ? '已作答' : '未作答'
                 return (
                   <button
                     key={q.id}
+                    ref={(node) => { questionNumberRefs.current[i] = node }}
                     onClick={() => goTo(i)}
-                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md border-2 text-sm font-bold transition ${
-                      i === currentIndex
-                        ? 'border-blue-700 bg-blue-700/10 text-blue-700'
-                        : graded
-                          ? anyWrong
-                            ? 'border-orange-700/60 bg-orange-700/10 text-orange-700'
-                            : 'border-green-700/60 bg-green-700/10 text-green-700'
-                          : answered
-                            ? 'border-brown-700 bg-beige-200 text-black-700'
-                            : 'border-brown-300 bg-white/60 text-black-500 hover:border-brown-700'
-                    }`}
+                    disabled={loading}
+                    aria-current={i === currentIndex ? 'step' : undefined}
+                    aria-label={`第 ${i + 1} 題，${stateLabel}${i === currentIndex ? '，目前題目' : ''}`}
+                    className={`${styles.questionNumber} ${
+                      graded
+                        ? anyWrong
+                          ? styles.questionNumberWrong
+                          : styles.questionNumberCorrect
+                        : answered
+                          ? styles.questionNumberAnswered
+                          : ''
+                    } ${i === currentIndex ? styles.questionNumberCurrent : ''}`}
                   >
                     {i + 1}
+                    {graded && (
+                      <span className={styles.questionStatusMark} aria-hidden="true">
+                        {anyWrong ? '×' : '✓'}
+                      </span>
+                    )}
                   </button>
                 )
               })}
+              </div>
+              </div>
             </div>
 
             <button
-              onClick={() => goTo(currentIndex + 1)}
-              disabled={currentIndex === adaptiveQuestion.length - 1}
-              className="flex shrink-0 items-center gap-1 rounded-md border border-brown-300 px-3 py-1.5 text-sm font-medium text-black-700 transition hover:bg-beige-200 disabled:cursor-not-allowed disabled:opacity-40"
+              onClick={handlePrimaryAction}
+              disabled={loading || (!!replyResponse && isLastQuestion)}
+              className={`${styles.primaryButton} ${styles.navPrimaryButton}`}
             >
-              下一題
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M6 3L11 8L6 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
+              {loading && canSubmit ? '送出中…' : primaryActionLabel}
+              {(!canSubmit || !!replyResponse) && !loading && (
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M6 3L11 8L6 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              )}
             </button>
           </div>
 
           <MathJax dynamic>
-            <div className="overflow-hidden rounded-lg border border-brown-700 bg-white/60">
-              <div className="border-b border-[#E3D1C5] px-5 pt-3 pb-2">
+            <div className={styles.questionCard}>
+              <div className={styles.questionMeta}>
                 {/* 題號 + 難易度（同一行）*/}
                 <div className="flex items-center justify-between gap-3 sm:hidden">
-                  <span className="shrink-0 font-bold text-blue-700">
+                  <span className={`${styles.questionIndex} shrink-0 font-bold`}>
                     <span className="text-[20px]">Q{currentIndex + 1}</span>
                     <span className="text-base"> / {numQuestionsTarget}</span>
                   </span>
-                  <DifficultyStars value={currentQuestion.adjustedDifficulty} />
+                  <DifficultyStars value={currentQuestion.adjustedDifficulty} tone="forest" />
                 </div>
                 {/* 標籤（第二行，mobile only）*/}
                 <div className="mt-1.5 flex flex-wrap gap-2 sm:hidden">
-                  <Chip label={typeLabel[currentQuestion.type] ?? currentQuestion.type} />
+                  <Chip label={typeLabel[currentQuestion.type] ?? currentQuestion.type} color="bg-[#E5EAE4] text-[#3F5B51]" />
                   {currentQuestion.exam.map((e) => (
-                    <Chip key={e.id} label={e.name} color={tagColors.exam} />
+                    <Chip key={e.id} label={e.name} color="bg-[#D5EAD9] text-[#2F6746]" />
                   ))}
                   {currentQuestion.concept.map((c) => (
                     <Chip
                       key={c.id}
                       label={c.conceptGroup.name === c.name ? c.name : c.conceptGroup.name + '-' + c.name}
-                      color={tagColors.concept}
+                      color="bg-[#E6DDF3] text-[#65458A]"
                     />
                   ))}
                   {currentQuestion.tag.map((t) => (
-                    <Chip key={t.id} label={t.name} color={tagColors.tag} />
+                    <Chip key={t.id} label={t.name} color="bg-[#F3E4C4] text-[#805C21]" />
                   ))}
                 </div>
                 {/* Desktop：題號 + 標籤靠左，難易度靠右 */}
                 <div className="hidden sm:flex sm:items-start sm:justify-between sm:gap-3">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="shrink-0 font-bold text-blue-700">
+                    <span className={`${styles.questionIndex} shrink-0 font-bold`}>
                       <span className="text-[20px]">Q{currentIndex + 1}</span>
                       <span className="text-base"> / {numQuestionsTarget}</span>
                     </span>
-                    <Chip label={typeLabel[currentQuestion.type] ?? currentQuestion.type} />
+                    <Chip label={typeLabel[currentQuestion.type] ?? currentQuestion.type} color="bg-[#E5EAE4] text-[#3F5B51]" />
                     {currentQuestion.exam.map((e) => (
-                      <Chip key={e.id} label={e.name} color={tagColors.exam} />
+                      <Chip key={e.id} label={e.name} color="bg-[#D5EAD9] text-[#2F6746]" />
                     ))}
                     {currentQuestion.concept.map((c) => (
                       <Chip
                         key={c.id}
                         label={c.conceptGroup.name === c.name ? c.name : c.conceptGroup.name + '-' + c.name}
-                        color={tagColors.concept}
+                        color="bg-[#E6DDF3] text-[#65458A]"
                       />
                     ))}
                     {currentQuestion.tag.map((t) => (
-                      <Chip key={t.id} label={t.name} color={tagColors.tag} />
+                      <Chip key={t.id} label={t.name} color="bg-[#F3E4C4] text-[#805C21]" />
                     ))}
                   </div>
-                  <DifficultyStars value={currentQuestion.adjustedDifficulty} />
+                  <DifficultyStars value={currentQuestion.adjustedDifficulty} tone="forest" />
                 </div>
               </div>
 
-              <div className="flex flex-col gap-4 px-5 lg:px-[40px] py-7">
+              <div className={styles.questionBody}>
                 {currentQuestion.content && (
                   <div
                     dangerouslySetInnerHTML={{ __html: currentQuestion.content }}
-                    className="prose max-w-none text-[18px] font-medium text-black-800 [&>*:last-child]:mb-0"
+                    className="prose max-w-none text-[18px] font-medium leading-relaxed text-black-800 [&>*:last-child]:mb-0"
                   />
                 )}
                 {currentQuestion.answer && (
@@ -1048,7 +1101,7 @@ export default function AdaptiveClient() {
               {currentQuestion.type === 'GROUP' &&
                 currentQuestion.children.map((child, i) => (
                   <Fragment key={child.id}>
-                    <div className="flex flex-col gap-4 border-t border-brown-300 px-5 lg:px-[40px] pt-5 pb-7">
+                    <div className={`${styles.questionBody} border-t border-[#e1e7df]`}>
                       {child.content && (
                         <div
                           dangerouslySetInnerHTML={{ __html: child.content }}
@@ -1072,40 +1125,45 @@ export default function AdaptiveClient() {
                 ))}
             </div>
           </MathJax>
-        </div>
-      )}
-
-      {adaptiveQuestion.length > 0 && !replyResponse && (
-        <div className="mt-[40px] flex lg:justify-end">
-          <button
-            onClick={onSubmit}
-            disabled={!canSubmit || loading}
-            className="flex w-full items-center justify-center gap-3 rounded-md bg-blue-700 px-6 py-3.5 text-base font-bold text-white transition hover:bg-[#1f3ea3] disabled:cursor-not-allowed disabled:opacity-50 lg:w-[320px]"
-          >
-            {loading ? '送出中…' : (
-              <>
-                確認送出
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                  <path d="M5 12H19M19 12L13 6M19 12L13 18" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+          {showBottomNav && <div className={styles.questionBottomNav}>
+            <button
+              onClick={() => goTo(currentIndex - 1)}
+              disabled={currentIndex === 0 || loading}
+              className={styles.navButton}
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M10 3L5 8L10 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              上一題
+            </button>
+            <button
+              onClick={handlePrimaryAction}
+              disabled={loading || (!!replyResponse && isLastQuestion)}
+              className={`${styles.primaryButton} ${styles.navPrimaryButton}`}
+            >
+              {loading && canSubmit ? '送出中…' : primaryActionLabel}
+              {(!canSubmit || !!replyResponse) && !loading && (
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M6 3L11 8L6 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
-              </>
-            )}
-          </button>
+              )}
+            </button>
+          </div>}
         </div>
       )}
 
       {replyResponse && (
-        <div className="mt-[40px] flex flex-wrap justify-end gap-3">
+        <div className={styles.postActions}>
           <button
             onClick={fetchAdaptive}
             disabled={loading}
-            className="rounded-md border border-blue-700 px-6 py-2.5 text-sm font-bold text-blue-700 transition hover:bg-blue-700/10 disabled:opacity-50"
+            className={styles.secondaryButton}
           >
             用相同條件再練一組
           </button>
           <button
             onClick={onReset}
-            className="rounded-md bg-blue-700 px-6 py-2.5 text-sm font-bold text-white transition hover:bg-[#1f3ea3]"
+            className={styles.primaryButton}
           >
             重新篩選
           </button>
@@ -1118,10 +1176,10 @@ export default function AdaptiveClient() {
           onClick={() => setShowLeaveModal(false)}
         >
           <div
-            className="mx-4 w-full max-w-xs rounded-xl bg-beige-100 p-[10px] shadow-xl"
+            className={`${styles.card} mx-4 w-full max-w-xs p-2`}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex flex-col items-center gap-6 rounded border border-brown-700 px-6 py-8">
+            <div className="flex flex-col items-center gap-6 rounded-xl px-6 py-8">
               <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-black-700">
                 <circle cx="20" cy="20" r="19" stroke="currentColor" strokeWidth="2"/>
                 <line x1="20" y1="12" x2="20" y2="24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
@@ -1133,13 +1191,13 @@ export default function AdaptiveClient() {
               <div className="flex w-full gap-3">
                 <button
                   onClick={() => setShowLeaveModal(false)}
-                  className="flex-1 rounded-md border border-brown-300 py-2.5 text-sm text-black-900 transition hover:bg-beige-200"
+                  className={`${styles.secondaryButton} flex-1`}
                 >
                   取消
                 </button>
                 <button
                   onClick={() => { setShowLeaveModal(false); onReset() }}
-                  className="flex-1 rounded-md border border-brown-300 py-2.5 text-sm text-black-900 transition hover:bg-beige-200"
+                  className={`${styles.primaryButton} flex-1`}
                 >
                   仍要離開
                 </button>
@@ -1155,14 +1213,14 @@ export default function AdaptiveClient() {
           onClick={() => setShowResultModal(false)}
         >
           <div
-            className="mx-4 w-full max-w-xs rounded-xl bg-beige-100 p-[10px] shadow-xl"
+            className={`${styles.card} mx-4 w-full max-w-xs p-2`}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex flex-col items-center gap-6 rounded border border-brown-700 px-6 py-8">
+            <div className="flex flex-col items-center gap-6 rounded-xl px-6 py-8">
               <div className="w-full text-center">
                 <p className="text-base font-normal text-black-700">此次練習一共獲得</p>
                 <div className="mt-1 flex justify-center">
-                  <span className="relative text-[64px] font-bold leading-tight text-blue-700">
+                  <span className={`${styles.questionIndex} relative text-[64px] font-bold leading-tight`}>
                     {totalScore}
                     <span className="absolute bottom-3 left-full ml-1 text-base font-normal text-black-700">分</span>
                   </span>
@@ -1171,21 +1229,21 @@ export default function AdaptiveClient() {
                   <Coins size={16} strokeWidth={2.5} />
                   +{totalAwardedPoints} 積分
                 </div>
-                <hr className="mt-2 border-brown-700" />
+                <hr className="mt-2 border-[#d6dfd7]" />
               </div>
               <div className="flex w-full gap-4">
-                <div className="flex-1 rounded-lg bg-green-700/10 px-4 py-3 text-center">
-                  <p className="text-2xl font-bold text-black-700">{correctCount}</p>
-                  <p className="mt-1 text-sm font-medium text-green-700">正確</p>
+                <div className={`${styles.scoreCorrect} flex-1 rounded-lg px-4 py-3 text-center`}>
+                  <p className="text-2xl font-bold">{correctCount}</p>
+                  <p className="mt-1 text-sm font-semibold">正確</p>
                 </div>
-                <div className="flex-1 rounded-lg bg-orange-700/10 px-4 py-3 text-center">
-                  <p className="text-2xl font-bold text-black-700">{wrongCount}</p>
-                  <p className="mt-1 text-sm font-medium text-orange-700">錯誤</p>
+                <div className={`${styles.scoreWrong} flex-1 rounded-lg px-4 py-3 text-center`}>
+                  <p className="text-2xl font-bold">{wrongCount}</p>
+                  <p className="mt-1 text-sm font-semibold">錯誤</p>
                 </div>
               </div>
               <button
                 onClick={() => setShowResultModal(false)}
-                className="w-full rounded-md border border-brown-300 py-2.5 text-sm text-black-900 transition hover:bg-beige-200"
+                className={`${styles.primaryButton} w-full`}
               >
                 好
               </button>
