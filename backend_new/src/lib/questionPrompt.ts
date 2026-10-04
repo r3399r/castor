@@ -24,10 +24,20 @@ export const QUESTION_EXTRACT_INSTRUCTION = `
 ## 輸出規則
 
 - 只回覆 JSON array，不要任何說明文字、標題或 markdown code block
-- 內容使用 HTML 格式，盡量符合原題目的排版，css使用html inline style，不含多餘空白與換行
+- 內容使用 HTML 格式，盡量符合原題目的排版，css使用html inline style，不含多餘空白與換行（數學公式除外，見「數學公式」一節）
 - 所有字串中的雙引號需正確跳脫
 - 只辨識截圖中實際存在的內容，不要自行補上截圖外的題目或選項
 - 若截圖模糊、殘缺或裁切到看不出完整題目，回傳空 array []，不要猜測內容
+
+## 數學公式
+
+題目中的數學式一律使用 LaTeX（MathJax）語法，不要用 CSS、<sup>、<sub>、<table> 或純文字拼湊出數學排版：
+
+- 行內公式用 $...$，獨立成行的公式用 $$...$$
+- JSON 字串裡的反斜線必須寫成雙反斜線，例如 $\\\\frac{1}{2}$、$x^{2}+y^{2}=r^{2}$、$\\\\sqrt{3}$、$\\\\int_{0}^{1}f(x)dx$
+- 單一個反斜線在 JSON 中會被當成其他跳脫字元（\\f 是換頁、\\t 是定位），公式會整段損毀，務必使用雙反斜線
+- inline style 與 HTML 標籤只負責圖片與版面結構（分欄、表格、對齊），不要用來模擬分數、根號或次方
+- 純文字就能表達的數字與單位（例如 3 公分、50%）不需要包成公式
 
 ## 圖片處理
 
@@ -60,16 +70,25 @@ export const QUESTION_EXTRACT_INSTRUCTION = `
 
 ## options 格式
 
+options 是用「|」分隔的選項標籤，前端依此切出可點選的按鈕；長度上限 255 字元：
+
 - SINGLE / MULTIPLE：依原卷格式，如 "A|B|C|D"
-- TRUE_FALSE："True|False"
-- FILL："1|2|3|4|5|6|7|8|9|0|-|±"
+- TRUE_FALSE：固定為 "True|False"
+- FILL：固定為 "1|2|3|4|5|6|7|8|9|0|-|±"
+- 選項標籤本身不可含有「|」
+- GROUP：options 與 answer 一律為 null
 
 ## answer 格式
 
-- SINGLE："A"
-- MULTIPLE："AC"
-- TRUE_FALSE："True" 或 "False"
-- FILL：依序填入，例如 "301"
+answer 必須與 options 嚴格對應。後端不檢查這個格式，寫錯不會報錯，而是變成一道永遠算不出分數的題目；長度上限 255 字元：
+
+- SINGLE：選項標籤本身，例如 "A"，需與 options 中的字串完全一致
+- TRUE_FALSE："True" 或 "False"，大小寫需完全一致
+- MULTIPLE：O／X 遮罩，不是選項字母。長度必須等於選項數量，選中的位置寫大寫 O，未選的寫大寫 X。
+  例如 options 為 "A|B|C|D"、正確答案是 A 與 C 時，answer 要寫 "OXOX"，不可寫成 "AC"
+- FILL：依序寫出每個空格的答案字元，例如 "301" 代表三個空格，答案依序是 3、0、1。
+  前端是用 answer 的長度決定要顯示幾個空格，因此長度必須正好等於空格數；
+  每個字元都必須是 options 中的單一字元
 
 ## difficulty
 

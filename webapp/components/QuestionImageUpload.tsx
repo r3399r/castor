@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { apiPost } from '@/lib/api'
+import { ApiError, apiPost } from '@/lib/api'
 
 // Mirrors backend_new's questionImageBodySchema. Kept in step by hand --
 // the point of checking here is to say "that file is too big" while the
@@ -105,6 +105,49 @@ const downscaleToLimit = async (
   } finally {
     if (objectUrl) URL.revokeObjectURL(objectUrl)
   }
+}
+
+/**
+ * Turns a failed recognition into something the admin can act on.
+ *
+ * What matters is whose problem it is. An overloaded provider needs
+ * nothing but another click; a screenshot the model couldn't read needs a
+ * different screenshot. The previous copy offered both at once, which
+ * sent admins hunting for a clearer image during what were really
+ * upstream 503s.
+ */
+const describeRecognizeError = (e: unknown): string => {
+  if (!(e instanceof ApiError))
+    return `辨識失敗：${e instanceof Error ? e.message : String(e)}`
+
+  switch (e.code) {
+    // The provider itself said "later" -- Gemini answers an overloaded
+    // model with 503, and a rate-limited key with 429.
+    case 'AI_UNAVAILABLE':
+    case 'AI_REQUEST_FAILED':
+    case 'AI_EMPTY_RESPONSE':
+      return 'AI 服務目前忙線中，請稍候幾秒再按一次「AI 辨識」。這是暫時性狀況，與截圖品質無關。'
+    // The call went through but the reply was unusable; here a clearer
+    // screenshot genuinely can help.
+    case 'AI_INVALID_JSON':
+    case 'AI_INVALID_SHAPE':
+      return 'AI 回傳的格式不正確，請再試一次；若持續失敗，請換一張更清楚的截圖。'
+    // Config problems, not content problems -- an admin retrying these
+    // forever would never get anywhere.
+    case 'AI_MODEL_NOT_FOUND':
+      return 'AI 模型設定已失效（可能已停止服務），請聯絡系統管理員更新模型設定。'
+    case 'AI_NOT_CONFIGURED':
+      return '伺服器尚未完成 AI 設定（金鑰或模型），請聯絡系統管理員。'
+  }
+
+  if (e.status === 400)
+    return '圖片格式或大小不符，或此科目尚未建立觀念（需先新增觀念才能辨識）。'
+  if (e.status === 404) return '找不到此科目。'
+  // A 502/504 carrying no code never reached the handler -- CloudFront or
+  // API Gateway answered first, including on the 29s gateway timeout.
+  if (e.status === 502 || e.status === 504)
+    return 'AI 服務暫時無法連線或辨識逾時，請稍候幾秒再試一次。'
+  return `辨識失敗（${e.status}），請再試一次。`
 }
 
 export default function QuestionImageUpload({
@@ -214,16 +257,7 @@ export default function QuestionImageUpload({
       }
       onQuestions(JSON.stringify(res.questions, null, 2))
     } catch (e) {
-      // apiPost only surfaces the status code, so the AI_* codes the
-      // server distinguishes all arrive here as one 502 -- worth telling
-      // them apart from a rejected upload, which is the admin's to fix.
-      const message = e instanceof Error ? e.message : String(e)
-      if (message.includes('502'))
-        setError('AI 辨識失敗或回傳格式不正確，請再試一次，或換一張更清楚的截圖。')
-      else if (message.includes('400'))
-        setError('圖片格式或大小不符，或此科目尚未建立觀念（需先新增觀念才能辨識）。')
-      else if (message.includes('404')) setError('找不到此科目。')
-      else setError(`辨識失敗：${message}`)
+      setError(describeRecognizeError(e))
     } finally {
       setBusy(false)
     }

@@ -99,6 +99,18 @@ Resources:
           # Same SSM parameter the legacy backend's preview endpoint reads
           # -- one key, one place to rotate it.
           GOOGLE_GENAI_API_KEY: !Sub '{{resolve:ssm:${Project}-google-genai-api-key}}'
+          # Pinned here rather than left to genai.ts's built-in default so
+          # that swapping models is a stack parameter change instead of a
+          # code change and rebuild.
+          GEMINI_MODEL: gemini-3.6-flash
+          # Only the final retry attempt uses this, and only after the
+          # primary has already answered 503. It has to be a *different*
+          # model to be worth anything: 503 UNAVAILABLE is per-model
+          # capacity, so re-asking the model that just refused is the
+          # weakest retry available. 3.5 is the nearest older stable flash
+          # -- same tier, separate capacity pool, and not a preview that
+          # could be retired underneath us.
+          GEMINI_FALLBACK_MODEL: gemini-3.5-flash
       Events:
         AnyRoute:
           Type: Api
