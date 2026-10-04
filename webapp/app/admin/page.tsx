@@ -3,7 +3,8 @@ import Navbar from '@/components/Navbar'
 
 const ADMIN_FUNCTIONS = [
   { label: '類別管理', description: '新增、編輯、刪除考試類別', href: '/admin/category' },
-  { label: '科目管理', description: '新增、編輯、刪除科目', href: '/admin/subject' },
+  { label: '科目管理', description: '新增、編輯、刪除科目、新增題目', href: '/admin/subject' },
+  { label: '題目管理', description: '檢視、編輯、刪除題目', href: '/admin/question' },
   { label: '考試管理', description: '新增、編輯、刪除考試', href: '/admin/exam' },
   { label: '標籤管理', description: '新增、編輯、刪除標籤', href: '/admin/tag' },
   { label: '觀念群組管理', description: '新增、編輯、刪除觀念群組', href: '/admin/concept-group' },
@@ -11,7 +12,6 @@ const ADMIN_FUNCTIONS = [
   { label: '篩選維度管理', description: '新增、編輯、刪除篩選維度', href: '/admin/filter-dimension' },
   { label: '篩選選項管理', description: '新增、編輯、刪除篩選選項', href: '/admin/filter-option' },
   { label: '使用者管理', description: '檢視使用者列表', href: '/admin/user' },
-  { label: '題目管理', description: '檢視、編輯、刪除題目', href: '/admin/question' },
 ]
 
 export default function AdminPage() {
