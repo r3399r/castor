@@ -3,10 +3,11 @@ import Footer from '@/components/Footer'
 import LearningFooterFoliage from '@/components/learning/LearningFooterFoliage'
 import Navbar from '@/components/Navbar'
 import ReplyTabsClient from './ReplyTabsClient'
+import styles from './reply.module.css'
 
 export default function ReplyPage() {
   return (
-    <div className="learning-page">
+    <div className={`${styles.page} learning-page`}>
       <div className="standard-site-header">
         <Navbar />
       </div>

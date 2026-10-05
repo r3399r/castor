@@ -8,6 +8,7 @@ import Chip, { tagColors } from '@/components/Chip'
 import DifficultyStars from '@/components/DifficultyStars'
 import type { GetReplyResponse, ReplyGroup } from '@/types/api'
 import type { QueryFilters } from './useSharedFilters'
+import styles from './reply.module.css'
 
 const typeLabel: Record<string, string> = {
   SINGLE: '單選題',
@@ -64,35 +65,35 @@ function ReplyRow({ item }: { item: ReplyGroup }) {
   )
 
   return (
-    <article className="overflow-hidden rounded-lg border border-brown-700 bg-white/60">
+    <article className={styles.recordCard}>
       {/* Header */}
-      <div className="border-b border-[#E3D1C5] px-5 pt-3 pb-2">
+      <div className={styles.cardHeader}>
         <div className="flex items-center justify-between gap-3 sm:hidden">
-          <span className="flex items-center gap-2 font-bold text-blue-700">
-            <BookOpenText size={20} strokeWidth={2.5} className="shrink-0 text-orange-700/70" />
+          <span className={`${styles.subjectName} flex items-center gap-2`}>
+            <BookOpenText size={20} strokeWidth={2.5} className={`${styles.subjectIcon} shrink-0`} />
             {item.subject.name}
           </span>
-          <DifficultyStars value={difficulty} />
+          <DifficultyStars value={difficulty} tone="forest" />
         </div>
         <div className="mt-2.5 flex flex-wrap gap-2 sm:hidden">
           <MetaChips />
         </div>
         <div className="hidden sm:flex sm:items-start sm:justify-between sm:gap-3">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="flex shrink-0 items-center gap-2 font-bold text-blue-700">
-              <BookOpenText size={20} strokeWidth={2.5} className="shrink-0 text-orange-700/70" />
+            <span className={`${styles.subjectName} flex shrink-0 items-center gap-2`}>
+              <BookOpenText size={20} strokeWidth={2.5} className={`${styles.subjectIcon} shrink-0`} />
               {item.subject.name}
             </span>
             <div className="ml-2 flex flex-wrap gap-2">
               <MetaChips />
             </div>
           </div>
-          <DifficultyStars value={difficulty} />
+          <DifficultyStars value={difficulty} tone="forest" />
         </div>
       </div>
 
       {/* Body */}
-      <div className="flex flex-col gap-4 px-5 py-7 lg:px-[40px]">
+      <div className={styles.cardBody}>
         {/* Parent / standalone question content */}
         {question.content && (
           <div
@@ -107,7 +108,7 @@ function ReplyRow({ item }: { item: ReplyGroup }) {
             const correct = child.score > 0
             const childQ = isGroup ? child.question : null
             return (
-              <div key={child.id} className={isGroup ? 'border-t border-brown-300 pt-5' : ''}>
+              <div key={child.id} className={isGroup ? styles.subQuestion : ''}>
                 {childQ?.content && (
                   <div
                     dangerouslySetInnerHTML={{ __html: childQ.content }}
@@ -115,9 +116,7 @@ function ReplyRow({ item }: { item: ReplyGroup }) {
                   />
                 )}
                 <div
-                  className={`rounded-md border px-5 py-4 ${
-                    correct ? 'border-green-700/30 bg-green-700/10' : 'border-orange-700/30 bg-orange-700/10'
-                  }`}
+                  className={`${styles.statusPanel} ${correct ? styles.statusCorrect : styles.statusWrong}`}
                 >
                   <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
                     <div className="flex flex-col gap-2 text-base text-black-700 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4">
@@ -131,18 +130,14 @@ function ReplyRow({ item }: { item: ReplyGroup }) {
                       <div className="flex items-center gap-4">
                         <div>
                           作答：
-                          <span className="inline-block rounded border border-brown-300 bg-white/60 px-2 py-0.5 font-semibold text-black-900">
+                          <span className={styles.value}>
                             {child.repliedAnswer ?? '—'}
                           </span>
                         </div>
                         <div>
                           得分：
                           <span
-                            className={`inline-block rounded border bg-white/60 px-2 py-0.5 font-semibold ${
-                              correct
-                                ? 'border-green-700/30 text-green-700'
-                                : 'border-orange-700/30 text-orange-700'
-                            }`}
+                            className={`${styles.value} ${correct ? styles.valueCorrect : styles.valueWrong}`}
                           >
                             {child.score}
                           </span>
@@ -157,9 +152,7 @@ function ReplyRow({ item }: { item: ReplyGroup }) {
                         rel={fbUrl ? 'noopener noreferrer' : undefined}
                         aria-disabled={!fbUrl}
                         onClick={(e) => { if (!fbUrl) e.preventDefault() }}
-                        className={`inline-flex w-full items-center justify-center gap-1.5 rounded-md border border-brown-900 px-3 py-1.5 text-sm font-medium text-brown-900 transition sm:w-auto sm:justify-start ${
-                          fbUrl ? 'hover:bg-brown-900/10' : 'cursor-not-allowed opacity-40'
-                        }`}
+                        className={`${styles.discussionButton} ${fbUrl ? '' : 'cursor-not-allowed opacity-40'}`}
                       >
                         討論區
                         <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -182,9 +175,7 @@ function ReplyRow({ item }: { item: ReplyGroup }) {
             rel={fbUrl ? 'noopener noreferrer' : undefined}
             aria-disabled={!fbUrl}
             onClick={(e) => { if (!fbUrl) e.preventDefault() }}
-            className={`inline-flex w-auto items-center gap-1.5 self-end rounded-md border border-brown-900 px-3 py-1.5 text-sm font-medium text-brown-900 transition ${
-              fbUrl ? 'hover:bg-brown-900/10' : 'cursor-not-allowed opacity-40'
-            }`}
+            className={`${styles.discussionButton} self-end ${fbUrl ? '' : 'cursor-not-allowed opacity-40'}`}
           >
             討論區
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -260,11 +251,11 @@ export default function ReplyClient({
 
   if (error) {
     return (
-      <div className="rounded-[24px] border border-red-200 bg-red-50 p-8 text-center">
-        <p className="text-sm text-red-600">{error}</p>
+      <div className={styles.errorState}>
+        <p className={styles.errorText}>{error}</p>
         <a
           href="/"
-          className="mt-4 inline-block text-sm text-blue-700 underline hover:text-[#1f3ea3]"
+          className={`${styles.loginLink} mt-4 inline-block`}
         >
           回首頁登入
         </a>
@@ -276,17 +267,17 @@ export default function ReplyClient({
 
   return (
     <div>
-      <p className="mb-6 text-sm text-black-500">回顧每次練習的題目、作答與得分。</p>
+      <p className={styles.description}>回顧每次練習的題目、作答與得分。</p>
 
       {isEmpty ? (
-        <div className="rounded-[24px] border border-brown-300 bg-white p-8 text-center">
-          <p className="text-sm text-black-500">
+        <div className={styles.emptyState}>
+          <p className={styles.emptyText}>
             {filters.hasActiveFilters ? '沒有符合篩選條件的答題紀錄' : '尚無答題紀錄'}
           </p>
           {!filters.hasActiveFilters && (
             <a
               href="/adaptive"
-              className="mt-4 inline-block rounded-md bg-blue-700 px-6 py-2.5 text-sm font-bold text-white hover:bg-[#1f3ea3]"
+              className={`${styles.primaryButton} mt-4 inline-block`}
             >
               開始智慧練習
             </a>
@@ -295,7 +286,7 @@ export default function ReplyClient({
       ) : (
         <>
           <MathJax dynamic>
-            <div className="flex flex-col gap-[40px]">
+            <div className={styles.cardList}>
               {replyList.data.map((item) => (
                 <ReplyRow key={`${item.repliedAt}|${item.children[0]?.parentId ?? item.children[0]?.questionId}`} item={item} />
               ))}
@@ -303,21 +294,21 @@ export default function ReplyClient({
           </MathJax>
 
           {replyList.paginate.totalPages > 1 && (
-            <div className="mt-6 flex items-center justify-center gap-3">
+            <div className={styles.pagination}>
               <button
                 onClick={() => fetchPage(page - 1)}
                 disabled={page === 1 || loading}
-                className="rounded-md border border-brown-300 px-4 py-2 text-sm disabled:opacity-40"
+                className={styles.paginationButton}
               >
                 ← 上一頁
               </button>
-              <span className="text-sm text-black-500">
+              <span className={styles.paginationText}>
                 第 {page} / {replyList.paginate.totalPages} 頁
               </span>
               <button
                 onClick={() => fetchPage(page + 1)}
                 disabled={page === replyList.paginate.totalPages || loading}
-                className="rounded-md border border-brown-300 px-4 py-2 text-sm disabled:opacity-40"
+                className={styles.paginationButton}
               >
                 下一頁 →
               </button>

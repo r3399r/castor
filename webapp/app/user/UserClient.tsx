@@ -6,6 +6,7 @@ import { Coins } from 'lucide-react'
 import { apiFetch, apiPut } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import type { GetUserMeResponse, PutUserMeRequest, PutUserMeResponse } from '@/types/api'
+import styles from './user.module.css'
 
 export default function UserClient() {
   const { logout } = useAuth()
@@ -57,9 +58,9 @@ export default function UserClient() {
 
   if (error || !me) {
     return (
-      <div className="rounded-[24px] border border-red-200 bg-red-50 p-8 text-center">
-        <p className="text-sm text-red-600">{error ?? '無法載入使用者資料，請確認已登入。'}</p>
-        <a href="/" className="mt-4 inline-block text-sm text-blue-700 underline hover:text-[#1f3ea3]">
+      <div className={styles.errorState}>
+        <p className={styles.errorText}>{error ?? '無法載入使用者資料，請確認已登入。'}</p>
+        <a href="/" className={`${styles.loginLink} mt-4 inline-block`}>
           回首頁登入
         </a>
       </div>
@@ -69,20 +70,20 @@ export default function UserClient() {
   const initial = (me.name ?? me.email ?? '?').charAt(0).toUpperCase()
 
   return (
-    <div>
-      <h1 className="mt-[60px] mb-6 text-3xl font-bold text-blue-700">個人資料</h1>
+    <div className={styles.content}>
+      <h1 className={styles.title}>個人資料</h1>
 
-      <div className="flex flex-col items-start justify-between gap-4 rounded-lg border border-brown-300 bg-white p-6 sm:flex-row sm:items-center">
+      <div className={`${styles.card} ${styles.profileCard}`}>
         <div className="flex items-center gap-4">
           {me.avatar ? (
             <img
               src={me.avatar}
               alt={me.name ?? '使用者頭像'}
               referrerPolicy="no-referrer"
-              className="h-16 w-16 shrink-0 rounded-full border border-brown-300 object-cover"
+              className={styles.avatar}
             />
           ) : (
-            <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full border border-brown-300 bg-blue-700/10 text-xl font-bold text-blue-700">
+            <span className={styles.avatarFallback}>
               {initial}
             </span>
           )}
@@ -94,47 +95,47 @@ export default function UserClient() {
                   onChange={(e) => setNameDraft(e.target.value)}
                   maxLength={255}
                   autoFocus
-                  className="rounded-md border border-brown-300 px-2 py-1 text-base font-bold text-black-900 focus:border-blue-700 focus:outline-none"
+                  className={styles.textInput}
                 />
                 <button
                   onClick={handleSave}
                   disabled={saving || !nameDraft.trim()}
-                  className="rounded-md bg-blue-700 px-3 py-1 text-sm font-medium text-white transition hover:bg-[#1f3ea3] disabled:cursor-not-allowed disabled:opacity-50"
+                  className={styles.primaryButton}
                 >
                   {saving ? '儲存中…' : '儲存'}
                 </button>
-                <button onClick={handleCancel} disabled={saving} className="text-sm text-black-500 hover:text-black-700">
+                <button onClick={handleCancel} disabled={saving} className={styles.cancelButton}>
                   取消
                 </button>
               </div>
             ) : (
               <div className="flex items-center gap-2">
-                <h2 className="text-lg font-bold text-black-900">{me.name || '未設定名稱'}</h2>
-                <button onClick={() => setEditing(true)} className="text-sm text-blue-700 hover:underline">
+                <h2 className={styles.name}>{me.name || '未設定名稱'}</h2>
+                <button onClick={() => setEditing(true)} className={styles.textButton}>
                   編輯
                 </button>
               </div>
             )}
-            <span className="text-sm text-black-500">{me.email}</span>
+            <span className={`${styles.muted} text-sm`}>{me.email}</span>
           </div>
         </div>
         <button
           onClick={logout}
-          className="rounded-md border border-brown-300 px-4 py-2 text-sm text-black-900 transition hover:bg-beige-200"
+          className={styles.secondaryButton}
         >
           登出
         </button>
       </div>
 
-      <div className="mt-4 flex items-center justify-between gap-4 rounded-lg border border-brown-300 bg-white p-6">
+      <div className={`${styles.card} ${styles.pointsCard}`}>
         <div className="flex items-center gap-3">
-          <Coins size={28} strokeWidth={1.5} className="text-amber-700" />
+          <span className={styles.pointsIcon}><Coins size={24} strokeWidth={1.8} /></span>
           <div>
-            <p className="text-sm text-black-500">累積積分</p>
-            <p className="text-2xl font-bold text-amber-700">{me.lifetimePoints}</p>
+            <p className={`${styles.muted} text-sm`}>累積積分</p>
+            <p className={styles.pointsValue}>{me.lifetimePoints}</p>
           </div>
         </div>
-        <Link href="/user/wallet" className="text-sm text-blue-700 hover:underline">
+        <Link href="/user/wallet" className={styles.linkButton}>
           查看紀錄
         </Link>
       </div>

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { Coins } from 'lucide-react'
 import { apiFetch, LIMIT } from '@/lib/api'
 import type { GetWalletResponse, PointTransaction } from '@/types/api'
+import styles from '../user.module.css'
 
 const typeLabel: Record<string, string> = {
   EARN_REPLY: '答題獲得',
@@ -19,22 +20,22 @@ function formatDate(dateStr: string | null): string {
 function TransactionRow({ item }: { item: PointTransaction }) {
   const positive = item.amount >= 0
   return (
-    <div className="flex items-center justify-between gap-4 rounded-lg border border-brown-300 bg-white/60 px-5 py-4">
+    <div className={styles.transactionRow}>
       <div className="flex items-center gap-3">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-700/10 text-amber-700">
+        <span className={styles.transactionIcon}>
           <Coins size={18} strokeWidth={2} />
         </span>
         <div>
-          <p className="text-sm font-medium text-black-900">{typeLabel[item.type] ?? item.type}</p>
-          <p className="text-xs text-black-500">{formatDate(item.createdAt)}</p>
+          <p className={styles.transactionTitle}>{typeLabel[item.type] ?? item.type}</p>
+          <p className={styles.transactionMeta}>{formatDate(item.createdAt)}</p>
         </div>
       </div>
       <div className="text-right">
-        <p className={`text-base font-bold ${positive ? 'text-green-700' : 'text-orange-700'}`}>
+        <p className={`text-base font-bold ${positive ? styles.amountPositive : styles.amountNegative}`}>
           {positive ? '+' : ''}
           {item.amount}
         </p>
-        <p className="text-xs text-black-500">餘額 {item.balanceAfter}</p>
+        <p className={styles.transactionMeta}>餘額 {item.balanceAfter}</p>
       </div>
     </div>
   )
@@ -77,9 +78,9 @@ export default function WalletClient() {
 
   if (error) {
     return (
-      <div className="rounded-[24px] border border-red-200 bg-red-50 p-8 text-center">
-        <p className="text-sm text-red-600">{error}</p>
-        <a href="/" className="mt-4 inline-block text-sm text-blue-700 underline hover:text-[#1f3ea3]">
+      <div className={`${styles.content} ${styles.errorState}`}>
+        <p className={styles.errorText}>{error}</p>
+        <a href="/" className={`${styles.loginLink} mt-4 inline-block`}>
           回首頁登入
         </a>
       </div>
@@ -89,44 +90,44 @@ export default function WalletClient() {
   const isEmpty = !wallet || wallet.data.length === 0
 
   return (
-    <div className="pb-[70px]">
-      <h1 className="mt-[60px] mb-2 text-3xl font-bold text-blue-700">積分紀錄</h1>
-      <p className="mb-10 text-sm text-black-500">查看每一筆積分的獲得明細。</p>
+    <div className={`${styles.content} pb-[70px]`}>
+      <h1 className={styles.title}>積分紀錄</h1>
+      <p className={styles.subtitle}>查看每一筆積分的獲得明細。</p>
 
       {isEmpty ? (
-        <div className="rounded-[24px] border border-brown-300 bg-white p-8 text-center">
-          <p className="text-sm text-black-500">尚無積分紀錄</p>
+        <div className={styles.emptyState}>
+          <p className={styles.emptyText}>尚無積分紀錄</p>
           <a
             href="/adaptive"
-            className="mt-4 inline-block rounded-md bg-blue-700 px-6 py-2.5 text-sm font-bold text-white hover:bg-[#1f3ea3]"
+            className={`${styles.primaryButton} mt-4 inline-flex`}
           >
             開始智慧練習
           </a>
         </div>
       ) : (
         <>
-          <div className="flex flex-col gap-3">
+          <div className={styles.transactionList}>
             {wallet.data.map((item) => (
               <TransactionRow key={item.id} item={item} />
             ))}
           </div>
 
           {wallet.paginate.totalPages > 1 && (
-            <div className="mt-6 flex items-center justify-center gap-3">
+            <div className={styles.pagination}>
               <button
                 onClick={() => fetchPage(page - 1)}
                 disabled={page === 1 || loading}
-                className="rounded-md border border-brown-300 px-4 py-2 text-sm disabled:opacity-40"
+                className={styles.paginationButton}
               >
                 ← 上一頁
               </button>
-              <span className="text-sm text-black-500">
+              <span className={styles.paginationText}>
                 第 {page} / {wallet.paginate.totalPages} 頁
               </span>
               <button
                 onClick={() => fetchPage(page + 1)}
                 disabled={page === wallet.paginate.totalPages || loading}
-                className="rounded-md border border-brown-300 px-4 py-2 text-sm disabled:opacity-40"
+                className={styles.paginationButton}
               >
                 下一頁 →
               </button>

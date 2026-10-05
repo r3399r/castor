@@ -5,6 +5,7 @@ import FilterPanel from './FilterPanel'
 import ReplyClient from './ReplyClient'
 import WrongClient from './WrongClient'
 import { useSharedFilters } from './useSharedFilters'
+import styles from './reply.module.css'
 
 // 錯題本 first to match the mobile app's tab order (mobile/lib/pages/reply_tabs_page.dart).
 const TABS = [
@@ -26,18 +27,16 @@ export default function ReplyTabsClient() {
 
   return (
     <div>
-      <h1 className="mt-[60px] mb-6 text-3xl font-bold text-blue-700">作答記錄</h1>
+      <h1 className={styles.title}>作答記錄</h1>
 
-      <div className="mb-8 flex border-b border-brown-300">
+      <div className={styles.tabList} role="tablist" aria-label="作答記錄分類">
         {TABS.map((tab) => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
-            className={`border-b-2 px-6 py-3 text-sm font-medium transition ${
-              activeTab === tab.key
-                ? 'border-blue-700 text-blue-700'
-                : 'border-transparent text-black-500 hover:text-black-700'
-            }`}
+            role="tab"
+            aria-selected={activeTab === tab.key}
+            className={`${styles.tab} ${activeTab === tab.key ? styles.tabActive : ''}`}
           >
             {tab.label}
           </button>
