@@ -65,7 +65,7 @@ function ResultBox({ result }: { result: { correctAnswer: string; score: number;
               <>
                 <span className={styles.resultIcon}>
                   <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
-                    <path d="M2 6L5 9L10 3" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M2 6L5 9L10 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
                 </span>
                 答對了！
@@ -74,7 +74,7 @@ function ResultBox({ result }: { result: { correctAnswer: string; score: number;
               <>
                 <span className={styles.resultIcon}>
                   <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
-                    <path d="M3 3L9 9M9 3L3 9" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+                    <path d="M3 3L9 9M9 3L3 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
                   </svg>
                 </span>
                 答錯了
@@ -107,17 +107,17 @@ function ResultBox({ result }: { result: { correctAnswer: string; score: number;
 }
 
 const CorrectIcon = () => (
-  <span className="ml-auto flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#315E50]">
+  <span className={`${styles.answerResultIcon} ${styles.answerCorrectIcon}`}>
     <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-      <path d="M2 6L5 9L10 3" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M2 6L5 9L10 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   </span>
 )
 
 const WrongIcon = () => (
-  <span className="ml-auto flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#9A5058]">
+  <span className={`${styles.answerResultIcon} ${styles.answerWrongIcon}`}>
     <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-      <path d="M3 3L9 9M9 3L3 9" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+      <path d="M3 3L9 9M9 3L3 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
     </svg>
   </span>
 )
@@ -993,11 +993,32 @@ export default function AdaptiveClient({
                           : ''
                     } ${i === currentIndex ? styles.questionNumberCurrent : ''}`}
                   >
-                    {i + 1}
-                    {graded && (
-                      <span className={styles.questionStatusMark} aria-hidden="true">
-                        {anyWrong ? '×' : '✓'}
-                      </span>
+                    {graded ? (
+                      <svg
+                        className={styles.questionResultIcon}
+                        viewBox="0 0 16 16"
+                        fill="none"
+                        aria-hidden="true"
+                      >
+                        {anyWrong ? (
+                          <path
+                            d="M4 4L12 12M12 4L4 12"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                          />
+                        ) : (
+                          <path
+                            d="M3 8L6.5 11.5L13 4.5"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        )}
+                      </svg>
+                    ) : (
+                      i + 1
                     )}
                   </button>
                 )

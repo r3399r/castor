@@ -9,7 +9,20 @@
   --color-spirit-gold: #edc96d;
   --color-spirit-gold-hover: #e3b84f;
   --color-spirit-leaf: #507346;
-  --color-spirit-coral: #b45543;
+  --color-spirit-coral: #d7654f;
+  --color-danger: #d7654f;
+  --color-danger-soft: #fbece7;
+  --color-danger-text: #963b28;
+  --color-danger-hover: #be503d;
+  --color-danger-on: #fff;
+  /* Keep existing Tailwind red utilities on the shared semantic palette. */
+  --color-red-50: var(--color-danger-soft);
+  --color-red-100: var(--color-danger-soft);
+  --color-red-200: var(--color-danger);
+  --color-red-300: var(--color-danger);
+  --color-red-500: var(--color-danger-text);
+  --color-red-600: var(--color-danger-text);
+  --color-red-700: var(--color-danger-hover);
   --color-spirit-cream: #f6f4e9;
   --color-spirit-paper: #fffdf6;
   --color-spirit-mist: #e8eee6;
