@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Fredoka, Inter } from 'next/font/google'
 import { AuthProvider } from '@/contexts/AuthContext'
 import MathJaxProvider from '@/components/MathJaxProvider'
@@ -21,6 +21,12 @@ export const metadata: Metadata = {
   title: 'PMP - 考試題庫與練習平台',
   description:
     '涵蓋高中／大學／公職／證照考試，透過智慧出題與個人化練習，幫助你精準掌握重點，穩定提升解題能力與每一次考試表現。',
+}
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

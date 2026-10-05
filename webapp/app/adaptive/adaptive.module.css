@@ -874,6 +874,47 @@
   }
 }
 
+/* iOS Safari changes the visual viewport while its browser chrome expands
+   and collapses. Keep the practice controls in document flow there so the
+   bottom toolbar cannot cover them. */
+@supports (-webkit-touch-callout: none) {
+  @media (max-width: 47.999rem) {
+    .page {
+      min-height: 100vh;
+      min-height: 100dvh;
+    }
+
+    .practiceActive {
+      padding-bottom: 0;
+    }
+
+    .practiceQuestion {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .questionNav {
+      position: relative;
+      inset: auto;
+      order: 2;
+      width: auto;
+      margin: -1px -16px 0;
+      padding-bottom: calc(40px + env(safe-area-inset-bottom));
+    }
+
+    .questionNav::before {
+      position: absolute;
+      top: -2px;
+      right: 0;
+      left: 0;
+      height: 2px;
+      background: var(--practice-nav-background);
+      content: '';
+      pointer-events: none;
+    }
+  }
+}
+
 @media (max-width: 39.999rem) {
   .pageHeader { margin: 42px 0 30px; }
   .pageTitle { font-size: 1.75rem; }

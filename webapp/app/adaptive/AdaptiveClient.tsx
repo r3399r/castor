@@ -945,7 +945,7 @@ export default function AdaptiveClient({
       )}
 
       {adaptiveQuestion.length > 0 && currentQuestion && (
-        <div>
+        <div className={styles.practiceQuestion}>
           {/* 導覽列：上一題／跳題／下一題 -- 可自由前後切換，不受作答狀態限制 */}
           <div ref={questionNavRef} className={styles.questionNav}>
             <button
@@ -1033,7 +1033,7 @@ export default function AdaptiveClient({
               className={`${styles.primaryButton} ${styles.navPrimaryButton}`}
             >
               {loading && canSubmit ? '送出中…' : primaryActionLabel}
-              {(!canSubmit || !!replyResponse) && !loading && (
+              {!loading && (
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <path d="M6 3L11 8L6 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
@@ -1163,7 +1163,7 @@ export default function AdaptiveClient({
               className={`${styles.primaryButton} ${styles.navPrimaryButton}`}
             >
               {loading && canSubmit ? '送出中…' : primaryActionLabel}
-              {(!canSubmit || !!replyResponse) && !loading && (
+              {!loading && (
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <path d="M6 3L11 8L6 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
