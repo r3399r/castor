@@ -1,0 +1,360 @@
+.page {
+  --learning-page-background: linear-gradient(180deg, #f4f3e9 0%, #efe7e1 100%);
+  --reply-ink: #34423d;
+  --reply-muted: #68766f;
+  --reply-forest: #315e50;
+  --reply-forest-hover: #254d44;
+  --reply-line: #cbd8ce;
+  --reply-surface: #fffdf8;
+  --reply-hover: #edf3e9;
+  --reply-gold: #e8cc76;
+  --reply-correct: #10b85a;
+  --reply-correct-bg: #e9f8ef;
+  --reply-correct-text: #0d6b38;
+  color: var(--reply-ink);
+}
+
+.title {
+  margin: 56px 0 24px;
+  color: var(--reply-forest);
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: 0.02em;
+}
+
+.tabList {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 28px;
+  border-bottom: 1px solid var(--reply-line);
+}
+
+.tab {
+  min-height: 42px;
+  padding: 9px 18px;
+  border-bottom: 3px solid transparent;
+  color: var(--reply-muted);
+  font-size: 0.9375rem;
+  font-weight: 700;
+  transition: border-color 180ms ease, color 180ms ease, background-color 180ms ease;
+}
+
+.tab:hover {
+  background: rgb(255 253 248 / 0.48);
+  color: var(--reply-forest);
+}
+
+.tabActive {
+  border-bottom-color: var(--reply-gold);
+  color: var(--reply-forest);
+}
+
+.tab:focus-visible,
+.filterOption:focus-visible,
+.quietButton:focus-visible,
+.primaryButton:focus-visible,
+.dangerButton:focus-visible,
+.paginationButton:focus-visible,
+.discussionButton:focus-visible,
+.noteInput:focus-visible {
+  outline: 3px solid rgb(49 94 80 / 0.25);
+  outline-offset: 3px;
+}
+
+.filterPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-bottom: 36px;
+  padding: 20px;
+  border: 1px solid rgb(203 216 206 / 0.82);
+  border-radius: 16px;
+  background: var(--reply-surface);
+  box-shadow: 0 8px 28px rgb(23 63 58 / 0.05);
+}
+
+.filterHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.filterTitle {
+  color: var(--reply-forest);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.filterOptions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.filterGroup {
+  overflow: hidden;
+  border: 1px solid var(--reply-line);
+  border-radius: 12px;
+  background: var(--reply-surface);
+}
+
+.filterGroupRow {
+  padding: 14px 16px;
+}
+
+.filterGroupRow + .filterGroupRow {
+  border-top: 1px solid #e1e7df;
+}
+
+.filterLabel {
+  display: block;
+  margin-bottom: 9px;
+  color: #43564f;
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.filterOption {
+  --option-accent: var(--reply-forest);
+  --option-bg: #e2efe7;
+  min-height: 36px;
+  padding: 7px 13px;
+  border: 2px solid var(--reply-line);
+  border-radius: 8px;
+  background: var(--reply-surface);
+  color: #43564f;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.35;
+  transition: border-color 180ms ease, background-color 180ms ease, color 180ms ease;
+}
+
+.filterOption:hover:not(:disabled) {
+  border-color: var(--option-accent);
+  background: color-mix(in srgb, var(--option-bg) 55%, white);
+}
+
+.filterOptionSelected {
+  border-color: var(--option-accent);
+  background: var(--option-bg);
+  color: var(--option-accent);
+}
+
+.filterOption:disabled,
+.quietButton:disabled,
+.primaryButton:disabled,
+.dangerButton:disabled,
+.paginationButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.categoryTone { --option-accent: #315e50; --option-bg: #e2efe7; }
+.dimensionTone { --option-accent: #527765; --option-bg: #e5eee8; }
+.subjectTone { --option-accent: #3f6fa8; --option-bg: #dfeaf8; }
+.examTone { --option-accent: #7d4fa3; --option-bg: #ece1f6; }
+.tagTone { --option-accent: var(--color-danger-text); --option-bg: var(--color-danger-soft); }
+
+.quietButton,
+.paginationButton {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 7px 12px;
+  border: 1px solid var(--reply-line);
+  border-radius: 8px;
+  background: var(--reply-surface);
+  color: #52645d;
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition: border-color 180ms ease, background-color 180ms ease, color 180ms ease;
+}
+
+.quietButton:hover:not(:disabled),
+.paginationButton:hover:not(:disabled) {
+  border-color: #91aa98;
+  background: var(--reply-hover);
+  color: var(--reply-forest);
+}
+
+.description {
+  margin-bottom: 22px;
+  color: var(--reply-muted);
+  font-size: 0.9375rem;
+}
+
+.cardList {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.recordCard {
+  overflow: hidden;
+  border: 1px solid rgb(203 216 206 / 0.85);
+  border-radius: 16px;
+  background: var(--reply-surface);
+}
+
+.cardHeader {
+  border-bottom: 1px solid #e1e7df;
+  padding: 15px 20px;
+}
+
+.subjectName {
+  color: var(--reply-forest);
+  font-weight: 700;
+}
+
+.subjectIcon { color: #6f8e76; }
+
+.cardBody {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 28px 40px 30px;
+}
+
+.subQuestion {
+  border-top: 1px solid #e1e7df;
+  padding-top: 20px;
+}
+
+.statusPanel {
+  padding: 16px 20px;
+  border: 1px solid;
+  border-radius: 10px;
+}
+
+.statusCorrect {
+  border-color: var(--reply-correct);
+  background: var(--reply-correct-bg);
+}
+
+.statusWrong {
+  border-color: var(--color-danger);
+  background: var(--color-danger-soft);
+}
+
+.value {
+  display: inline-block;
+  padding: 2px 8px;
+  border: 1px solid var(--reply-line);
+  border-radius: 5px;
+  background: rgb(255 253 248 / 0.72);
+  color: #43564f;
+  font-weight: 700;
+}
+
+.valueCorrect { border-color: var(--reply-correct); color: var(--reply-correct-text); }
+.valueWrong { border-color: var(--color-danger); color: var(--color-danger-text); }
+
+.discussionButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border: 1px solid #b9b2a6;
+  border-radius: 8px;
+  background: #fffdf8;
+  color: #625d54;
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+
+.discussionButton:hover:not([aria-disabled='true']) {
+  border-color: #49463f;
+  background: #f0ece4;
+  color: #49463f;
+}
+
+.discussionButton:active:not([aria-disabled='true']) { background: #e6e0d6; }
+.discussionButton[aria-disabled='true'] { cursor: not-allowed; opacity: 0.4; }
+
+.noteInput {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--reply-line);
+  border-radius: 8px;
+  background: var(--reply-surface);
+  color: var(--reply-ink);
+  font-size: 0.875rem;
+  resize: vertical;
+}
+
+.primaryButton,
+.dangerButton {
+  min-height: 38px;
+  padding: 7px 14px;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 700;
+  transition: border-color 180ms ease, background-color 180ms ease, color 180ms ease;
+}
+
+.primaryButton {
+  border: 1px solid var(--reply-forest);
+  background: var(--reply-forest);
+  color: #fffdf8;
+}
+
+.primaryButton:hover:not(:disabled) {
+  border-color: var(--reply-forest-hover);
+  background: var(--reply-forest-hover);
+}
+
+.dangerButton {
+  border: 1px solid var(--color-danger);
+  background: transparent;
+  color: var(--color-danger-text);
+}
+
+.dangerButton:hover:not(:disabled) { background: var(--color-danger-soft); }
+
+.emptyState,
+.errorState {
+  padding: 32px;
+  border-radius: 16px;
+  background: var(--reply-surface);
+  text-align: center;
+}
+
+.emptyState { border: 1px solid var(--reply-line); }
+.errorState { border: 1px solid var(--color-danger); background: var(--color-danger-soft); }
+.errorText { color: var(--color-danger-text); font-size: 0.875rem; }
+.emptyText { color: var(--reply-muted); font-size: 0.875rem; }
+.loginLink { color: var(--reply-forest); font-size: 0.875rem; text-decoration: underline; }
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.paginationText { color: var(--reply-muted); font-size: 0.875rem; }
+
+@media (max-width: 47.999rem) {
+  .title { margin-top: 42px; font-size: 1.75rem; }
+  .filterPanel { padding: 16px; }
+  .cardBody { padding: 24px 16px; }
+  .cardHeader { padding: 14px 16px; }
+  .discussionButton { width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tab,
+  .filterOption,
+  .quietButton,
+  .primaryButton,
+  .dangerButton,
+  .paginationButton,
+  .discussionButton { transition: none; }
+}

@@ -8,6 +8,7 @@ import Chip, { tagColors } from '@/components/Chip'
 import DifficultyStars from '@/components/DifficultyStars'
 import type { GetWrongQuestionResponse, PutWrongQuestionNoteResponse, WrongQuestion } from '@/types/api'
 import type { QueryFilters } from './useSharedFilters'
+import styles from './reply.module.css'
 
 const typeLabel: Record<string, string> = {
   SINGLE: '單選題',
@@ -74,12 +75,12 @@ function WrongCard({
   }
 
   return (
-    <article className="overflow-hidden rounded-lg border border-brown-700 bg-white/60">
-      <div className="border-b border-[#E3D1C5] px-5 pt-3 pb-2">
+    <article className={styles.recordCard}>
+      <div className={styles.cardHeader}>
         <div className="flex items-start justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="flex shrink-0 items-center gap-2 font-bold text-blue-700">
-              <BookOpenText size={20} strokeWidth={2.5} className="shrink-0 text-orange-700/70" />
+            <span className={`${styles.subjectName} flex shrink-0 items-center gap-2`}>
+              <BookOpenText size={20} strokeWidth={2.5} className={`${styles.subjectIcon} shrink-0`} />
               {item.subject.name}
             </span>
             <div className="ml-2 flex flex-wrap gap-2">
@@ -99,11 +100,11 @@ function WrongCard({
               ))}
             </div>
           </div>
-          <DifficultyStars value={difficulty} />
+          <DifficultyStars value={difficulty} tone="forest" />
         </div>
       </div>
 
-      <div className="flex flex-col gap-4 px-5 py-7 lg:px-[40px]">
+      <div className={styles.cardBody}>
         {isGroup && item.parentQuestion?.content && (
           <div
             dangerouslySetInnerHTML={{ __html: item.parentQuestion.content }}
@@ -120,13 +121,13 @@ function WrongCard({
         {question.answer && (
           <div className="text-base text-black-700">
             正確答案：
-            <span className="inline-block rounded border border-brown-300 bg-white/60 px-2 py-0.5 font-semibold text-black-900">
+            <span className={styles.value}>
               {question.answer}
             </span>
           </div>
         )}
 
-        <div className="rounded-md border border-orange-700/30 bg-orange-700/10 px-5 py-4">
+        <div className={`${styles.statusPanel} ${styles.statusWrong}`}>
           <div className="flex flex-col gap-2 text-base text-black-700 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4">
             <div>
               最後答錯時間：
@@ -135,13 +136,13 @@ function WrongCard({
             <div className="flex items-center gap-4">
               <div>
                 得分：
-                <span className="inline-block rounded border border-orange-700/30 bg-white/60 px-2 py-0.5 font-semibold text-orange-700">
+                <span className={`${styles.value} ${styles.valueWrong}`}>
                   {item.score}
                 </span>
               </div>
               <div>
                 答錯次數：
-                <span className="inline-block rounded border border-orange-700/30 bg-white/60 px-2 py-0.5 font-semibold text-orange-700">
+                <span className={`${styles.value} ${styles.valueWrong}`}>
                   {item.wrongCount}
                 </span>
               </div>
@@ -156,7 +157,7 @@ function WrongCard({
             onChange={(e) => setNote(e.target.value)}
             placeholder="寫下這題錯在哪裡、下次要注意什麼…"
             rows={2}
-            className="w-full rounded-md border border-brown-300 bg-white/80 px-3 py-2 text-sm text-black-900 focus:border-blue-700 focus:outline-none"
+            className={styles.noteInput}
           />
         </div>
 
@@ -164,14 +165,14 @@ function WrongCard({
           <button
             onClick={handleSave}
             disabled={saving || !noteChanged}
-            className="rounded-md bg-blue-700 px-4 py-1.5 text-sm font-medium text-white transition hover:bg-[#1f3ea3] disabled:cursor-not-allowed disabled:opacity-50"
+            className={styles.primaryButton}
           >
             {saving ? '儲存中…' : '儲存註記'}
           </button>
           <button
             onClick={handleDelete}
             disabled={deleting}
-            className="rounded-md border border-red-300 px-4 py-1.5 text-sm font-medium text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+            className={styles.dangerButton}
           >
             {deleting ? '移除中…' : '從錯題本移除'}
           </button>
@@ -257,9 +258,9 @@ export default function WrongClient({
 
   if (error) {
     return (
-      <div className="rounded-[24px] border border-red-200 bg-red-50 p-8 text-center">
-        <p className="text-sm text-red-600">{error}</p>
-        <a href="/" className="mt-4 inline-block text-sm text-blue-700 underline hover:text-[#1f3ea3]">
+      <div className={styles.errorState}>
+        <p className={styles.errorText}>{error}</p>
+        <a href="/" className={`${styles.loginLink} mt-4 inline-block`}>
           回首頁登入
         </a>
       </div>
@@ -270,18 +271,18 @@ export default function WrongClient({
 
   return (
     <div>
-      <p className="mb-6 text-sm text-black-500">作答時未拿到滿分的題目會自動收錄在這裡，答對後也不會自動移除，你可以自己加註記或移除。</p>
+      <p className={styles.description}>作答時未拿到滿分的題目會自動收錄在這裡，答對後也不會自動移除，你可以自己加註記或移除。</p>
 
       {isEmpty ? (
-        <div className="rounded-[24px] border border-brown-300 bg-white p-8 text-center">
-          <p className="text-sm text-black-500">
+        <div className={styles.emptyState}>
+          <p className={styles.emptyText}>
             {filters.hasActiveFilters ? '沒有符合篩選條件的錯題' : '目前沒有錯題，繼續保持！'}
           </p>
         </div>
       ) : (
         <>
           <MathJax dynamic>
-            <div className="flex flex-col gap-[40px]">
+            <div className={styles.cardList}>
               {list.data.map((item) => (
                 <WrongCard key={item.id} item={item} onSaveNote={handleSaveNote} onDelete={handleDelete} />
               ))}
@@ -289,21 +290,21 @@ export default function WrongClient({
           </MathJax>
 
           {list.paginate.totalPages > 1 && (
-            <div className="mt-6 flex items-center justify-center gap-3">
+            <div className={styles.pagination}>
               <button
                 onClick={() => fetchPage(page - 1)}
                 disabled={page === 1 || loading}
-                className="rounded-md border border-brown-300 px-4 py-2 text-sm disabled:opacity-40"
+                className={styles.paginationButton}
               >
                 ← 上一頁
               </button>
-              <span className="text-sm text-black-500">
+              <span className={styles.paginationText}>
                 第 {page} / {list.paginate.totalPages} 頁
               </span>
               <button
                 onClick={() => fetchPage(page + 1)}
                 disabled={page === list.paginate.totalPages || loading}
-                className="rounded-md border border-brown-300 px-4 py-2 text-sm disabled:opacity-40"
+                className={styles.paginationButton}
               >
                 下一頁 →
               </button>
