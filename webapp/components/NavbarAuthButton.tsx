@@ -7,7 +7,16 @@ export default function NavbarAuthButton() {
   const { user, loading, login } = useAuth()
 
   if (loading) {
-    return <div className="h-9" />
+    return (
+      <button
+        type="button"
+        disabled
+        aria-busy="true"
+        className="flex h-9 items-center justify-center rounded-md border border-brown-300 px-5 text-sm text-black-900 opacity-70"
+      >
+        Google 登入
+      </button>
+    )
   }
 
   if (user) {

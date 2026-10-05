@@ -41,10 +41,8 @@ export default function NavbarMenu() {
         </div>
       </div>
 
-      {/* Small screens: auth icon always visible next to the hamburger --
-          the hamburger itself only toggles the nav-link dropdown, so it's
-          only shown once there's actually something in it (i.e. once
-          logged in). */}
+      {/* Small screens: show sign-in before authentication, then expose the
+          authenticated navigation alongside the profile control. */}
       <div className="flex items-center gap-3 lg:hidden">
         <NavbarAuthButton />
         {user && (
