@@ -881,7 +881,7 @@
   @media (max-width: 47.999rem) {
     .page {
       min-height: 100vh;
-      min-height: 100dvh;
+      min-height: 100svh;
     }
 
     .practiceActive {
@@ -893,6 +893,20 @@
       flex-direction: column;
     }
 
+    /* iOS browsers overlay their expanded bottom chrome on top of the page.
+       A stable, same-colour tail keeps the controls scrollable above it and
+       prevents the viewport resize from exposing a light compositing seam. */
+    .practiceQuestion::after {
+      display: block;
+      order: 3;
+      height: calc(112px + env(safe-area-inset-bottom));
+      margin: -1px -16px 0;
+      background: var(--practice-nav-background);
+      content: '';
+      flex: 0 0 auto;
+      pointer-events: none;
+    }
+
     .questionNav {
       position: relative;
       inset: auto;
@@ -900,6 +914,7 @@
       width: auto;
       margin: -1px -16px 0;
       padding-bottom: calc(40px + env(safe-area-inset-bottom));
+      overflow-anchor: none;
     }
 
     .questionNav::before {
