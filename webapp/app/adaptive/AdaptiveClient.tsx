@@ -306,7 +306,6 @@ export default function AdaptiveClient({
   // tracked in refs, not state, so accumulating it on every render/tick
   // doesn't trigger re-renders -- it's only read when leaving a page.
   const [currentIndex, setCurrentIndex] = useState(0)
-  const practiceRootRef = useRef<HTMLDivElement>(null)
   const questionNavRef = useRef<HTMLDivElement>(null)
   const questionNumberListRef = useRef<HTMLDivElement>(null)
   const questionNumberRefs = useRef<Array<HTMLButtonElement | null>>([])
@@ -580,19 +579,6 @@ export default function AdaptiveClient({
         : '下一題'
 
   useEffect(() => {
-    const root = practiceRootRef.current
-    const nav = questionNavRef.current
-    if (!root || !nav || adaptiveQuestion.length === 0) return
-    const updateReservedSpace = () => {
-      root.style.setProperty('--adaptive-mobile-nav-height', `${nav.getBoundingClientRect().height}px`)
-    }
-    updateReservedSpace()
-    const observer = new ResizeObserver(updateReservedSpace)
-    observer.observe(nav)
-    return () => observer.disconnect()
-  }, [adaptiveQuestion.length])
-
-  useEffect(() => {
     const nav = questionNavRef.current
     if (!nav || adaptiveQuestion.length === 0) {
       setShowBottomNav(false)
@@ -620,7 +606,7 @@ export default function AdaptiveClient({
   }, [adaptiveQuestion.length, currentIndex])
 
   return (
-    <div ref={practiceRootRef} className={adaptiveQuestion.length > 0 ? styles.practiceActive : undefined}>
+    <div className={adaptiveQuestion.length > 0 ? styles.practiceActive : undefined}>
       {adaptiveQuestion.length === 0 && !loading ? (
         <header className={styles.pageHeader}>
           <h1 className={styles.pageTitle}>智慧練習</h1>
