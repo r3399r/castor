@@ -135,7 +135,7 @@ export default function UserClient() {
             <p className={styles.pointsValue}>{me.lifetimePoints}</p>
           </div>
         </div>
-        <Link href="/user/wallet" className={styles.linkButton}>
+        <Link href="/user/wallet" className={styles.secondaryButton}>
           查看紀錄
         </Link>
       </div>

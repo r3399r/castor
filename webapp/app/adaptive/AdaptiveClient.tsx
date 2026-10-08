@@ -1,6 +1,7 @@
 'use client'
 
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import type { KeyboardEvent } from 'react'
 import { Goal, BookOpenText, Brain, Coins, FunnelPlus, NotebookPen } from 'lucide-react'
 import { apiFetch, apiPost } from '@/lib/api'
 import Chip from '@/components/Chip'
@@ -18,6 +19,8 @@ import styles from './adaptive.module.css'
 // High enough to fetch every category in one page -- there's no realistic
 // dataset near this size yet.
 const ALL_ITEMS_LIMIT = 1000
+const examCategoryTabs = ['admission', 'national', 'license'] as const
+type ExamCategoryTab = (typeof examCategoryTabs)[number]
 
 type CategoryOption = { id: number; name: string }
 type SubjectOption = { id: number; name: string; sortOrder: number }
@@ -275,6 +278,7 @@ export default function AdaptiveClient({
   onPracticeStateChange?: (active: boolean) => void
 }) {
   const [selectedCategoryId, setSelectedCategoryId] = useState('')
+  const [activeExamCategoryTab, setActiveExamCategoryTab] = useState<ExamCategoryTab>('admission')
   const [selectedSubjectId, setSelectedSubjectId] = useState('')
   const [selectedExamIds, setSelectedExamIds] = useState<string[]>([])
   const [selectedConceptIds, setSelectedConceptIds] = useState<string[]>([])
@@ -300,6 +304,37 @@ export default function AdaptiveClient({
   const [showLeaveModal, setShowLeaveModal] = useState(false)
   const [showBottomNav, setShowBottomNav] = useState(false)
   const [loading, setLoading] = useState(false)
+
+  const changeExamCategoryTab = (tab: ExamCategoryTab) => {
+    setActiveExamCategoryTab(tab)
+    if (tab === 'admission') return
+    setSelectedCategoryId('')
+    setSelectedSubjectId('')
+    setSelectedFilterOptionByDim({})
+    setSelectedExamIds([])
+    setSelectedConceptIds([])
+    setSelectedTagIds([])
+    setSubjectList([])
+    setFilterDimensions([])
+    setExamList([])
+    setConceptGroupList([])
+    setTagList([])
+  }
+
+  const handleExamCategoryTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, currentTab: ExamCategoryTab) => {
+    const currentIndex = examCategoryTabs.indexOf(currentTab)
+    let nextIndex = currentIndex
+    if (event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % examCategoryTabs.length
+    else if (event.key === 'ArrowLeft') nextIndex = (currentIndex - 1 + examCategoryTabs.length) % examCategoryTabs.length
+    else if (event.key === 'Home') nextIndex = 0
+    else if (event.key === 'End') nextIndex = examCategoryTabs.length - 1
+    else return
+
+    event.preventDefault()
+    const nextTab = examCategoryTabs[nextIndex]
+    changeExamCategoryTab(nextTab)
+    requestAnimationFrame(() => document.getElementById(`exam-tab-${nextTab}`)?.focus())
+  }
 
   // Single-question view: currentIndex is a page index into adaptiveQuestion
   // (a GROUP question and all its children share one page). Dwell time is
@@ -672,6 +707,108 @@ export default function AdaptiveClient({
                 ))}
               </div>
             </div>
+          </div>
+          <div className={`${styles.card} ${styles.examTabbedCard} ${filtersLocked ? styles.locked : ''}`}>
+            <div className={styles.examTabs} role="tablist" aria-label="考試類別">
+              <button
+                type="button"
+                role="tab"
+                id="exam-tab-admission"
+                aria-selected={activeExamCategoryTab === 'admission'}
+                aria-controls="exam-panel-admission"
+                tabIndex={activeExamCategoryTab === 'admission' ? 0 : -1}
+                className={styles.examTab}
+                onClick={() => changeExamCategoryTab('admission')}
+                onKeyDown={(event) => handleExamCategoryTabKeyDown(event, 'admission')}
+              >
+                入學考試
+              </button>
+              <button
+                type="button"
+                role="tab"
+                id="exam-tab-national"
+                aria-selected={activeExamCategoryTab === 'national'}
+                aria-controls="exam-panel-national"
+                tabIndex={activeExamCategoryTab === 'national' ? 0 : -1}
+                className={styles.examTab}
+                onClick={() => changeExamCategoryTab('national')}
+                onKeyDown={(event) => handleExamCategoryTabKeyDown(event, 'national')}
+              >
+                國家考試
+              </button>
+              <button
+                type="button"
+                role="tab"
+                id="exam-tab-license"
+                aria-selected={activeExamCategoryTab === 'license'}
+                aria-controls="exam-panel-license"
+                tabIndex={activeExamCategoryTab === 'license' ? 0 : -1}
+                className={styles.examTab}
+                onClick={() => changeExamCategoryTab('license')}
+                onKeyDown={(event) => handleExamCategoryTabKeyDown(event, 'license')}
+              >
+                專技證照
+              </button>
+            </div>
+
+            {activeExamCategoryTab === 'admission' && (
+              <div
+                id="exam-panel-admission"
+                role="tabpanel"
+                aria-labelledby="exam-tab-admission"
+                className={styles.examTabPanel}
+              >
+                <div className={styles.optionGrid}>
+                  {categoryList.map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => setSelectedCategoryId(String(c.id))}
+                      aria-pressed={selectedCategoryId === String(c.id)}
+                      className={`${styles.option} ${styles.categoryTone} ${selectedCategoryId === String(c.id) ? styles.selected : ''}`}
+                    >
+                      {c.name}
+                    </button>
+                  ))}
+                  <button disabled className={`${styles.option} ${styles.categoryTone}`}>
+                    分科
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {activeExamCategoryTab === 'national' && (
+              <div
+                id="exam-panel-national"
+                role="tabpanel"
+                aria-labelledby="exam-tab-national"
+                className={styles.examTabPanel}
+              >
+                <div className={styles.optionGrid}>
+                  {['公務員高考三級', '公務員普考', '初等考試', '司法特考', '地方特考'].map((name) => (
+                    <button key={name} disabled className={`${styles.option} ${styles.categoryTone}`}>
+                      {name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {activeExamCategoryTab === 'license' && (
+              <div
+                id="exam-panel-license"
+                role="tabpanel"
+                aria-labelledby="exam-tab-license"
+                className={styles.examTabPanel}
+              >
+                <div className={styles.optionGrid}>
+                  {['護理師執照', '律師執照', '會計師執照'].map((name) => (
+                    <button key={name} disabled className={`${styles.option} ${styles.categoryTone}`}>
+                      {name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </section>
 

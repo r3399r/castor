@@ -136,6 +136,54 @@
 .site-footer--learning > :last-child {
   margin-bottom: 0;
 }
+
+.learning-auth-state {
+  display: flex;
+  min-height: 280px;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  margin-top: 60px;
+  padding: 40px 24px;
+  border: 1px solid var(--user-line, #cbd8ce);
+  border-radius: 16px;
+  background: var(--user-surface, #fffdf8);
+  color: var(--user-ink, #34423d);
+  text-align: center;
+}
+
+.learning-auth-state--loading {
+  min-height: 192px;
+}
+
+.learning-auth-state__message {
+  color: var(--user-ink, #43564f);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.learning-auth-state__button {
+  min-height: 42px;
+  margin-top: 24px;
+  padding: 9px 20px;
+  border: 1px solid var(--user-forest, #315e50);
+  border-radius: 8px;
+  background: var(--user-forest, #315e50);
+  color: #fffdf8;
+  font-size: 0.875rem;
+  font-weight: 700;
+  transition: border-color 180ms ease, background-color 180ms ease, color 180ms ease;
+}
+
+.learning-auth-state__button:hover {
+  border-color: var(--user-forest-hover, #254d44);
+  background: var(--user-forest-hover, #254d44);
+}
+
+.learning-auth-state__button:focus-visible {
+  outline: 3px solid rgb(49 94 80 / 0.25);
+  outline-offset: 3px;
+}
 .standard-site-header .site-header {
   border-bottom: 0;
 }

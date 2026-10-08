@@ -102,6 +102,58 @@
   padding: 20px;
 }
 
+.examTabbedCard {
+  display: none;
+  overflow: hidden;
+}
+
+.examTabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  padding: 8px;
+  border-bottom: 1px solid #e1e7df;
+  background: #f4f3e9;
+}
+
+.examTab {
+  min-height: 36px;
+  padding: 5px 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--adaptive-muted);
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1.35;
+  transition: border-color 180ms ease, background-color 180ms ease, color 180ms ease;
+}
+
+.examTab:hover {
+  background: rgb(255 253 248 / 0.72);
+  color: var(--adaptive-forest);
+}
+
+.examTab[aria-selected='true'] {
+  border-color: var(--adaptive-forest);
+  background: var(--adaptive-forest);
+  color: #fffdf8;
+}
+
+.examTab[aria-selected='true']:hover {
+  border-color: var(--adaptive-forest-hover);
+  background: var(--adaptive-forest-hover);
+  color: #fffdf8;
+}
+
+.examTab:focus-visible {
+  outline: 3px solid rgb(49 94 80 / 0.25);
+  outline-offset: 2px;
+}
+
+.examTabPanel {
+  padding: 20px;
+}
+
 .examCardTitle {
   display: block;
   margin-bottom: 14px;
@@ -819,7 +871,8 @@
 }
 
 @media (max-width: 63.999rem) {
-  .examGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .examGrid { display: none; }
+  .examTabbedCard { display: block; }
   .answerGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .questionBody { padding: 26px 28px 28px; }
 }
@@ -894,6 +947,7 @@
   .examCard,
   .filterGroup,
   .actionCard { padding: 18px 16px; }
+  .examTabPanel { padding: 16px; }
   .optionGrid { grid-template-columns: minmax(0, 1fr); }
   .navButton { min-height: 40px; }
   .questionMeta { padding: 14px 16px; }

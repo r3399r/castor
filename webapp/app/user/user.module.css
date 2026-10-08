@@ -17,7 +17,16 @@
   --user-surface: #fffdf8;
   --user-hover: #edf3e9;
   --user-gold: #d4b65e;
+  display: flex;
+  min-height: 100vh;
+  min-height: 100dvh;
+  flex-direction: column;
   color: #34423d;
+}
+
+.main {
+  width: 100%;
+  flex: 1 0 auto;
 }
 
 .content {
@@ -102,7 +111,6 @@
 
 .primaryButton,
 .secondaryButton,
-.linkButton,
 .paginationButton {
   display: inline-flex;
   min-height: 38px;
@@ -140,13 +148,6 @@
   color: var(--user-forest);
 }
 
-.linkButton {
-  border: 1px solid #b9b2a6;
-  background: #fffdf8;
-  color: #625d54;
-}
-
-.linkButton:hover { border-color: #49463f; background: #f0ece4; color: #49463f; }
 .textButton { color: var(--user-forest); font-size: 0.875rem; font-weight: 600; }
 .textButton:hover { text-decoration: underline; }
 .cancelButton { color: var(--user-muted); font-size: 0.875rem; }
@@ -159,7 +160,6 @@
 
 .primaryButton:focus-visible,
 .secondaryButton:focus-visible,
-.linkButton:focus-visible,
 .paginationButton:focus-visible,
 .textButton:focus-visible,
 .cancelButton:focus-visible,
@@ -254,6 +254,5 @@
 @media (prefers-reduced-motion: reduce) {
   .primaryButton,
   .secondaryButton,
-  .linkButton,
   .paginationButton { transition: none; }
 }
