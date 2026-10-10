@@ -410,6 +410,24 @@ export type SubscriptionStatus = {
 // authenticated request rather than two.
 export type PostUserSyncResponse = User & { subscription: SubscriptionStatus };
 
+// Subscriber-only. retention is the modelled probability the concept is
+// still recallable (0-1); level buckets it for display so the UI does not
+// re-derive the thresholds.
+export type ForgettingRiskItem = {
+  conceptId: number;
+  concept: string;
+  subjectId: number;
+  subject: string;
+  mastery: number;
+  attemptCount: number;
+  lastAttemptAt: string | null;
+  daysSinceReview: number;
+  retention: number;
+  level: 'high' | 'medium' | 'low';
+};
+
+export type GetForgettingRiskResponse = ForgettingRiskItem[];
+
 export type GetUserMeResponse = User;
 
 export type PutUserMeRequest = { name: string };

@@ -13,12 +13,14 @@ import {
 } from 'recharts'
 import { ActivityCalendar } from 'react-activity-calendar'
 import { apiFetch } from '@/lib/api'
+import { useAuth } from '@/contexts/AuthContext'
 import Chip from '@/components/Chip'
 import { LoadingState } from '@/components/ui'
 import AnalysisHeaderLandscape from './AnalysisHeaderLandscape'
 import styles from './analysis.module.css'
 import type {
   DailyMastery,
+  ForgettingRiskItem,
   GetUserHistoryResponse,
   GetUserStatsResponse,
   StatsSubject,
@@ -401,6 +403,122 @@ function HistorySection({ history }: { history: GetUserHistoryResponse }) {
   )
 }
 
+// ─── Forgetting Risk (subscribers only) ───────────────────────────────────────
+
+// Status colours, reserved for risk and never reused as a series hue.
+// Each ships with an icon and a word, so the level never rests on colour
+// alone -- the bar beside them is the magnitude, not the identity.
+const RISK_META: Record<
+  ForgettingRiskItem['level'],
+  { label: string; icon: string; text: string; bg: string; bar: string }
+> = {
+  high: { label: '高風險', icon: '▲', text: '#963B28', bg: '#FBECE7', bar: '#C0432C' },
+  medium: { label: '中風險', icon: '◆', text: '#7A5713', bg: '#FBF1DE', bar: '#B3861F' },
+  low: { label: '低風險', icon: '●', text: '#2F6B4F', bg: '#E8F1EA', bar: '#3F8C66' },
+}
+
+function ForgettingRiskSection() {
+  const { subscription } = useAuth()
+  const [items, setItems] = useState<ForgettingRiskItem[] | null>(null)
+  const [failed, setFailed] = useState(false)
+
+  const subscribed = subscription?.active === true
+
+  useEffect(() => {
+    if (!subscribed) return
+    apiFetch<ForgettingRiskItem[]>('analysis/forgetting-risk', { limit: 10 })
+      .then(setItems)
+      .catch(() => setFailed(true))
+  }, [subscribed])
+
+  // null means sync has not answered yet, which is not the same as "not
+  // subscribed" -- returning nothing keeps a subscriber from seeing the
+  // locked state flash before their entitlement is known.
+  if (subscription === null) return null
+
+  if (!subscribed)
+    return (
+      <div className={styles.card}>
+        <h2 className={`mb-2 ${styles.cardTitle}`}>遺忘風險提示</h2>
+        <p className={`mb-4 text-sm ${styles.bodyText}`}>
+          訂閱後可看見哪些觀念正在被遺忘，並依急迫度排出優先複習順序。
+        </p>
+        <button
+          type="button"
+          className="rounded-full bg-[#227578] px-5 py-2 text-sm font-bold text-white transition hover:bg-[#195E62] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#227578]"
+        >
+          查看訂閱方案
+        </button>
+      </div>
+    )
+
+  return (
+    <div className={styles.card}>
+      <h2 className={`mb-2 ${styles.cardTitle}`}>遺忘風險提示</h2>
+      <p className={`mb-4 text-sm ${styles.bodyText}`}>
+        依預估記憶保留率排序，最可能忘記的排在最前面，建議由上往下複習。
+      </p>
+
+      {failed && <p className="text-sm text-red-600">無法載入遺忘風險分析，請稍後再試。</p>}
+
+      {!failed && items === null && <p className={`text-sm ${styles.muted}`}>載入中…</p>}
+
+      {!failed && items !== null && items.length === 0 && (
+        <p className={`text-sm ${styles.muted}`}>
+          還沒有足夠的練習紀錄。先做幾題，這裡就會列出需要複習的觀念。
+        </p>
+      )}
+
+      {!failed && items !== null && items.length > 0 && (
+        <ul className="flex flex-col gap-3">
+          {items.map((item) => {
+            const meta = RISK_META[item.level]
+            const retentionPct = Math.round(item.retention * 100)
+            return (
+              <li key={item.conceptId} className="flex flex-col gap-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold">{item.concept}</span>
+                    <span className={`text-xs ${styles.muted}`}>{item.subject}</span>
+                  </div>
+                  <span
+                    className="flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold"
+                    style={{ color: meta.text, backgroundColor: meta.bg }}
+                  >
+                    <span aria-hidden>{meta.icon}</span>
+                    {meta.label}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <div
+                    className={styles.masteryTrack}
+                    role="img"
+                    aria-label={`預估記憶保留率 ${retentionPct}%`}
+                  >
+                    <div
+                      className={styles.masteryFill}
+                      style={{ width: `${retentionPct}%`, background: meta.bar }}
+                    />
+                  </div>
+                  <span className="w-10 shrink-0 text-right text-xs font-bold tabular-nums">
+                    {retentionPct}%
+                  </span>
+                </div>
+
+                <p className={`text-[11px] ${styles.muted}`}>
+                  上次練習 <span className="tabular-nums">{item.daysSinceReview}</span> 天前 ·
+                  {' '}熟練度 <span className="tabular-nums">{item.mastery.toFixed(1)}</span>
+                </p>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </div>
+  )
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function AnalysisClient() {
@@ -482,6 +600,8 @@ export default function AnalysisClient() {
           <HistorySection history={history} />
         </>
       )}
+
+      <ForgettingRiskSection />
 
       {stats && stats.length > 0 && (
         <>

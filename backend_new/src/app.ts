@@ -2,8 +2,10 @@ import { Hono } from 'hono';
 import { toErrorResponse } from 'src/lib/errorResponse';
 import { adminAuth } from 'src/middleware/adminAuth';
 import { requestLogger } from 'src/middleware/requestLogger';
+import { requireSubscription } from 'src/middleware/requireSubscription';
 import { requireUser } from 'src/middleware/requireUser';
 import { transaction } from 'src/middleware/transaction';
+import { analysis } from 'src/routes/analysis';
 import { category } from 'src/routes/category';
 import { concept } from 'src/routes/concept';
 import { conceptGroup } from 'src/routes/conceptGroup';
@@ -56,6 +58,12 @@ export const app = new Hono()
   .use('/api/subscription/*', transaction)
   .use('/api/subscription/*', requireUser)
   .route('/api/subscription', subscription)
+  // Subscriber-only. requireSubscription reads the user row requireUser
+  // resolves, so the order of these three matters.
+  .use('/api/analysis/*', transaction)
+  .use('/api/analysis/*', requireUser)
+  .use('/api/analysis/*', requireSubscription)
+  .route('/api/analysis', analysis)
   .use('/api/question/*', adminAuth)
   .use('/api/question/*', transaction)
   .use('/api/question/adaptive', requireUser)

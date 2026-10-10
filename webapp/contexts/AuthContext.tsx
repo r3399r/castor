@@ -4,10 +4,21 @@ import { createContext, useContext, useEffect, useState } from 'react'
 import { signInWithPopup, signOut, type User } from 'firebase/auth'
 import { auth, provider } from '@/lib/firebase'
 import { apiPost } from '@/lib/api'
+import type { PostUserSyncResponse, SubscriptionStatus } from '@/types/api'
 
 type AuthContextType = {
   user: User | null
   loading: boolean
+  /**
+   * The caller's subscription, or null until sync has answered.
+   *
+   * Comes from the POST /user/sync response, which already carries it --
+   * so entitlement costs no request of its own. null therefore means
+   * "not known yet", which is not the same as "not subscribed": a gated
+   * block should wait rather than flash its locked state while sync is
+   * still in flight.
+   */
+  subscription: SubscriptionStatus | null
   login: () => Promise<void>
   logout: () => Promise<void>
 }
@@ -31,6 +42,7 @@ function isInAppBrowser(): boolean {
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
+  const [subscription, setSubscription] = useState<SubscriptionStatus | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -42,11 +54,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           initialized = true
           const token = await firebaseUser.getIdToken()
           sessionStorage.setItem('idToken', token)
-          apiPost('user/sync', {}, token).catch(console.error)
+          apiPost<PostUserSyncResponse>('user/sync', {}, token)
+            .then((synced) => setSubscription(synced.subscription))
+            .catch(console.error)
         }
       } else {
         initialized = false
         setUser(null)
+        setSubscription(null)
         sessionStorage.removeItem('idToken')
       }
       setLoading(false)
@@ -75,7 +90,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, subscription, login, logout }}>
       {children}
     </AuthContext.Provider>
   )
