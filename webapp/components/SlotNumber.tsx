@@ -43,7 +43,7 @@ export default function SlotNumber({ value }: { value: string }) {
           return (
             <span
               key={i}
-              className="text-[56px] font-semibold font-[var(--font-inter)] text-spirit-teal"
+              className="text-[56px] font-semibold font-[var(--font-inter)] text-spirit-canopy"
               style={{ lineHeight: `${H}px` }}
             >
               {part.ch}
@@ -77,7 +77,7 @@ export default function SlotNumber({ value }: { value: string }) {
                 <span
                   key={idx}
                   style={{ display: 'block', height: H, lineHeight: `${H}px` }}
-                  className="text-[56px] font-semibold font-[var(--font-inter)] text-spirit-teal"
+                  className="text-[56px] font-semibold font-[var(--font-inter)] text-spirit-canopy"
                 >
                   {d}
                 </span>

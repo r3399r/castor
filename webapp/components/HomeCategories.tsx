@@ -23,7 +23,7 @@ export default function HomeCategories() {
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div className="space-y-3">
           <p className="text-sm font-bold tracking-[0.12em] text-spirit-leaf uppercase">熱門分類</p>
-          <h2 className="text-[40px] font-bold text-spirit-forest">熱門考試 / 科目</h2>
+          <h2 className="text-[40px] font-bold text-spirit-canopy">熱門考試 / 科目</h2>
         </div>
         <a
           href="/question"
@@ -38,7 +38,7 @@ export default function HomeCategories() {
         {categories.map((category) => (
           <article key={category.title} className={`${category.color} rounded-spirit-card border-2 border-spirit-leaf shadow-spirit-card transition-all duration-300 hover:-translate-y-2 hover:shadow-spirit-float`}>
             <div className="m-[10px] rounded-spirit-control border border-spirit-line p-4">
-              <h3 className="text-[28px] font-bold text-spirit-forest">{category.title}</h3>
+              <h3 className="text-[28px] font-bold text-spirit-canopy">{category.title}</h3>
               <hr className="my-4 border-spirit-line" />
               <div>
                 {category.items.map((item) => (

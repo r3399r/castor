@@ -9,7 +9,7 @@ export default function HomeHero() {
             <p className="text-sm font-bold tracking-[0.12em] text-spirit-leaf uppercase">
               PMP - Practice Makes Perfect
             </p>
-            <h1 className="text-[40px] font-bold text-spirit-forest sm:text-5xl lg:text-6xl">
+            <h1 className="text-[40px] font-bold text-spirit-canopy sm:text-5xl lg:text-6xl">
               個人化智慧題庫
             </h1>
             <p className="max-w-xl text-base leading-7 text-spirit-muted sm:text-lg">
@@ -19,7 +19,7 @@ export default function HomeHero() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <a
               href="/question"
-              className="inline-flex items-center justify-center rounded-md bg-spirit-teal px-8 py-3 text-base text-spirit-on-dark transition hover:bg-spirit-teal-hover"
+              className="inline-flex items-center justify-center rounded-md bg-spirit-canopy px-8 py-3 text-base text-spirit-on-dark transition hover:bg-spirit-forest"
             >
               開始練習
             </a>

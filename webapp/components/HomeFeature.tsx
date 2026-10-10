@@ -21,7 +21,7 @@ export default function HomeFeature() {
     <section className="-mx-4 bg-spirit-mist py-[60px] sm:-mx-6 xl:py-[96px]">
       <div className="mx-auto w-full max-w-[1120px] px-4 md:px-[40px] xl:px-[70px]">
         <header className="mx-auto max-w-[720px] space-y-4 text-center">
-          <h2 className="text-[40px] font-bold leading-tight text-spirit-forest">
+          <h2 className="text-[40px] font-bold leading-tight text-spirit-canopy">
             掌握每個觀念的學習狀態
           </h2>
           <p className="text-base leading-7 text-spirit-muted">
@@ -51,7 +51,7 @@ export default function HomeFeature() {
                     aria-hidden
                   />
                   <div>
-                    <h3 className="text-xl font-bold text-spirit-forest">{feature.title}</h3>
+                    <h3 className="text-xl font-bold text-spirit-canopy">{feature.title}</h3>
                     <p className="text-base leading-7 text-spirit-muted">{feature.description}</p>
                   </div>
                 </div>

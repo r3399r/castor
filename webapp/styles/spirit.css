@@ -4,7 +4,7 @@
   overflow: visible;
   width: 100%;
   border-bottom: 1px solid rgb(225 199 122 / 0.3);
-  background: #234b43;
+  background: var(--color-spirit-canopy);
   color: #c8cec5;
 }
 .site-header::after {
@@ -92,7 +92,7 @@
   position: relative;
   z-index: 20;
   border-bottom: 1px solid rgb(225 199 122 / 0.3);
-  background: #234b43;
+  background: var(--color-spirit-canopy);
 }
 .learning-page {
   --learning-footer-background: #688a77;

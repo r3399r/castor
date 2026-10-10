@@ -31,7 +31,7 @@ export default function HomeHighlights() {
         <div className="flex flex-col gap-10 xl:flex-row xl:gap-0 xl:divide-x xl:divide-spirit-line">
           {/* Left: heading */}
           <div className="flex flex-col gap-5 xl:w-[340px] xl:shrink-0 xl:pr-12">
-            <h2 className="text-[40px] font-bold leading-tight text-spirit-forest">
+            <h2 className="text-[40px] font-bold leading-tight text-spirit-canopy">
               讓學習
               <br />
               更有效率
@@ -49,7 +49,7 @@ export default function HomeHighlights() {
                 <div key={item.title} className="flex flex-col gap-3 flex-1 pr-6 last:pr-0 last:pl-6">
                   <img src={item.icon} alt="" width={32} height={32} aria-hidden />
                   <div>
-                    <h3 className="text-lg font-bold text-spirit-forest">{item.title}</h3>
+                    <h3 className="text-lg font-bold text-spirit-canopy">{item.title}</h3>
                     <p className="mt-1 text-sm leading-6 text-spirit-muted">{item.description}</p>
                   </div>
                 </div>
@@ -65,7 +65,7 @@ export default function HomeHighlights() {
                 <div key={item.title} className="flex flex-col gap-3 flex-1 pr-6 last:pr-0 last:pl-6">
                   <img src={item.icon} alt="" width={32} height={32} aria-hidden />
                   <div>
-                    <h3 className="text-lg font-bold text-spirit-forest">{item.title}</h3>
+                    <h3 className="text-lg font-bold text-spirit-canopy">{item.title}</h3>
                     <p className="mt-1 text-sm leading-6 text-spirit-muted">{item.description}</p>
                   </div>
                 </div>
