@@ -251,13 +251,13 @@ export default function BoxClient() {
         }
       >
         <h1>
-          禮物盒<span>讓學習，慢慢長成美好。</span>
+          精靈養成<span>將智慧練習成果化為積分，兌換經驗值，讓精靈逐步成長。</span>
         </h1>
       </IllustratedHero>
       <div className="sp-box-content">
         <Tabs
           id="gift-tabs"
-          label="禮物盒功能"
+          label="精靈養成功能"
           value={activeTab}
           onChange={setActiveTab}
           items={tabs}

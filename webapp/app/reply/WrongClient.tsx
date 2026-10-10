@@ -6,6 +6,7 @@ import { BookOpenText } from 'lucide-react'
 import { apiDelete, apiFetch, apiPut, LIMIT } from '@/lib/api'
 import Chip, { tagColors } from '@/components/Chip'
 import DifficultyStars from '@/components/DifficultyStars'
+import { LoadingState } from '@/components/ui'
 import type { GetWrongQuestionResponse, PutWrongQuestionNoteResponse, WrongQuestion } from '@/types/api'
 import type { QueryFilters } from './useSharedFilters'
 import styles from './reply.module.css'
@@ -108,13 +109,13 @@ function WrongCard({
         {isGroup && item.parentQuestion?.content && (
           <div
             dangerouslySetInnerHTML={{ __html: item.parentQuestion.content }}
-            className="prose max-w-none text-[18px] font-medium text-black-800 [&>*:last-child]:mb-0"
+            className="prose max-w-none text-spirit-reading font-medium text-black-800 [&>*:last-child]:mb-0"
           />
         )}
         {question.content && (
           <div
             dangerouslySetInnerHTML={{ __html: question.content }}
-            className="prose max-w-none text-[18px] font-medium text-black-800 [&>*:last-child]:mb-0"
+            className="prose max-w-none text-spirit-reading font-medium text-black-800 [&>*:last-child]:mb-0"
           />
         )}
 
@@ -249,11 +250,7 @@ export default function WrongClient({
   }
 
   if (loading && !list) {
-    return (
-      <div className="flex h-48 items-center justify-center">
-        <span className="text-sm text-black-500">載入中…</span>
-      </div>
-    )
+    return <LoadingState />
   }
 
   if (error) {

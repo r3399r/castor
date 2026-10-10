@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { apiDelete, apiFetch, apiPut, LIMIT } from '@/lib/api'
 import MultiSelectField from '@/components/MultiSelectField'
 import Pagination from '@/components/Pagination'
+import { ErrorState, LoadingState, PageHeader, TableFrame } from '@/components/ui'
 import SortableTh, { type SortDirection } from '@/components/SortableTh'
 import type { Paginate } from '@/types/api'
 import { MathJax } from 'better-react-mathjax'
@@ -205,24 +206,16 @@ export default function QuestionClient() {
   }
 
   if (loading && questions === null) {
-    return (
-      <div className="flex h-48 items-center justify-center">
-        <span className="text-sm text-black-500">載入中…</span>
-      </div>
-    )
+    return <LoadingState />
   }
 
   if (error) {
-    return (
-      <div className="mt-[60px] rounded-[24px] border border-red-200 bg-red-50 p-8 text-center">
-        <p className="text-sm text-red-600">{error}</p>
-      </div>
-    )
+    return <ErrorState>{error}</ErrorState>
   }
 
   return (
-    <div className="pb-[70px]">
-      <h1 className="mt-[60px] mb-6 text-3xl font-bold text-blue-700">題目管理</h1>
+    <div className="pb-page-bottom">
+      <PageHeader title="題目管理" />
       <p className="mb-6 text-sm text-black-500">
         題目透過「新增題目」流程建立，此頁面僅供檢視、編輯與刪除。新建立的題目預設為停用，
         按下綠色的「啟用」後使用者才會練習到該題；顯示「停用」的題目則代表目前已啟用。
@@ -231,14 +224,14 @@ export default function QuestionClient() {
         要新增題目，請前往{' '}
         <a
           href="/admin/subject/"
-          className="font-medium text-blue-700 underline transition hover:text-[#1f3ea3]"
+          className="font-medium text-blue-700 underline transition hover:text-spirit-forest"
         >
           科目管理
         </a>
         ，在目標科目那一列按下「新增題目」。
       </p>
 
-      <div className="mt-4 overflow-x-auto rounded-lg border border-brown-300 bg-white/40">
+      <TableFrame className="mt-4">
         <table className="w-full text-left text-sm">
           <thead>
             <tr className="border-b border-brown-300/60 text-xs font-medium text-black-700">
@@ -394,7 +387,7 @@ export default function QuestionClient() {
                           <button
                             onClick={() => handleSave(row)}
                             disabled={savingId === row.id || !editExamId || editConceptIds.length === 0}
-                            className="rounded-md bg-blue-700 px-4 py-2 text-sm font-bold text-white transition hover:bg-[#1f3ea3] disabled:cursor-not-allowed disabled:opacity-50"
+                            className="rounded-md bg-blue-700 px-4 py-2 text-sm font-bold text-white transition hover:bg-spirit-forest disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             {savingId === row.id ? '儲存中…' : '儲存'}
                           </button>
@@ -464,7 +457,7 @@ export default function QuestionClient() {
             })}
           </tbody>
         </table>
-      </div>
+      </TableFrame>
 
       <Pagination
         page={page}

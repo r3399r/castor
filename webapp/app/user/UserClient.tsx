@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Coins } from 'lucide-react'
 import { apiFetch, apiPut } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
+import { LoadingState } from '@/components/ui'
 import type { GetUserMeResponse, PutUserMeRequest, PutUserMeResponse } from '@/types/api'
 import styles from './user.module.css'
 
@@ -49,11 +50,7 @@ export default function UserClient() {
   }
 
   if (loading) {
-    return (
-      <div className="flex h-48 items-center justify-center">
-        <span className="text-sm text-black-500">載入中…</span>
-      </div>
-    )
+    return <LoadingState />
   }
 
   if (error || !me) {

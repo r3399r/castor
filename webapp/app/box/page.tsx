@@ -5,7 +5,7 @@ import BoxClient from "./BoxClient";
 export default function BoxPage() {
   return (
     <div className="spirit-theme sp-page sp-box-page">
-      <div className="sp-navigation">
+      <div className="standard-site-header">
         <Navbar />
       </div>
       <div className="sp-box-access">

@@ -4,33 +4,33 @@
     #f4f3e9 0%,
     #efe7e1 100%
   );
-  --adaptive-ink: #34423d;
-  --adaptive-muted: #68766f;
-  --adaptive-forest: #315e50;
-  --adaptive-forest-hover: #254d44;
-  --adaptive-selected: #e1eee3;
-  --adaptive-hover: #edf3e9;
-  --adaptive-line: #cbd8ce;
-  --adaptive-surface: #fffdf8;
-  --practice-gold: #e8cc76;
-  --practice-gold-soft: #e8cc77;
-  --practice-gold-hover: #faf6e7;
-  --practice-gold-border: #d4b65e;
-  --practice-gold-ink: #66532c;
-  --practice-forest: #315e50;
-  --practice-paper: #fffdf8;
-  --practice-nav-background: #28564d;
-  --practice-correct-bg: #e2efe7;
+  --adaptive-ink: var(--color-spirit-ink);
+  --adaptive-muted: var(--color-spirit-muted);
+  --adaptive-forest: var(--color-spirit-canopy);
+  --adaptive-forest-hover: var(--color-spirit-forest);
+  --adaptive-selected: var(--color-spirit-mist);
+  --adaptive-hover: var(--color-spirit-mist);
+  --adaptive-line: var(--color-spirit-line);
+  --adaptive-surface: var(--color-spirit-paper);
+  --practice-gold: var(--color-spirit-gold);
+  --practice-gold-soft: var(--color-warning);
+  --practice-gold-hover: var(--color-warning-soft);
+  --practice-gold-border: var(--color-spirit-gold-hover);
+  --practice-gold-ink: var(--color-warning-text);
+  --practice-forest: var(--color-spirit-canopy);
+  --practice-paper: var(--color-spirit-paper);
+  --practice-nav-background: var(--color-spirit-canopy);
+  --practice-correct-bg: var(--color-success-soft);
   --practice-wrong: var(--color-danger-text);
   --practice-wrong-bg: var(--color-danger-soft);
-  --result-correct: #10b85a;
-  --result-correct-bg: #e9f8ef;
-  --result-correct-text: #0d6b38;
+  --result-correct: var(--color-success);
+  --result-correct-bg: var(--color-success-soft);
+  --result-correct-text: var(--color-success-text);
   --result-wrong-badge: var(--color-danger);
-  --result-gold: #e8cc76;
-  --result-deep-green: #315e50;
-  --result-paper: #fffdf8;
-  --result-icon: #fff;
+  --result-gold: var(--color-spirit-gold);
+  --result-deep-green: var(--color-spirit-canopy);
+  --result-paper: var(--color-spirit-paper);
+  --result-icon: var(--color-danger-on);
   color: var(--adaptive-ink);
 }
 
@@ -47,8 +47,8 @@
   color: var(--adaptive-forest);
   font-size: 2rem;
   font-weight: 700;
-  line-height: 1.25;
-  letter-spacing: 0.02em;
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-wide);
 }
 
 .pageSubtitle {
@@ -67,7 +67,7 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
-  animation: reveal 180ms ease-out both;
+  animation: reveal var(--motion-duration-standard) var(--motion-ease-emphasized) both;
 }
 
 .sectionHeading {
@@ -77,7 +77,7 @@
   color: var(--adaptive-forest);
   font-size: 1.25rem;
   font-weight: 700;
-  line-height: 1.4;
+  line-height: var(--leading-comfortable);
 }
 
 .sectionIcon {
@@ -86,10 +86,10 @@
 }
 
 .card {
-  border: 1px solid rgb(203 216 206 / 0.8);
+  border: var(--spirit-border-muted);
   border-radius: 16px;
   background: var(--adaptive-surface);
-  box-shadow: 0 8px 28px rgb(23 63 58 / 0.06);
+  box-shadow: var(--shadow-spirit-card);
 }
 
 .examGrid {
@@ -112,20 +112,20 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
   padding: 8px;
-  border-bottom: 1px solid #e1e7df;
+  border-bottom: var(--spirit-border);
   background: #f4f3e9;
 }
 
 .examTab {
-  min-height: 36px;
+  min-height: var(--control-height-nav);
   padding: 5px 10px;
-  border: 1px solid transparent;
+  border: var(--border-width-subtle) solid transparent;
   border-radius: 8px;
   color: var(--adaptive-muted);
   font-size: 0.875rem;
   font-weight: 700;
-  line-height: 1.35;
-  transition: border-color 180ms ease, background-color 180ms ease, color 180ms ease;
+  line-height: var(--leading-snug);
+  transition: border-color var(--motion-duration-standard) var(--motion-ease-standard), background-color var(--motion-duration-standard) var(--motion-ease-standard), color var(--motion-duration-standard) var(--motion-ease-standard);
 }
 
 .examTab:hover {
@@ -136,17 +136,17 @@
 .examTab[aria-selected='true'] {
   border-color: var(--adaptive-forest);
   background: var(--adaptive-forest);
-  color: #fffdf8;
+  color: var(--color-spirit-paper);
 }
 
 .examTab[aria-selected='true']:hover {
   border-color: var(--adaptive-forest-hover);
   background: var(--adaptive-forest-hover);
-  color: #fffdf8;
+  color: var(--color-spirit-paper);
 }
 
 .examTab:focus-visible {
-  outline: 3px solid rgb(49 94 80 / 0.25);
+  outline: var(--spirit-focus-outline);
   outline-offset: 2px;
 }
 
@@ -157,7 +157,7 @@
 .examCardTitle {
   display: block;
   margin-bottom: 14px;
-  color: #43564f;
+  color: var(--color-spirit-ink-soft);
   font-size: 0.9375rem;
   font-weight: 700;
 }
@@ -177,19 +177,19 @@
 .option,
 .pillOption,
 .segmentOption {
-  --option-selected-bg: #e2efe7;
-  --option-accent: #315e50;
+  --option-selected-bg: var(--color-success-soft);
+  --option-accent: var(--color-spirit-canopy);
   --option-hover-bg: #f0f6f2;
   position: relative;
-  min-height: 40px;
-  border: 2px solid var(--adaptive-line);
+  min-height: var(--control-height-md);
+  border: var(--border-width-strong) solid var(--adaptive-line);
   background: var(--adaptive-surface);
-  color: #43564f;
+  color: var(--color-spirit-ink-soft);
   font-size: 0.875rem;
   font-weight: 600;
-  line-height: 1.35;
+  line-height: var(--leading-snug);
   text-align: left;
-  transition: border-color 180ms ease, background-color 180ms ease, color 180ms ease;
+  transition: border-color var(--motion-duration-standard) var(--motion-ease-standard), background-color var(--motion-duration-standard) var(--motion-ease-standard), color var(--motion-duration-standard) var(--motion-ease-standard);
 }
 
 .option {
@@ -199,7 +199,7 @@
 
 .pillOption {
   max-width: 100%;
-  min-height: 36px;
+  min-height: var(--control-height-nav);
   border-radius: 999px;
   padding: 7px 14px;
   overflow-wrap: anywhere;
@@ -239,13 +239,13 @@
 .primaryButton:focus-visible,
 .navButton:focus-visible,
 .questionNumber:focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--option-accent, #315e50) 30%, transparent);
+  outline: var(--focus-ring-width) solid color-mix(in srgb, var(--option-accent, var(--color-spirit-canopy)) 30%, transparent);
   outline-offset: 3px;
 }
 
 .categoryTone {
-  --option-selected-bg: #e2efe7;
-  --option-accent: #315e50;
+  --option-selected-bg: var(--color-success-soft);
+  --option-accent: var(--color-spirit-canopy);
   --option-hover-bg: #f0f6f2;
 }
 
@@ -282,13 +282,13 @@
 }
 
 .filterGroup ~ .filterGroup {
-  border-top: 1px solid #e1e7df;
+  border-top: var(--spirit-border);
 }
 
 .filterLabel {
   display: block;
   margin-bottom: 12px;
-  color: #43564f;
+  color: var(--color-spirit-ink-soft);
   font-size: 0.875rem;
   font-weight: 700;
 }
@@ -313,7 +313,7 @@
 }
 
 .clearButton {
-  min-height: 34px;
+  min-height: var(--control-height-sm);
   border: 1px solid #9bada4;
   border-radius: 8px;
   background: transparent;
@@ -328,7 +328,7 @@
 }
 
 .clearButton:focus-visible {
-  outline: 3px solid rgb(49 94 80 / 0.24);
+  outline: var(--spirit-focus-outline);
   outline-offset: 3px;
 }
 
@@ -362,7 +362,7 @@
 
 .segmentOption {
   width: 48px;
-  min-height: 38px;
+  min-height: var(--control-height-md);
   border: 0;
   border-radius: 0;
   padding: 7px 13px;
@@ -374,12 +374,12 @@
 }
 
 .segmentOption.selected {
-  background: #315e50;
-  color: #fffdf8;
+  background: var(--color-spirit-canopy);
+  color: var(--color-spirit-paper);
 }
 
 .segmentOption.selected:hover:not(:disabled) {
-  background: #315e50;
+  background: var(--color-spirit-canopy);
 }
 
 .countText {
@@ -395,17 +395,17 @@
   align-items: center;
   justify-content: center;
   gap: 7px;
-  min-height: 42px;
+  min-height: var(--control-height-md);
   border-radius: 10px;
   font-size: 0.875rem;
   font-weight: 700;
-  transition: border-color 180ms ease, background-color 180ms ease, color 180ms ease;
+  transition: border-color var(--motion-duration-standard) var(--motion-ease-standard), background-color var(--motion-duration-standard) var(--motion-ease-standard), color var(--motion-duration-standard) var(--motion-ease-standard);
 }
 
 .primaryButton {
   border: 1px solid var(--adaptive-forest);
   background: var(--adaptive-forest);
-  color: #fffdf8;
+  color: var(--color-spirit-paper);
   padding: 10px 22px;
 }
 
@@ -418,7 +418,7 @@
 .navButton {
   border: 1px solid var(--adaptive-line);
   background: var(--adaptive-surface);
-  color: #43564f;
+  color: var(--color-spirit-ink-soft);
 }
 
 .secondaryButton {
@@ -445,7 +445,7 @@
 
 .backButton {
   display: inline-flex;
-  min-height: 44px;
+  min-height: var(--control-height-md);
   align-items: center;
   gap: 8px;
   margin: 44px 0 20px;
@@ -468,13 +468,13 @@
 
 .backButton:focus-visible {
   border-radius: 6px;
-  outline: 3px solid rgb(49 94 80 / 0.24);
+  outline: var(--spirit-focus-outline);
   outline-offset: 3px;
 }
 
 .questionNav {
   position: relative;
-  z-index: 1;
+  z-index: var(--layer-decoration);
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr) max-content;
   align-items: center;
@@ -490,13 +490,13 @@
 .questionNav > .navButton {
   border-color: rgb(255 253 248 / 0.42);
   background: transparent;
-  color: #fffdf8;
+  color: var(--color-spirit-paper);
 }
 
 .questionNav > .navButton:hover:not(:disabled) {
   border-color: rgb(255 253 248 / 0.68);
   background: rgb(255 253 248 / 0.1);
-  color: #fffdf8;
+  color: var(--color-spirit-paper);
 }
 
 .questionNav > .navButton:disabled {
@@ -557,7 +557,7 @@
   display: grid;
   flex: 0 0 32px;
   width: 32px;
-  height: 32px;
+  height: var(--control-height-sm);
   place-items: center;
   border: 2px solid rgb(168 194 181 / 0.4);
   border-radius: 50%;
@@ -626,14 +626,14 @@
 
 .questionCard {
   overflow: hidden;
-  border: 1px solid rgb(203 216 206 / 0.85);
+  border: var(--spirit-border-muted);
   border-radius: 16px;
   background: var(--adaptive-surface);
   box-shadow: none;
 }
 
 .questionMeta {
-  border-bottom: 1px solid #e1e7df;
+  border-bottom: var(--spirit-border);
   padding: 15px 20px;
 }
 
@@ -659,16 +659,16 @@
   display: flex;
   cursor: pointer;
   min-width: 0;
-  min-height: 48px;
+  min-height: var(--control-height-lg);
   align-items: center;
   justify-content: center;
-  border: 2px solid var(--adaptive-line);
+  border: var(--border-width-strong) solid var(--adaptive-line);
   border-radius: 10px;
-  background: #fffdf8;
-  color: #43564f;
+  background: var(--color-spirit-paper);
+  color: var(--color-spirit-ink-soft);
   font-size: 1.125rem;
   font-weight: 700;
-  transition: border-color 180ms ease, background-color 180ms ease, color 180ms ease;
+  transition: border-color var(--motion-duration-standard) var(--motion-ease-standard), background-color var(--motion-duration-standard) var(--motion-ease-standard), color var(--motion-duration-standard) var(--motion-ease-standard);
 }
 
 .answerOption:has(input:not(:disabled)):hover {
@@ -818,7 +818,7 @@
   border: 1px solid currentColor;
   border-radius: 5px;
   background: rgb(255 253 248 / 0.65);
-  color: #43564f;
+  color: var(--color-spirit-ink-soft);
   font-weight: 700;
 }
 
@@ -832,23 +832,23 @@
   padding: 7px 12px;
   border: 1px solid #b9b2a6;
   border-radius: 8px;
-  background: #fffdf8;
+  background: var(--color-spirit-paper);
   color: #625d54;
   font-size: 0.875rem;
   font-weight: 600;
-  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+  transition: background-color var(--motion-duration-fast) var(--motion-ease-standard), border-color var(--motion-duration-fast) var(--motion-ease-standard), color var(--motion-duration-fast) var(--motion-ease-standard);
 }
 
 .discussionButton:hover {
-  border-color: #49463f;
+  border-color: var(--color-spirit-ink);
   background: #f0ece4;
-  color: #49463f;
+  color: var(--color-spirit-ink);
 }
 
 .discussionButton:active {
-  border-color: #49463f;
+  border-color: var(--color-spirit-ink);
   background: #e6e0d6;
-  color: #49463f;
+  color: var(--color-spirit-ink);
 }
 
 .discussionButton:focus-visible {
@@ -949,7 +949,7 @@
   .actionCard { padding: 18px 16px; }
   .examTabPanel { padding: 16px; }
   .optionGrid { grid-template-columns: minmax(0, 1fr); }
-  .navButton { min-height: 40px; }
+  .navButton { min-height: var(--control-height-md); }
   .questionMeta { padding: 14px 16px; }
   .questionBody { padding: 24px 16px; }
   .answerGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

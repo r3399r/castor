@@ -9,19 +9,18 @@
   );
   --learning-footer-link: #f3f1e8;
   --learning-footer-copyright: #c6d4cd;
-  color: #34423d;
+  color: var(--color-spirit-ink);
 }
 
 .header {
   position: relative;
-  z-index: 20;
-  border-bottom: 1px solid rgb(225 199 122 / 0.3);
-  background: #234b43;
+  z-index: var(--layer-header);
+  background: var(--color-spirit-canopy);
 }
 
 .titleBand {
   position: relative;
-  z-index: 1;
+  z-index: var(--layer-decoration);
   overflow-x: clip;
   overflow-y: visible;
   height: 160px;
@@ -36,7 +35,7 @@
 
 .titleBandInner {
   position: relative;
-  z-index: 2;
+  z-index: var(--layer-raised);
   display: flex;
   height: 100%;
   width: 100%;
@@ -47,7 +46,7 @@
 
 .titleCopy {
   position: relative;
-  z-index: 2;
+  z-index: var(--layer-raised);
   width: 58%;
   padding-top: 16px;
 }
@@ -56,7 +55,7 @@
   position: absolute;
   right: 0;
   bottom: -62px;
-  z-index: 1;
+  z-index: var(--layer-decoration);
   width: 88%;
   height: 200px;
   opacity: 0;
@@ -75,11 +74,11 @@
 
 .pageTitle {
   margin: 0;
-  color: #315b50;
+  color: var(--color-spirit-canopy);
   font-size: 2rem;
   font-weight: 700;
-  line-height: 1.25;
-  letter-spacing: 0.02em;
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-wide);
 }
 
 .titleCopy p {
@@ -93,7 +92,7 @@
 }
 
 .sectionTitle {
-  color: #315b50;
+  color: var(--color-spirit-canopy);
 }
 
 .sectionTitle {
@@ -103,7 +102,7 @@
   margin: 40px 0 20px;
   font-size: 1.25rem;
   font-weight: 700;
-  line-height: 1.4;
+  line-height: var(--leading-comfortable);
 }
 
 .history {
@@ -115,7 +114,7 @@
 
 .summaryGrid {
   position: relative;
-  z-index: 3;
+  z-index: var(--layer-highlight);
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 22px;
@@ -124,7 +123,7 @@
 }
 
 .card {
-  border: 1px solid rgb(216 208 195 / 0.72);
+  border: var(--spirit-border-muted);
   border-radius: 16px;
   box-shadow: none;
 }
@@ -166,7 +165,7 @@
   color: inherit;
   font-size: 1rem;
   font-weight: 700;
-  line-height: 1.3;
+  line-height: var(--leading-compact);
   white-space: nowrap;
 }
 
@@ -182,7 +181,7 @@
 .summaryValue {
   font-size: 3.5rem;
   font-weight: 700;
-  line-height: 1;
+  line-height: var(--leading-none);
   font-variant-numeric: tabular-nums;
 }
 
@@ -190,7 +189,7 @@
   color: color-mix(in srgb, currentColor 78%, transparent);
   font-size: 1.25rem;
   font-weight: 600;
-  line-height: 1;
+  line-height: var(--leading-none);
 }
 
 .summarySub,
@@ -203,7 +202,7 @@
   min-height: 1.4em;
   color: color-mix(in srgb, currentColor 82%, transparent);
   font-size: 0.8125rem;
-  line-height: 1.4;
+  line-height: var(--leading-comfortable);
   transform: translateY(-4px);
 }
 
@@ -212,13 +211,13 @@
   top: 28px;
   right: 24px;
   width: 48px;
-  height: 48px;
+  height: var(--control-height-lg);
   object-fit: contain;
   pointer-events: none;
 }
 
 .card {
-  background: #fffdf8;
+  background: var(--color-spirit-paper);
   padding: 32px;
 }
 
@@ -234,7 +233,7 @@
   display: flex;
   align-items: center;
   gap: 9px;
-  color: #34423d;
+  color: var(--color-spirit-ink);
   font-size: 1rem;
   font-weight: 700;
 }
@@ -259,19 +258,19 @@
 .tabGroup {
   display: flex;
   overflow: hidden;
-  border: 1px solid #d8d0c3;
+  border: var(--spirit-border);
   border-radius: 10px;
   background: transparent;
 }
 
 .tabButton {
-  min-height: 32px;
+  min-height: var(--control-height-sm);
   padding: 5px 12px;
-  border-right: 1px solid #d8d0c3;
+  border-right: var(--spirit-border);
   background: transparent;
-  color: #34423d;
+  color: var(--color-spirit-ink);
   font-size: 0.75rem;
-  transition: background-color 160ms ease, color 160ms ease;
+  transition: background-color var(--motion-duration-fast) var(--motion-ease-standard), color var(--motion-duration-fast) var(--motion-ease-standard);
 }
 
 .tabButton:last-child {
@@ -280,19 +279,19 @@
 
 .tabButton:hover {
   background: #e8eee6;
-  color: #315b50;
+  color: var(--color-spirit-canopy);
 }
 
 .tabButton:focus-visible,
 .legendButton:focus-visible {
-  outline: 3px solid rgb(57 115 101 / 0.35);
+  outline: var(--spirit-focus-outline);
   outline-offset: 2px;
 }
 
 .tabActive,
 .tabActive:hover {
-  background: #315b50;
-  color: #fffdf8;
+  background: var(--color-spirit-canopy);
+  color: var(--color-spirit-paper);
 }
 
 .legendButton {
@@ -304,11 +303,11 @@
 
 .bodyText,
 .legendText {
-  color: #34423d;
+  color: var(--color-spirit-ink);
 }
 
 .masteryValue {
-  color: #315b50;
+  color: var(--color-spirit-canopy);
 }
 
 .masteryTrack {
@@ -323,7 +322,7 @@
   height: 100%;
   border-radius: 2px;
   background: #397365;
-  transition: width 180ms ease;
+  transition: width var(--motion-duration-standard) var(--motion-ease-standard);
 }
 
 .subjectGrid {
@@ -346,9 +345,9 @@
 }
 
 .errorCard {
-  border: 1px solid #d8d0c3;
+  border: var(--spirit-border);
   border-radius: 16px;
-  background: #fffdf8;
+  background: var(--color-spirit-paper);
   padding: 32px;
   color: #7a4e42;
   text-align: center;
@@ -358,7 +357,7 @@
 .errorLink {
   display: inline-block;
   margin-top: 16px;
-  color: #315b50;
+  color: var(--color-spirit-canopy);
   font-size: 0.875rem;
   text-decoration: underline;
 }
@@ -421,7 +420,7 @@
     top: 24px;
     right: 18px;
     width: 48px;
-    height: 48px;
+    height: var(--control-height-lg);
   }
 }
 
@@ -501,7 +500,7 @@
     top: 20px;
     right: 22px;
     width: 48px;
-    height: 48px;
+    height: var(--control-height-lg);
   }
 
   .card {

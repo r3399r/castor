@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { apiFetch, apiPost } from '@/lib/api'
 import MultiSelectField from '@/components/MultiSelectField'
+import { ErrorState, LoadingState, PageHeader } from '@/components/ui'
 import QuestionImageUpload from '@/components/QuestionImageUpload'
 import { takeQuestionDraft } from '@/lib/questionDraft'
 import { MathJax } from 'better-react-mathjax'
@@ -220,29 +221,19 @@ export default function SubjectNewQuestionClient() {
   }, [subjectId])
 
   if (loading) {
-    return (
-      <div className="flex h-48 items-center justify-center">
-        <span className="text-sm text-black-500">載入中…</span>
-      </div>
-    )
+    return <LoadingState />
   }
 
   if (error || subject === null) {
-    return (
-      <div className="mt-[60px] rounded-[24px] border border-red-200 bg-red-50 p-8 text-center">
-        <p className="text-sm text-red-600">{error ?? '找不到此科目。'}</p>
-      </div>
-    )
+    return <ErrorState>{error ?? '找不到此科目。'}</ErrorState>
   }
 
   return (
-    <div className="pb-[70px]">
-      <h1 className="mt-[60px] mb-2 text-3xl font-bold text-blue-700">
-        新增題目（{subject.name}）
-      </h1>
-      <p className="mb-6 text-sm text-black-500">
-        選擇送出時使用的試卷，並確認此科目目前可用的標籤、觀念群組。
-      </p>
+    <div className="pb-page-bottom">
+      <PageHeader
+        title={`新增題目（${subject.name}）`}
+        subtitle="選擇送出時使用的試卷，並確認此科目目前可用的標籤、觀念群組。"
+      />
 
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="rounded-lg border border-brown-300 bg-white/40 p-4">
@@ -361,7 +352,7 @@ export default function SubjectNewQuestionClient() {
           {parsedQuestions.map((question, i) => {
             const problems = missingFields(question)
             return (
-              <div key={i} className="rounded-[24px] border border-brown-300 bg-white p-6">
+              <div key={i} className="rounded-spirit-card border border-brown-300 bg-white p-6">
                 <div className="mb-3 flex flex-wrap items-center gap-2 text-sm">
                   <span className="font-bold text-black-900">第 {i + 1} 題</span>
                   {question.type && (
@@ -393,7 +384,7 @@ export default function SubjectNewQuestionClient() {
                   <p className="text-sm text-black-200">此題無 content</p>
                 )}
 
-                <div className="mt-3 space-y-1 border-t border-[#E5E0DC] pt-3 text-sm">
+                <div className="mt-3 space-y-1 border-t border-spirit-line pt-3 text-sm">
                   <div className="flex gap-2">
                     <span className="w-20 shrink-0 font-medium text-black-500">options:</span>
                     <span className="text-black-900">{question.options ?? '—'}</span>
@@ -419,7 +410,7 @@ export default function SubjectNewQuestionClient() {
                 </div>
 
                 {subject.tags.length > 0 && (
-                  <div className="mt-3 border-t border-[#E5E0DC] pt-3">
+                  <div className="mt-3 border-t border-spirit-line pt-3">
                     <MultiSelectField
                       label="標籤（可複選，可不選）"
                       options={subject.tags.map((tag) => ({
@@ -448,7 +439,7 @@ export default function SubjectNewQuestionClient() {
               type="button"
               onClick={handleSubmitAll}
               disabled={!selectedExamId || submitting || hasInvalidQuestion}
-              className="rounded-md bg-blue-700 px-6 py-2.5 text-sm font-bold text-white transition hover:bg-[#1f3ea3] disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-md bg-blue-700 px-6 py-2.5 text-sm font-bold text-white transition hover:bg-spirit-forest disabled:cursor-not-allowed disabled:opacity-50"
             >
               {submitting ? '送出中…' : '送出'}
             </button>

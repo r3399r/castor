@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Coins } from 'lucide-react'
 import { apiFetch, LIMIT } from '@/lib/api'
+import { LoadingState } from '@/components/ui'
 import type { GetWalletResponse, PointTransaction } from '@/types/api'
 import styles from '../user.module.css'
 
@@ -69,11 +70,7 @@ export default function WalletClient() {
   }, [])
 
   if (loading && !wallet) {
-    return (
-      <div className="flex h-48 items-center justify-center">
-        <span className="text-sm text-black-500">載入中…</span>
-      </div>
-    )
+    return <LoadingState />
   }
 
   if (error) {
@@ -90,7 +87,7 @@ export default function WalletClient() {
   const isEmpty = !wallet || wallet.data.length === 0
 
   return (
-    <div className={`${styles.content} pb-[70px]`}>
+    <div className={`${styles.content} pb-page-bottom`}>
       <h1 className={styles.title}>積分紀錄</h1>
       <p className={styles.subtitle}>查看每一筆積分的獲得明細。</p>
 

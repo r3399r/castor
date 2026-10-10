@@ -2,6 +2,7 @@ import AuthGuard from '@/components/AuthGuard'
 import Footer from '@/components/Footer'
 import LearningFooterFoliage from '@/components/learning/LearningFooterFoliage'
 import Navbar from '@/components/Navbar'
+import { PageContainer } from '@/components/layout'
 import AnalysisClient from './AnalysisClient'
 import styles from './analysis.module.css'
 
@@ -11,12 +12,12 @@ export default function AnalysisPage() {
       <div className={`${styles.header} standard-site-header`}>
         <Navbar />
       </div>
-      <div className="relative z-10 px-4 md:px-10 lg:px-[70px]">
-        <div className="mx-auto max-w-[1120px]">
+      <div className="layer-content relative">
+        <PageContainer>
           <AuthGuard>
             <AnalysisClient />
           </AuthGuard>
-        </div>
+        </PageContainer>
       </div>
       <div className="px-4 sm:px-6">
         <LearningFooterFoliage className="learning-page-footer-foliage" />

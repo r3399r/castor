@@ -38,7 +38,7 @@ export default function FilterPanel({ filters, disabled }: { filters: SharedFilt
             disabled={disabled}
             className={styles.quietButton}
           >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <svg className="icon-sm" width="16" height="16" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M11 3L3 11M3 3L11 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
             </svg>
             清空篩選

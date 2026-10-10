@@ -9,7 +9,7 @@ import HomeStatsBar from '@/components/HomeStatsBar'
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-beige-100">
+    <div className="min-h-screen bg-spirit-cream text-spirit-ink">
       <div className="standard-site-header">
         <Navbar />
       </div>

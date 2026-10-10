@@ -6,6 +6,7 @@ import { BookOpenText } from 'lucide-react'
 import { apiFetch, LIMIT } from '@/lib/api'
 import Chip, { tagColors } from '@/components/Chip'
 import DifficultyStars from '@/components/DifficultyStars'
+import { LoadingState } from '@/components/ui'
 import type { GetReplyResponse, ReplyGroup } from '@/types/api'
 import type { QueryFilters } from './useSharedFilters'
 import styles from './reply.module.css'
@@ -98,7 +99,7 @@ function ReplyRow({ item }: { item: ReplyGroup }) {
         {question.content && (
           <div
             dangerouslySetInnerHTML={{ __html: question.content }}
-            className="prose max-w-none text-[18px] font-medium text-black-800 [&>*:last-child]:mb-0"
+            className="prose max-w-none text-spirit-reading font-medium text-black-800 [&>*:last-child]:mb-0"
           />
         )}
 
@@ -155,7 +156,7 @@ function ReplyRow({ item }: { item: ReplyGroup }) {
                         className={`${styles.discussionButton} ${fbUrl ? '' : 'cursor-not-allowed opacity-40'}`}
                       >
                         討論區
-                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                        <svg className="icon-sm" width="16" height="16" viewBox="0 0 14 14" fill="none">
                           <path d="M5.5 2.5H2.5C1.95 2.5 1.5 2.95 1.5 3.5V11.5C1.5 12.05 1.95 12.5 2.5 12.5H10.5C11.05 12.5 11.5 12.05 11.5 11.5V8.5M8.5 1.5H12.5M12.5 1.5V5.5M12.5 1.5L6 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                         </svg>
                       </a>
@@ -178,7 +179,7 @@ function ReplyRow({ item }: { item: ReplyGroup }) {
             className={`${styles.discussionButton} self-end ${fbUrl ? '' : 'cursor-not-allowed opacity-40'}`}
           >
             討論區
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <svg className="icon-sm" width="16" height="16" viewBox="0 0 14 14" fill="none">
               <path d="M5.5 2.5H2.5C1.95 2.5 1.5 2.95 1.5 3.5V11.5C1.5 12.05 1.95 12.5 2.5 12.5H10.5C11.05 12.5 11.5 12.05 11.5 11.5V8.5M8.5 1.5H12.5M12.5 1.5V5.5M12.5 1.5L6 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </a>
@@ -242,11 +243,7 @@ export default function ReplyClient({
   }, [filters.categoryId, filters.subjectId, examIdsKey, tagIdsKey])
 
   if (loading && !replyList) {
-    return (
-      <div className="flex h-48 items-center justify-center">
-        <span className="text-sm text-black-500">載入中…</span>
-      </div>
-    )
+    return <LoadingState />
   }
 
   if (error) {

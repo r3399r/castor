@@ -5,6 +5,7 @@ import {
   useId,
   useRef,
   type ButtonHTMLAttributes,
+  type FormHTMLAttributes,
   type HTMLAttributes,
   type ReactNode,
 } from 'react'
@@ -13,19 +14,100 @@ import { X } from 'lucide-react'
 
 export function Button({
   variant = 'primary',
+  size = 'md',
+  loading = false,
   className = '',
   type = 'button',
+  disabled,
+  children,
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: 'primary' | 'secondary' | 'quiet'
+  variant?: 'primary' | 'secondary' | 'ghost' | 'quiet' | 'danger'
+  size?: 'sm' | 'md' | 'lg'
+  loading?: boolean
 }) {
   return (
     <button
       type={type}
-      className={`sp-button sp-button--${variant} ${className}`}
+      className={`sp-button sp-button--${variant} sp-button--${size} ${className}`}
+      disabled={disabled || loading}
+      aria-busy={loading || undefined}
       {...props}
-    />
+    >
+      {children}
+    </button>
   )
+}
+
+export function PageHeader({
+  title,
+  subtitle,
+  actions,
+  className = '',
+}: {
+  title: string
+  subtitle?: ReactNode
+  actions?: ReactNode
+  className?: string
+}) {
+  return (
+    <header className={`ui-page-header ${className}`}>
+      <div>
+        <h1>{title}</h1>
+        {subtitle && <div className="ui-page-header__subtitle">{subtitle}</div>}
+      </div>
+      {actions && <div className="ui-page-header__actions">{actions}</div>}
+    </header>
+  )
+}
+
+export function LoadingState({ label = '載入中…' }: { label?: string }) {
+  return <div className="ui-state ui-state--loading" role="status">{label}</div>
+}
+
+export function ErrorState({ children }: { children: ReactNode }) {
+  return <div className="ui-state ui-state--error" role="alert">{children}</div>
+}
+
+export function EmptyState({ children }: { children: ReactNode }) {
+  return <div className="ui-state ui-state--empty">{children}</div>
+}
+
+export function Field({
+  label,
+  children,
+  hint,
+  error,
+  className = '',
+}: {
+  label: ReactNode
+  children: ReactNode
+  hint?: ReactNode
+  error?: ReactNode
+  className?: string
+}) {
+  return (
+    <label className={`ui-field ${className}`}>
+      <span className="ui-field__label">{label}</span>
+      {children}
+      {hint && <span className="ui-field__hint">{hint}</span>}
+      {error && <span className="ui-field__error">{error}</span>}
+    </label>
+  )
+}
+
+export function TableFrame({
+  className = '',
+  ...props
+}: HTMLAttributes<HTMLDivElement>) {
+  return <div className={`ui-table-frame ${className}`} {...props} />
+}
+
+export function FormPanel({
+  className = '',
+  ...props
+}: FormHTMLAttributes<HTMLFormElement>) {
+  return <form className={`ui-form-panel ${className}`} {...props} />
 }
 export function Card({
   className = '',

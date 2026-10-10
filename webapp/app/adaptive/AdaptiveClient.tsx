@@ -653,7 +653,7 @@ export default function AdaptiveClient({
           disabled={loading}
           className={styles.backButton}
         >
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <svg className="icon-md" width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M16 10H4M4 10L9 5M4 10L9 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
           返回
@@ -884,7 +884,7 @@ export default function AdaptiveClient({
                   onClick={() => { setSelectedExamIds([]); setSelectedConceptIds([]); setSelectedTagIds([]) }}
                   className={`${styles.clearButton} flex items-center gap-1 rounded-lg px-2.5 py-1 text-sm transition`}
                 >
-                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <svg className="icon-sm" width="16" height="16" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M11 3L3 11M3 3L11 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
                   </svg>
                   清空
@@ -1170,48 +1170,48 @@ export default function AdaptiveClient({
                 {/* 題號 + 難易度（同一行）*/}
                 <div className="flex items-center justify-between gap-3 sm:hidden">
                   <span className={`${styles.questionIndex} shrink-0 font-bold`}>
-                    <span className="text-[20px]">Q{currentIndex + 1}</span>
+                    <span className="text-spirit-heading">Q{currentIndex + 1}</span>
                     <span className="text-base"> / {numQuestionsTarget}</span>
                   </span>
                   <DifficultyStars value={currentQuestion.adjustedDifficulty} tone="forest" />
                 </div>
                 {/* 標籤（第二行，mobile only）*/}
                 <div className="mt-1.5 flex flex-wrap gap-2 sm:hidden">
-                  <Chip label={typeLabel[currentQuestion.type] ?? currentQuestion.type} color="bg-[#E5EAE4] text-[#3F5B51]" />
+                  <Chip label={typeLabel[currentQuestion.type] ?? currentQuestion.type} color="bg-badge-neutral text-badge-neutral-text" />
                   {currentQuestion.exam.map((e) => (
-                    <Chip key={e.id} label={e.name} color="bg-[#D5EAD9] text-[#2F6746]" />
+                    <Chip key={e.id} label={e.name} color="bg-success-border text-success-text" />
                   ))}
                   {currentQuestion.concept.map((c) => (
                     <Chip
                       key={c.id}
                       label={c.conceptGroup.name === c.name ? c.name : c.conceptGroup.name + '-' + c.name}
-                      color="bg-[#E6DDF3] text-[#65458A]"
+                      color="bg-badge-purple text-badge-purple-text"
                     />
                   ))}
                   {currentQuestion.tag.map((t) => (
-                    <Chip key={t.id} label={t.name} color="bg-[#F3E4C4] text-[#805C21]" />
+                    <Chip key={t.id} label={t.name} color="bg-badge-amber text-badge-amber-text" />
                   ))}
                 </div>
                 {/* Desktop：題號 + 標籤靠左，難易度靠右 */}
                 <div className="hidden sm:flex sm:items-start sm:justify-between sm:gap-3">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className={`${styles.questionIndex} shrink-0 font-bold`}>
-                      <span className="text-[20px]">Q{currentIndex + 1}</span>
+                      <span className="text-spirit-heading">Q{currentIndex + 1}</span>
                       <span className="text-base"> / {numQuestionsTarget}</span>
                     </span>
-                    <Chip label={typeLabel[currentQuestion.type] ?? currentQuestion.type} color="bg-[#E5EAE4] text-[#3F5B51]" />
+                    <Chip label={typeLabel[currentQuestion.type] ?? currentQuestion.type} color="bg-badge-neutral text-badge-neutral-text" />
                     {currentQuestion.exam.map((e) => (
-                      <Chip key={e.id} label={e.name} color="bg-[#D5EAD9] text-[#2F6746]" />
+                      <Chip key={e.id} label={e.name} color="bg-success-border text-success-text" />
                     ))}
                     {currentQuestion.concept.map((c) => (
                       <Chip
                         key={c.id}
                         label={c.conceptGroup.name === c.name ? c.name : c.conceptGroup.name + '-' + c.name}
-                        color="bg-[#E6DDF3] text-[#65458A]"
+                        color="bg-badge-purple text-badge-purple-text"
                       />
                     ))}
                     {currentQuestion.tag.map((t) => (
-                      <Chip key={t.id} label={t.name} color="bg-[#F3E4C4] text-[#805C21]" />
+                      <Chip key={t.id} label={t.name} color="bg-badge-amber text-badge-amber-text" />
                     ))}
                   </div>
                   <DifficultyStars value={currentQuestion.adjustedDifficulty} tone="forest" />
@@ -1222,7 +1222,7 @@ export default function AdaptiveClient({
                 {currentQuestion.content && (
                   <div
                     dangerouslySetInnerHTML={{ __html: currentQuestion.content }}
-                    className="prose max-w-none text-[18px] font-medium leading-relaxed text-black-800 [&>*:last-child]:mb-0"
+                    className="prose max-w-none text-spirit-reading font-medium leading-relaxed text-black-800 [&>*:last-child]:mb-0"
                   />
                 )}
                 {currentQuestion.answer && (
@@ -1245,7 +1245,7 @@ export default function AdaptiveClient({
               {currentQuestion.type === 'GROUP' &&
                 currentQuestion.children.map((child, i) => (
                   <Fragment key={child.id}>
-                    <div className={`${styles.questionBody} border-t border-[#e1e7df]`}>
+                    <div className={`${styles.questionBody} border-t border-spirit-line`}>
                       {child.content && (
                         <div
                           dangerouslySetInnerHTML={{ __html: child.content }}
@@ -1316,7 +1316,7 @@ export default function AdaptiveClient({
 
       {showLeaveModal && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+          className="layer-overlay fixed inset-0 flex items-center justify-center bg-black/40"
           onClick={() => setShowLeaveModal(false)}
         >
           <div
@@ -1353,7 +1353,7 @@ export default function AdaptiveClient({
 
       {showResultModal && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+          className="layer-overlay fixed inset-0 flex items-center justify-center bg-black/40"
           onClick={() => setShowResultModal(false)}
         >
           <div
@@ -1373,7 +1373,7 @@ export default function AdaptiveClient({
                   <Coins size={16} strokeWidth={2.5} />
                   +{totalAwardedPoints} 積分
                 </div>
-                <hr className="mt-2 border-[#d6dfd7]" />
+                <hr className="mt-2 border-spirit-line" />
               </div>
               <div className="flex w-full gap-4">
                 <div className={`${styles.scoreCorrect} flex-1 rounded-lg px-4 py-3 text-center`}>

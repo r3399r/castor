@@ -19,19 +19,22 @@ export default function SortableTh<T extends string>({
 
   return (
     <th
-      onClick={() => onSort(column)}
-      className={`cursor-pointer select-none px-4 py-3 transition-colors hover:text-black-900 ${
+      className={`select-none p-0 transition-colors ${
         align === 'right' ? 'text-right' : ''
       }`}
     >
-      <span className={`inline-flex items-center gap-1 ${align === 'right' ? 'flex-row-reverse' : ''} ${active ? 'text-black-900' : ''}`}>
+      <button
+        type="button"
+        onClick={() => onSort(column)}
+        className={`inline-flex w-full items-center gap-1 px-4 py-3 text-spirit-muted transition-colors hover:text-spirit-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-spirit-canopy ${align === 'right' ? 'flex-row-reverse justify-start' : ''} ${active ? 'text-spirit-ink' : ''}`}
+      >
         {label}
         {active && (
-          <span className="text-[10px] text-blue-700">
+          <span className="text-spirit-micro text-spirit-canopy">
             {direction === 'desc' ? '▼' : '▲'}
           </span>
         )}
-      </span>
+      </button>
     </th>
   )
 }
