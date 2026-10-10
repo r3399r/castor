@@ -192,6 +192,13 @@
 .sp-box-page .sp-section-heading {
   padding-block: 16px;
 }
+.sp-box-page .sp-button--primary {
+  color: var(--color-spirit-deep);
+  background: var(--color-spirit-gold);
+}
+.sp-box-page .sp-button--primary:hover:not(:disabled) {
+  background: var(--color-spirit-gold-hover);
+}
 /* Use the same centered 1120px container and responsive page insets as the
    standard header and the other learning pages. */
 .sp-box-page .sp-hero-inner,

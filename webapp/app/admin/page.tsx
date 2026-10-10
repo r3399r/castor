@@ -1,5 +1,6 @@
 import AuthGuard from '@/components/AuthGuard'
-import Navbar from '@/components/Navbar'
+import { PageContainer, StandardPageLayout } from '@/components/layout'
+import { PageHeader } from '@/components/ui'
 
 const ADMIN_FUNCTIONS = [
   { label: '類別管理', description: '新增、編輯、刪除考試類別', href: '/admin/category' },
@@ -16,15 +17,11 @@ const ADMIN_FUNCTIONS = [
 
 export default function AdminPage() {
   return (
-    <div className="m-[10px] min-h-[calc(100vh-20px)] border border-brown-700 bg-beige-100">
-      <div className="px-4 sm:px-6">
-        <Navbar />
-      </div>
-      <div className="px-4 md:px-10 lg:px-[70px]">
-        <div className="mx-auto max-w-[1120px]">
-          <AuthGuard>
-            <div className="pb-[70px]">
-              <h1 className="mt-[60px] mb-6 text-3xl font-bold text-blue-700">管理後台</h1>
+    <StandardPageLayout>
+      <PageContainer>
+        <AuthGuard>
+          <div className="pb-[70px]">
+              <PageHeader title="管理後台" />
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {ADMIN_FUNCTIONS.map((fn) => (
                   <a
@@ -37,10 +34,9 @@ export default function AdminPage() {
                   </a>
                 ))}
               </div>
-            </div>
-          </AuthGuard>
-        </div>
-      </div>
-    </div>
+          </div>
+        </AuthGuard>
+      </PageContainer>
+    </StandardPageLayout>
   )
 }

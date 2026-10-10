@@ -14,6 +14,7 @@ import {
 import { ActivityCalendar } from 'react-activity-calendar'
 import { apiFetch } from '@/lib/api'
 import Chip from '@/components/Chip'
+import { LoadingState } from '@/components/ui'
 import AnalysisHeaderLandscape from './AnalysisHeaderLandscape'
 import styles from './analysis.module.css'
 import type {
@@ -422,11 +423,7 @@ export default function AnalysisClient() {
   }, [])
 
   if (loading) {
-    return (
-      <div className="flex h-48 items-center justify-center">
-        <span className={`text-sm ${styles.muted}`}>載入中…</span>
-      </div>
-    )
+    return <LoadingState />
   }
 
   if (error) {

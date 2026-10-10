@@ -4,6 +4,7 @@ import { useState } from 'react'
 import AuthGuard from '@/components/AuthGuard'
 import Footer from '@/components/Footer'
 import LearningFooterFoliage from '@/components/learning/LearningFooterFoliage'
+import { PageContainer } from '@/components/layout'
 import AdaptiveClient from './AdaptiveClient'
 import styles from './adaptive.module.css'
 
@@ -12,12 +13,12 @@ export default function AdaptivePageClient() {
 
   return (
     <>
-      <div className="relative z-10 px-4 md:px-10 lg:px-[70px]">
-        <div className={`${styles.content} mx-auto max-w-[1120px]`}>
+      <div className="relative z-10">
+        <PageContainer className={styles.content}>
           <AuthGuard>
             <AdaptiveClient onPracticeStateChange={setPracticeActive} />
           </AuthGuard>
-        </div>
+        </PageContainer>
       </div>
       {!practiceActive && (
         <div className="px-4 sm:px-6">

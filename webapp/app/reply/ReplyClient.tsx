@@ -6,6 +6,7 @@ import { BookOpenText } from 'lucide-react'
 import { apiFetch, LIMIT } from '@/lib/api'
 import Chip, { tagColors } from '@/components/Chip'
 import DifficultyStars from '@/components/DifficultyStars'
+import { LoadingState } from '@/components/ui'
 import type { GetReplyResponse, ReplyGroup } from '@/types/api'
 import type { QueryFilters } from './useSharedFilters'
 import styles from './reply.module.css'
@@ -242,11 +243,7 @@ export default function ReplyClient({
   }, [filters.categoryId, filters.subjectId, examIdsKey, tagIdsKey])
 
   if (loading && !replyList) {
-    return (
-      <div className="flex h-48 items-center justify-center">
-        <span className="text-sm text-black-500">載入中…</span>
-      </div>
-    )
+    return <LoadingState />
   }
 
   if (error) {

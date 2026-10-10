@@ -2,6 +2,7 @@ import AuthGuard from '@/components/AuthGuard'
 import Footer from '@/components/Footer'
 import LearningFooterFoliage from '@/components/learning/LearningFooterFoliage'
 import Navbar from '@/components/Navbar'
+import { PageContainer } from '@/components/layout'
 import UserClient from './UserClient'
 import styles from './user.module.css'
 
@@ -11,12 +12,12 @@ export default function UserPage() {
       <div className="standard-site-header">
         <Navbar />
       </div>
-      <main className={`${styles.main} relative z-10 px-4 md:px-10 lg:px-[70px]`}>
-        <div className="mx-auto max-w-[1120px]">
+      <main className={`${styles.main} relative z-10`}>
+        <PageContainer>
           <AuthGuard variant="learning">
             <UserClient />
           </AuthGuard>
-        </div>
+        </PageContainer>
       </main>
       <div className="px-4 sm:px-6">
         <LearningFooterFoliage className="learning-page-footer-foliage" />

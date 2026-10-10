@@ -24,7 +24,7 @@ export default function NavbarMenu() {
   return (
     <>
       {/* Desktop */}
-      <div className="hidden items-center gap-2 lg:flex">
+      <div className="site-header__desktop-actions hidden items-center gap-2 lg:flex">
         {user &&
           navItems.map((item) => (
             <Link
@@ -43,7 +43,7 @@ export default function NavbarMenu() {
 
       {/* Small screens: show sign-in before authentication, then expose the
           authenticated navigation alongside the profile control. */}
-      <div className="flex items-center gap-3 lg:hidden">
+      <div className="site-header__mobile-actions flex items-center gap-3 lg:hidden">
         <NavbarAuthButton />
         {user && (
           <button
@@ -75,14 +75,14 @@ export default function NavbarMenu() {
           id="site-header-mobile-menu"
           className="site-header__mobile-menu absolute -left-4 -right-4 top-full z-50 px-4 py-3 sm:-left-6 sm:-right-6 sm:px-6 lg:hidden"
         >
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-3 sm:gap-4">
             {navItems.map((item) => (
               <Link
                 key={item.label}
                 href={item.href}
                 aria-current={isActive(item.href) ? 'page' : undefined}
                 onClick={() => setOpen(false)}
-                className="site-header__nav-link rounded-[6px] px-4 py-3 text-center text-sm transition focus:outline-none"
+                className="site-header__nav-link rounded-[6px] px-4 py-4 text-center text-sm transition focus:outline-none"
               >
                 {item.label}
               </Link>

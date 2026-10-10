@@ -359,7 +359,7 @@ export default function PreviewClient() {
         <button
           onClick={onAskGemini}
           disabled={!imageUrl || !selectedSubjectId || loading || !selectedType}
-          className="rounded-md bg-blue-700 px-6 py-2.5 text-sm font-bold text-white transition hover:bg-[#1f3ea3] disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-md bg-blue-700 px-6 py-2.5 text-sm font-bold text-white transition hover:bg-spirit-forest disabled:cursor-not-allowed disabled:opacity-50"
         >
           {loading ? '請求中…' : 'Ask Gemini'}
         </button>
@@ -468,7 +468,7 @@ export default function PreviewClient() {
           <button
             onClick={onCreateQuestion}
             disabled={!payload || createLoading}
-            className="rounded-md bg-blue-700 px-6 py-2.5 text-sm font-bold text-white transition hover:bg-[#1f3ea3] disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-md bg-blue-700 px-6 py-2.5 text-sm font-bold text-white transition hover:bg-spirit-forest disabled:cursor-not-allowed disabled:opacity-50"
           >
             {createLoading ? '建立中…' : '建立題目'}
           </button>

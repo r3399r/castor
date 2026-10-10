@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from 'react'
 import { apiDelete, apiFetch, apiPost, apiPut, LIMIT } from '@/lib/api'
 import MultiSelectField from '@/components/MultiSelectField'
 import Pagination from '@/components/Pagination'
+import { Button, ErrorState, FormPanel, LoadingState, PageHeader, TableFrame } from '@/components/ui'
 import SortableTh, { type SortDirection } from '@/components/SortableTh'
 import type { Category, Paginate } from '@/types/api'
 
@@ -202,28 +203,19 @@ export default function SubjectClient() {
   }
 
   if (loading && subjects === null) {
-    return (
-      <div className="flex h-48 items-center justify-center">
-        <span className="text-sm text-black-500">載入中…</span>
-      </div>
-    )
+    return <LoadingState />
   }
 
   if (error) {
-    return (
-      <div className="mt-[60px] rounded-[24px] border border-red-200 bg-red-50 p-8 text-center">
-        <p className="text-sm text-red-600">{error}</p>
-      </div>
-    )
+    return <ErrorState>{error}</ErrorState>
   }
 
   return (
     <div className="pb-[70px]">
-      <h1 className="mt-[60px] mb-6 text-3xl font-bold text-blue-700">科目管理</h1>
+      <PageHeader title="科目管理" />
 
-      <form
+      <FormPanel
         onSubmit={handleCreate}
-        className="mb-2 flex items-center gap-3 rounded-lg border border-brown-300 bg-white/40 p-4"
       >
         <input
           value={newName}
@@ -240,17 +232,13 @@ export default function SubjectClient() {
           placeholder="排序"
           className="w-24 rounded-md border border-brown-300 bg-white px-3 py-2 text-sm text-black-900 outline-none focus:border-blue-700"
         />
-        <button
-          type="submit"
-          disabled={creating || newName.trim() === ''}
-          className="shrink-0 rounded-md bg-blue-700 px-5 py-2 text-sm font-bold text-white transition hover:bg-[#1f3ea3] disabled:opacity-50"
-        >
+        <Button type="submit" disabled={creating || newName.trim() === ''} loading={creating} className="shrink-0">
           {creating ? '新增中…' : '新增'}
-        </button>
-      </form>
+        </Button>
+      </FormPanel>
       {createError && <p className="mb-4 text-sm text-red-600">{createError}</p>}
 
-      <div className="mt-4 overflow-x-auto rounded-lg border border-brown-300 bg-white/40">
+      <TableFrame className="mt-4">
         <table className="w-full text-left text-sm">
           <thead>
             <tr className="border-b border-brown-300/60 text-xs font-medium text-black-700">
@@ -322,7 +310,7 @@ export default function SubjectClient() {
                           <button
                             onClick={() => handleSaveRelation(subject.id)}
                             disabled={savingRelationId === subject.id}
-                            className="rounded-md bg-blue-700 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-[#1f3ea3] disabled:opacity-50"
+                            className="rounded-md bg-blue-700 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-spirit-forest disabled:opacity-50"
                           >
                             {savingRelationId === subject.id ? '儲存中…' : '儲存'}
                           </button>
@@ -345,7 +333,7 @@ export default function SubjectClient() {
                           <button
                             onClick={() => handleUpdate(subject.id)}
                             disabled={savingId === subject.id}
-                            className="rounded-md bg-blue-700 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-[#1f3ea3] disabled:opacity-50"
+                            className="rounded-md bg-blue-700 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-spirit-forest disabled:opacity-50"
                           >
                             {savingId === subject.id ? '儲存中…' : '儲存'}
                           </button>
@@ -397,7 +385,7 @@ export default function SubjectClient() {
             })}
           </tbody>
         </table>
-      </div>
+      </TableFrame>
 
       <Pagination
         page={page}

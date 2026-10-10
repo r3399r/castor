@@ -1,3 +1,5 @@
+import { Field } from '@/components/ui'
+
 export default function SelectField({
   label,
   value,
@@ -12,17 +14,16 @@ export default function SelectField({
   children: React.ReactNode
 }) {
   return (
-    <div className="flex flex-col gap-1">
-      <label className="text-sm font-medium text-black-700">{label}</label>
+    <Field label={label}>
       <select
         value={value}
         disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
-        className="rounded-lg border border-brown-300 bg-white px-3 py-2.5 text-sm text-black-900 disabled:cursor-not-allowed disabled:opacity-50"
+        className="ui-control"
       >
         <option value="">-- 請選擇 --</option>
         {children}
       </select>
-    </div>
+    </Field>
   )
 }

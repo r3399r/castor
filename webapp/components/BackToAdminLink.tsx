@@ -8,7 +8,7 @@ export default function BackToAdminLink({
   return (
     <a
       href={href}
-      className="mt-6 inline-flex items-center gap-1 text-sm text-black-500 transition hover:text-blue-700"
+      className="mt-6 inline-flex items-center gap-1 text-sm text-spirit-muted transition hover:text-spirit-canopy"
     >
       {label}
     </a>

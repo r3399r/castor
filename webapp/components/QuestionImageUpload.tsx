@@ -368,7 +368,7 @@ export default function QuestionImageUpload({
           type="button"
           onClick={handleRecognize}
           disabled={files.length === 0 || busy}
-          className="rounded-md bg-blue-700 px-6 py-2.5 text-sm font-bold text-white transition hover:bg-[#1f3ea3] disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-md bg-blue-700 px-6 py-2.5 text-sm font-bold text-white transition hover:bg-spirit-forest disabled:cursor-not-allowed disabled:opacity-50"
         >
           {busy ? 'AI 辨識中…' : 'AI 辨識'}
         </button>

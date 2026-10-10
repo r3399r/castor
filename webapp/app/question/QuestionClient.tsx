@@ -188,7 +188,7 @@ export default function QuestionClient() {
               fetchQuestions(0)
             }}
             disabled={!selectedSubjectId || loading}
-            className="rounded-md bg-blue-700 px-6 py-2.5 text-sm font-bold text-white transition hover:bg-[#1f3ea3] disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-md bg-blue-700 px-6 py-2.5 text-sm font-bold text-white transition hover:bg-spirit-forest disabled:cursor-not-allowed disabled:opacity-50"
           >
             {loading ? '搜尋中…' : '搜尋'}
           </button>
