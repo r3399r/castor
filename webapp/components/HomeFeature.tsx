@@ -18,13 +18,13 @@ const features = [
 
 export default function HomeFeature() {
   return (
-    <section className="-mx-4 bg-beige-200 py-[60px] sm:-mx-6 xl:py-[96px]">
+    <section className="-mx-4 bg-spirit-mist py-[60px] sm:-mx-6 xl:py-[96px]">
       <div className="mx-auto w-full max-w-[1120px] px-4 md:px-[40px] xl:px-[70px]">
         <header className="mx-auto max-w-[720px] space-y-4 text-center">
-          <h2 className="text-[40px] font-bold leading-tight text-black-700">
+          <h2 className="text-[40px] font-bold leading-tight text-spirit-forest">
             掌握每個觀念的學習狀態
           </h2>
-          <p className="text-base leading-7 text-black-500">
+          <p className="text-base leading-7 text-spirit-muted">
             每次作答後，系統都會自動分析，為你找出需要加強的觀念。
           </p>
         </header>
@@ -38,7 +38,7 @@ export default function HomeFeature() {
             />
           </div>
 
-          <ul className="divide-y divide-black-200">
+          <ul className="divide-y divide-spirit-line">
             {features.map((feature) => (
               <li key={feature.title} className="pb-6 pt-9 first:pt-0 last:pb-0">
                 <div className="flex items-start gap-5">
@@ -51,8 +51,8 @@ export default function HomeFeature() {
                     aria-hidden
                   />
                   <div>
-                    <h3 className="text-xl font-bold text-black-700">{feature.title}</h3>
-                    <p className="text-base leading-7 text-black-500">{feature.description}</p>
+                    <h3 className="text-xl font-bold text-spirit-forest">{feature.title}</h3>
+                    <p className="text-base leading-7 text-spirit-muted">{feature.description}</p>
                   </div>
                 </div>
               </li>

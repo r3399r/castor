@@ -28,15 +28,15 @@ export default function HomeHighlights() {
   return (
     <section className="py-[48px] xl:py-[72px]">
       <div className="mx-auto w-full max-w-[1120px] px-4 md:px-[40px] xl:px-[70px]">
-        <div className="flex flex-col gap-10 xl:flex-row xl:gap-0 xl:divide-x xl:divide-black-200">
+        <div className="flex flex-col gap-10 xl:flex-row xl:gap-0 xl:divide-x xl:divide-spirit-line">
           {/* Left: heading */}
           <div className="flex flex-col gap-5 xl:w-[340px] xl:shrink-0 xl:pr-12">
-            <h2 className="text-[40px] font-bold leading-tight text-blue-700">
+            <h2 className="text-[40px] font-bold leading-tight text-spirit-forest">
               讓學習
               <br />
               更有效率
             </h2>
-            <p className="text-base leading-7 text-black-500">
+            <p className="text-base leading-7 text-spirit-muted">
               從題庫練習到作答分析，完整掌握你的學習進度，短時間內有感提升成績。
             </p>
           </div>
@@ -44,29 +44,29 @@ export default function HomeHighlights() {
           {/* Right: 2×2 grid */}
           <div className="flex flex-col xl:flex-1 xl:pl-12">
             {/* Top row */}
-            <div className="flex flex-row divide-x divide-black-200 pb-8">
+            <div className="flex flex-row divide-x divide-spirit-line pb-8">
               {highlights.slice(0, 2).map((item) => (
                 <div key={item.title} className="flex flex-col gap-3 flex-1 pr-6 last:pr-0 last:pl-6">
                   <img src={item.icon} alt="" width={32} height={32} aria-hidden />
                   <div>
-                    <h3 className="text-lg font-bold text-black-700">{item.title}</h3>
-                    <p className="mt-1 text-sm leading-6 text-black-500">{item.description}</p>
+                    <h3 className="text-lg font-bold text-spirit-forest">{item.title}</h3>
+                    <p className="mt-1 text-sm leading-6 text-spirit-muted">{item.description}</p>
                   </div>
                 </div>
               ))}
             </div>
 
             {/* Horizontal divider */}
-            <hr className="border-black-200" />
+            <hr className="border-spirit-line" />
 
             {/* Bottom row */}
-            <div className="flex flex-row divide-x divide-black-200 pt-8">
+            <div className="flex flex-row divide-x divide-spirit-line pt-8">
               {highlights.slice(2, 4).map((item) => (
                 <div key={item.title} className="flex flex-col gap-3 flex-1 pr-6 last:pr-0 last:pl-6">
                   <img src={item.icon} alt="" width={32} height={32} aria-hidden />
                   <div>
-                    <h3 className="text-lg font-bold text-black-700">{item.title}</h3>
-                    <p className="mt-1 text-sm leading-6 text-black-500">{item.description}</p>
+                    <h3 className="text-lg font-bold text-spirit-forest">{item.title}</h3>
+                    <p className="mt-1 text-sm leading-6 text-spirit-muted">{item.description}</p>
                   </div>
                 </div>
               ))}
