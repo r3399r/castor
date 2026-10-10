@@ -13,6 +13,7 @@ import {
   userTable,
 } from 'src/db/schema';
 import { DEFAULT_LIMIT, genPagination, MAX_LIMIT } from 'src/lib/paginator';
+import { findActiveSubscription } from 'src/lib/subscription';
 import { verifyIdTokenFull } from 'src/lib/firebaseAdmin';
 import { requireAdmin } from 'src/middleware/adminAuth';
 import { requireUser, UserEnv } from 'src/middleware/requireUser';
@@ -89,6 +90,11 @@ export const user = new Hono<UserEnv>()
   // lastLoginAt is refreshed for a returning user -- matching the legacy
   // version, a changed name/email/avatar on the Firebase side doesn't
   // get written back here.
+  // Carries the caller's subscription status as well as their row.
+  // Sync is what every client calls on sign-in, so folding the status in
+  // here saves a second authenticated round trip before the UI can
+  // decide what the user is entitled to see. GET /subscription/me stays
+  // for refreshing it mid-session without a full sync.
   .post('/sync', async (c) => {
     const identity = await verifyIdTokenFull(c.req.header('Authorization'));
     if (identity === null) throw new UnauthorizedError('Sign-in required');
@@ -101,7 +107,15 @@ export const user = new Hono<UserEnv>()
     if (existing) {
       await db.update(userTable).set({ lastLoginAt: now, updatedAt: now }).where(eq(userTable.id, existing.id));
       const [updated] = await db.select().from(userTable).where(eq(userTable.id, existing.id));
-      return c.json(updated);
+      const active = await findActiveSubscription(db, existing.id);
+      return c.json({
+        ...updated,
+        subscription: {
+          active: active !== undefined,
+          plan: active?.plan ?? null,
+          expiresAt: active?.currentPeriodEnd ?? null,
+        },
+      });
     }
 
     const [{ insertId }] = await db.insert(userTable).values({
@@ -114,7 +128,13 @@ export const user = new Hono<UserEnv>()
       updatedAt: now,
     });
     const [created] = await db.select().from(userTable).where(eq(userTable.id, insertId));
-    return c.json(created, 201);
+    // No lookup on this path: the row was created a moment ago, so it
+    // cannot have a subscription yet. Still reported, so the client never
+    // has to branch on the status code to find the field.
+    return c.json(
+      { ...created, subscription: { active: false, plan: null, expiresAt: null } },
+      201
+    );
   })
   // Current mastery per concept group, grouped by subject. A subject only
   // shows up here once the user has an existing user_concept_stat row for

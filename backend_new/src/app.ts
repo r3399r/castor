@@ -16,6 +16,7 @@ import { question } from 'src/routes/question';
 import { reply } from 'src/routes/reply';
 import { store } from 'src/routes/store';
 import { subject } from 'src/routes/subject';
+import { subscription } from 'src/routes/subscription';
 import { tag } from 'src/routes/tag';
 import { user } from 'src/routes/user';
 import { wallet } from 'src/routes/wallet';
@@ -50,6 +51,11 @@ export const app = new Hono()
   .route('/api/filter-option', filterOption)
   .use('/api/user/*', transaction)
   .route('/api/user', user)
+  // The caller's own subscription. Behind requireUser but never behind
+  // requireSubscription -- a non-subscriber has to be able to ask.
+  .use('/api/subscription/*', transaction)
+  .use('/api/subscription/*', requireUser)
+  .route('/api/subscription', subscription)
   .use('/api/question/*', adminAuth)
   .use('/api/question/*', transaction)
   .use('/api/question/adaptive', requireUser)

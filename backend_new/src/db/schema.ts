@@ -455,3 +455,25 @@ export const durationGlobalStatTable = mysqlTable('duration_global_stat', {
   medianMs: int('median_ms', { unsigned: true }).notNull(),
   updatedAt: datetime('updated_at', { mode: 'date', fsp: 3 }),
 });
+
+// One row per subscription *period*, not per user -- renewals and
+// re-subscribes append, so the table carries both the current state and
+// the history. See db/table/user_subscription.sql for why activeUserId
+// exists: it is a generated column that is the user id while status is
+// 'active' and NULL otherwise, which lets a plain UNIQUE index enforce
+// "at most one active subscription per user" despite MySQL having no
+// partial indexes. It is database-generated, so it is never written here.
+export const userSubscriptionTable = mysqlTable('user_subscription', {
+  id: int('id', { unsigned: true }).autoincrement().primaryKey(),
+  userId: int('user_id', { unsigned: true })
+    .notNull()
+    .references(() => userTable.id),
+  plan: varchar('plan', { length: 32 }).notNull(),
+  status: varchar('status', { length: 16 }).notNull(),
+  currentPeriodStart: datetime('current_period_start', { mode: 'date', fsp: 3 }).notNull(),
+  currentPeriodEnd: datetime('current_period_end', { mode: 'date', fsp: 3 }).notNull(),
+  provider: varchar('provider', { length: 32 }),
+  providerRef: varchar('provider_ref', { length: 255 }),
+  createdAt: datetime('created_at', { mode: 'date', fsp: 3 }),
+  updatedAt: datetime('updated_at', { mode: 'date', fsp: 3 }),
+});

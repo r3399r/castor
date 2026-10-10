@@ -19,6 +19,7 @@ import {
   subjectTable,
   userConceptStatTable,
   userStatHistoryTable,
+  userSubscriptionTable,
   userTable,
 } from 'src/db/schema';
 import { ADMIN_EMAILS } from 'src/middleware/adminAuth';
@@ -46,6 +47,7 @@ type UserDto = {
 
 const clearTable = async () => {
   const db = getDb();
+  await db.delete(userSubscriptionTable);
   await db.delete(userConceptStatTable);
   await db.delete(userStatHistoryTable);
   await db.delete(conceptTable);
@@ -219,7 +221,11 @@ describe('user routes', () => {
 
       const res = await postSync();
       expect(res.status).toBe(201);
-      const body = (await res.json()) as UserDto;
+      // Sync is the one user-shaped response that also carries the
+      // subscription, so it is typed separately from UserDto.
+      const body = (await res.json()) as UserDto & {
+        subscription: { active: boolean; plan: string | null; expiresAt: string | null };
+      };
       expect(body).toMatchObject({
         firebaseUid: 'new-uid',
         email: 'new@example.com',
@@ -227,9 +233,75 @@ describe('user routes', () => {
         avatar: 'https://example.com/new.png',
       });
       expect(body.lastLoginAt).toEqual(expect.any(String));
+      // Present even on the create path, so the client never has to
+      // branch on the status code to find the field.
+      expect(body.subscription).toEqual({ active: false, plan: null, expiresAt: null });
 
       const rows = await getDb().select().from(userTable).where(eq(userTable.firebaseUid, 'new-uid'));
       expect(rows).toHaveLength(1);
+    });
+
+    // Folded into sync so sign-in costs one authenticated request rather
+    // than a sync followed by GET /subscription/me.
+    it('reports an active subscription alongside the user row', async () => {
+      const db = getDb();
+      const [{ insertId: userId }] = await db.insert(userTable).values({
+        firebaseUid: 'subscriber-uid',
+        email: 'subscriber@example.com',
+        createdAt: new Date(),
+      });
+      await db.insert(userSubscriptionTable).values({
+        userId,
+        plan: 'annual',
+        status: 'active',
+        currentPeriodStart: new Date(Date.now() - 86_400_000),
+        currentPeriodEnd: new Date(Date.now() + 30 * 86_400_000),
+        createdAt: new Date(),
+      });
+      vi.mocked(verifyIdTokenFull).mockResolvedValue({
+        uid: 'subscriber-uid',
+        email: 'subscriber@example.com',
+        name: null,
+        picture: null,
+      });
+
+      const res = await postSync();
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as {
+        id: number;
+        subscription: { active: boolean; plan: string | null; expiresAt: string | null };
+      };
+      expect(body.id).toBe(userId);
+      expect(body.subscription.active).toBe(true);
+      expect(body.subscription.plan).toBe('annual');
+      expect(new Date(body.subscription.expiresAt!).getTime()).toBeGreaterThan(Date.now());
+    });
+
+    it('reports inactive for a returning user whose period has elapsed', async () => {
+      const db = getDb();
+      const [{ insertId: userId }] = await db.insert(userTable).values({
+        firebaseUid: 'lapsed-uid',
+        email: 'lapsed@example.com',
+        createdAt: new Date(),
+      });
+      await db.insert(userSubscriptionTable).values({
+        userId,
+        plan: 'monthly',
+        status: 'active',
+        currentPeriodStart: new Date(Date.now() - 60 * 86_400_000),
+        currentPeriodEnd: new Date(Date.now() - 86_400_000),
+        createdAt: new Date(),
+      });
+      vi.mocked(verifyIdTokenFull).mockResolvedValue({
+        uid: 'lapsed-uid',
+        email: 'lapsed@example.com',
+        name: null,
+        picture: null,
+      });
+
+      const res = await postSync();
+      const body = (await res.json()) as { subscription: { active: boolean } };
+      expect(body.subscription.active).toBe(false);
     });
 
     it('succeeds for a non-admin identity -- /sync is not gated by the admin allowlist', async () => {

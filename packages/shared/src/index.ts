@@ -397,7 +397,18 @@ export type StatsSubject = {
 
 export type GetUserStatsResponse = StatsSubject[];
 
-export type PostUserSyncResponse = User;
+// Mirrors GET /subscription/me, so a client can handle the two
+// interchangeably. expiresAt is an ISO string over the wire, like every
+// other date in this file.
+export type SubscriptionStatus = {
+  active: boolean;
+  plan: string | null;
+  expiresAt: string | null;
+};
+
+// Sync returns the subscription alongside the user so sign-in needs one
+// authenticated request rather than two.
+export type PostUserSyncResponse = User & { subscription: SubscriptionStatus };
 
 export type GetUserMeResponse = User;
 
