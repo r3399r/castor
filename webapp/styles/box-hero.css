@@ -18,10 +18,8 @@
   --spirit-balance-leaf: #789256;
   --spirit-balance-glow:
     0 0 32px rgba(220, 233, 150, 0.22), 0 14px 32px rgba(3, 30, 29, 0.3);
-  --spirit-garden-header-shade: rgb(16 47 46 / 0.28);
   --spirit-garden-copy-shade: rgba(4, 38, 39, 0.42);
   --spirit-garden-copy-mid: rgba(4, 38, 39, 0.25);
-  --spirit-garden-header-height: 76px;
   --spirit-garden-image: url("/images/spirit-garden-hero.webp");
   /* Until mobile art is provided, crop the original with cover; do not stretch.
      To replace it later, set this variable to image-set() with
@@ -29,60 +27,14 @@
   --spirit-garden-mobile-image: var(--spirit-garden-image);
   position: relative;
   background-color: var(--spirit-garden-edge);
+}
+.sp-box-page .sp-box-access {
+  position: relative;
+  background-color: var(--spirit-garden-edge);
   background-image: var(--spirit-garden-page-gradient);
   background-position: center bottom;
   background-size: 100% calc(100% - var(--spirit-garden-height));
   background-repeat: no-repeat;
-}
-.sp-box-page > .sp-navigation {
-  position: absolute;
-  inset: 0 0 auto;
-  z-index: 40;
-  isolation: isolate;
-  background: transparent;
-}
-.sp-box-page > .sp-navigation .site-header__content {
-  width: calc(100% - 32px);
-  max-width: 1120px;
-  margin-inline: auto;
-}
-@media (width >= 48rem) {
-  .sp-box-page > .sp-navigation .site-header__content {
-    width: calc(100% - 80px);
-  }
-}
-@media (width >= 64rem) {
-  .sp-box-page > .sp-navigation .site-header__content {
-    width: calc(100% - 140px);
-  }
-}
-/* The gift-box navigation sits directly over the hero artwork. */
-.sp-box-page > .sp-navigation::before {
-  content: none;
-}
-.sp-box-page > .sp-navigation .site-header {
-  border-bottom-color: transparent;
-  background: transparent;
-}
-.sp-box-page > .sp-navigation .site-header::after {
-  content: none;
-}
-.sp-box-page > .sp-navigation nav {
-  border-bottom-color: transparent;
-}
-/* Keep the opened mobile menu readable and inside the viewport.
-   The existing menu contents, state and event handlers stay untouched. */
-.sp-box-page > .sp-navigation nav div.absolute {
-  inset-inline: -20px;
-  left: -20px;
-  right: -20px;
-  background: var(--color-spirit-deep);
-  border-color: var(--spirit-light-line);
-}
-.sp-box-page > .sp-navigation [aria-label="個人資料"] > span {
-  color: var(--color-spirit-on-dark);
-  background: var(--spirit-garden-header-shade);
-  border-color: var(--spirit-light-line);
 }
 .sp-box-page .sp-hero {
   min-height: var(--spirit-garden-height);
@@ -96,8 +48,8 @@
   margin-bottom: 0;
 }
 .sp-box-page .sp-hero-inner {
-  /* Hero includes the former header height instead of growing to image ratio. */
-  padding-top: calc(var(--spirit-garden-header-height) + 48px);
+  padding-top: 56px;
+  padding-bottom: 56px;
 }
 .sp-box-page .sp-hero-copy {
   position: relative;
@@ -116,14 +68,21 @@
 .sp-box-page .sp-hero-copy > p:last-child {
   color: var(--color-spirit-on-dark);
 }
+.sp-box-page .sp-hero h1 {
+  margin: 0;
+  font-size: 2rem;
+  line-height: 1.25;
+  letter-spacing: 0.02em;
+}
+.sp-box-page .sp-hero h1 span {
+  margin-top: 8px;
+  font-size: 0.9375rem;
+  line-height: 1.65;
+  letter-spacing: normal;
+}
 .sp-box-page .sp-hero > .sp-hero-decoration,
 .sp-box-page .sp-hero > .sp-painted-divider {
   display: none;
-}
-/* No pale overlay or narrow transition band: the page gradient starts below
-   the Hero. Only the final 6% of the painting blends into its teal base. */
-.sp-box-page .sp-hero::after {
-  content: none;
 }
 .sp-box-page .sp-balance {
   --paper-base: #eeebcf;
@@ -233,19 +192,31 @@
 .sp-box-page .sp-section-heading {
   padding-block: 16px;
 }
-/* Match the 1120px content containers on adaptive/reply/analysis.
-   Their desktop inset is 10px outer margin + 1px border + 70px padding. */
-@media (width >= 64rem) {
-  .sp-box-page {
-    --spirit-box-content-width: 1120px;
-    --spirit-box-desktop-inset: 81px;
-  }
+/* Use the same centered 1120px container and responsive page insets as the
+   standard header and the other learning pages. */
+.sp-box-page .sp-hero-inner,
+.sp-box-page .sp-box-content {
+  width: calc(100% - 32px);
+  max-width: 1120px;
+  margin-inline: auto;
+  padding-inline: 0;
+}
+.sp-box-page .sp-box-content {
+  padding-top: 32px;
+}
+.sp-box-page .sp-tabs {
+  margin-top: 0;
+}
+@media (width >= 48rem) {
   .sp-box-page .sp-hero-inner,
   .sp-box-page .sp-box-content {
-    width: calc(100% - 2 * var(--spirit-box-desktop-inset));
-    max-width: var(--spirit-box-content-width);
-    margin-inline: auto;
-    padding-inline: 0;
+    width: calc(100% - 80px);
+  }
+}
+@media (width >= 64rem) {
+  .sp-box-page .sp-hero-inner,
+  .sp-box-page .sp-box-content {
+    width: calc(100% - 140px);
   }
 }
 @media (48rem <= width < 64rem) {
@@ -256,11 +227,11 @@
   }
 }
 /* AuthGuard still controls access. Its loading/login view also needs a painted
-   surface and header clearance when BoxClient (and its Hero) is not mounted. */
+   surface when BoxClient (and its Hero) is not mounted. */
 .sp-box-page .sp-box-access:not(:has(.sp-box)) {
   position: relative;
   margin-bottom: 0;
-  padding: calc(var(--spirit-garden-header-height) + 48px) 20px 64px;
+  padding: 56px 20px 64px;
   min-height: var(--spirit-garden-height);
   background: var(--spirit-garden-image) center bottom / cover no-repeat;
   background-image:
@@ -294,7 +265,8 @@
     background-position: center bottom;
   }
   .sp-box-page .sp-hero-inner {
-    padding-top: calc(var(--spirit-garden-header-height) + 32px);
+    padding-top: 32px;
+    padding-bottom: 32px;
   }
   .sp-box-page .sp-hero::before {
     inset: 96px 0 auto;

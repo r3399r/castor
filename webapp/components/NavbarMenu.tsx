@@ -11,7 +11,7 @@ const navItems = [
   { label: '智慧練習', href: '/adaptive' },
   { label: '作答記錄', href: '/reply' },
   { label: '學習分析', href: '/analysis' },
-  { label: '禮物盒', href: '/box' },
+  { label: '精靈養成', href: '/box' },
 ]
 
 export default function NavbarMenu() {

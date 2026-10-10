@@ -7,18 +7,6 @@
   background: var(--color-spirit-canopy);
   color: #c8cec5;
 }
-.site-header::after {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  background-image: url("/images/textures/header-pencil-hatching-02.webp");
-  background-position: center;
-  background-repeat: no-repeat;
-  background-size: 100% 100%;
-  content: "";
-  opacity: 0.26;
-  pointer-events: none;
-}
 .site-header__nav,
 .site-header__content {
   position: relative;
@@ -91,7 +79,7 @@
 .standard-site-header {
   position: relative;
   z-index: 20;
-  border-bottom: 1px solid rgb(225 199 122 / 0.3);
+  border-bottom: 0;
   background: var(--color-spirit-canopy);
 }
 .learning-page {
@@ -221,9 +209,6 @@
   }
   .site-header__mobile-menu {
     top: 62px;
-  }
-  .site-header::after {
-    opacity: 0.22;
   }
   .site-header__logo {
     max-width: calc(100% - 112px);
