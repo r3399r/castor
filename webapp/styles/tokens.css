@@ -1,14 +1,19 @@
 /* Shared visual vocabulary. Existing pages opt in through .spirit-theme. */
 @theme static {
   --color-spirit-ink: #223e39;
+  --color-spirit-ink-soft: #43564f;
   --color-spirit-muted: #587069;
+  --color-spirit-muted-soft: #788a83;
+  --color-spirit-disabled: #91a099;
   --color-spirit-forest: #173f3a;
   --color-spirit-canopy: #234b43;
   --color-spirit-deep: #102f2e;
   --color-spirit-teal: #227578;
   --color-spirit-teal-hover: #195e62;
-  --color-spirit-gold: #edc96d;
+  --color-spirit-gold: #e1c77a;
   --color-spirit-gold-hover: #e3b84f;
+  --color-spirit-gold-ink: #66532c;
+  --color-spirit-gold-soft: #faf6e7;
   --color-spirit-leaf: #507346;
   --color-spirit-coral: #d7654f;
   --color-danger: #d7654f;
@@ -16,6 +21,26 @@
   --color-danger-text: #963b28;
   --color-danger-hover: #be503d;
   --color-danger-on: #fff;
+  --color-success: #10b85a;
+  --color-success-soft: #e9f8ef;
+  --color-success-text: #0d6b38;
+  --color-success-border: #d5ead9;
+  --color-warning: var(--color-spirit-gold);
+  --color-warning-soft: var(--color-spirit-gold-soft);
+  --color-warning-text: var(--color-spirit-gold-ink);
+  --color-warning-border: var(--color-spirit-gold-hover);
+  --color-info: var(--color-spirit-teal);
+  --color-info-soft: #e7f1f0;
+  --color-info-text: var(--color-spirit-forest);
+  --color-info-border: #b9d3cf;
+  --color-badge-neutral: #e5eae4;
+  --color-badge-neutral-text: #3f5b51;
+  --color-badge-purple: #e6ddf3;
+  --color-badge-purple-text: #65458a;
+  --color-badge-amber: #f3e4c4;
+  --color-badge-amber-text: #805c21;
+  --color-category-gold-soft: #f6edcf;
+  --color-category-leaf-soft: #e4ecda;
   /* Keep existing Tailwind red utilities on the shared semantic palette. */
   --color-red-50: var(--color-danger-soft);
   --color-red-100: var(--color-danger-soft);
@@ -25,11 +50,12 @@
   --color-red-600: var(--color-danger-text);
   --color-red-700: var(--color-danger-hover);
   --color-spirit-cream: #f6f4e9;
-  --color-spirit-paper: #fffdf6;
+  --color-spirit-paper: #fffdf8;
   --color-spirit-mist: #e8eee6;
   --color-spirit-line: #d4ded0;
   --color-spirit-on-dark: #f8f5e8;
   --font-spirit: var(--font-inter, Arial), 'Taipei Sans TC Beta', sans-serif;
+  /* Typography scale: interface copy should use this shared progression. */
   --text-spirit-micro: 0.6875rem;
   --text-spirit-caption: 0.75rem;
   --text-spirit-label: 0.8125rem;
@@ -40,12 +66,54 @@
   --text-spirit-small: 0.875rem;
   --text-spirit-body: 1rem;
   --text-spirit-title: 2rem;
-  --spacing-spirit-unit: 0.25rem;
+  --text-spirit-reading: 1.125rem;
+  --text-spirit-display-sm: 2.5rem;
+  --text-spirit-display-md: 3rem;
+  --text-spirit-display-lg: 3.5rem;
+  --text-spirit-display-xl: 4rem;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  /* Make Tailwind's generic text utilities follow the same type scale. */
+  --text-xs: var(--text-spirit-caption);
+  --text-sm: var(--text-spirit-small);
+  --text-base: var(--text-spirit-body);
+  --text-lg: var(--text-spirit-reading);
+  --text-xl: var(--text-spirit-heading);
+  --text-2xl: var(--text-spirit-section);
+  --text-3xl: var(--text-spirit-character);
+  --text-4xl: var(--text-spirit-title);
+  --text-5xl: var(--text-spirit-display-md);
+  --text-6xl: var(--text-spirit-display-lg);
+
+  /* A four-pixel spacing grid with named page-level intervals. */
+  --spacing: 0.25rem;
+  --spacing-spirit-unit: var(--spacing);
+  --spacing-page-gutter: 1rem;
+  --spacing-page-gutter-md: 2.5rem;
+  --spacing-page-gutter-lg: 4.375rem;
+  --spacing-page-bottom: 4.5rem;
+  --spacing-section-sm: 3rem;
+  --spacing-section-md: 4rem;
+  --spacing-section-lg: 4.5rem;
+  --spacing-section-xl: 6rem;
+  --container-site: 70rem;
+
+  /* Generic rounded-* utilities map to the same semantic radius scale. */
   --radius-spirit-small: 0.5rem;
   --radius-spirit-image: 0.625rem;
   --radius-spirit-control: 0.75rem;
+  --radius-spirit-surface: 1rem;
   --radius-spirit-card: 1.25rem;
   --radius-spirit-panel: 1.75rem;
+  --radius-sm: var(--radius-spirit-small);
+  --radius-md: var(--radius-spirit-small);
+  --radius-lg: var(--radius-spirit-control);
+  --radius-xl: var(--radius-spirit-surface);
+  --radius-2xl: var(--radius-spirit-panel);
+  --radius-3xl: 2rem;
   --shadow-spirit-card: 0 8px 28px rgb(23 63 58 / 0.06);
   --shadow-spirit-float: 0 20px 64px rgb(23 63 58 / 0.15);
   /* Existing Tailwind breakpoints, made explicit; no change to other pages. */
@@ -72,6 +140,12 @@
   --spirit-space-12: 3rem;
   --spirit-space-16: 4rem;
   --spirit-overlay: rgb(16 47 46 / 0.65);
+  --spirit-hover-on-dark: rgb(255 253 248 / 0.08);
+  --spirit-selected-on-dark: rgb(255 253 248 / 0.12);
+  --spirit-focus-ring: rgb(34 117 120 / 0.28);
+  --spirit-focus-ring-gold: rgb(225 199 122 / 0.72);
+  --spirit-line-on-dark: rgb(248 245 232 / 0.2);
+  --spirit-surface-translucent: rgb(255 253 248 / 0.72);
   --spirit-light-line: rgb(248 245 232 / 0.2);
   --spirit-light-muted: #c6d7cc;
   --spirit-leaf-silhouette: #386457;

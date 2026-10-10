@@ -9,13 +9,13 @@
   );
   --learning-footer-link: #f3f1e8;
   --learning-footer-copyright: #c6d4cd;
-  color: #34423d;
+  color: var(--color-spirit-ink);
 }
 
 .header {
   position: relative;
   z-index: 20;
-  background: #234b43;
+  background: var(--color-spirit-canopy);
 }
 
 .titleBand {
@@ -74,7 +74,7 @@
 
 .pageTitle {
   margin: 0;
-  color: #315b50;
+  color: var(--color-spirit-canopy);
   font-size: 2rem;
   font-weight: 700;
   line-height: 1.25;
@@ -92,7 +92,7 @@
 }
 
 .sectionTitle {
-  color: #315b50;
+  color: var(--color-spirit-canopy);
 }
 
 .sectionTitle {
@@ -217,7 +217,7 @@
 }
 
 .card {
-  background: #fffdf8;
+  background: var(--color-spirit-paper);
   padding: 32px;
 }
 
@@ -233,7 +233,7 @@
   display: flex;
   align-items: center;
   gap: 9px;
-  color: #34423d;
+  color: var(--color-spirit-ink);
   font-size: 1rem;
   font-weight: 700;
 }
@@ -268,7 +268,7 @@
   padding: 5px 12px;
   border-right: 1px solid #d8d0c3;
   background: transparent;
-  color: #34423d;
+  color: var(--color-spirit-ink);
   font-size: 0.75rem;
   transition: background-color 160ms ease, color 160ms ease;
 }
@@ -279,7 +279,7 @@
 
 .tabButton:hover {
   background: #e8eee6;
-  color: #315b50;
+  color: var(--color-spirit-canopy);
 }
 
 .tabButton:focus-visible,
@@ -290,8 +290,8 @@
 
 .tabActive,
 .tabActive:hover {
-  background: #315b50;
-  color: #fffdf8;
+  background: var(--color-spirit-canopy);
+  color: var(--color-spirit-paper);
 }
 
 .legendButton {
@@ -303,11 +303,11 @@
 
 .bodyText,
 .legendText {
-  color: #34423d;
+  color: var(--color-spirit-ink);
 }
 
 .masteryValue {
-  color: #315b50;
+  color: var(--color-spirit-canopy);
 }
 
 .masteryTrack {
@@ -347,7 +347,7 @@
 .errorCard {
   border: 1px solid #d8d0c3;
   border-radius: 16px;
-  background: #fffdf8;
+  background: var(--color-spirit-paper);
   padding: 32px;
   color: #7a4e42;
   text-align: center;
@@ -357,7 +357,7 @@
 .errorLink {
   display: inline-block;
   margin-top: 16px;
-  color: #315b50;
+  color: var(--color-spirit-canopy);
   font-size: 0.875rem;
   text-decoration: underline;
 }

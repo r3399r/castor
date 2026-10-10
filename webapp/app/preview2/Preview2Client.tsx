@@ -68,7 +68,7 @@ function CopyList({ label, text }: { label: string; text: string }) {
         <label className="text-sm font-medium text-black-700">{label}</label>
         <CopyButton text={text} />
       </div>
-      <div className="min-h-[2.5rem] rounded-lg border border-brown-300 bg-[#F9F5F1] p-3 text-sm whitespace-pre-wrap text-black-700">
+      <div className="min-h-[2.5rem] rounded-lg border border-brown-300 bg-spirit-cream p-3 text-sm whitespace-pre-wrap text-black-700">
         {text || '—'}
       </div>
     </div>
@@ -158,7 +158,7 @@ export default function Preview2Client() {
     <div>
       <h1 className="mb-6 text-2xl font-bold text-blue-700">題目預覽 2</h1>
 
-      <div className="flex flex-col gap-4 rounded-[24px] border border-brown-300 bg-white p-6">
+      <div className="flex flex-col gap-4 rounded-spirit-card border border-brown-300 bg-white p-6">
         <SelectField
           label="選擇類別"
           value={selectedCategoryId}
@@ -230,12 +230,12 @@ export default function Preview2Client() {
           <p className="text-sm text-black-200">請在上方貼上題目 JSON</p>
         )}
         {questions.length > 0 && (
-          <div className="rounded-[24px] border border-brown-300 bg-white p-6">
+          <div className="rounded-spirit-card border border-brown-300 bg-white p-6">
             <p className="mb-3 font-medium text-black-900">共 {questions.length} 題</p>
             {questions.map((q, qi) => {
               const missing = getMissingQuestionFields(q)
               return (
-                <div key={qi} className={qi > 0 ? 'mt-3 border-t border-[#E5E0DC] pt-3' : ''}>
+                <div key={qi} className={qi > 0 ? 'mt-3 border-t border-spirit-line pt-3' : ''}>
                   <p className="text-sm font-medium text-black-900">
                     題目 {qi + 1}{' '}
                     {missing.length === 0 ? (
@@ -254,14 +254,14 @@ export default function Preview2Client() {
       <section className="mt-6 space-y-2">
         <h2 className="text-lg font-bold text-black-900">Preview</h2>
         {questions.length === 0 ? (
-          <div className="min-h-[120px] rounded-[24px] border border-brown-300 bg-white p-6">
+          <div className="min-h-[120px] rounded-spirit-card border border-brown-300 bg-white p-6">
             <p className="text-sm text-black-200">請在 Input JSON 中填入 content 以預覽</p>
           </div>
         ) : (
           questions.map((q, qi) => (
             <div
               key={qi}
-              className="mb-4 min-h-[120px] rounded-[24px] border border-brown-300 bg-white p-6"
+              className="mb-4 min-h-[120px] rounded-spirit-card border border-brown-300 bg-white p-6"
             >
               {questions.length > 1 && (
                 <p className="mb-2 font-medium text-black-900">題目 {qi + 1}</p>
@@ -280,7 +280,7 @@ export default function Preview2Client() {
                 <MathJax dynamic key={i}>
                   <div
                     dangerouslySetInnerHTML={{ __html: child.content ?? '' }}
-                    className="prose prose-sm mt-4 max-w-none border-t border-[#E5E0DC] pt-4"
+                    className="prose prose-sm mt-4 max-w-none border-t border-spirit-line pt-4"
                   />
                 </MathJax>
               ))}
@@ -303,7 +303,7 @@ export default function Preview2Client() {
         </div>
         <textarea
           readOnly
-          className="h-64 w-full rounded-lg border border-brown-300 bg-[#F9F5F1] p-3 font-mono text-sm"
+          className="h-64 w-full rounded-lg border border-brown-300 bg-spirit-cream p-3 font-mono text-sm"
           value={outputJson}
           placeholder="Output JSON 會依上方選擇的科目及試卷自動填入 subjectId 及 examId"
         />

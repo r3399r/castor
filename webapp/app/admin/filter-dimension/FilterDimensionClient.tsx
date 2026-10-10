@@ -175,7 +175,7 @@ export default function FilterDimensionClient() {
   }
 
   return (
-    <div className="pb-[70px]">
+    <div className="pb-page-bottom">
       <PageHeader title="篩選維度管理" />
       <p className="mb-6 text-sm text-black-500">
         篩選維度是每個類別下的篩選分組（例如「類科分組」、「類科選擇」），排序決定在篩選畫面中由上而下的顯示順序。

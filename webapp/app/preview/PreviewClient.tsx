@@ -247,7 +247,7 @@ export default function PreviewClient() {
     <div>
       <h1 className="mb-6 text-2xl font-bold text-blue-700">題目預覽</h1>
 
-      <div className="flex flex-col gap-4 rounded-[24px] border border-brown-300 bg-white p-6">
+      <div className="flex flex-col gap-4 rounded-spirit-card border border-brown-300 bg-white p-6">
         <SelectField
           label="選擇類別"
           value={selectedCategoryId}
@@ -353,7 +353,7 @@ export default function PreviewClient() {
 
       <section className="space-y-2">
         <h2 className="text-lg font-bold text-black-900">Gemini Input</h2>
-        <div className="rounded-lg border border-brown-300 bg-[#F9F5F1] p-4 text-sm whitespace-pre-wrap text-black-700">
+        <div className="rounded-lg border border-brown-300 bg-spirit-cream p-4 text-sm whitespace-pre-wrap text-black-700">
           {geminiInput}
         </div>
         <button
@@ -388,7 +388,7 @@ export default function PreviewClient() {
       </section>
 
       {payload && (
-        <section className="mt-4 space-y-1 rounded-[24px] border border-brown-300 bg-white p-6">
+        <section className="mt-4 space-y-1 rounded-spirit-card border border-brown-300 bg-white p-6">
           <h2 className="mb-3 text-lg font-bold text-black-900">Parsed Fields</h2>
           {(
             [
@@ -413,7 +413,7 @@ export default function PreviewClient() {
             <p className="mt-2 text-sm text-red-500">題組必須有子題</p>
           )}
           {payload.childQuestions?.map((child, i) => (
-            <div key={i} className="mt-3 rounded-lg border border-[#E5E0DC] p-3">
+            <div key={i} className="mt-3 rounded-lg border border-spirit-line p-3">
               <p className="mb-1 font-medium text-black-900">子題 {i + 1}</p>
               {(
                 [
@@ -437,7 +437,7 @@ export default function PreviewClient() {
 
       <section className="mt-6 space-y-2">
         <h2 className="text-lg font-bold text-black-900">Preview</h2>
-        <div className="min-h-[120px] rounded-[24px] border border-brown-300 bg-white p-6">
+        <div className="min-h-[120px] rounded-spirit-card border border-brown-300 bg-white p-6">
           {payload?.content ? (
             <>
               <MathJax dynamic>
@@ -451,7 +451,7 @@ export default function PreviewClient() {
                   <div
                     key={i}
                     dangerouslySetInnerHTML={{ __html: child.content ?? '' }}
-                    className="prose prose-sm mt-4 max-w-none border-t border-[#E5E0DC] pt-4"
+                    className="prose prose-sm mt-4 max-w-none border-t border-spirit-line pt-4"
                   />
                 </MathJax>
               ))}

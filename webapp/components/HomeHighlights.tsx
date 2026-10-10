@@ -26,12 +26,12 @@ const highlights = [
 
 export default function HomeHighlights() {
   return (
-    <section className="py-[48px] xl:py-[72px]">
-      <div className="mx-auto w-full max-w-[1120px] px-4 md:px-[40px] xl:px-[70px]">
+    <section className="py-section-sm xl:py-section-lg">
+      <div className="mx-auto w-full max-w-site px-page-gutter md:px-page-gutter-md xl:px-page-gutter-lg">
         <div className="flex flex-col gap-10 xl:flex-row xl:gap-0 xl:divide-x xl:divide-spirit-line">
           {/* Left: heading */}
           <div className="flex flex-col gap-5 xl:w-[340px] xl:shrink-0 xl:pr-12">
-            <h2 className="text-[40px] font-bold leading-tight text-spirit-canopy">
+            <h2 className="text-spirit-display-sm font-bold leading-tight text-spirit-canopy">
               讓學習
               <br />
               更有效率

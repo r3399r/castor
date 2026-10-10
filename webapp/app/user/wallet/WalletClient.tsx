@@ -87,7 +87,7 @@ export default function WalletClient() {
   const isEmpty = !wallet || wallet.data.length === 0
 
   return (
-    <div className={`${styles.content} pb-[70px]`}>
+    <div className={`${styles.content} pb-page-bottom`}>
       <h1 className={styles.title}>積分紀錄</h1>
       <p className={styles.subtitle}>查看每一筆積分的獲得明細。</p>
 

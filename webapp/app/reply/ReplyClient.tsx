@@ -99,7 +99,7 @@ function ReplyRow({ item }: { item: ReplyGroup }) {
         {question.content && (
           <div
             dangerouslySetInnerHTML={{ __html: question.content }}
-            className="prose max-w-none text-[18px] font-medium text-black-800 [&>*:last-child]:mb-0"
+            className="prose max-w-none text-spirit-reading font-medium text-black-800 [&>*:last-child]:mb-0"
           />
         )}
 

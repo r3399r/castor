@@ -211,7 +211,7 @@ export default function SubjectClient() {
   }
 
   return (
-    <div className="pb-[70px]">
+    <div className="pb-page-bottom">
       <PageHeader title="科目管理" />
 
       <FormPanel

@@ -214,7 +214,7 @@ export default function QuestionClient() {
   }
 
   return (
-    <div className="pb-[70px]">
+    <div className="pb-page-bottom">
       <PageHeader title="題目管理" />
       <p className="mb-6 text-sm text-black-500">
         題目透過「新增題目」流程建立，此頁面僅供檢視、編輯與刪除。新建立的題目預設為停用，

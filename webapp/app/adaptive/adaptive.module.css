@@ -4,33 +4,33 @@
     #f4f3e9 0%,
     #efe7e1 100%
   );
-  --adaptive-ink: #34423d;
-  --adaptive-muted: #68766f;
-  --adaptive-forest: #315e50;
-  --adaptive-forest-hover: #254d44;
-  --adaptive-selected: #e1eee3;
-  --adaptive-hover: #edf3e9;
-  --adaptive-line: #cbd8ce;
-  --adaptive-surface: #fffdf8;
-  --practice-gold: #e8cc76;
-  --practice-gold-soft: #e8cc77;
-  --practice-gold-hover: #faf6e7;
-  --practice-gold-border: #d4b65e;
-  --practice-gold-ink: #66532c;
-  --practice-forest: #315e50;
-  --practice-paper: #fffdf8;
-  --practice-nav-background: #28564d;
-  --practice-correct-bg: #e2efe7;
+  --adaptive-ink: var(--color-spirit-ink);
+  --adaptive-muted: var(--color-spirit-muted);
+  --adaptive-forest: var(--color-spirit-canopy);
+  --adaptive-forest-hover: var(--color-spirit-forest);
+  --adaptive-selected: var(--color-spirit-mist);
+  --adaptive-hover: var(--color-spirit-mist);
+  --adaptive-line: var(--color-spirit-line);
+  --adaptive-surface: var(--color-spirit-paper);
+  --practice-gold: var(--color-spirit-gold);
+  --practice-gold-soft: var(--color-warning);
+  --practice-gold-hover: var(--color-warning-soft);
+  --practice-gold-border: var(--color-spirit-gold-hover);
+  --practice-gold-ink: var(--color-warning-text);
+  --practice-forest: var(--color-spirit-canopy);
+  --practice-paper: var(--color-spirit-paper);
+  --practice-nav-background: var(--color-spirit-canopy);
+  --practice-correct-bg: var(--color-success-soft);
   --practice-wrong: var(--color-danger-text);
   --practice-wrong-bg: var(--color-danger-soft);
-  --result-correct: #10b85a;
-  --result-correct-bg: #e9f8ef;
-  --result-correct-text: #0d6b38;
+  --result-correct: var(--color-success);
+  --result-correct-bg: var(--color-success-soft);
+  --result-correct-text: var(--color-success-text);
   --result-wrong-badge: var(--color-danger);
-  --result-gold: #e8cc76;
-  --result-deep-green: #315e50;
-  --result-paper: #fffdf8;
-  --result-icon: #fff;
+  --result-gold: var(--color-spirit-gold);
+  --result-deep-green: var(--color-spirit-canopy);
+  --result-paper: var(--color-spirit-paper);
+  --result-icon: var(--color-danger-on);
   color: var(--adaptive-ink);
 }
 
@@ -112,7 +112,7 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
   padding: 8px;
-  border-bottom: 1px solid #e1e7df;
+  border-bottom: 1px solid var(--color-spirit-line);
   background: #f4f3e9;
 }
 
@@ -136,13 +136,13 @@
 .examTab[aria-selected='true'] {
   border-color: var(--adaptive-forest);
   background: var(--adaptive-forest);
-  color: #fffdf8;
+  color: var(--color-spirit-paper);
 }
 
 .examTab[aria-selected='true']:hover {
   border-color: var(--adaptive-forest-hover);
   background: var(--adaptive-forest-hover);
-  color: #fffdf8;
+  color: var(--color-spirit-paper);
 }
 
 .examTab:focus-visible {
@@ -157,7 +157,7 @@
 .examCardTitle {
   display: block;
   margin-bottom: 14px;
-  color: #43564f;
+  color: var(--color-spirit-ink-soft);
   font-size: 0.9375rem;
   font-weight: 700;
 }
@@ -177,14 +177,14 @@
 .option,
 .pillOption,
 .segmentOption {
-  --option-selected-bg: #e2efe7;
-  --option-accent: #315e50;
+  --option-selected-bg: var(--color-success-soft);
+  --option-accent: var(--color-spirit-canopy);
   --option-hover-bg: #f0f6f2;
   position: relative;
   min-height: 40px;
   border: 2px solid var(--adaptive-line);
   background: var(--adaptive-surface);
-  color: #43564f;
+  color: var(--color-spirit-ink-soft);
   font-size: 0.875rem;
   font-weight: 600;
   line-height: 1.35;
@@ -239,13 +239,13 @@
 .primaryButton:focus-visible,
 .navButton:focus-visible,
 .questionNumber:focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--option-accent, #315e50) 30%, transparent);
+  outline: 3px solid color-mix(in srgb, var(--option-accent, var(--color-spirit-canopy)) 30%, transparent);
   outline-offset: 3px;
 }
 
 .categoryTone {
-  --option-selected-bg: #e2efe7;
-  --option-accent: #315e50;
+  --option-selected-bg: var(--color-success-soft);
+  --option-accent: var(--color-spirit-canopy);
   --option-hover-bg: #f0f6f2;
 }
 
@@ -282,13 +282,13 @@
 }
 
 .filterGroup ~ .filterGroup {
-  border-top: 1px solid #e1e7df;
+  border-top: 1px solid var(--color-spirit-line);
 }
 
 .filterLabel {
   display: block;
   margin-bottom: 12px;
-  color: #43564f;
+  color: var(--color-spirit-ink-soft);
   font-size: 0.875rem;
   font-weight: 700;
 }
@@ -374,12 +374,12 @@
 }
 
 .segmentOption.selected {
-  background: #315e50;
-  color: #fffdf8;
+  background: var(--color-spirit-canopy);
+  color: var(--color-spirit-paper);
 }
 
 .segmentOption.selected:hover:not(:disabled) {
-  background: #315e50;
+  background: var(--color-spirit-canopy);
 }
 
 .countText {
@@ -405,7 +405,7 @@
 .primaryButton {
   border: 1px solid var(--adaptive-forest);
   background: var(--adaptive-forest);
-  color: #fffdf8;
+  color: var(--color-spirit-paper);
   padding: 10px 22px;
 }
 
@@ -418,7 +418,7 @@
 .navButton {
   border: 1px solid var(--adaptive-line);
   background: var(--adaptive-surface);
-  color: #43564f;
+  color: var(--color-spirit-ink-soft);
 }
 
 .secondaryButton {
@@ -490,13 +490,13 @@
 .questionNav > .navButton {
   border-color: rgb(255 253 248 / 0.42);
   background: transparent;
-  color: #fffdf8;
+  color: var(--color-spirit-paper);
 }
 
 .questionNav > .navButton:hover:not(:disabled) {
   border-color: rgb(255 253 248 / 0.68);
   background: rgb(255 253 248 / 0.1);
-  color: #fffdf8;
+  color: var(--color-spirit-paper);
 }
 
 .questionNav > .navButton:disabled {
@@ -633,7 +633,7 @@
 }
 
 .questionMeta {
-  border-bottom: 1px solid #e1e7df;
+  border-bottom: 1px solid var(--color-spirit-line);
   padding: 15px 20px;
 }
 
@@ -664,8 +664,8 @@
   justify-content: center;
   border: 2px solid var(--adaptive-line);
   border-radius: 10px;
-  background: #fffdf8;
-  color: #43564f;
+  background: var(--color-spirit-paper);
+  color: var(--color-spirit-ink-soft);
   font-size: 1.125rem;
   font-weight: 700;
   transition: border-color 180ms ease, background-color 180ms ease, color 180ms ease;
@@ -818,7 +818,7 @@
   border: 1px solid currentColor;
   border-radius: 5px;
   background: rgb(255 253 248 / 0.65);
-  color: #43564f;
+  color: var(--color-spirit-ink-soft);
   font-weight: 700;
 }
 
@@ -832,7 +832,7 @@
   padding: 7px 12px;
   border: 1px solid #b9b2a6;
   border-radius: 8px;
-  background: #fffdf8;
+  background: var(--color-spirit-paper);
   color: #625d54;
   font-size: 0.875rem;
   font-weight: 600;
@@ -840,15 +840,15 @@
 }
 
 .discussionButton:hover {
-  border-color: #49463f;
+  border-color: var(--color-spirit-ink);
   background: #f0ece4;
-  color: #49463f;
+  color: var(--color-spirit-ink);
 }
 
 .discussionButton:active {
-  border-color: #49463f;
+  border-color: var(--color-spirit-ink);
   background: #e6e0d6;
-  color: #49463f;
+  color: var(--color-spirit-ink);
 }
 
 .discussionButton:focus-visible {

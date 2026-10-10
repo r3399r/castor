@@ -44,10 +44,10 @@
      named spirit tokens directly. */
   --color-black-900: var(--color-spirit-ink);
   --color-black-800: var(--color-spirit-ink);
-  --color-black-700: #43564f;
+  --color-black-700: var(--color-spirit-ink-soft);
   --color-black-500: var(--color-spirit-muted);
-  --color-black-400: #788a83;
-  --color-black-300: #91a099;
+  --color-black-400: var(--color-spirit-muted-soft);
+  --color-black-300: var(--color-spirit-disabled);
   --color-black-200: #b7c4bc;
   --color-brown-900: var(--color-spirit-forest);
   --color-brown-700: #789086;
@@ -63,17 +63,17 @@
 .react-activity-calendar__tooltip {
   width: max-content;
   max-width: calc(100vw - 20px);
-  border: 1px solid #E5E0DC;
+  border: 1px solid var(--color-spirit-line);
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.96);
+  background: color-mix(in srgb, var(--color-spirit-paper) 96%, transparent);
   padding: 6px 10px;
-  color: #4E4946;
+  color: var(--color-spirit-ink-soft);
   font-size: 12px;
   line-height: 1.4;
-  box-shadow: 0 8px 24px rgba(48, 43, 40, 0.12);
+  box-shadow: var(--shadow-spirit-card);
 }
 
 .react-activity-calendar__tooltip-arrow {
-  fill: rgba(255, 255, 255, 0.96);
-  stroke: #E5E0DC;
+  fill: var(--color-spirit-paper);
+  stroke: var(--color-spirit-line);
 }

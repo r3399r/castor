@@ -120,7 +120,7 @@ export default function QuestionClient() {
     <div>
       <h1 className="mb-6 text-2xl font-bold text-blue-700">題庫搜尋</h1>
 
-      <div className="flex flex-col gap-4 rounded-[24px] border border-brown-300 bg-white p-6">
+      <div className="flex flex-col gap-4 rounded-spirit-card border border-brown-300 bg-white p-6">
         <SelectField
           label="選擇類別"
           value={selectedCategoryId}
@@ -251,7 +251,7 @@ export default function QuestionClient() {
                   )}
 
                   {item.children.map((child) => (
-                    <div key={child.id} className="mt-4 border-t border-[#E5E0DC] pt-4">
+                    <div key={child.id} className="mt-4 border-t border-spirit-line pt-4">
                       {child.content && (
                         <MathJax>
                           <div

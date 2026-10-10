@@ -23,7 +23,7 @@ export default function AuthGuard({ children, variant = 'default' }: AuthGuardPr
 
   if (!user) {
     return (
-      <div className={learning ? 'learning-auth-state' : 'rounded-[24px] border border-brown-300 bg-white p-12 text-center'}>
+      <div className={learning ? 'learning-auth-state' : 'rounded-spirit-card border border-brown-300 bg-white p-12 text-center'}>
         <p className={learning ? 'learning-auth-state__message' : 'text-base font-medium text-spirit-ink'}>請先登入以使用此功能</p>
         {learning ? (
           <button onClick={login} className="learning-auth-state__button">Google 登入</button>

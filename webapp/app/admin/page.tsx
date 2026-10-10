@@ -20,7 +20,7 @@ export default function AdminPage() {
     <StandardPageLayout>
       <PageContainer>
         <AuthGuard>
-          <div className="pb-[70px]">
+          <div className="pb-page-bottom">
               <PageHeader title="管理後台" />
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {ADMIN_FUNCTIONS.map((fn) => (

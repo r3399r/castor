@@ -177,7 +177,7 @@ export default function ConceptGroupClient() {
   }
 
   return (
-    <div className="pb-[70px]">
+    <div className="pb-page-bottom">
       <PageHeader title="觀念群組管理" />
 
       <FormPanel

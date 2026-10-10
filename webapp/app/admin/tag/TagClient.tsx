@@ -177,7 +177,7 @@ export default function TagClient() {
   }
 
   return (
-    <div className="pb-[70px]">
+    <div className="pb-page-bottom">
       <PageHeader title="標籤管理" />
 
       <FormPanel

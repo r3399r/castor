@@ -76,7 +76,7 @@ export default function UserClient() {
   }
 
   return (
-    <div className="pb-[70px]">
+    <div className="pb-page-bottom">
       <PageHeader title="使用者管理" />
 
       <TableFrame className="mt-4">

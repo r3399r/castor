@@ -295,7 +295,7 @@ export default function FilterOptionClient() {
   }
 
   return (
-    <div className="pb-[70px]">
+    <div className="pb-page-bottom">
       <PageHeader title="篩選選項管理" />
       <p className="mb-6 text-sm text-black-500">
         篩選選項屬於某個篩選維度，可選擇上層選項以形成階層式篩選（選擇上層選項可縮小子選項範圍），並可設定此選項適用的科目。

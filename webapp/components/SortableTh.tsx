@@ -30,7 +30,7 @@ export default function SortableTh<T extends string>({
       >
         {label}
         {active && (
-          <span className="text-[10px] text-spirit-canopy">
+          <span className="text-spirit-micro text-spirit-canopy">
             {direction === 'desc' ? '▼' : '▲'}
           </span>
         )}

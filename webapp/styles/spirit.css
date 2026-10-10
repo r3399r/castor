@@ -3,9 +3,9 @@
   isolation: isolate;
   overflow: visible;
   width: 100%;
-  border-bottom: 1px solid rgb(225 199 122 / 0.3);
+  border-bottom: 1px solid color-mix(in srgb, var(--color-spirit-gold) 30%, transparent);
   background: var(--color-spirit-canopy);
-  color: #c8cec5;
+  color: var(--spirit-light-muted);
 }
 .site-header__nav,
 .site-header__content {
@@ -26,11 +26,11 @@
   align-items: center;
   gap: 8px;
   min-width: 0;
-  color: #f7f0dc;
+  color: var(--color-spirit-on-dark);
   line-height: 1.5;
 }
 .site-header__logo::before {
-  color: #e1c77a;
+  color: var(--color-spirit-gold);
   content: "✦";
   font-size: 0.55rem;
   line-height: 1;
@@ -38,7 +38,7 @@
 .site-header__nav-link,
 .site-header__menu-toggle,
 .site-header button {
-  color: #c8cec5;
+  color: var(--spirit-light-muted);
 }
 .site-header__nav-link {
   position: relative;
@@ -46,11 +46,11 @@
 .site-header__nav-link:hover,
 .site-header__menu-toggle:hover,
 .site-header button:hover {
-  background: rgb(255 253 248 / 0.08);
-  color: #fffdf8;
+  background: var(--spirit-hover-on-dark);
+  color: var(--color-spirit-paper);
 }
 .site-header__nav-link[aria-current="page"] {
-  color: #e1c77a;
+  color: var(--color-spirit-gold);
   font-weight: 700;
 }
 .site-header__nav-link[aria-current="page"]::after {
@@ -60,21 +60,21 @@
   width: 32px;
   height: 3px;
   border-radius: 999px;
-  background: #e1c77a;
+  background: var(--color-spirit-gold);
   content: "";
   transform: translateX(-50%);
 }
 .site-header :is(a, button):focus-visible {
-  outline: 3px solid rgb(225 199 122 / 0.72);
+  outline: 3px solid var(--spirit-focus-ring-gold);
   outline-offset: 3px;
 }
 .site-header [aria-label="個人資料"] > :is(img, span) {
   border-width: 2px;
-  border-color: #e1c77a;
+  border-color: var(--color-spirit-gold);
 }
 .site-header [aria-label="個人資料"] > span {
-  background: rgb(247 240 220 / 0.1);
-  color: #f7f0dc;
+  background: var(--spirit-selected-on-dark);
+  color: var(--color-spirit-on-dark);
 }
 .standard-site-header {
   position: relative;
@@ -135,8 +135,8 @@
   padding: 40px 24px;
   border: 1px solid var(--user-line, #cbd8ce);
   border-radius: 16px;
-  background: var(--user-surface, #fffdf8);
-  color: var(--user-ink, #34423d);
+  background: var(--user-surface, var(--color-spirit-paper));
+  color: var(--user-ink, var(--color-spirit-ink));
   text-align: center;
 }
 
@@ -145,7 +145,7 @@
 }
 
 .learning-auth-state__message {
-  color: var(--user-ink, #43564f);
+  color: var(--user-ink, var(--color-spirit-ink-soft));
   font-size: 1rem;
   font-weight: 600;
 }
@@ -154,10 +154,10 @@
   min-height: 42px;
   margin-top: 24px;
   padding: 9px 20px;
-  border: 1px solid var(--user-forest, #315e50);
+  border: 1px solid var(--user-forest, var(--color-spirit-canopy));
   border-radius: 8px;
-  background: var(--user-forest, #315e50);
-  color: #fffdf8;
+  background: var(--user-forest, var(--color-spirit-canopy));
+  color: var(--color-spirit-paper);
   font-size: 0.875rem;
   font-weight: 700;
   transition: border-color 180ms ease, background-color 180ms ease, color 180ms ease;
@@ -185,8 +185,8 @@
   top: 70px;
   right: 0;
   left: 0;
-  border-bottom: 1px solid rgb(225 199 122 / 0.3);
-  background: #234b43;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-spirit-gold) 30%, transparent);
+  background: var(--color-spirit-canopy);
 }
 @media (width < 64rem) {
   .site-header__content {

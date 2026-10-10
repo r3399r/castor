@@ -113,7 +113,7 @@ function ChartLegend({
           <svg width="16" height="3" style={{ display: 'block', flexShrink: 0 }}>
             <line x1="0" y1="1.5" x2="16" y2="1.5" stroke={s.color} strokeWidth="2" />
           </svg>
-          <span className={`text-[11px] ${styles.legendText}`}>{s.name}</span>
+          <span className={`text-spirit-micro ${styles.legendText}`}>{s.name}</span>
         </button>
       ))}
     </div>
@@ -389,7 +389,7 @@ function HistorySection({ history }: { history: GetUserHistoryResponse }) {
           </div>
         </div>
         <ProgressChart series={series} toggleable={viewMode === 'subjects'} />
-        <p className={`mt-1 text-right text-[10px] ${styles.chartNote}`}>熟練度 0–10</p>
+        <p className={`mt-1 text-right text-spirit-micro ${styles.chartNote}`}>熟練度 0–10</p>
       </div>
 
       {/* Learning heatmap */}

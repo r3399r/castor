@@ -8,9 +8,9 @@ export function PageContainer({
   ...props
 }: HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className="px-4 md:px-10 lg:px-[70px]">
+    <div className="px-page-gutter md:px-page-gutter-md lg:px-page-gutter-lg">
       <div
-        className={`mx-auto w-full max-w-[1120px] ${className}`}
+        className={`mx-auto w-full max-w-site ${className}`}
         {...props}
       />
     </div>

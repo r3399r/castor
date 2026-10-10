@@ -18,10 +18,10 @@ const features = [
 
 export default function HomeFeature() {
   return (
-    <section className="-mx-4 bg-spirit-mist py-[60px] sm:-mx-6 xl:py-[96px]">
-      <div className="mx-auto w-full max-w-[1120px] px-4 md:px-[40px] xl:px-[70px]">
+    <section className="-mx-4 bg-spirit-mist py-section-md sm:-mx-6 xl:py-section-xl">
+      <div className="mx-auto w-full max-w-site px-page-gutter md:px-page-gutter-md xl:px-page-gutter-lg">
         <header className="mx-auto max-w-[720px] space-y-4 text-center">
-          <h2 className="text-[40px] font-bold leading-tight text-spirit-canopy">
+          <h2 className="text-spirit-display-sm font-bold leading-tight text-spirit-canopy">
             掌握每個觀念的學習狀態
           </h2>
           <p className="text-base leading-7 text-spirit-muted">

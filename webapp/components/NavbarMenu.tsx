@@ -31,7 +31,7 @@ export default function NavbarMenu() {
               key={item.label}
               href={item.href}
               aria-current={isActive(item.href) ? 'page' : undefined}
-              className="site-header__nav-link flex h-9 items-center rounded-[6px] px-4 text-sm transition focus:outline-none"
+              className="site-header__nav-link flex h-9 items-center rounded-spirit-small px-4 text-sm transition focus:outline-none"
             >
               {item.label}
             </Link>
@@ -82,7 +82,7 @@ export default function NavbarMenu() {
                 href={item.href}
                 aria-current={isActive(item.href) ? 'page' : undefined}
                 onClick={() => setOpen(false)}
-                className="site-header__nav-link rounded-[6px] px-4 py-4 text-center text-sm transition focus:outline-none"
+                className="site-header__nav-link rounded-spirit-small px-4 py-4 text-center text-sm transition focus:outline-none"
               >
                 {item.label}
               </Link>

@@ -229,7 +229,7 @@ export default function SubjectNewQuestionClient() {
   }
 
   return (
-    <div className="pb-[70px]">
+    <div className="pb-page-bottom">
       <PageHeader
         title={`新增題目（${subject.name}）`}
         subtitle="選擇送出時使用的試卷，並確認此科目目前可用的標籤、觀念群組。"
@@ -352,7 +352,7 @@ export default function SubjectNewQuestionClient() {
           {parsedQuestions.map((question, i) => {
             const problems = missingFields(question)
             return (
-              <div key={i} className="rounded-[24px] border border-brown-300 bg-white p-6">
+              <div key={i} className="rounded-spirit-card border border-brown-300 bg-white p-6">
                 <div className="mb-3 flex flex-wrap items-center gap-2 text-sm">
                   <span className="font-bold text-black-900">第 {i + 1} 題</span>
                   {question.type && (
@@ -384,7 +384,7 @@ export default function SubjectNewQuestionClient() {
                   <p className="text-sm text-black-200">此題無 content</p>
                 )}
 
-                <div className="mt-3 space-y-1 border-t border-[#E5E0DC] pt-3 text-sm">
+                <div className="mt-3 space-y-1 border-t border-spirit-line pt-3 text-sm">
                   <div className="flex gap-2">
                     <span className="w-20 shrink-0 font-medium text-black-500">options:</span>
                     <span className="text-black-900">{question.options ?? '—'}</span>
@@ -410,7 +410,7 @@ export default function SubjectNewQuestionClient() {
                 </div>
 
                 {subject.tags.length > 0 && (
-                  <div className="mt-3 border-t border-[#E5E0DC] pt-3">
+                  <div className="mt-3 border-t border-spirit-line pt-3">
                     <MultiSelectField
                       label="標籤（可複選，可不選）"
                       options={subject.tags.map((tag) => ({
