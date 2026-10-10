@@ -46,8 +46,8 @@
   color: var(--user-forest);
   font-size: 2rem;
   font-weight: 700;
-  line-height: 1.25;
-  letter-spacing: 0.02em;
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-wide);
 }
 
 .subtitle {
@@ -57,10 +57,10 @@
 }
 
 .card {
-  border: 1px solid rgb(203 216 206 / 0.85);
+  border: var(--spirit-border-muted);
   border-radius: 16px;
   background: var(--user-surface);
-  box-shadow: 0 8px 28px rgb(23 63 58 / 0.05);
+  box-shadow: var(--shadow-spirit-card);
 }
 
 .profileCard {
@@ -75,7 +75,7 @@
   width: 64px;
   height: 64px;
   flex: none;
-  border: 2px solid var(--user-line);
+  border: var(--border-width-strong) solid var(--user-line);
   border-radius: 50%;
   object-fit: cover;
 }
@@ -87,7 +87,7 @@
   flex: none;
   align-items: center;
   justify-content: center;
-  border: 2px solid var(--user-line);
+  border: var(--border-width-strong) solid var(--user-line);
   border-radius: 50%;
   background: var(--color-success-soft);
   color: var(--user-forest);
@@ -99,7 +99,7 @@
 .muted { color: var(--user-muted); }
 
 .textInput {
-  min-height: 38px;
+  min-height: var(--control-height-md);
   padding: 7px 10px;
   border: 1px solid var(--user-line);
   border-radius: 8px;
@@ -113,14 +113,14 @@
 .secondaryButton,
 .paginationButton {
   display: inline-flex;
-  min-height: 38px;
+  min-height: var(--control-height-md);
   align-items: center;
   justify-content: center;
   padding: 7px 14px;
   border-radius: 8px;
   font-size: 0.875rem;
   font-weight: 700;
-  transition: border-color 180ms ease, background-color 180ms ease, color 180ms ease;
+  transition: border-color var(--motion-duration-standard) var(--motion-ease-standard), background-color var(--motion-duration-standard) var(--motion-ease-standard), color var(--motion-duration-standard) var(--motion-ease-standard);
 }
 
 .primaryButton {
@@ -164,7 +164,7 @@
 .textButton:focus-visible,
 .cancelButton:focus-visible,
 .textInput:focus-visible {
-  outline: 3px solid rgb(49 94 80 / 0.25);
+  outline: var(--spirit-focus-outline);
   outline-offset: 3px;
 }
 
@@ -180,7 +180,7 @@
 .pointsIcon {
   display: flex;
   width: 44px;
-  height: 44px;
+  height: var(--control-height-md);
   align-items: center;
   justify-content: center;
   border-radius: 50%;
@@ -198,7 +198,7 @@
   justify-content: space-between;
   gap: 16px;
   padding: 16px 20px;
-  border: 1px solid rgb(203 216 206 / 0.85);
+  border: var(--spirit-border-muted);
   border-radius: 12px;
   background: var(--user-surface);
 }
@@ -206,7 +206,7 @@
 .transactionIcon {
   display: flex;
   width: 36px;
-  height: 36px;
+  height: var(--control-height-nav);
   flex: none;
   align-items: center;
   justify-content: center;

@@ -59,7 +59,7 @@
   content: "";
   position: absolute;
   inset: 76px 0 30%;
-  z-index: 0;
+  z-index: var(--layer-base);
   background: linear-gradient(to right, var(--spirit-garden-copy-shade) 0%, var(--spirit-garden-copy-mid) 27%, transparent 52%);
   mask-image: linear-gradient(to bottom, transparent, black 18%, black 70%, transparent);
   pointer-events: none;
@@ -71,14 +71,14 @@
 .sp-box-page .sp-hero h1 {
   margin: 0;
   font-size: 2rem;
-  line-height: 1.25;
-  letter-spacing: 0.02em;
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-wide);
 }
 .sp-box-page .sp-hero h1 span {
   margin-top: 8px;
   font-size: 0.9375rem;
-  line-height: 1.65;
-  letter-spacing: normal;
+  line-height: var(--leading-relaxed);
+  letter-spacing: var(--tracking-normal);
 }
 .sp-box-page .sp-hero > .sp-hero-decoration,
 .sp-box-page .sp-hero > .sp-painted-divider {
@@ -121,7 +121,7 @@
   border-radius: inherit;
   background: linear-gradient(174deg, transparent 14%, rgba(255,251,226,.20) 17%, transparent 21%, transparent 72%, rgba(216,202,145,.12) 76%, transparent 82%);
   pointer-events: none;
-  z-index: 0;
+  z-index: var(--layer-base);
 }
 @media (width >= 64rem) {
   .sp-box-page .sp-hero-copy { align-self: flex-start; margin-top: 5.265625px; }
@@ -131,7 +131,7 @@
 }
 .sp-box-page .sp-balance > .sp-points-copy {
   position: relative;
-  z-index: 2;
+  z-index: var(--layer-raised);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -147,7 +147,7 @@
 .sp-box-page .sp-balance strong {
   color: var(--paper-number);
   font-size: clamp(56px, 4vw, 76px);
-  line-height: 1.15;
+  line-height: var(--leading-display-relaxed);
   white-space: nowrap;
   background: radial-gradient(ellipse, rgba(239,201,99,.15), transparent 72%);
 }
@@ -155,7 +155,7 @@
 .sp-box-page .sp-balance small { color: var(--paper-secondary); margin-top: 8px; }
 .sp-box-page .sp-points-vine {
   position: absolute;
-  z-index: 1;
+  z-index: var(--layer-decoration);
   height: auto;
   max-width: none;
   object-fit: contain;
@@ -288,7 +288,7 @@
     width: 30%;
     max-width: 160px;
     aspect-ratio: 1.25;
-    z-index: 0;
+    z-index: var(--layer-base);
     pointer-events: none;
     /* Independent replaceable transparent artwork; crop to the outer branch
        for a few broad leaves instead of shrinking the entire long vine. */
@@ -319,7 +319,7 @@
 }
 .sp-box-page .sp-tabs button {
   position: relative;
-  height: 50px;
+  height: var(--control-height-lg);
   min-width: 0;
   padding: 0 28px;
   gap: 10px;
@@ -330,7 +330,7 @@
   white-space: nowrap;
   font-size: 16px;
   box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 6px 14px rgba(2,31,31,.12);
-  transition: background-color 180ms, border-color 180ms, color 180ms, transform 180ms, box-shadow 180ms;
+  transition: background-color var(--motion-duration-standard) var(--motion-ease-standard), border-color var(--motion-duration-standard) var(--motion-ease-standard), color var(--motion-duration-standard) var(--motion-ease-standard), transform var(--motion-duration-standard) var(--motion-ease-standard), box-shadow var(--motion-duration-standard) var(--motion-ease-standard);
 }
 .sp-box-page .sp-tabs button svg { width: 24px; height: 24px; flex-shrink: 0; stroke-width: 2; }
 .sp-box-page .sp-tabs button[aria-selected='true'] {
@@ -356,11 +356,11 @@
 }
 @media (48rem <= width < 64rem) {
   .sp-box-page .sp-tabs { grid-template-columns: repeat(3, 164px); gap: 14px; }
-  .sp-box-page .sp-tabs button { height: 46px; padding-inline: 22px; }
+  .sp-box-page .sp-tabs button { height: var(--control-height-lg); padding-inline: 22px; }
 }
 @media (width < 48rem) {
   .sp-box-page .sp-tabs { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-  .sp-box-page .sp-tabs button { height: 40px; padding-inline: 4px; gap: 4px; font-size: 14px; letter-spacing: -.025em; }
+  .sp-box-page .sp-tabs button { height: var(--control-height-md); padding-inline: 4px; gap: 4px; font-size: 14px; letter-spacing: var(--tracking-tight); }
   .sp-box-page .sp-tabs button svg { width: 18px; height: 18px; }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -384,7 +384,7 @@
   margin-left: auto;
 }
 .sp-box-page .sp-guardian-selector .sp-select-control { width: 100%; }
-.sp-box-page .sp-guardian-selector select { width: 100%; min-height: 50px; }
+.sp-box-page .sp-guardian-selector select { width: 100%; min-height: var(--control-height-lg); }
 @media (48rem <= width < 64rem) {
   .sp-box-page .sp-guardian-selector { margin-left: 0; }
 }
@@ -473,7 +473,7 @@
   background: #fffaf0;
   border-color: rgb(66 104 83 / 0.34);
   border-radius: 16px;
-  box-shadow: 0 12px 34px rgb(23 63 58 / 0.09);
+  box-shadow: var(--shadow-spirit-raised);
 }
 .sp-box-page .sp-support-summary {
   display: grid;
@@ -485,7 +485,7 @@
   color: var(--color-spirit-teal);
   font-size: var(--text-spirit-micro);
   text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: var(--tracking-caps);
   font-weight: 700;
 }
 .sp-box-page .sp-support-copy h2 {
@@ -521,7 +521,7 @@
   margin-top: 4px;
   color: #c27a18;
   font-size: 24px;
-  line-height: 1.1;
+  line-height: var(--leading-display);
 }
 .sp-box-page .sp-support-rules {
   margin-top: 22px;

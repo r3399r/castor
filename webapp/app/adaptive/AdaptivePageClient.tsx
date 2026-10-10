@@ -13,7 +13,7 @@ export default function AdaptivePageClient() {
 
   return (
     <>
-      <div className="relative z-10">
+      <div className="layer-content relative">
         <PageContainer className={styles.content}>
           <AuthGuard>
             <AdaptiveClient onPracticeStateChange={setPracticeActive} />

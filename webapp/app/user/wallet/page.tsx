@@ -12,7 +12,7 @@ export default function WalletPage() {
       <div className="standard-site-header">
         <Navbar />
       </div>
-      <main className={`${styles.main} relative z-10`}>
+      <main className={`${styles.main} layer-content relative`}>
         <PageContainer>
           <AuthGuard variant="learning">
             <WalletClient />

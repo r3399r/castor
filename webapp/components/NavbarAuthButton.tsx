@@ -12,7 +12,7 @@ export default function NavbarAuthButton() {
         type="button"
         disabled
         aria-busy="true"
-        className="flex h-9 items-center justify-center rounded-md border border-brown-300 px-5 text-sm text-black-900 opacity-70"
+        className="flex h-control-nav items-center justify-center rounded-md border border-brown-300 px-5 text-sm text-black-900 opacity-70"
       >
         Google 登入
       </button>
@@ -29,10 +29,10 @@ export default function NavbarAuthButton() {
             src={user.photoURL}
             alt={user.displayName ?? '使用者頭像'}
             referrerPolicy="no-referrer"
-            className="h-9 w-9 rounded-full border border-brown-300 object-cover"
+            className="h-control-nav w-control-nav rounded-full border border-brown-300 object-cover"
           />
         ) : (
-          <span className="flex h-9 w-9 items-center justify-center rounded-full border border-brown-300 bg-blue-700/10 text-sm font-bold text-blue-700">
+          <span className="flex h-control-nav w-control-nav items-center justify-center rounded-full border border-brown-300 bg-blue-700/10 text-sm font-bold text-blue-700">
             {initial}
           </span>
         )}
@@ -43,7 +43,7 @@ export default function NavbarAuthButton() {
   return (
     <button
       onClick={login}
-      className="flex h-9 items-center justify-center rounded-md border border-brown-300 px-5 text-sm text-black-900 transition hover:bg-beige-200"
+      className="flex h-control-nav items-center justify-center rounded-md border border-brown-300 px-5 text-sm text-black-900 transition hover:bg-beige-200"
     >
       Google 登入
     </button>

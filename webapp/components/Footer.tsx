@@ -7,7 +7,7 @@ export default function Footer({ variant = 'default' }: FooterProps) {
 
   return (
     <footer
-      className={`${learning ? 'site-footer--learning' : 'noise bg-spirit-deep py-8'} relative z-10 -mx-4 text-center sm:-mx-6`}
+      className={`${learning ? 'site-footer--learning' : 'noise bg-spirit-deep py-8'} layer-content relative -mx-4 text-center sm:-mx-6`}
     >
       <nav className="flex items-center justify-center gap-8">
         <a href="#" className={`text-sm transition ${learning ? '' : 'text-spirit-on-dark hover:text-spirit-gold'}`}>

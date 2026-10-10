@@ -47,8 +47,8 @@
   color: var(--adaptive-forest);
   font-size: 2rem;
   font-weight: 700;
-  line-height: 1.25;
-  letter-spacing: 0.02em;
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-wide);
 }
 
 .pageSubtitle {
@@ -67,7 +67,7 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
-  animation: reveal 180ms ease-out both;
+  animation: reveal var(--motion-duration-standard) var(--motion-ease-emphasized) both;
 }
 
 .sectionHeading {
@@ -77,7 +77,7 @@
   color: var(--adaptive-forest);
   font-size: 1.25rem;
   font-weight: 700;
-  line-height: 1.4;
+  line-height: var(--leading-comfortable);
 }
 
 .sectionIcon {
@@ -86,10 +86,10 @@
 }
 
 .card {
-  border: 1px solid rgb(203 216 206 / 0.8);
+  border: var(--spirit-border-muted);
   border-radius: 16px;
   background: var(--adaptive-surface);
-  box-shadow: 0 8px 28px rgb(23 63 58 / 0.06);
+  box-shadow: var(--shadow-spirit-card);
 }
 
 .examGrid {
@@ -112,20 +112,20 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
   padding: 8px;
-  border-bottom: 1px solid var(--color-spirit-line);
+  border-bottom: var(--spirit-border);
   background: #f4f3e9;
 }
 
 .examTab {
-  min-height: 36px;
+  min-height: var(--control-height-nav);
   padding: 5px 10px;
-  border: 1px solid transparent;
+  border: var(--border-width-subtle) solid transparent;
   border-radius: 8px;
   color: var(--adaptive-muted);
   font-size: 0.875rem;
   font-weight: 700;
-  line-height: 1.35;
-  transition: border-color 180ms ease, background-color 180ms ease, color 180ms ease;
+  line-height: var(--leading-snug);
+  transition: border-color var(--motion-duration-standard) var(--motion-ease-standard), background-color var(--motion-duration-standard) var(--motion-ease-standard), color var(--motion-duration-standard) var(--motion-ease-standard);
 }
 
 .examTab:hover {
@@ -146,7 +146,7 @@
 }
 
 .examTab:focus-visible {
-  outline: 3px solid rgb(49 94 80 / 0.25);
+  outline: var(--spirit-focus-outline);
   outline-offset: 2px;
 }
 
@@ -181,15 +181,15 @@
   --option-accent: var(--color-spirit-canopy);
   --option-hover-bg: #f0f6f2;
   position: relative;
-  min-height: 40px;
-  border: 2px solid var(--adaptive-line);
+  min-height: var(--control-height-md);
+  border: var(--border-width-strong) solid var(--adaptive-line);
   background: var(--adaptive-surface);
   color: var(--color-spirit-ink-soft);
   font-size: 0.875rem;
   font-weight: 600;
-  line-height: 1.35;
+  line-height: var(--leading-snug);
   text-align: left;
-  transition: border-color 180ms ease, background-color 180ms ease, color 180ms ease;
+  transition: border-color var(--motion-duration-standard) var(--motion-ease-standard), background-color var(--motion-duration-standard) var(--motion-ease-standard), color var(--motion-duration-standard) var(--motion-ease-standard);
 }
 
 .option {
@@ -199,7 +199,7 @@
 
 .pillOption {
   max-width: 100%;
-  min-height: 36px;
+  min-height: var(--control-height-nav);
   border-radius: 999px;
   padding: 7px 14px;
   overflow-wrap: anywhere;
@@ -239,7 +239,7 @@
 .primaryButton:focus-visible,
 .navButton:focus-visible,
 .questionNumber:focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--option-accent, var(--color-spirit-canopy)) 30%, transparent);
+  outline: var(--focus-ring-width) solid color-mix(in srgb, var(--option-accent, var(--color-spirit-canopy)) 30%, transparent);
   outline-offset: 3px;
 }
 
@@ -282,7 +282,7 @@
 }
 
 .filterGroup ~ .filterGroup {
-  border-top: 1px solid var(--color-spirit-line);
+  border-top: var(--spirit-border);
 }
 
 .filterLabel {
@@ -313,7 +313,7 @@
 }
 
 .clearButton {
-  min-height: 34px;
+  min-height: var(--control-height-sm);
   border: 1px solid #9bada4;
   border-radius: 8px;
   background: transparent;
@@ -328,7 +328,7 @@
 }
 
 .clearButton:focus-visible {
-  outline: 3px solid rgb(49 94 80 / 0.24);
+  outline: var(--spirit-focus-outline);
   outline-offset: 3px;
 }
 
@@ -362,7 +362,7 @@
 
 .segmentOption {
   width: 48px;
-  min-height: 38px;
+  min-height: var(--control-height-md);
   border: 0;
   border-radius: 0;
   padding: 7px 13px;
@@ -395,11 +395,11 @@
   align-items: center;
   justify-content: center;
   gap: 7px;
-  min-height: 42px;
+  min-height: var(--control-height-md);
   border-radius: 10px;
   font-size: 0.875rem;
   font-weight: 700;
-  transition: border-color 180ms ease, background-color 180ms ease, color 180ms ease;
+  transition: border-color var(--motion-duration-standard) var(--motion-ease-standard), background-color var(--motion-duration-standard) var(--motion-ease-standard), color var(--motion-duration-standard) var(--motion-ease-standard);
 }
 
 .primaryButton {
@@ -445,7 +445,7 @@
 
 .backButton {
   display: inline-flex;
-  min-height: 44px;
+  min-height: var(--control-height-md);
   align-items: center;
   gap: 8px;
   margin: 44px 0 20px;
@@ -468,13 +468,13 @@
 
 .backButton:focus-visible {
   border-radius: 6px;
-  outline: 3px solid rgb(49 94 80 / 0.24);
+  outline: var(--spirit-focus-outline);
   outline-offset: 3px;
 }
 
 .questionNav {
   position: relative;
-  z-index: 1;
+  z-index: var(--layer-decoration);
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr) max-content;
   align-items: center;
@@ -557,7 +557,7 @@
   display: grid;
   flex: 0 0 32px;
   width: 32px;
-  height: 32px;
+  height: var(--control-height-sm);
   place-items: center;
   border: 2px solid rgb(168 194 181 / 0.4);
   border-radius: 50%;
@@ -626,14 +626,14 @@
 
 .questionCard {
   overflow: hidden;
-  border: 1px solid rgb(203 216 206 / 0.85);
+  border: var(--spirit-border-muted);
   border-radius: 16px;
   background: var(--adaptive-surface);
   box-shadow: none;
 }
 
 .questionMeta {
-  border-bottom: 1px solid var(--color-spirit-line);
+  border-bottom: var(--spirit-border);
   padding: 15px 20px;
 }
 
@@ -659,16 +659,16 @@
   display: flex;
   cursor: pointer;
   min-width: 0;
-  min-height: 48px;
+  min-height: var(--control-height-lg);
   align-items: center;
   justify-content: center;
-  border: 2px solid var(--adaptive-line);
+  border: var(--border-width-strong) solid var(--adaptive-line);
   border-radius: 10px;
   background: var(--color-spirit-paper);
   color: var(--color-spirit-ink-soft);
   font-size: 1.125rem;
   font-weight: 700;
-  transition: border-color 180ms ease, background-color 180ms ease, color 180ms ease;
+  transition: border-color var(--motion-duration-standard) var(--motion-ease-standard), background-color var(--motion-duration-standard) var(--motion-ease-standard), color var(--motion-duration-standard) var(--motion-ease-standard);
 }
 
 .answerOption:has(input:not(:disabled)):hover {
@@ -836,7 +836,7 @@
   color: #625d54;
   font-size: 0.875rem;
   font-weight: 600;
-  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+  transition: background-color var(--motion-duration-fast) var(--motion-ease-standard), border-color var(--motion-duration-fast) var(--motion-ease-standard), color var(--motion-duration-fast) var(--motion-ease-standard);
 }
 
 .discussionButton:hover {
@@ -949,7 +949,7 @@
   .actionCard { padding: 18px 16px; }
   .examTabPanel { padding: 16px; }
   .optionGrid { grid-template-columns: minmax(0, 1fr); }
-  .navButton { min-height: 40px; }
+  .navButton { min-height: var(--control-height-md); }
   .questionMeta { padding: 14px 16px; }
   .questionBody { padding: 24px 16px; }
   .answerGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

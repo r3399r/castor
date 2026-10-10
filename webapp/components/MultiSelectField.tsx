@@ -195,7 +195,7 @@ export default function MultiSelectField({
               top: anchor.top,
               bottom: anchor.bottom,
             }}
-            className="z-50 max-h-60 overflow-y-auto rounded-spirit-control border border-spirit-line bg-spirit-paper shadow-spirit-float">
+            className="layer-dropdown max-h-60 overflow-y-auto rounded-spirit-control border border-spirit-line bg-spirit-paper shadow-spirit-float">
           {value.length > 0 && (
             <button
               type="button"

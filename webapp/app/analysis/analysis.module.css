@@ -14,13 +14,13 @@
 
 .header {
   position: relative;
-  z-index: 20;
+  z-index: var(--layer-header);
   background: var(--color-spirit-canopy);
 }
 
 .titleBand {
   position: relative;
-  z-index: 1;
+  z-index: var(--layer-decoration);
   overflow-x: clip;
   overflow-y: visible;
   height: 160px;
@@ -35,7 +35,7 @@
 
 .titleBandInner {
   position: relative;
-  z-index: 2;
+  z-index: var(--layer-raised);
   display: flex;
   height: 100%;
   width: 100%;
@@ -46,7 +46,7 @@
 
 .titleCopy {
   position: relative;
-  z-index: 2;
+  z-index: var(--layer-raised);
   width: 58%;
   padding-top: 16px;
 }
@@ -55,7 +55,7 @@
   position: absolute;
   right: 0;
   bottom: -62px;
-  z-index: 1;
+  z-index: var(--layer-decoration);
   width: 88%;
   height: 200px;
   opacity: 0;
@@ -77,8 +77,8 @@
   color: var(--color-spirit-canopy);
   font-size: 2rem;
   font-weight: 700;
-  line-height: 1.25;
-  letter-spacing: 0.02em;
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-wide);
 }
 
 .titleCopy p {
@@ -102,7 +102,7 @@
   margin: 40px 0 20px;
   font-size: 1.25rem;
   font-weight: 700;
-  line-height: 1.4;
+  line-height: var(--leading-comfortable);
 }
 
 .history {
@@ -114,7 +114,7 @@
 
 .summaryGrid {
   position: relative;
-  z-index: 3;
+  z-index: var(--layer-highlight);
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 22px;
@@ -123,7 +123,7 @@
 }
 
 .card {
-  border: 1px solid rgb(216 208 195 / 0.72);
+  border: var(--spirit-border-muted);
   border-radius: 16px;
   box-shadow: none;
 }
@@ -165,7 +165,7 @@
   color: inherit;
   font-size: 1rem;
   font-weight: 700;
-  line-height: 1.3;
+  line-height: var(--leading-compact);
   white-space: nowrap;
 }
 
@@ -181,7 +181,7 @@
 .summaryValue {
   font-size: 3.5rem;
   font-weight: 700;
-  line-height: 1;
+  line-height: var(--leading-none);
   font-variant-numeric: tabular-nums;
 }
 
@@ -189,7 +189,7 @@
   color: color-mix(in srgb, currentColor 78%, transparent);
   font-size: 1.25rem;
   font-weight: 600;
-  line-height: 1;
+  line-height: var(--leading-none);
 }
 
 .summarySub,
@@ -202,7 +202,7 @@
   min-height: 1.4em;
   color: color-mix(in srgb, currentColor 82%, transparent);
   font-size: 0.8125rem;
-  line-height: 1.4;
+  line-height: var(--leading-comfortable);
   transform: translateY(-4px);
 }
 
@@ -211,7 +211,7 @@
   top: 28px;
   right: 24px;
   width: 48px;
-  height: 48px;
+  height: var(--control-height-lg);
   object-fit: contain;
   pointer-events: none;
 }
@@ -258,19 +258,19 @@
 .tabGroup {
   display: flex;
   overflow: hidden;
-  border: 1px solid #d8d0c3;
+  border: var(--spirit-border);
   border-radius: 10px;
   background: transparent;
 }
 
 .tabButton {
-  min-height: 32px;
+  min-height: var(--control-height-sm);
   padding: 5px 12px;
-  border-right: 1px solid #d8d0c3;
+  border-right: var(--spirit-border);
   background: transparent;
   color: var(--color-spirit-ink);
   font-size: 0.75rem;
-  transition: background-color 160ms ease, color 160ms ease;
+  transition: background-color var(--motion-duration-fast) var(--motion-ease-standard), color var(--motion-duration-fast) var(--motion-ease-standard);
 }
 
 .tabButton:last-child {
@@ -284,7 +284,7 @@
 
 .tabButton:focus-visible,
 .legendButton:focus-visible {
-  outline: 3px solid rgb(57 115 101 / 0.35);
+  outline: var(--spirit-focus-outline);
   outline-offset: 2px;
 }
 
@@ -322,7 +322,7 @@
   height: 100%;
   border-radius: 2px;
   background: #397365;
-  transition: width 180ms ease;
+  transition: width var(--motion-duration-standard) var(--motion-ease-standard);
 }
 
 .subjectGrid {
@@ -345,7 +345,7 @@
 }
 
 .errorCard {
-  border: 1px solid #d8d0c3;
+  border: var(--spirit-border);
   border-radius: 16px;
   background: var(--color-spirit-paper);
   padding: 32px;
@@ -420,7 +420,7 @@
     top: 24px;
     right: 18px;
     width: 48px;
-    height: 48px;
+    height: var(--control-height-lg);
   }
 }
 
@@ -500,7 +500,7 @@
     top: 20px;
     right: 22px;
     width: 48px;
-    height: 48px;
+    height: var(--control-height-lg);
   }
 
   .card {

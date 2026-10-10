@@ -76,6 +76,25 @@
   --font-weight-semibold: 600;
   --font-weight-bold: 700;
 
+  /* Shared reading rhythm and tracking. */
+  --leading-none: 1;
+  --leading-display: 1.1;
+  --leading-display-relaxed: 1.15;
+  --leading-tight: 1.25;
+  --leading-compact: 1.3;
+  --leading-snug: 1.35;
+  --leading-comfortable: 1.4;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.65;
+  --leading-loose: 1.85;
+  --tracking-tight: -0.025em;
+  --tracking-normal: 0;
+  --tracking-subtle: 0.015em;
+  --tracking-wide: 0.02em;
+  --tracking-display: 0.03em;
+  --tracking-wider: 0.06em;
+  --tracking-caps: 0.1em;
+
   /* Make Tailwind's generic text utilities follow the same type scale. */
   --text-xs: var(--text-spirit-caption);
   --text-sm: var(--text-spirit-small);
@@ -100,6 +119,15 @@
   --spacing-section-lg: 4.5rem;
   --spacing-section-xl: 6rem;
   --container-site: 70rem;
+  --spacing-control-sm: 2rem;
+  --spacing-control-nav: 2.25rem;
+  --spacing-control-md: 2.625rem;
+  --spacing-control-lg: 3rem;
+  --spacing-icon-xs: 0.75rem;
+  --spacing-icon-sm: 1rem;
+  --spacing-icon-md: 1.25rem;
+  --spacing-icon-lg: 1.5rem;
+  --spacing-icon-xl: 2rem;
 
   /* Generic rounded-* utilities map to the same semantic radius scale. */
   --radius-spirit-small: 0.5rem;
@@ -114,8 +142,14 @@
   --radius-xl: var(--radius-spirit-surface);
   --radius-2xl: var(--radius-spirit-panel);
   --radius-3xl: 2rem;
+  --shadow-spirit-subtle: 0 2px 8px rgb(23 63 58 / 0.05);
   --shadow-spirit-card: 0 8px 28px rgb(23 63 58 / 0.06);
+  --shadow-spirit-raised: 0 12px 34px rgb(23 63 58 / 0.09);
   --shadow-spirit-float: 0 20px 64px rgb(23 63 58 / 0.15);
+  --shadow-sm: var(--shadow-spirit-subtle);
+  --shadow-md: var(--shadow-spirit-card);
+  --shadow-lg: var(--shadow-spirit-raised);
+  --shadow-xl: var(--shadow-spirit-float);
   /* Existing Tailwind breakpoints, made explicit; no change to other pages. */
   --breakpoint-sm: 40rem;
   --breakpoint-md: 48rem;
@@ -126,11 +160,27 @@
 :root {
   --spirit-surface: var(--color-spirit-paper);
   --spirit-surface-raised: var(--color-spirit-cream);
-  --spirit-border: 1px solid var(--color-spirit-line);
+  --border-width-subtle: 1px;
+  --border-width-strong: 2px;
+  --border-width-active: 3px;
+  --spirit-border: var(--border-width-subtle) solid var(--color-spirit-line);
+  --spirit-border-strong: var(--border-width-strong) solid var(--color-spirit-line);
+  --spirit-border-active: var(--border-width-active) solid currentColor;
+  --spirit-border-muted: var(--border-width-subtle) solid color-mix(in srgb, var(--color-spirit-line) 72%, transparent);
+  --spirit-border-on-dark: var(--border-width-subtle) solid var(--spirit-line-on-dark);
   --spirit-focus: var(--color-spirit-teal);
+  --focus-ring-width: 3px;
+  --focus-ring-offset: 3px;
+  --spirit-focus-outline: var(--focus-ring-width) solid var(--spirit-focus-ring);
   --spirit-disabled-opacity: 0.45;
   --spirit-active-scale: 0.98;
-  --spirit-duration: 180ms;
+  --motion-duration-fast: 120ms;
+  --motion-duration-standard: 180ms;
+  --motion-duration-slow: 250ms;
+  --motion-duration-progress: 350ms;
+  --motion-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --motion-ease-emphasized: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --spirit-duration: var(--motion-duration-standard);
   --spirit-space-1: 0.25rem;
   --spirit-space-2: 0.5rem;
   --spirit-space-3: 0.75rem;
@@ -150,4 +200,27 @@
   --spirit-light-muted: #c6d7cc;
   --spirit-leaf-silhouette: #386457;
   --spirit-glow: rgb(237 201 109 / 0.16);
+  --control-height-sm: 2rem;
+  --control-height-nav: 2.25rem;
+  --control-height-md: 2.625rem;
+  --control-height-lg: 3rem;
+  --icon-size-xs: 0.75rem;
+  --icon-size-sm: 1rem;
+  --icon-size-md: 1.25rem;
+  --icon-size-lg: 1.5rem;
+  --icon-size-xl: 2rem;
+  --icon-text-gap-sm: 0.5rem;
+  --icon-text-gap-md: 0.75rem;
+  --layer-behind: -1;
+  --layer-base: 0;
+  --layer-decoration: 1;
+  --layer-raised: 2;
+  --layer-highlight: 3;
+  --layer-content: 10;
+  --layer-header: 20;
+  --layer-dropdown: 30;
+  --layer-sticky: 40;
+  --layer-overlay: 50;
+  --layer-modal: 60;
+  --layer-toast: 70;
 }

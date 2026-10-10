@@ -12,7 +12,7 @@ export default function ReplyPage() {
       <div className="standard-site-header">
         <Navbar />
       </div>
-      <div className="relative z-10">
+      <div className="layer-content relative">
         <PageContainer>
           <AuthGuard>
             <ReplyTabsClient />

@@ -653,7 +653,7 @@ export default function AdaptiveClient({
           disabled={loading}
           className={styles.backButton}
         >
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <svg className="icon-md" width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M16 10H4M4 10L9 5M4 10L9 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
           返回
@@ -884,7 +884,7 @@ export default function AdaptiveClient({
                   onClick={() => { setSelectedExamIds([]); setSelectedConceptIds([]); setSelectedTagIds([]) }}
                   className={`${styles.clearButton} flex items-center gap-1 rounded-lg px-2.5 py-1 text-sm transition`}
                 >
-                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <svg className="icon-sm" width="16" height="16" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M11 3L3 11M3 3L11 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
                   </svg>
                   清空
@@ -1316,7 +1316,7 @@ export default function AdaptiveClient({
 
       {showLeaveModal && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+          className="layer-overlay fixed inset-0 flex items-center justify-center bg-black/40"
           onClick={() => setShowLeaveModal(false)}
         >
           <div
@@ -1353,7 +1353,7 @@ export default function AdaptiveClient({
 
       {showResultModal && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+          className="layer-overlay fixed inset-0 flex items-center justify-center bg-black/40"
           onClick={() => setShowResultModal(false)}
         >
           <div

@@ -11,7 +11,7 @@ export default function DifficultyStars({ value, tone = 'default' }: { value: nu
           return (
             <span key={i} className="relative inline-flex items-center justify-center w-5 h-5">
               {/* empty star background */}
-              <svg viewBox="0 0 20 20" className="w-5 h-5" fill="none">
+              <svg viewBox="0 0 20 20" className="icon-md" fill="none">
                 <path
                   d="M10 2.5l2.06 4.17 4.6.67-3.33 3.24.79 4.58L10 12.77l-4.12 2.19.79-4.58L3.34 7.34l4.6-.67L10 2.5z"
                   fill={emptyColor}
@@ -26,7 +26,7 @@ export default function DifficultyStars({ value, tone = 'default' }: { value: nu
                   className="absolute inset-0 overflow-hidden"
                   style={{ width: `${fraction * 100}%` }}
                 >
-                  <svg viewBox="0 0 20 20" className="w-5 h-5" fill="none">
+                  <svg viewBox="0 0 20 20" className="icon-md" fill="none">
                     <path
                       d="M10 2.5l2.06 4.17 4.6.67-3.33 3.24.79 4.58L10 12.77l-4.12 2.19.79-4.58L3.34 7.34l4.6-.67L10 2.5z"
                       fill={filledColor}

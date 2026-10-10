@@ -38,6 +38,48 @@
   }
 }
 
+@utility layer-content {
+  z-index: var(--layer-content);
+}
+
+@utility layer-dropdown {
+  z-index: var(--layer-dropdown);
+}
+
+@utility layer-overlay {
+  z-index: var(--layer-overlay);
+}
+
+@utility icon-sm {
+  width: var(--icon-size-sm);
+  height: var(--icon-size-sm);
+  flex: none;
+}
+
+@utility icon-xs {
+  width: var(--icon-size-xs);
+  height: var(--icon-size-xs);
+  flex: none;
+}
+
+@utility icon-md {
+  width: var(--icon-size-md);
+  height: var(--icon-size-md);
+  flex: none;
+}
+
+@utility icon-lg {
+  width: var(--icon-size-lg);
+  height: var(--icon-size-lg);
+  flex: none;
+}
+
+@utility icon-xl {
+  width: var(--icon-size-xl);
+  height: var(--icon-size-xl);
+  flex: none;
+}
+
 @theme {
   --font-sans: var(--font-inter), 'Taipei Sans TC Beta', sans-serif;
   /* Compatibility aliases for older screens. New shared components use the
@@ -69,7 +111,7 @@
   padding: 6px 10px;
   color: var(--color-spirit-ink-soft);
   font-size: 12px;
-  line-height: 1.4;
+  line-height: var(--leading-comfortable);
   box-shadow: var(--shadow-spirit-card);
 }
 
