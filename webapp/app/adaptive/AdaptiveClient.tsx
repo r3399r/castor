@@ -39,6 +39,12 @@ type FilterDimensionWithOptions = {
   sortOrder: number
   options: { id: number; name: string; parentId: number | null; subjectIds: number[] }[]
 }
+type QuestionProgressState = {
+  answered: boolean
+  graded: boolean
+  result: 'correct' | 'wrong' | null
+  label: '未作答' | '已作答' | '答對' | '答錯'
+}
 
 const typeLabel: Record<string, string> = {
   SINGLE: '單選題',
@@ -303,6 +309,7 @@ export default function AdaptiveClient({
   const [showResultModal, setShowResultModal] = useState(false)
   const [showLeaveModal, setShowLeaveModal] = useState(false)
   const [showBottomNav, setShowBottomNav] = useState(false)
+  const [questionNumberEdges, setQuestionNumberEdges] = useState({ left: false, right: false })
   const [loading, setLoading] = useState(false)
 
   const changeExamCategoryTab = (tab: ExamCategoryTab) => {
@@ -364,6 +371,34 @@ export default function AdaptiveClient({
   const currentQuestion = adaptiveQuestion[currentIndex]
   const currentOffset = responseOffsets[currentIndex] ?? 0
 
+  const questionProgress = useMemo<QuestionProgressState[]>(() =>
+    adaptiveQuestion.map((question, index) => {
+      const offset = responseOffsets[index] ?? 0
+      const answered = question.type === 'GROUP'
+        ? question.children.every((child) => repliedAnswer.has(child.id))
+        : repliedAnswer.has(question.id)
+      const results = question.type === 'GROUP'
+        ? question.children.map((_, childIndex) => replyResponse?.[offset + childIndex])
+        : [replyResponse?.[offset]]
+      const graded = !!replyResponse && results.every(Boolean)
+      const result = graded
+        ? results.some((response) => (response?.score ?? 0) <= 0) ? 'wrong' : 'correct'
+        : null
+
+      return {
+        answered,
+        graded,
+        result,
+        label: result === 'wrong' ? '答錯' : result === 'correct' ? '答對' : answered ? '已作答' : '未作答',
+      }
+    }),
+  [adaptiveQuestion, repliedAnswer, replyResponse, responseOffsets])
+
+  const completedQuestionCount = useMemo(
+    () => questionProgress.filter((question) => question.answered).length,
+    [questionProgress],
+  )
+
   const totalScore = useMemo(() => replyResponse?.reduce((sum, r) => sum + r.score, 0) ?? 0, [replyResponse])
   const correctCount = useMemo(() => replyResponse?.filter((r) => r.score > 0).length ?? 0, [replyResponse])
   const wrongCount = useMemo(() => replyResponse?.filter((r) => r.score <= 0).length ?? 0, [replyResponse])
@@ -402,6 +437,28 @@ export default function AdaptiveClient({
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     list.scrollTo({ left: Math.max(0, nextLeft), behavior: reduceMotion ? 'auto' : 'smooth' })
   }, [currentIndex])
+
+  useEffect(() => {
+    const list = questionNumberListRef.current
+    if (!list) return
+
+    const updateEdges = () => {
+      const maxScrollLeft = Math.max(0, list.scrollWidth - list.clientWidth)
+      setQuestionNumberEdges({
+        left: list.scrollLeft > 2,
+        right: list.scrollLeft < maxScrollLeft - 2,
+      })
+    }
+    const resizeObserver = new ResizeObserver(updateEdges)
+    list.addEventListener('scroll', updateEdges, { passive: true })
+    resizeObserver.observe(list)
+    updateEdges()
+
+    return () => {
+      list.removeEventListener('scroll', updateEdges)
+      resizeObserver.disconnect()
+    }
+  }, [adaptiveQuestion.length])
 
   useEffect(() => {
     apiFetch<Paginate<CategoryOption>>('category', { limit: ALL_ITEMS_LIMIT })
@@ -1070,7 +1127,7 @@ export default function AdaptiveClient({
       {adaptiveQuestion.length > 0 && currentQuestion && (
         <div className={styles.practiceQuestion}>
           {/* 導覽列：上一題／跳題／下一題 -- 可自由前後切換，不受作答狀態限制 */}
-          <div ref={questionNavRef} className={styles.questionNav}>
+          <div ref={questionNavRef} className={styles.questionNav} role="navigation" aria-label="題目導覽">
             <button
               onClick={() => goTo(currentIndex - 1)}
               disabled={currentIndex === 0 || loading}
@@ -1083,21 +1140,26 @@ export default function AdaptiveClient({
             </button>
 
             <div className={styles.navCenter}>
-              <div ref={questionNumberListRef} className={styles.questionNumbers}>
+              <div
+                className={styles.completionProgress}
+                role="progressbar"
+                aria-label="作答進度"
+                aria-valuemin={0}
+                aria-valuemax={adaptiveQuestion.length}
+                aria-valuenow={completedQuestionCount}
+              >
+                <span
+                  className={styles.completionProgressFill}
+                  style={{ width: `${adaptiveQuestion.length > 0 ? completedQuestionCount / adaptiveQuestion.length * 100 : 0}%` }}
+                />
+              </div>
+              <div
+                ref={questionNumberListRef}
+                className={`${styles.questionNumbers} ${questionNumberEdges.left ? styles.canScrollLeft : ''} ${questionNumberEdges.right ? styles.canScrollRight : ''}`}
+              >
               <div className={styles.questionNumberTrack}>
               {adaptiveQuestion.map((q, i) => {
-                const off = responseOffsets[i] ?? 0
-                const leafResults = q.type === 'GROUP'
-                  ? q.children.map((_, ci) => replyResponse?.[off + ci])
-                  : [replyResponse?.[off]]
-                const graded = !!replyResponse && leafResults.every((r) => !!r)
-                const anyWrong = graded && leafResults.some((r) => (r?.score ?? 0) <= 0)
-                const answered = q.type === 'GROUP'
-                  ? q.children.every((c) => repliedAnswer.has(c.id))
-                  : repliedAnswer.has(q.id)
-                const stateLabel = graded
-                  ? anyWrong ? '答錯' : '答對'
-                  : answered ? '已作答' : '未作答'
+                const progress = questionProgress[i]
                 return (
                   <button
                     key={q.id}
@@ -1105,25 +1167,25 @@ export default function AdaptiveClient({
                     onClick={() => goTo(i)}
                     disabled={loading}
                     aria-current={i === currentIndex ? 'step' : undefined}
-                    aria-label={`第 ${i + 1} 題，${stateLabel}${i === currentIndex ? '，目前題目' : ''}`}
+                    aria-label={`第 ${i + 1} 題，${progress.label}${i === currentIndex ? '，目前題目' : ''}`}
                     className={`${styles.questionNumber} ${
-                      graded
-                        ? anyWrong
+                      progress.graded
+                        ? progress.result === 'wrong'
                           ? styles.questionNumberWrong
                           : styles.questionNumberCorrect
-                        : answered
+                        : progress.answered
                           ? styles.questionNumberAnswered
                           : ''
                     } ${i === currentIndex ? styles.questionNumberCurrent : ''}`}
                   >
-                    {graded ? (
+                    {progress.graded ? (
                       <svg
                         className={styles.questionResultIcon}
                         viewBox="0 0 16 16"
                         fill="none"
                         aria-hidden="true"
                       >
-                        {anyWrong ? (
+                        {progress.result === 'wrong' ? (
                           <path
                             d="M4 4L12 12M12 4L4 12"
                             stroke="currentColor"
@@ -1171,7 +1233,7 @@ export default function AdaptiveClient({
                 <div className="flex items-center justify-between gap-3 sm:hidden">
                   <span className={`${styles.questionIndex} shrink-0 font-bold`}>
                     <span className="text-spirit-heading">Q{currentIndex + 1}</span>
-                    <span className="text-base"> / {numQuestionsTarget}</span>
+                    <span className="text-base"> / {adaptiveQuestion.length}</span>
                   </span>
                   <DifficultyStars value={currentQuestion.adjustedDifficulty} tone="forest" />
                 </div>
@@ -1269,7 +1331,7 @@ export default function AdaptiveClient({
                 ))}
             </div>
           </MathJax>
-          {showBottomNav && <div className={styles.questionBottomNav}>
+          {showBottomNav && <div className={styles.questionBottomNav} role="navigation" aria-label="浮動題目導覽">
             <button
               onClick={() => goTo(currentIndex - 1)}
               disabled={currentIndex === 0 || loading}
@@ -1280,6 +1342,9 @@ export default function AdaptiveClient({
               </svg>
               上一題
             </button>
+            <span className={styles.floatingProgress}>
+              第 {currentIndex + 1}／{adaptiveQuestion.length} 題
+            </span>
             <button
               onClick={handlePrimaryAction}
               disabled={loading || (!!replyResponse && isLastQuestion)}
