@@ -1,5 +1,5 @@
 import { zValidator } from '@hono/zod-validator';
-import { asc, count, desc, eq, inArray, sql } from 'drizzle-orm';
+import { asc, count, desc, eq, inArray } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import {
@@ -9,9 +9,9 @@ import {
   subjectCategoryTable,
   subjectTable,
   userConceptStatTable,
-  userStatHistoryTable,
   userTable,
 } from 'src/db/schema';
+import { buildDateSubjectMap, loadMasteryHistoryRows } from 'src/lib/masteryHistory';
 import { DEFAULT_LIMIT, genPagination, MAX_LIMIT } from 'src/lib/paginator';
 import { findActiveSubscription } from 'src/lib/subscription';
 import { verifyIdTokenFull } from 'src/lib/firebaseAdmin';
@@ -38,8 +38,6 @@ export const userListQuerySchema = z.object({
 export const userUpdateMeBodySchema = z.object({
   name: z.string().trim().min(1).max(255),
 });
-
-type DailyMastery = { date: string; weightedMastery: number };
 
 // A user's current streak, counted back from the most recent recorded
 // day -- zero unless that day is today or yesterday (missing a day
@@ -229,115 +227,40 @@ export const user = new Hono<UserEnv>()
   // 'YYYY-MM-DD' string Drizzle's `mode: 'string'` implies, so it's
   // selected through DATE_FORMAT here to get a reliable, timezone-proof
   // string instead of trusting the driver's own Date coercion.
+  // Totals, streak and the activity heatmap only.
+  //
+  // The mastery-over-time series this used to carry
+  // (overallDailyMastery / subjectHistory) is subscriber-only and now
+  // comes from GET /api/analysis/overview. Dropped from the payload
+  // rather than merely hidden in the UI: leaving it in the response
+  // would make the paywall decorative for anyone opening the network
+  // tab. Losing it also means this route no longer needs the subject
+  // and concept joins that only ever fed the weighting.
   .get('/history', requireUser, async (c) => {
     const user = c.get('user');
     console.log(`GET /api/user/history userId=${user.id}`);
     const db = c.get('db');
 
-    const dateExpr = sql<string>`date_format(${userStatHistoryTable.date}, '%Y-%m-%d')`;
-    const rows = await db
-      .select({
-        date: dateExpr,
-        subjectId: userStatHistoryTable.subjectId,
-        weightedMastery: userStatHistoryTable.weightedMastery,
-        dailyAttempts: userStatHistoryTable.dailyAttempts,
-        dailyCorrect: userStatHistoryTable.dailyCorrect,
-      })
-      .from(userStatHistoryTable)
-      .where(eq(userStatHistoryTable.userId, user.id));
+    const rows = await loadMasteryHistoryRows(db, user.id);
 
     if (rows.length === 0)
       return c.json({
         totalAttempts: 0,
         overallAccuracy: 0,
         streakDays: 0,
-        overallDailyMastery: [],
-        subjectHistory: [],
         activityMap: [],
       });
 
     let totalAttempts = 0;
     let totalCorrect = 0;
-    const dateSubjectMap = new Map<string, Map<number, { mastery: number | null; attempts: number }>>();
     for (const row of rows) {
       totalAttempts += row.dailyAttempts;
       totalCorrect += row.dailyCorrect;
-
-      if (!dateSubjectMap.has(row.date)) dateSubjectMap.set(row.date, new Map());
-      dateSubjectMap.get(row.date)!.set(row.subjectId, { mastery: row.weightedMastery, attempts: row.dailyAttempts });
     }
 
+    const dateSubjectMap = buildDateSubjectMap(rows);
     const sortedDatesDesc = [...dateSubjectMap.keys()].sort().reverse();
     const streakDays = computeStreak(sortedDatesDesc);
-
-    const subjectIds = [...new Set(rows.map((r) => r.subjectId))];
-    const [subjects, conceptGroups] = await Promise.all([
-      db.select({ id: subjectTable.id, name: subjectTable.name }).from(subjectTable).where(inArray(subjectTable.id, subjectIds)),
-      db
-        .select({ subjectId: conceptGroupTable.subjectId, id: conceptGroupTable.id })
-        .from(conceptGroupTable)
-        .where(inArray(conceptGroupTable.subjectId, subjectIds)),
-    ]);
-    const subjectNameById = new Map(subjects.map((s) => [s.id, s.name]));
-    const concepts =
-      conceptGroups.length > 0
-        ? await db
-            .select({ conceptGroupId: conceptTable.conceptGroupId, numberOfQuestions: conceptTable.numberOfQuestions })
-            .from(conceptTable)
-            .where(inArray(conceptTable.conceptGroupId, conceptGroups.map((g) => g.id)))
-        : [];
-    const groupSubjectById = new Map(conceptGroups.map((g) => [g.id, g.subjectId]));
-    const subjectQuestionCount = new Map<number, number>();
-    for (const concept of concepts) {
-      const subjectId = groupSubjectById.get(concept.conceptGroupId);
-      if (subjectId === undefined) continue;
-      subjectQuestionCount.set(subjectId, (subjectQuestionCount.get(subjectId) ?? 0) + concept.numberOfQuestions);
-    }
-
-    // Overall daily mastery: weighted average across subjects touched
-    // that day, weighted by each subject's total question count.
-    const sparseMastery = new Map<string, number>(
-      [...dateSubjectMap.entries()].map(([date, subjectEntries]) => {
-        let weightedSum = 0;
-        let totalQ = 0;
-        for (const [subjectId, { mastery }] of subjectEntries) {
-          if (mastery === null) continue;
-          const q = subjectQuestionCount.get(subjectId) ?? 0;
-          weightedSum += mastery * q;
-          totalQ += q;
-        }
-        return [date, totalQ > 0 ? weightedSum / totalQ : 0];
-      })
-    );
-
-    const fillDaily = (sparse: Map<string, number>, firstDate: string): DailyMastery[] => {
-      const today = new Date().toISOString().slice(0, 10);
-      const out: DailyMastery[] = [];
-      let last = 0;
-      const cursor = new Date(`${firstDate}T00:00:00Z`);
-      const end = new Date(`${today}T00:00:00Z`);
-      while (cursor <= end) {
-        const dateStr = cursor.toISOString().slice(0, 10);
-        if (sparse.has(dateStr)) last = sparse.get(dateStr)!;
-        out.push({ date: dateStr, weightedMastery: last });
-        cursor.setUTCDate(cursor.getUTCDate() + 1);
-      }
-      return out;
-    };
-
-    const overallDailyMastery = fillDaily(sparseMastery, [...sparseMastery.keys()].sort()[0]);
-
-    const subjectSparseMastery = new Map<number, Map<string, number>>();
-    for (const row of rows) {
-      if (row.weightedMastery === null) continue;
-      if (!subjectSparseMastery.has(row.subjectId)) subjectSparseMastery.set(row.subjectId, new Map());
-      subjectSparseMastery.get(row.subjectId)!.set(row.date, row.weightedMastery);
-    }
-    const subjectHistory = [...subjectSparseMastery.entries()].map(([subjectId, sparse]) => ({
-      subjectId,
-      subjectName: subjectNameById.get(subjectId) ?? '',
-      dailyStats: fillDaily(sparse, [...sparse.keys()].sort()[0]),
-    }));
 
     const activityMap = [...dateSubjectMap.entries()]
       .sort(([a], [b]) => a.localeCompare(b))
@@ -348,14 +271,7 @@ export const user = new Hono<UserEnv>()
 
     const overallAccuracy = totalAttempts > 0 ? (totalCorrect / totalAttempts / 10) * 100 : 0;
 
-    return c.json({
-      totalAttempts,
-      overallAccuracy,
-      streakDays,
-      overallDailyMastery,
-      subjectHistory,
-      activityMap,
-    });
+    return c.json({ totalAttempts, overallAccuracy, streakDays, activityMap });
   })
   // The signed-in user's own profile -- unlike GET /:id below, this needs
   // no admin check since it can only ever read the caller's own row.

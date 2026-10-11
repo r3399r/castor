@@ -134,7 +134,12 @@ const addStat = async (
   });
 };
 
-type Overview = { forgettingRisk: RiskItem[]; speed: SpeedItem[] };
+type ProgressPoint = { date: string; weightedMastery: number };
+type Overview = {
+  progress: { overall: ProgressPoint[]; subjects: { subjectName: string; dailyStats: ProgressPoint[] }[] };
+  forgettingRisk: RiskItem[];
+  speed: SpeedItem[];
+};
 
 type SpeedItem = {
   subject: string;
@@ -433,7 +438,7 @@ describe('analysis', () => {
       ]);
       vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
 
-      const res = await app.request('/api/analysis/overview?days=30');
+      const res = await app.request('/api/analysis/overview?speedDays=30');
       const body = ((await res.json()) as Overview).speed;
       expect(body[0].sampleCount).toBe(5);
     });
@@ -468,8 +473,111 @@ describe('analysis', () => {
       await grantSubscription(userId);
       vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
 
-      const res = await app.request('/api/analysis/overview?days=9999');
+      const res = await app.request('/api/analysis/overview?speedDays=9999');
       expect(res.status).toBe(400);
+    });
+  });
+
+  describe('GET /api/analysis/overview -- progress', () => {
+    const seedProgress = async () => {
+      const db = getDb();
+      const { userId, subjectId, groupId } = await seed();
+      await grantSubscription(userId);
+      await db
+        .insert(conceptTable)
+        .values({ name: 'c', conceptGroupId: groupId, numberOfQuestions: 10, createdAt: new Date() });
+      return { userId, subjectId };
+    };
+
+    it('returns an empty series for a user with no history', async () => {
+      const { userId } = await seed();
+      await grantSubscription(userId);
+      vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
+
+      const res = await app.request('/api/analysis/overview');
+      const body = (await res.json()) as Overview;
+      expect(body.progress).toEqual({ overall: [], subjects: [] });
+    });
+
+    it('returns the overall curve and the per-subject split', async () => {
+      const { userId, subjectId } = await seedProgress();
+      await getDb()
+        .insert(userStatHistoryTable)
+        .values([
+          { userId, subjectId, date: dateOnly(daysAgo(1)), weightedMastery: 4, dailyAttempts: 2, createdAt: new Date() },
+          { userId, subjectId, date: dateOnly(new Date()), weightedMastery: 6, dailyAttempts: 3, createdAt: new Date() },
+        ]);
+      vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
+
+      const res = await app.request('/api/analysis/overview');
+      const body = (await res.json()) as Overview;
+
+      expect(body.progress.overall.map((d) => d.weightedMastery)).toEqual([4, 6]);
+      expect(body.progress.subjects).toHaveLength(1);
+      expect(body.progress.subjects[0].subjectName).toBe('數學');
+      expect(body.progress.subjects[0].dailyStats.map((d) => d.weightedMastery)).toEqual([4, 6]);
+    });
+
+    // What makes a sparse history render as a continuous line instead of
+    // one that drops to zero on rest days.
+    it('carries the last known mastery forward across days with no activity', async () => {
+      const { userId, subjectId } = await seedProgress();
+      await getDb()
+        .insert(userStatHistoryTable)
+        .values([
+          { userId, subjectId, date: dateOnly(daysAgo(3)), weightedMastery: 4, dailyAttempts: 1, createdAt: new Date() },
+          { userId, subjectId, date: dateOnly(new Date()), weightedMastery: 8, dailyAttempts: 1, createdAt: new Date() },
+        ]);
+      vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
+
+      const res = await app.request('/api/analysis/overview');
+      const body = (await res.json()) as Overview;
+
+      expect(body.progress.overall.map((d) => d.date)).toEqual([
+        dateOnly(daysAgo(3)),
+        dateOnly(daysAgo(2)),
+        dateOnly(daysAgo(1)),
+        dateOnly(new Date()),
+      ]);
+      expect(body.progress.overall.map((d) => d.weightedMastery)).toEqual([4, 4, 4, 8]);
+    });
+
+    it('caps the series at progressDays, keeping the most recent days', async () => {
+      const { userId, subjectId } = await seedProgress();
+      await getDb()
+        .insert(userStatHistoryTable)
+        .values([
+          { userId, subjectId, date: dateOnly(daysAgo(10)), weightedMastery: 3, dailyAttempts: 1, createdAt: new Date() },
+          { userId, subjectId, date: dateOnly(new Date()), weightedMastery: 9, dailyAttempts: 1, createdAt: new Date() },
+        ]);
+      vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
+
+      const res = await app.request('/api/analysis/overview?progressDays=3');
+      const body = (await res.json()) as Overview;
+
+      expect(body.progress.overall).toHaveLength(3);
+      expect(body.progress.overall.at(-1)?.date).toBe(dateOnly(new Date()));
+      // The window opens on a carried-forward value, not on zero: the
+      // series is built in full and then sliced, so history older than
+      // the window still sets the starting level.
+      expect(body.progress.overall[0].weightedMastery).toBe(3);
+      expect(body.progress.overall.at(-1)?.weightedMastery).toBe(9);
+    });
+
+    it('is refused without a subscription', async () => {
+      const { userId, subjectId } = await seed();
+      await getDb().insert(userStatHistoryTable).values({
+        userId,
+        subjectId,
+        date: dateOnly(new Date()),
+        weightedMastery: 7,
+        dailyAttempts: 1,
+        createdAt: new Date(),
+      });
+      vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
+
+      const res = await app.request('/api/analysis/overview');
+      expect(res.status).toBe(403);
     });
   });
 });

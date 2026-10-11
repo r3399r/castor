@@ -423,8 +423,6 @@ describe('user routes', () => {
         totalAttempts: 0,
         overallAccuracy: 0,
         streakDays: 0,
-        overallDailyMastery: [],
-        subjectHistory: [],
         activityMap: [],
       });
     });
@@ -450,26 +448,25 @@ describe('user routes', () => {
         totalAttempts: number;
         overallAccuracy: number;
         streakDays: number;
-        overallDailyMastery: { date: string; weightedMastery: number }[];
-        subjectHistory: { subjectId: number; subjectName: string; dailyStats: { date: string; weightedMastery: number }[] }[];
         activityMap: { date: string; count: number }[];
       };
       expect(body.totalAttempts).toBe(5);
       // (10 + 20) / 5 / 10 * 100 = 60
       expect(body.overallAccuracy).toBeCloseTo(60, 10);
       expect(body.streakDays).toBe(2);
-      expect(body.overallDailyMastery.map((d) => d.date)).toEqual([yesterday, today]);
-      expect(body.overallDailyMastery.map((d) => d.weightedMastery)).toEqual([4, 6]);
       expect(body.activityMap).toEqual([
         { date: yesterday, count: 2 },
         { date: today, count: 3 },
       ]);
-      expect(body.subjectHistory).toHaveLength(1);
-      expect(body.subjectHistory[0]).toMatchObject({ subjectId, subjectName: 'fixture subject' });
-      expect(body.subjectHistory[0].dailyStats.map((d) => d.weightedMastery)).toEqual([4, 6]);
+      // The mastery series moved to the gated GET /analysis/overview --
+      // asserted there, and asserted absent here so the paywall cannot
+      // silently regress into leaking it again.
+      expect(body).not.toHaveProperty('overallDailyMastery');
+      expect(body).not.toHaveProperty('subjectHistory');
+      expect(subjectId).toBeGreaterThan(0);
     });
 
-    it('carries the last known mastery forward across gap days with no activity', async () => {
+    it('does not extend the streak across gap days with no activity', async () => {
       const userId = await seedUser();
       vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
       const db = getDb();
@@ -485,22 +482,11 @@ describe('user routes', () => {
       ]);
 
       const res = await app.request('/api/user/history');
-      const body = (await res.json()) as {
-        streakDays: number;
-        overallDailyMastery: { date: string; weightedMastery: number }[];
-      };
+      const body = (await res.json()) as { streakDays: number };
       // Not consecutive with today (a 2-day gap in between) -- streak
       // still counts today itself, just doesn't extend past it.
       expect(body.streakDays).toBe(1);
-      expect(body.overallDailyMastery).toHaveLength(4);
-      expect(body.overallDailyMastery.map((d) => d.date)).toEqual([
-        threeDaysAgo,
-        dateNDaysAgo(2),
-        dateNDaysAgo(1),
-        today,
-      ]);
-      // carried forward on the two gap days
-      expect(body.overallDailyMastery.map((d) => d.weightedMastery)).toEqual([4, 4, 4, 8]);
+      expect(threeDaysAgo < today).toBe(true);
     });
 
     it('reports a streak of 0 when the most recent activity is older than yesterday', async () => {

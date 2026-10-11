@@ -443,7 +443,13 @@ export type SpeedComparison = {
 // One request for the whole subscriber-only section of the analysis
 // page -- both halves share a gate and a lifecycle, so they are fetched
 // together.
+export type MasteryProgress = {
+  overall: DailyMastery[];
+  subjects: SubjectHistory[];
+};
+
 export type GetAnalysisOverviewResponse = {
+  progress: MasteryProgress;
   forgettingRisk: ForgettingRiskItem[];
   speed: SpeedComparison[];
 };
@@ -485,11 +491,12 @@ export type SubjectHistory = {
   dailyStats: DailyMastery[];
 };
 
+// The mastery-over-time series moved to GetAnalysisOverviewResponse when
+// progress charts became subscriber-only. DailyMastery and SubjectHistory
+// above are still the shapes those series take.
 export type GetUserHistoryResponse = {
   totalAttempts: number;
   overallAccuracy: number;
   streakDays: number;
-  overallDailyMastery: DailyMastery[];
-  subjectHistory: SubjectHistory[];
   activityMap: { date: string; count: number }[];
 };

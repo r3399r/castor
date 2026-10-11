@@ -10,6 +10,13 @@ import {
   userConceptStatTable,
   userStatHistoryTable,
 } from 'src/db/schema';
+import {
+  buildDateSubjectMap,
+  buildOverallDailyMastery,
+  buildSubjectHistory,
+  loadMasteryHistoryRows,
+  loadSubjectWeights,
+} from 'src/lib/masteryHistory';
 import { SubscriptionEnv } from 'src/middleware/requireSubscription';
 
 type Db = SubscriptionEnv['Variables']['db'];
@@ -63,8 +70,14 @@ const riskLevelOf = (retention: number): RiskLevel =>
 
 // ─── Speed comparison ────────────────────────────────────────────────────────
 
-const DEFAULT_WINDOW_DAYS = 90;
+/** Default span of reply history the speed comparison draws on. */
+const DEFAULT_SPEED_DAYS = 90;
+
+/** Shared upper bound for both day-range parameters. */
 const MAX_WINDOW_DAYS = 365;
+
+/** Matches the widest range tab the analysis page offers. */
+const DEFAULT_PROGRESS_DAYS = 90;
 
 /**
  * Below this many timed answers in a subject, the user's own median is
@@ -158,7 +171,7 @@ const loadForgettingRisk = async (db: Db, userId: number, limit: number) => {
  * The user's median seconds per question against the platform's, per
  * subject.
  */
-const loadSpeedComparison = async (db: Db, userId: number, days: number) => {
+const loadSpeedComparison = async (db: Db, userId: number, speedDays: number) => {
   // user_stat_history's UNIQUE(user_id, subject_id, date) makes user_id a
   // usable index prefix. Naming the subjects explicitly below is what
   // keeps the reply query on idx_subject_user_created_at, which leads
@@ -170,7 +183,7 @@ const loadSpeedComparison = async (db: Db, userId: number, days: number) => {
   const subjectIds = subjectRows.map((r) => r.subjectId);
   if (subjectIds.length === 0) return [];
 
-  const since = new Date(Date.now() - days * DAY_MS);
+  const since = new Date(Date.now() - speedDays * DAY_MS);
   const [replies, subjects] = await Promise.all([
     db
       .select({
@@ -241,17 +254,70 @@ const loadSpeedComparison = async (db: Db, userId: number, days: number) => {
     .sort((a, b) => a.subject.localeCompare(b.subject));
 };
 
+/**
+ * Trims a filled series to its last `days` points.
+ *
+ * A slice of the *completed* series, deliberately not a windowed query:
+ * filling from a cutoff date would start the carry-forward at zero and
+ * invent a climb out of nothing for anyone whose practice predates the
+ * window. Building the whole series first means the first day in view
+ * already carries the value it inherited.
+ */
+const takeRecentDays = <T,>(points: T[], days: number): T[] =>
+  points.slice(Math.max(0, points.length - days));
+
+/**
+ * Mastery over time, overall and split by subject.
+ *
+ * Bounded by `progressDays` rather than returning all history: the
+ * client's range tabs filter in place (so a tab switch is not a round
+ * trip), but it can only ever draw as far back as its widest tab, and a
+ * long-standing user's full series is otherwise unbounded. The caller
+ * asks for the range it can display, so widening a tab is a visible
+ * change here rather than silent truncation. Distinct from speedDays,
+ * which bounds a different thing entirely.
+ */
+const loadProgress = async (db: Db, userId: number, progressDays: number) => {
+  const rows = await loadMasteryHistoryRows(db, userId);
+  if (rows.length === 0) return { overall: [], subjects: [] };
+
+  const subjectIds = [...new Set(rows.map((r) => r.subjectId))];
+  const { nameById, questionCountById } = await loadSubjectWeights(db, subjectIds);
+
+  return {
+    overall: takeRecentDays(
+      buildOverallDailyMastery(buildDateSubjectMap(rows), questionCountById),
+      progressDays
+    ),
+    subjects: buildSubjectHistory(rows, nameById).map((subject) => ({
+      ...subject,
+      dailyStats: takeRecentDays(subject.dailyStats, progressDays),
+    })),
+  };
+};
+
 // ─── Route ───────────────────────────────────────────────────────────────────
 
 export const overviewQuerySchema = z.object({
-  days: z.coerce
+  // Named for what it bounds. The two spans answer different
+  // questions -- how far back to measure answer times, versus how much
+  // of the mastery curve to draw -- and a bare `days` beside
+  // progressDays read as though it governed both.
+  speedDays: z.coerce
     .number()
     .int()
     .positive()
     .max(MAX_WINDOW_DAYS)
     .optional()
-    .default(DEFAULT_WINDOW_DAYS),
+    .default(DEFAULT_SPEED_DAYS),
   riskLimit: z.coerce.number().int().positive().max(100).optional().default(20),
+  progressDays: z.coerce
+    .number()
+    .int()
+    .positive()
+    .max(MAX_WINDOW_DAYS)
+    .optional()
+    .default(DEFAULT_PROGRESS_DAYS),
 });
 
 export const analysis = new Hono<SubscriptionEnv>()
@@ -275,16 +341,17 @@ export const analysis = new Hono<SubscriptionEnv>()
    */
   .get('/overview', zValidator('query', overviewQuerySchema), async (c) => {
     const user = c.get('user');
-    const { days, riskLimit } = c.req.valid('query');
+    const { speedDays, riskLimit, progressDays } = c.req.valid('query');
     console.log(
-      `GET /api/analysis/overview userId=${user.id} days=${days} riskLimit=${riskLimit}`
+      `GET /api/analysis/overview userId=${user.id} speedDays=${speedDays} riskLimit=${riskLimit} progressDays=${progressDays}`
     );
     const db = c.get('db');
 
-    const [forgettingRisk, speed] = await Promise.all([
+    const [progress, forgettingRisk, speed] = await Promise.all([
+      loadProgress(db, user.id, progressDays),
       loadForgettingRisk(db, user.id, riskLimit),
-      loadSpeedComparison(db, user.id, days),
+      loadSpeedComparison(db, user.id, speedDays),
     ]);
 
-    return c.json({ forgettingRisk, speed });
+    return c.json({ progress, forgettingRisk, speed });
   });

@@ -22,6 +22,7 @@ import type {
   DailyMastery,
   ForgettingRiskItem,
   GetAnalysisOverviewResponse,
+  MasteryProgress,
   SpeedComparison,
   GetUserHistoryResponse,
   GetUserStatsResponse,
@@ -82,11 +83,18 @@ function StatCard({
 
 // ─── Progress Chart ───────────────────────────────────────────────────────────
 
+// The widest entry here is what the overview request asks the server
+// for, so the two must be widened together -- see PROGRESS_DAYS below.
 const DATE_RANGES = [
   { label: '30天', days: 30 },
   { label: '90天', days: 90 },
-  { label: '全部', days: 0 },
 ]
+
+const PROGRESS_DAYS = Math.max(...DATE_RANGES.map((r) => r.days))
+
+// How far back the speed comparison samples. Unrelated to the curve's
+// range tabs -- it is not something the user switches.
+const SPEED_DAYS = 90
 
 const SERIES_COLORS = ['#397365', '#A66D58', '#718666', '#B38A4A', '#6C7F88', '#8D6B78', '#567E78']
 
@@ -339,64 +347,12 @@ const VIEW_MODES = [
 ]
 
 function HistorySection({ history }: { history: GetUserHistoryResponse }) {
-  const [rangeDays, setRangeDays] = useState(90)
-  const [viewMode, setViewMode] = useState<'overall' | 'subjects'>('overall')
-
-  const series = useMemo<ChartSeries[]>(() => {
-    const filter = (data: DailyMastery[]) => {
-      if (rangeDays === 0) return data
-      const cutoff = cutoffDate(rangeDays)
-      return data.filter((d) => d.date >= cutoff)
-    }
-    const overall: ChartSeries = { name: '整體', color: SERIES_COLORS[0], data: filter(history.overallDailyMastery) }
-    const subjects: ChartSeries[] = history.subjectHistory.map((s, i) => ({
-      name: s.subjectName,
-      color: SERIES_COLORS[(i + 1) % SERIES_COLORS.length],
-      data: filter(s.dailyStats),
-    }))
-    return viewMode === 'overall' ? [overall] : subjects
-  }, [history, rangeDays, viewMode])
-
-  function TabGroup<T extends string | number>({
-    options,
-    value,
-    onChange,
-  }: {
-    options: { label: string; value: T }[]
-    value: T
-    onChange: (v: T) => void
-  }) {
-    return (
-      <div className={styles.tabGroup}>
-        {options.map((o) => (
-          <button
-            key={o.value}
-            onClick={() => onChange(o.value)}
-            className={`${styles.tabButton} ${value === o.value ? styles.tabActive : ''}`}
-          >
-            {o.label}
-          </button>
-        ))}
-      </div>
-    )
-  }
-
+  // The progress curve that used to lead this section is subscriber-only
+  // and now renders inside ProAnalysisSections, from
+  // GET /analysis/overview. GET /user/history no longer returns the
+  // series it was drawn from, so there is nothing here to hide.
   return (
     <div className={styles.history}>
-      {/* Progress curve */}
-      <div className={styles.card}>
-        <div className={styles.chartHeader}>
-          <h2 className={styles.cardTitle}>進步曲線</h2>
-          <div className={styles.controls}>
-            <TabGroup options={VIEW_MODES} value={viewMode} onChange={setViewMode} />
-            <TabGroup<number> options={DATE_RANGES.map(r => ({ label: r.label, value: r.days }))} value={rangeDays} onChange={setRangeDays} />
-          </div>
-        </div>
-        <ProgressChart series={series} toggleable={viewMode === 'subjects'} />
-        <p className={`mt-1 text-right text-spirit-micro ${styles.chartNote}`}>熟練度 0–10</p>
-      </div>
-
-      {/* Learning heatmap */}
       <div className={styles.card}>
         <h2 className={`mb-4 ${styles.cardTitle}`}>學習熱點圖</h2>
         <LearningHeatmap activityMap={history.activityMap} />
@@ -430,6 +386,88 @@ function LockedProCard({ title, blurb }: { title: string; blurb: string }) {
       >
         查看訂閱方案
       </button>
+    </div>
+  )
+}
+
+// Module scope, not nested inside a component: a component defined
+// during render is a new type on every render, so React would unmount
+// and remount the tabs (losing focus) each time the parent re-rendered.
+function TabGroup<T extends string | number>({
+  options,
+  value,
+  onChange,
+}: {
+  options: { label: string; value: T }[]
+  value: T
+  onChange: (v: T) => void
+}) {
+  return (
+    <div className={styles.tabGroup}>
+      {options.map((o) => (
+        <button
+          key={o.value}
+          onClick={() => onChange(o.value)}
+          className={`${styles.tabButton} ${value === o.value ? styles.tabActive : ''}`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function ProgressCard({
+  progress,
+  failed,
+}: {
+  progress: MasteryProgress | null
+  failed: boolean
+}) {
+  const [rangeDays, setRangeDays] = useState(90)
+  const [viewMode, setViewMode] = useState<'overall' | 'subjects'>('overall')
+
+  const series = useMemo<ChartSeries[]>(() => {
+    if (progress === null) return []
+    const filter = (data: DailyMastery[]) => {
+      const cutoff = cutoffDate(rangeDays)
+      return data.filter((d) => d.date >= cutoff)
+    }
+    const overall: ChartSeries = {
+      name: '整體',
+      color: SERIES_COLORS[0],
+      data: filter(progress.overall),
+    }
+    const subjects: ChartSeries[] = progress.subjects.map((s, i) => ({
+      name: s.subjectName,
+      color: SERIES_COLORS[(i + 1) % SERIES_COLORS.length],
+      data: filter(s.dailyStats),
+    }))
+    return viewMode === 'overall' ? [overall] : subjects
+  }, [progress, rangeDays, viewMode])
+
+  return (
+    <div className={styles.card}>
+      <div className={styles.chartHeader}>
+        <h2 className={styles.cardTitle}>進步曲線</h2>
+        <div className={styles.controls}>
+          <TabGroup options={VIEW_MODES} value={viewMode} onChange={setViewMode} />
+          <TabGroup<number>
+            options={DATE_RANGES.map((r) => ({ label: r.label, value: r.days }))}
+            value={rangeDays}
+            onChange={setRangeDays}
+          />
+        </div>
+      </div>
+
+      {failed && <p className="text-sm text-red-600">無法載入進步曲線，請稍後再試。</p>}
+      {!failed && progress === null && <p className={`text-sm ${styles.muted}`}>載入中…</p>}
+      {!failed && progress !== null && (
+        <>
+          <ProgressChart series={series} toggleable={viewMode === 'subjects'} />
+          <p className={`mt-1 text-right text-[10px] ${styles.chartNote}`}>熟練度 0–10</p>
+        </>
+      )}
     </div>
   )
 }
@@ -634,7 +672,11 @@ function ProAnalysisSections() {
 
   useEffect(() => {
     if (!subscribed) return
-    apiFetch<GetAnalysisOverviewResponse>('analysis/overview', { days: 90, riskLimit: 10 })
+    apiFetch<GetAnalysisOverviewResponse>('analysis/overview', {
+        speedDays: SPEED_DAYS,
+        riskLimit: 10,
+        progressDays: PROGRESS_DAYS,
+      })
       .then(setData)
       .catch(() => setFailed(true))
   }, [subscribed])
@@ -648,6 +690,10 @@ function ProAnalysisSections() {
     return (
       <>
         <LockedProCard
+          title="進步曲線"
+          blurb="訂閱後可看見整體與各科熟練度隨時間的變化，掌握自己是否真的在進步。"
+        />
+        <LockedProCard
           title="遺忘風險提示"
           blurb="訂閱後可看見哪些觀念正在被遺忘，並依急迫度排出優先複習順序。"
         />
@@ -660,6 +706,7 @@ function ProAnalysisSections() {
 
   return (
     <>
+      <ProgressCard progress={data?.progress ?? null} failed={failed} />
       <ForgettingRiskCard items={data?.forgettingRisk ?? null} failed={failed} />
       <SpeedCard items={data?.speed ?? null} failed={failed} />
     </>
