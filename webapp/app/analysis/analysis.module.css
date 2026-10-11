@@ -112,6 +112,16 @@
   margin-bottom: 32px;
 }
 
+/* The subscriber-only cards. Spaced like .history because they are the
+   same thing structurally -- sibling cards stacked in one column -- and
+   .content itself provides no gap, so without this they sit flush. */
+.proSections {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  margin-bottom: 32px;
+}
+
 .summaryGrid {
   position: relative;
   z-index: var(--layer-highlight);

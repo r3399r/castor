@@ -428,6 +428,22 @@ export type ForgettingRiskItem = {
 
 export type GetForgettingRiskResponse = ForgettingRiskItem[];
 
+// Subscriber-only. platformMedianMs is null until a subject has enough
+// samples platform-wide; deltaMs is null whenever the comparison would be
+// unsound -- either because of that, or because the user has too few timed
+// answers in the subject. Treat null as "no comparison yet", never as 0.
+export type SpeedComparison = {
+  subjectId: number;
+  subject: string;
+  userMedianMs: number;
+  platformMedianMs: number | null;
+  deltaMs: number | null;
+  accuracy: number;
+  sampleCount: number;
+};
+
+export type GetSpeedResponse = SpeedComparison[];
+
 export type GetUserMeResponse = User;
 
 export type PutUserMeRequest = { name: string };
