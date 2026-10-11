@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react'
 import { Coins } from 'lucide-react'
 import { apiFetch, LIMIT } from '@/lib/api'
-import { LoadingState } from '@/components/ui'
+import Pagination from '@/components/Pagination'
+import { ButtonLink, EmptyState, ErrorState, LoadingState, PageHeader } from '@/components/ui'
 import type { GetWalletResponse, PointTransaction } from '@/types/api'
 import styles from '../user.module.css'
 
@@ -75,12 +76,12 @@ export default function WalletClient() {
 
   if (error) {
     return (
-      <div className={`${styles.content} ${styles.errorState}`}>
-        <p className={styles.errorText}>{error}</p>
-        <a href="/" className={`${styles.loginLink} mt-4 inline-block`}>
+      <ErrorState className={styles.content}>
+        <p>{error}</p>
+        <a href="/" className={styles.loginLink}>
           回首頁登入
         </a>
-      </div>
+      </ErrorState>
     )
   }
 
@@ -88,19 +89,15 @@ export default function WalletClient() {
 
   return (
     <div className={`${styles.content} pb-page-bottom`}>
-      <h1 className={styles.title}>積分紀錄</h1>
-      <p className={styles.subtitle}>查看每一筆積分的獲得明細。</p>
+      <PageHeader title="積分紀錄" subtitle="查看每一筆積分的獲得明細。" />
 
       {isEmpty ? (
-        <div className={styles.emptyState}>
-          <p className={styles.emptyText}>尚無積分紀錄</p>
-          <a
-            href="/adaptive"
-            className={`${styles.primaryButton} mt-4 inline-flex`}
-          >
+        <EmptyState>
+          <p>尚無積分紀錄</p>
+          <ButtonLink href="/adaptive">
             開始智慧練習
-          </a>
-        </div>
+          </ButtonLink>
+        </EmptyState>
       ) : (
         <>
           <div className={styles.transactionList}>
@@ -109,27 +106,13 @@ export default function WalletClient() {
             ))}
           </div>
 
-          {wallet.paginate.totalPages > 1 && (
-            <div className={styles.pagination}>
-              <button
-                onClick={() => fetchPage(page - 1)}
-                disabled={page === 1 || loading}
-                className={styles.paginationButton}
-              >
-                ← 上一頁
-              </button>
-              <span className={styles.paginationText}>
-                第 {page} / {wallet.paginate.totalPages} 頁
-              </span>
-              <button
-                onClick={() => fetchPage(page + 1)}
-                disabled={page === wallet.paginate.totalPages || loading}
-                className={styles.paginationButton}
-              >
-                下一頁 →
-              </button>
-            </div>
-          )}
+          <Pagination
+            page={page}
+            totalPages={wallet.paginate.totalPages}
+            onChange={fetchPage}
+            disabled={loading}
+            className="mt-6"
+          />
         </>
       )}
     </div>

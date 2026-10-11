@@ -1,5 +1,6 @@
 'use client'
 
+import Link, { type LinkProps } from 'next/link'
 import {
   useEffect,
   useId,
@@ -39,6 +40,28 @@ export function Button({
   )
 }
 
+export function ButtonLink({
+  variant = 'primary',
+  size = 'md',
+  className = '',
+  children,
+  ...props
+}: LinkProps & {
+  variant?: 'primary' | 'secondary' | 'ghost' | 'quiet'
+  size?: 'sm' | 'md' | 'lg'
+  className?: string
+  children: ReactNode
+}) {
+  return (
+    <Link
+      className={`sp-button sp-button--${variant} sp-button--${size} ${className}`}
+      {...props}
+    >
+      {children}
+    </Link>
+  )
+}
+
 export function PageHeader({
   title,
   subtitle,
@@ -65,12 +88,12 @@ export function LoadingState({ label = '載入中…' }: { label?: string }) {
   return <div className="ui-state ui-state--loading" role="status">{label}</div>
 }
 
-export function ErrorState({ children }: { children: ReactNode }) {
-  return <div className="ui-state ui-state--error" role="alert">{children}</div>
+export function ErrorState({ className = '', ...props }: HTMLAttributes<HTMLDivElement>) {
+  return <div className={`ui-state ui-state--error ${className}`} role="alert" {...props} />
 }
 
-export function EmptyState({ children }: { children: ReactNode }) {
-  return <div className="ui-state ui-state--empty">{children}</div>
+export function EmptyState({ className = '', ...props }: HTMLAttributes<HTMLDivElement>) {
+  return <div className={`ui-state ui-state--empty ${className}`} {...props} />
 }
 
 export function Field({

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { PageHeader } from '@/components/ui'
 import FilterPanel from './FilterPanel'
 import ReplyClient from './ReplyClient'
 import WrongClient from './WrongClient'
@@ -27,7 +28,7 @@ export default function ReplyTabsClient() {
 
   return (
     <div>
-      <h1 className={styles.title}>作答記錄</h1>
+      <PageHeader title="作答記錄" />
 
       <div className={styles.tabList} role="tablist" aria-label="作答記錄分類">
         {TABS.map((tab) => (

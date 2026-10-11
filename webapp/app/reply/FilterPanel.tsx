@@ -1,6 +1,7 @@
 'use client'
 
 import type { SharedFilters } from './useSharedFilters'
+import { Button } from '@/components/ui'
 import styles from './reply.module.css'
 
 // Rendered once by ReplyTabsClient and shared by both the 錯題本 and 歷史紀錄
@@ -33,16 +34,17 @@ export default function FilterPanel({ filters, disabled }: { filters: SharedFilt
       <div className={styles.filterHeader}>
         <span className={styles.filterTitle}>篩選條件</span>
         {hasActiveFilters && (
-          <button
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={clearFilters}
             disabled={disabled}
-            className={styles.quietButton}
           >
             <svg className="icon-sm" width="16" height="16" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M11 3L3 11M3 3L11 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
             </svg>
             清空篩選
-          </button>
+          </Button>
         )}
       </div>
 

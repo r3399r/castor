@@ -6,7 +6,9 @@ import { BookOpenText } from 'lucide-react'
 import { apiFetch, LIMIT } from '@/lib/api'
 import Chip, { tagColors } from '@/components/Chip'
 import DifficultyStars from '@/components/DifficultyStars'
-import { LoadingState } from '@/components/ui'
+import DiscussionLink from '@/components/DiscussionLink'
+import Pagination from '@/components/Pagination'
+import { ButtonLink, EmptyState, ErrorState, LoadingState } from '@/components/ui'
 import type { GetReplyResponse, ReplyGroup } from '@/types/api'
 import type { QueryFilters } from './useSharedFilters'
 import styles from './reply.module.css'
@@ -147,19 +149,7 @@ function ReplyRow({ item }: { item: ReplyGroup }) {
                     </div>
 
                     {!isGroup && (
-                      <a
-                        href={fbUrl ?? undefined}
-                        target={fbUrl ? '_blank' : undefined}
-                        rel={fbUrl ? 'noopener noreferrer' : undefined}
-                        aria-disabled={!fbUrl}
-                        onClick={(e) => { if (!fbUrl) e.preventDefault() }}
-                        className={`${styles.discussionButton} ${fbUrl ? '' : 'cursor-not-allowed opacity-40'}`}
-                      >
-                        討論區
-                        <svg className="icon-sm" width="16" height="16" viewBox="0 0 14 14" fill="none">
-                          <path d="M5.5 2.5H2.5C1.95 2.5 1.5 2.95 1.5 3.5V11.5C1.5 12.05 1.95 12.5 2.5 12.5H10.5C11.05 12.5 11.5 12.05 11.5 11.5V8.5M8.5 1.5H12.5M12.5 1.5V5.5M12.5 1.5L6 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      </a>
+                      <DiscussionLink href={fbUrl} />
                     )}
                   </div>
                 </div>
@@ -170,19 +160,7 @@ function ReplyRow({ item }: { item: ReplyGroup }) {
 
         {/* 討論區 link for group (shown once at bottom), disabled rather than hidden when there's no fbUrl */}
         {isGroup && (
-          <a
-            href={fbUrl ?? undefined}
-            target={fbUrl ? '_blank' : undefined}
-            rel={fbUrl ? 'noopener noreferrer' : undefined}
-            aria-disabled={!fbUrl}
-            onClick={(e) => { if (!fbUrl) e.preventDefault() }}
-            className={`${styles.discussionButton} self-end ${fbUrl ? '' : 'cursor-not-allowed opacity-40'}`}
-          >
-            討論區
-            <svg className="icon-sm" width="16" height="16" viewBox="0 0 14 14" fill="none">
-              <path d="M5.5 2.5H2.5C1.95 2.5 1.5 2.95 1.5 3.5V11.5C1.5 12.05 1.95 12.5 2.5 12.5H10.5C11.05 12.5 11.5 12.05 11.5 11.5V8.5M8.5 1.5H12.5M12.5 1.5V5.5M12.5 1.5L6 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </a>
+          <DiscussionLink href={fbUrl} className="self-end" />
         )}
       </div>
     </article>
@@ -248,15 +226,15 @@ export default function ReplyClient({
 
   if (error) {
     return (
-      <div className={styles.errorState}>
-        <p className={styles.errorText}>{error}</p>
+      <ErrorState>
+        <p>{error}</p>
         <a
           href="/"
-          className={`${styles.loginLink} mt-4 inline-block`}
+          className={styles.loginLink}
         >
           回首頁登入
         </a>
-      </div>
+      </ErrorState>
     )
   }
 
@@ -267,19 +245,16 @@ export default function ReplyClient({
       <p className={styles.description}>回顧每次練習的題目、作答與得分。</p>
 
       {isEmpty ? (
-        <div className={styles.emptyState}>
-          <p className={styles.emptyText}>
+        <EmptyState>
+          <p>
             {filters.hasActiveFilters ? '沒有符合篩選條件的答題紀錄' : '尚無答題紀錄'}
           </p>
           {!filters.hasActiveFilters && (
-            <a
-              href="/adaptive"
-              className={`${styles.primaryButton} mt-4 inline-block`}
-            >
+            <ButtonLink href="/adaptive">
               開始智慧練習
-            </a>
+            </ButtonLink>
           )}
-        </div>
+        </EmptyState>
       ) : (
         <>
           <MathJax dynamic>
@@ -290,27 +265,13 @@ export default function ReplyClient({
             </div>
           </MathJax>
 
-          {replyList.paginate.totalPages > 1 && (
-            <div className={styles.pagination}>
-              <button
-                onClick={() => fetchPage(page - 1)}
-                disabled={page === 1 || loading}
-                className={styles.paginationButton}
-              >
-                ← 上一頁
-              </button>
-              <span className={styles.paginationText}>
-                第 {page} / {replyList.paginate.totalPages} 頁
-              </span>
-              <button
-                onClick={() => fetchPage(page + 1)}
-                disabled={page === replyList.paginate.totalPages || loading}
-                className={styles.paginationButton}
-              >
-                下一頁 →
-              </button>
-            </div>
-          )}
+          <Pagination
+            page={page}
+            totalPages={replyList.paginate.totalPages}
+            onChange={fetchPage}
+            disabled={loading}
+            className="mt-6"
+          />
         </>
       )}
     </div>

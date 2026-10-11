@@ -1,11 +1,10 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
 import { Coins } from 'lucide-react'
 import { apiFetch, apiPut } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
-import { LoadingState } from '@/components/ui'
+import { Button, ButtonLink, ErrorState, LoadingState, PageHeader } from '@/components/ui'
 import type { GetUserMeResponse, PutUserMeRequest, PutUserMeResponse } from '@/types/api'
 import styles from './user.module.css'
 
@@ -55,12 +54,12 @@ export default function UserClient() {
 
   if (error || !me) {
     return (
-      <div className={styles.errorState}>
-        <p className={styles.errorText}>{error ?? '無法載入使用者資料，請確認已登入。'}</p>
-        <a href="/" className={`${styles.loginLink} mt-4 inline-block`}>
+      <ErrorState>
+        <p>{error ?? '無法載入使用者資料，請確認已登入。'}</p>
+        <a href="/" className={styles.loginLink}>
           回首頁登入
         </a>
-      </div>
+      </ErrorState>
     )
   }
 
@@ -68,7 +67,7 @@ export default function UserClient() {
 
   return (
     <div className={styles.content}>
-      <h1 className={styles.title}>個人資料</h1>
+      <PageHeader title="個人資料" />
 
       <div className={`${styles.card} ${styles.profileCard}`}>
         <div className="flex items-center gap-4">
@@ -94,34 +93,34 @@ export default function UserClient() {
                   autoFocus
                   className={styles.textInput}
                 />
-                <button
+                <Button
                   onClick={handleSave}
                   disabled={saving || !nameDraft.trim()}
-                  className={styles.primaryButton}
+                  loading={saving}
                 >
                   {saving ? '儲存中…' : '儲存'}
-                </button>
-                <button onClick={handleCancel} disabled={saving} className={styles.cancelButton}>
+                </Button>
+                <Button variant="quiet" onClick={handleCancel} disabled={saving}>
                   取消
-                </button>
+                </Button>
               </div>
             ) : (
               <div className="flex items-center gap-2">
                 <h2 className={styles.name}>{me.name || '未設定名稱'}</h2>
-                <button onClick={() => setEditing(true)} className={styles.textButton}>
+                <Button variant="ghost" size="sm" onClick={() => setEditing(true)}>
                   編輯
-                </button>
+                </Button>
               </div>
             )}
             <span className={`${styles.muted} text-sm`}>{me.email}</span>
           </div>
         </div>
-        <button
+        <Button
+          variant="secondary"
           onClick={logout}
-          className={styles.secondaryButton}
         >
           登出
-        </button>
+        </Button>
       </div>
 
       <div className={`${styles.card} ${styles.pointsCard}`}>
@@ -132,9 +131,9 @@ export default function UserClient() {
             <p className={styles.pointsValue}>{me.lifetimePoints}</p>
           </div>
         </div>
-        <Link href="/user/wallet" className={styles.secondaryButton}>
+        <ButtonLink href="/user/wallet" variant="secondary">
           查看紀錄
-        </Link>
+        </ButtonLink>
       </div>
     </div>
   )

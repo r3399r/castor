@@ -6,7 +6,8 @@ import { BookOpenText } from 'lucide-react'
 import { apiDelete, apiFetch, apiPut, LIMIT } from '@/lib/api'
 import Chip, { tagColors } from '@/components/Chip'
 import DifficultyStars from '@/components/DifficultyStars'
-import { LoadingState } from '@/components/ui'
+import Pagination from '@/components/Pagination'
+import { Button, EmptyState, ErrorState, LoadingState } from '@/components/ui'
 import type { GetWrongQuestionResponse, PutWrongQuestionNoteResponse, WrongQuestion } from '@/types/api'
 import type { QueryFilters } from './useSharedFilters'
 import styles from './reply.module.css'
@@ -163,20 +164,21 @@ function WrongCard({
         </div>
 
         <div className="flex items-center justify-between">
-          <button
+          <Button
             onClick={handleSave}
             disabled={saving || !noteChanged}
-            className={styles.primaryButton}
+            loading={saving}
           >
             {saving ? '儲存中…' : '儲存註記'}
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="danger"
             onClick={handleDelete}
             disabled={deleting}
-            className={styles.dangerButton}
+            loading={deleting}
           >
             {deleting ? '移除中…' : '從錯題本移除'}
-          </button>
+          </Button>
         </div>
       </div>
     </article>
@@ -255,12 +257,12 @@ export default function WrongClient({
 
   if (error) {
     return (
-      <div className={styles.errorState}>
-        <p className={styles.errorText}>{error}</p>
-        <a href="/" className={`${styles.loginLink} mt-4 inline-block`}>
+      <ErrorState>
+        <p>{error}</p>
+        <a href="/" className={styles.loginLink}>
           回首頁登入
         </a>
-      </div>
+      </ErrorState>
     )
   }
 
@@ -271,11 +273,11 @@ export default function WrongClient({
       <p className={styles.description}>作答時未拿到滿分的題目會自動收錄在這裡，答對後也不會自動移除，你可以自己加註記或移除。</p>
 
       {isEmpty ? (
-        <div className={styles.emptyState}>
-          <p className={styles.emptyText}>
+        <EmptyState>
+          <p>
             {filters.hasActiveFilters ? '沒有符合篩選條件的錯題' : '目前沒有錯題，繼續保持！'}
           </p>
-        </div>
+        </EmptyState>
       ) : (
         <>
           <MathJax dynamic>
@@ -286,27 +288,13 @@ export default function WrongClient({
             </div>
           </MathJax>
 
-          {list.paginate.totalPages > 1 && (
-            <div className={styles.pagination}>
-              <button
-                onClick={() => fetchPage(page - 1)}
-                disabled={page === 1 || loading}
-                className={styles.paginationButton}
-              >
-                ← 上一頁
-              </button>
-              <span className={styles.paginationText}>
-                第 {page} / {list.paginate.totalPages} 頁
-              </span>
-              <button
-                onClick={() => fetchPage(page + 1)}
-                disabled={page === list.paginate.totalPages || loading}
-                className={styles.paginationButton}
-              >
-                下一頁 →
-              </button>
-            </div>
-          )}
+          <Pagination
+            page={page}
+            totalPages={list.paginate.totalPages}
+            onChange={fetchPage}
+            disabled={loading}
+            className="mt-6"
+          />
         </>
       )}
     </div>

@@ -1,8 +1,8 @@
 export const tagColors = {
-  type: 'bg-spirit-mist text-spirit-muted',
-  exam: 'bg-spirit-leaf/15 text-spirit-leaf',
-  concept: 'bg-spirit-teal/15 text-spirit-teal-hover',
-  tag: 'bg-badge-amber text-badge-amber-text',
+  type: 'bg-badge-type text-badge-type-text',
+  exam: 'bg-badge-exam text-badge-exam-text',
+  concept: 'bg-badge-concept text-badge-concept-text',
+  tag: 'bg-badge-tag text-badge-tag-text',
 }
 
 export default function Chip({ label, color = tagColors.type }: { label: string; color?: string }) {

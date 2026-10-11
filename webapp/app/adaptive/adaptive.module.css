@@ -855,13 +855,21 @@
 }
 
 .scoreCorrect {
-  background: var(--practice-correct-bg);
-  color: var(--practice-forest);
+  background: var(--color-success-soft);
+  color: var(--color-success-text);
 }
 
 .scoreWrong {
-  background: var(--practice-wrong-bg);
-  color: var(--practice-wrong);
+  background: var(--color-danger-soft);
+  color: var(--color-danger-text);
+}
+
+.scoreWrong > p {
+  color: var(--color-danger-text);
+}
+
+.practiceModal {
+  width: min(360px, calc(100% - 32px));
 }
 
 .resultNotice {
@@ -917,49 +925,6 @@
   background: rgb(255 253 248 / 0.65);
   color: var(--color-spirit-ink-soft);
   font-weight: 700;
-}
-
-.discussionButton {
-  display: inline-flex;
-  width: 100%;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  margin-top: 12px;
-  padding: 7px 12px;
-  border: 1px solid #b9b2a6;
-  border-radius: 8px;
-  background: var(--color-spirit-paper);
-  color: #625d54;
-  font-size: 0.875rem;
-  font-weight: 600;
-  transition: background-color var(--motion-duration-fast) var(--motion-ease-standard), border-color var(--motion-duration-fast) var(--motion-ease-standard), color var(--motion-duration-fast) var(--motion-ease-standard);
-}
-
-.discussionButton:hover {
-  border-color: var(--color-spirit-ink);
-  background: #f0ece4;
-  color: var(--color-spirit-ink);
-}
-
-.discussionButton:active {
-  border-color: var(--color-spirit-ink);
-  background: #e6e0d6;
-  color: var(--color-spirit-ink);
-}
-
-.discussionButton:focus-visible {
-  outline: 3px solid rgb(98 93 84 / 0.32);
-  outline-offset: 3px;
-}
-
-@media (min-width: 40rem) {
-  .discussionButton {
-    width: auto;
-    justify-content: flex-start;
-    margin-top: 0;
-    margin-left: auto;
-  }
 }
 
 @keyframes reveal {

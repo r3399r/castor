@@ -33,12 +33,22 @@
   --color-info-soft: #e7f1f0;
   --color-info-text: var(--color-spirit-forest);
   --color-info-border: #b9d3cf;
-  --color-badge-neutral: #e5eae4;
-  --color-badge-neutral-text: #3f5b51;
-  --color-badge-purple: #e6ddf3;
-  --color-badge-purple-text: #65458a;
-  --color-badge-amber: #f3e4c4;
-  --color-badge-amber-text: #805c21;
+  /* Question metadata badges: distinct hues with restrained saturation. */
+  --color-badge-type: #dce8e2;
+  --color-badge-type-text: #31594f;
+  --color-badge-exam: #dceacb;
+  --color-badge-exam-text: #3f672f;
+  --color-badge-concept: #d5e9ec;
+  --color-badge-concept-text: #17646c;
+  --color-badge-tag: #f4dca8;
+  --color-badge-tag-text: #765018;
+  /* Compatibility aliases for existing semantic utility names. */
+  --color-badge-neutral: var(--color-badge-type);
+  --color-badge-neutral-text: var(--color-badge-type-text);
+  --color-badge-purple: var(--color-badge-concept);
+  --color-badge-purple-text: var(--color-badge-concept-text);
+  --color-badge-amber: var(--color-badge-tag);
+  --color-badge-amber-text: var(--color-badge-tag-text);
   --color-category-gold-soft: #f6edcf;
   --color-category-leaf-soft: #e4ecda;
   /* Keep existing Tailwind red utilities on the shared semantic palette. */

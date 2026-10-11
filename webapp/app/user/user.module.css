@@ -41,21 +41,6 @@
   color: var(--user-ink);
 }
 
-.title {
-  margin: 56px 0 24px;
-  color: var(--user-forest);
-  font-size: 2rem;
-  font-weight: 700;
-  line-height: var(--leading-tight);
-  letter-spacing: var(--tracking-wide);
-}
-
-.subtitle {
-  margin: -14px 0 32px;
-  color: var(--user-muted);
-  font-size: 0.9375rem;
-}
-
 .card {
   border: var(--spirit-border-muted);
   border-radius: 16px;
@@ -109,60 +94,6 @@
   font-weight: 700;
 }
 
-.primaryButton,
-.secondaryButton,
-.paginationButton {
-  display: inline-flex;
-  min-height: var(--control-height-md);
-  align-items: center;
-  justify-content: center;
-  padding: 7px 14px;
-  border-radius: 8px;
-  font-size: 0.875rem;
-  font-weight: 700;
-  transition: border-color var(--motion-duration-standard) var(--motion-ease-standard), background-color var(--motion-duration-standard) var(--motion-ease-standard), color var(--motion-duration-standard) var(--motion-ease-standard);
-}
-
-.primaryButton {
-  border: 1px solid var(--user-forest);
-  background: var(--user-forest);
-  color: var(--color-spirit-paper);
-}
-
-.primaryButton:hover:not(:disabled) {
-  border-color: var(--user-forest-hover);
-  background: var(--user-forest-hover);
-}
-
-.secondaryButton,
-.paginationButton {
-  border: 1px solid var(--user-line);
-  background: var(--user-surface);
-  color: #52645d;
-}
-
-.secondaryButton:hover:not(:disabled),
-.paginationButton:hover:not(:disabled) {
-  border-color: #91aa98;
-  background: var(--user-hover);
-  color: var(--user-forest);
-}
-
-.textButton { color: var(--user-forest); font-size: 0.875rem; font-weight: 600; }
-.textButton:hover { text-decoration: underline; }
-.cancelButton { color: var(--user-muted); font-size: 0.875rem; }
-.cancelButton:hover { color: var(--user-ink); }
-
-.primaryButton:disabled,
-.secondaryButton:disabled,
-.paginationButton:disabled,
-.cancelButton:disabled { cursor: not-allowed; opacity: 0.48; }
-
-.primaryButton:focus-visible,
-.secondaryButton:focus-visible,
-.paginationButton:focus-visible,
-.textButton:focus-visible,
-.cancelButton:focus-visible,
 .textInput:focus-visible {
   outline: var(--spirit-focus-outline);
   outline-offset: 3px;
@@ -220,39 +151,10 @@
 .amountPositive { color: #0d6b38; }
 .amountNegative { color: var(--color-danger-text); }
 
-.emptyState,
-.errorState {
-  padding: 32px;
-  border-radius: 16px;
-  background: var(--user-surface);
-  text-align: center;
-}
-
-.emptyState { border: 1px solid var(--user-line); }
-.errorState { border: 1px solid var(--color-danger); background: var(--color-danger-soft); }
-.emptyText { color: var(--user-muted); font-size: 0.875rem; }
-.errorText { color: var(--color-danger-text); font-size: 0.875rem; }
 .loginLink { color: var(--user-forest); font-size: 0.875rem; text-decoration: underline; }
 
-.pagination {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  margin-top: 24px;
-}
-
-.paginationText { color: var(--user-muted); font-size: 0.875rem; }
-
 @media (max-width: 47.999rem) {
-  .title { margin-top: 42px; font-size: 1.75rem; }
   .profileCard { align-items: stretch; flex-direction: column; padding: 20px 16px; }
   .pointsCard { padding: 20px 16px; }
   .transactionRow { padding: 14px 16px; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .primaryButton,
-  .secondaryButton,
-  .paginationButton { transition: none; }
 }

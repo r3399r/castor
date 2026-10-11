@@ -4,9 +4,10 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
 import { Goal, BookOpenText, Brain, Coins, FunnelPlus, NotebookPen } from 'lucide-react'
 import { apiFetch, apiPost } from '@/lib/api'
-import Chip from '@/components/Chip'
+import Chip, { tagColors } from '@/components/Chip'
 import DifficultyStars from '@/components/DifficultyStars'
-import { Button } from '@/components/ui'
+import DiscussionLink from '@/components/DiscussionLink'
+import { Button, Modal } from '@/components/ui'
 import type {
   GetQuestionAdaptiveResponse,
   Paginate,
@@ -98,17 +99,7 @@ function ResultBox({ result }: { result: { correctAnswer: string; score: number;
             <div className="text-base text-black-500">得分：<span className={styles.resultValue}>{result.score}</span></div>
           </div>
           {fbUrl && (
-            <a
-              href={fbUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={styles.discussionButton}
-            >
-              討論區
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path d="M5.5 2.5H2.5C1.95 2.5 1.5 2.95 1.5 3.5V11.5C1.5 12.05 1.95 12.5 2.5 12.5H10.5C11.05 12.5 11.5 12.05 11.5 11.5V8.5M8.5 1.5H12.5M12.5 1.5V5.5M12.5 1.5L6 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </a>
+            <DiscussionLink href={fbUrl} />
           )}
         </div>
       </div>
@@ -730,13 +721,14 @@ export default function AdaptiveClient({
                 </svg>
                 重新篩選
               </Button>
-              <button
+              <Button
                 onClick={fetchAdaptive}
                 disabled={loading}
-                className={`${styles.primaryButton} ${styles.topRepeatButton}`}
+                loading={loading}
+                className={styles.topRepeatButton}
               >
                 再練一組
-              </button>
+              </Button>
             </>
           )}
         </div>
@@ -1264,19 +1256,19 @@ export default function AdaptiveClient({
                 </div>
                 {/* 標籤（第二行，mobile only）*/}
                 <div className="mt-1.5 flex flex-wrap gap-2 sm:hidden">
-                  <Chip label={typeLabel[currentQuestion.type] ?? currentQuestion.type} color="bg-badge-neutral text-badge-neutral-text" />
+                  <Chip label={typeLabel[currentQuestion.type] ?? currentQuestion.type} color={tagColors.type} />
                   {currentQuestion.exam.map((e) => (
-                    <Chip key={e.id} label={e.name} color="bg-success-border text-success-text" />
+                    <Chip key={e.id} label={e.name} color={tagColors.exam} />
                   ))}
                   {currentQuestion.concept.map((c) => (
                     <Chip
                       key={c.id}
                       label={c.conceptGroup.name === c.name ? c.name : c.conceptGroup.name + '-' + c.name}
-                      color="bg-badge-purple text-badge-purple-text"
+                      color={tagColors.concept}
                     />
                   ))}
                   {currentQuestion.tag.map((t) => (
-                    <Chip key={t.id} label={t.name} color="bg-badge-amber text-badge-amber-text" />
+                    <Chip key={t.id} label={t.name} color={tagColors.tag} />
                   ))}
                 </div>
                 {/* Desktop：題號 + 標籤靠左，難易度靠右 */}
@@ -1286,19 +1278,19 @@ export default function AdaptiveClient({
                       <span className="text-spirit-heading">Q{currentIndex + 1}</span>
                       <span className="text-base"> / {numQuestionsTarget}</span>
                     </span>
-                    <Chip label={typeLabel[currentQuestion.type] ?? currentQuestion.type} color="bg-badge-neutral text-badge-neutral-text" />
+                    <Chip label={typeLabel[currentQuestion.type] ?? currentQuestion.type} color={tagColors.type} />
                     {currentQuestion.exam.map((e) => (
-                      <Chip key={e.id} label={e.name} color="bg-success-border text-success-text" />
+                      <Chip key={e.id} label={e.name} color={tagColors.exam} />
                     ))}
                     {currentQuestion.concept.map((c) => (
                       <Chip
                         key={c.id}
                         label={c.conceptGroup.name === c.name ? c.name : c.conceptGroup.name + '-' + c.name}
-                        color="bg-badge-purple text-badge-purple-text"
+                        color={tagColors.concept}
                       />
                     ))}
                     {currentQuestion.tag.map((t) => (
-                      <Chip key={t.id} label={t.name} color="bg-badge-amber text-badge-amber-text" />
+                      <Chip key={t.id} label={t.name} color={tagColors.tag} />
                     ))}
                   </div>
                   <DifficultyStars value={currentQuestion.adjustedDifficulty} tone="forest" />
@@ -1388,102 +1380,92 @@ export default function AdaptiveClient({
 
       {replyResponse && (
         <div className={styles.postActions}>
-          <button
+          <Button
+            variant="secondary"
             onClick={fetchAdaptive}
             disabled={loading}
-            className={styles.secondaryButton}
+            loading={loading}
           >
             用相同條件再練一組
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={onReset}
-            className={styles.primaryButton}
           >
             重新篩選
-          </button>
+          </Button>
         </div>
       )}
 
       {showLeaveModal && (
-        <div
-          className="layer-overlay fixed inset-0 flex items-center justify-center bg-black/40"
-          onClick={() => setShowLeaveModal(false)}
+        <Modal
+          title="離開練習？"
+          onClose={() => setShowLeaveModal(false)}
+          className={styles.practiceModal}
         >
-          <div
-            className={`${styles.card} mx-4 w-full max-w-xs p-2`}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex flex-col items-center gap-6 rounded-xl px-6 py-8">
-              <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-black-700">
-                <circle cx="20" cy="20" r="19" stroke="currentColor" strokeWidth="2"/>
-                <line x1="20" y1="12" x2="20" y2="24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
-                <circle cx="20" cy="29" r="1.5" fill="currentColor"/>
-              </svg>
-              <p className="w-full text-center text-base font-normal text-black-700">
-                尚有題目未完成，下次回來時再繼續挑戰。
-              </p>
-              <div className="flex w-full gap-3">
-                <button
-                  onClick={() => setShowLeaveModal(false)}
-                  className={`${styles.secondaryButton} flex-1`}
-                >
-                  取消
-                </button>
-                <button
-                  onClick={() => { setShowLeaveModal(false); onReset() }}
-                  className={`${styles.primaryButton} flex-1`}
-                >
-                  仍要離開
-                </button>
-              </div>
+          <div className="flex flex-col items-center gap-6">
+            <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-black-700" aria-hidden="true">
+              <circle cx="20" cy="20" r="19" stroke="currentColor" strokeWidth="2"/>
+              <line x1="20" y1="12" x2="20" y2="24" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
+              <circle cx="20" cy="29" r="1.5" fill="currentColor"/>
+            </svg>
+            <p className="w-full text-center text-base font-normal text-black-700">
+              尚有題目未完成，下次回來時再繼續挑戰。
+            </p>
+            <div className="flex w-full gap-3">
+              <Button
+                variant="secondary"
+                onClick={() => setShowLeaveModal(false)}
+                className="flex-1"
+              >
+                取消
+              </Button>
+              <Button
+                onClick={() => { setShowLeaveModal(false); onReset() }}
+                className="flex-1"
+              >
+                仍要離開
+              </Button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       {showResultModal && (
-        <div
-          className="layer-overlay fixed inset-0 flex items-center justify-center bg-black/40"
-          onClick={() => setShowResultModal(false)}
+        <Modal
+          title="練習結果"
+          onClose={() => setShowResultModal(false)}
+          className={styles.practiceModal}
         >
-          <div
-            className={`${styles.card} mx-4 w-full max-w-xs p-2`}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex flex-col items-center gap-6 rounded-xl px-6 py-8">
-              <div className="w-full text-center">
-                <p className="text-base font-normal text-black-700">此次練習一共獲得</p>
-                <div className="mt-1 flex justify-center">
-                  <span className={`${styles.questionIndex} relative text-[64px] font-bold leading-tight`}>
-                    {totalScore}
-                    <span className="absolute bottom-3 left-full ml-1 text-base font-normal text-black-700">分</span>
-                  </span>
-                </div>
-                <div className="mt-1 flex items-center justify-center gap-1 text-sm font-semibold text-amber-700">
-                  <Coins size={16} strokeWidth={2.5} />
-                  +{totalAwardedPoints} 積分
-                </div>
-                <hr className="mt-2 border-spirit-line" />
+          <div className="flex flex-col items-center gap-6">
+            <div className="w-full text-center">
+              <p className="text-base font-normal text-black-700">此次練習一共獲得</p>
+              <div className="mt-1 flex justify-center">
+                <span className={`${styles.questionIndex} relative text-[64px] font-bold leading-tight`}>
+                  {totalScore}
+                  <span className="absolute bottom-3 left-full ml-1 text-base font-normal text-black-700">分</span>
+                </span>
               </div>
-              <div className="flex w-full gap-4">
-                <div className={`${styles.scoreCorrect} flex-1 rounded-lg px-4 py-3 text-center`}>
-                  <p className="text-2xl font-bold">{correctCount}</p>
-                  <p className="mt-1 text-sm font-semibold">正確</p>
-                </div>
-                <div className={`${styles.scoreWrong} flex-1 rounded-lg px-4 py-3 text-center`}>
-                  <p className="text-2xl font-bold">{wrongCount}</p>
-                  <p className="mt-1 text-sm font-semibold">錯誤</p>
-                </div>
+              <div className="mt-1 flex items-center justify-center gap-1 text-sm font-semibold text-amber-700">
+                <Coins size={16} strokeWidth={2.5} />
+                +{totalAwardedPoints} 積分
               </div>
-              <button
-                onClick={() => setShowResultModal(false)}
-                className={`${styles.primaryButton} w-full`}
-              >
-                好
-              </button>
+              <hr className="mt-2 border-spirit-line" />
             </div>
+            <div className="flex w-full gap-4">
+              <div className={`${styles.scoreCorrect} flex-1 rounded-lg px-4 py-3 text-center`}>
+                <p className="text-2xl font-bold">{correctCount}</p>
+                <p className="mt-1 text-sm font-semibold">正確</p>
+              </div>
+              <div className={`${styles.scoreWrong} flex-1 rounded-lg px-4 py-3 text-center`}>
+                <p className="text-2xl font-bold">{wrongCount}</p>
+                <p className="mt-1 text-sm font-semibold">錯誤</p>
+              </div>
+            </div>
+            <Button onClick={() => setShowResultModal(false)} className="w-full">
+              好
+            </Button>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   )
