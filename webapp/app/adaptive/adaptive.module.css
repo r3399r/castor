@@ -34,6 +34,10 @@
   color: var(--adaptive-ink);
 }
 
+.page :is(button, label, a) {
+  touch-action: manipulation;
+}
+
 .content {
   padding-bottom: 0;
 }
@@ -455,6 +459,17 @@
   color: #435f56;
   font-size: 1rem;
   font-weight: 700;
+}
+
+.practiceToolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.mobileResultFilterButton,
+.topRepeatButton {
+  display: none;
 }
 
 .backButton:hover:not(:disabled) {
@@ -977,6 +992,21 @@
   .startGroup { align-items: stretch; flex-direction: column; }
   .countText { white-space: normal; }
   .primaryButton { width: 100%; }
+  .practiceToolbarResult .backButton {
+    display: none;
+  }
+  .practiceToolbarResult .mobileResultFilterButton {
+    display: inline-flex;
+    min-height: 44px;
+    margin: 24px 0 12px;
+  }
+  .practiceToolbarResult .topRepeatButton {
+    display: inline-flex;
+    width: auto;
+    min-height: 44px;
+    margin: 24px 0 12px;
+    padding: 8px 16px;
+  }
   .practiceActive {
     padding-bottom: calc(216px + env(safe-area-inset-bottom));
   }
@@ -1025,6 +1055,9 @@
   .questionBottomNav {
     display: none;
   }
+  .postActions {
+    display: none;
+  }
 }
 
 /* Keep iOS WebKit on a stable viewport height while its browser chrome
@@ -1053,6 +1086,69 @@
   .answerGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .postActions { flex-direction: column; }
   .postActions > * { width: 100%; }
+}
+
+/* Touch browsers can retain :hover after a tap. Restore the actual base or
+   selected state so a tap never looks selected unless state changed. */
+@media (hover: none), (pointer: coarse) {
+  .examTab:hover {
+    background: transparent;
+    color: var(--adaptive-muted);
+  }
+  .examTab[aria-selected='true']:hover {
+    border-color: var(--adaptive-forest);
+    background: var(--adaptive-forest);
+    color: var(--color-spirit-paper);
+  }
+  .option:hover:not(:disabled),
+  .pillOption:hover:not(:disabled),
+  .segmentOption:hover:not(:disabled) {
+    border-color: var(--adaptive-line);
+    background: var(--adaptive-surface);
+  }
+  .option.selected:hover:not(:disabled),
+  .pillOption.selected:hover:not(:disabled) {
+    border-color: var(--option-accent);
+    background: var(--option-selected-bg);
+    color: var(--option-accent);
+  }
+  .segmentOption.selected:hover:not(:disabled) {
+    background: var(--color-spirit-canopy);
+    color: var(--color-spirit-paper);
+  }
+  .answerOption:has(input:not(:disabled)):hover {
+    border-color: var(--adaptive-line);
+    background: var(--color-spirit-paper);
+  }
+  .answerSelected:has(input:not(:disabled)):hover {
+    border-color: var(--practice-gold-border);
+    background: var(--practice-gold-soft);
+    color: var(--practice-gold-ink);
+  }
+  .primaryButton:hover:not(:disabled) {
+    border-color: var(--adaptive-forest);
+    background: var(--adaptive-forest);
+  }
+  .secondaryButton:hover:not(:disabled),
+  .navButton:hover:not(:disabled) {
+    border-color: var(--adaptive-line);
+    background: var(--adaptive-surface);
+  }
+  .questionNav > .navButton:hover:not(:disabled) {
+    border-color: rgb(255 253 248 / 0.42);
+    background: transparent;
+    color: var(--color-spirit-paper);
+  }
+  .questionNav > .navPrimaryButton:hover:not(:disabled) {
+    border-color: var(--practice-gold);
+    background: var(--practice-gold);
+    color: var(--practice-gold-ink);
+  }
+  .mobileResultFilterButton:hover:not(:disabled) {
+    border: var(--spirit-border);
+    background: var(--spirit-surface);
+    color: var(--color-spirit-canopy);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

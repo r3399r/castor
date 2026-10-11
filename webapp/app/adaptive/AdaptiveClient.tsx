@@ -6,6 +6,7 @@ import { Goal, BookOpenText, Brain, Coins, FunnelPlus, NotebookPen } from 'lucid
 import { apiFetch, apiPost } from '@/lib/api'
 import Chip from '@/components/Chip'
 import DifficultyStars from '@/components/DifficultyStars'
+import { Button } from '@/components/ui'
 import type {
   GetQuestionAdaptiveResponse,
   Paginate,
@@ -705,16 +706,40 @@ export default function AdaptiveClient({
           <p className={styles.pageSubtitle}>制定今天的學習計畫，我們幫你挑出最適合的練習題目。</p>
         </header>
       ) : (
-        <button
-          onClick={() => (!replyResponse ? setShowLeaveModal(true) : onReset())}
-          disabled={loading}
-          className={styles.backButton}
-        >
-          <svg className="icon-md" width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M16 10H4M4 10L9 5M4 10L9 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-          返回
-        </button>
+        <div className={`${styles.practiceToolbar} ${replyResponse ? styles.practiceToolbarResult : ''}`}>
+          <button
+            onClick={() => (!replyResponse ? setShowLeaveModal(true) : onReset())}
+            disabled={loading}
+            className={styles.backButton}
+          >
+            <svg className="icon-md" width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M16 10H4M4 10L9 5M4 10L9 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            返回
+          </button>
+          {replyResponse && (
+            <>
+              <Button
+                variant="secondary"
+                onClick={onReset}
+                disabled={loading}
+                className={styles.mobileResultFilterButton}
+              >
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                  <path d="M16 10H4M4 10L9 5M4 10L9 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                重新篩選
+              </Button>
+              <button
+                onClick={fetchAdaptive}
+                disabled={loading}
+                className={`${styles.primaryButton} ${styles.topRepeatButton}`}
+              >
+                再練一組
+              </button>
+            </>
+          )}
+        </div>
       )}
 
       {adaptiveQuestion.length === 0 && !loading && <div className={styles.settings}>
