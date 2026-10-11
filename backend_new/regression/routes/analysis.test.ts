@@ -1,10 +1,14 @@
+import { eq } from 'drizzle-orm';
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { app } from 'src/app';
 import { closeDb, getDb } from 'src/db/client';
 import {
   conceptGroupTable,
   conceptTable,
+  questionTable,
+  replyTable,
   subjectTable,
+  userStatHistoryTable,
   userConceptStatTable,
   userSubscriptionTable,
   userTable,
@@ -21,6 +25,9 @@ const daysAhead = (days: number) => new Date(Date.now() + days * DAY_MS);
 const clearTables = async () => {
   const db = getDb();
   await db.delete(userSubscriptionTable);
+  await db.delete(replyTable);
+  await db.delete(questionTable);
+  await db.delete(userStatHistoryTable);
   await db.delete(userConceptStatTable);
   await db.delete(conceptTable);
   await db.delete(conceptGroupTable);
@@ -60,6 +67,58 @@ const addConcept = async (groupId: number, name: string) => {
   return insertId;
 };
 
+const dateOnly = (d: Date) => d.toISOString().slice(0, 10);
+
+/** reply.question_id is a real foreign key, so replies need a question. */
+const addQuestion = async (subjectId: number) => {
+  const [{ insertId }] = await getDb().insert(questionTable).values({
+    uuid: `speed-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    subjectId,
+    type: 'SINGLE',
+    difficulty: 5,
+    adjustedDifficulty: 5,
+    createdAt: new Date(),
+  });
+  return insertId;
+};
+
+/** The speed endpoint finds a user's subjects through user_stat_history. */
+const addActivity = async (userId: number, subjectId: number) => {
+  await getDb().insert(userStatHistoryTable).values({
+    userId,
+    subjectId,
+    date: dateOnly(new Date()),
+    weightedMastery: 5,
+    dailyAttempts: 1,
+    createdAt: new Date(),
+  });
+};
+
+const addReplies = async (
+  userId: number,
+  subjectId: number,
+  questionId: number,
+  rows: { durationMs: number; score?: number; tooFast?: boolean; daysOld?: number }[]
+) => {
+  await getDb()
+    .insert(replyTable)
+    .values(
+      rows.map((r) => {
+        const at = daysAgo(r.daysOld ?? 0);
+        return {
+          questionId,
+          subjectId,
+          userId,
+          score: r.score ?? 10,
+          durationMs: r.durationMs,
+          tooFast: r.tooFast ?? false,
+          repliedAt: at,
+          createdAt: at,
+        };
+      })
+    );
+};
+
 const addStat = async (
   userId: number,
   conceptId: number,
@@ -73,6 +132,15 @@ const addStat = async (
     lastAttemptAt: daysAgo(days),
     createdAt: new Date(),
   });
+};
+
+type SpeedItem = {
+  subject: string;
+  userMedianMs: number;
+  platformMedianMs: number | null;
+  deltaMs: number | null;
+  accuracy: number;
+  sampleCount: number;
 };
 
 type RiskItem = {
@@ -242,6 +310,160 @@ describe('analysis', () => {
       const body = (await res.json()) as RiskItem[];
       expect(body[0].retention).toBe(1);
       expect(body[0].daysSinceReview).toBe(0);
+    });
+  });
+
+  describe('GET /api/analysis/speed', () => {
+    const setupSpeedUser = async () => {
+      const { userId, subjectId } = await seed();
+      await grantSubscription(userId);
+      await getDb()
+        .update(subjectTable)
+        .set({ durationMedianMs: 60_000 })
+        .where(eq(subjectTable.id, subjectId));
+      await addActivity(userId, subjectId);
+      const questionId = await addQuestion(subjectId);
+      return { userId, subjectId, questionId };
+    };
+
+    it('rejects without a subscription', async () => {
+      await seed();
+      vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
+
+      const res = await app.request('/api/analysis/speed');
+      expect(res.status).toBe(403);
+    });
+
+    it('compares the user median against the subject median', async () => {
+      const { userId, subjectId, questionId } = await setupSpeedUser();
+      await addReplies(userId, subjectId, questionId, [
+        { durationMs: 70_000 },
+        { durationMs: 80_000 },
+        { durationMs: 90_000 },
+        { durationMs: 100_000 },
+        { durationMs: 110_000 },
+      ]);
+      vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
+
+      const res = await app.request('/api/analysis/speed');
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as SpeedItem[];
+
+      expect(body).toHaveLength(1);
+      expect(body[0].userMedianMs).toBe(90_000);
+      expect(body[0].platformMedianMs).toBe(60_000);
+      expect(body[0].deltaMs).toBe(30_000);
+      expect(body[0].sampleCount).toBe(5);
+      expect(body[0].accuracy).toBe(100);
+    });
+
+    // Excluded on the platform side too, so including them here would be
+    // comparing two different populations.
+    it('ignores too-fast replies', async () => {
+      const { userId, subjectId, questionId } = await setupSpeedUser();
+      await addReplies(userId, subjectId, questionId, [
+        { durationMs: 70_000 },
+        { durationMs: 80_000 },
+        { durationMs: 90_000 },
+        { durationMs: 100_000 },
+        { durationMs: 110_000 },
+        { durationMs: 10, tooFast: true, score: 0 },
+      ]);
+      vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
+
+      const res = await app.request('/api/analysis/speed');
+      const body = (await res.json()) as SpeedItem[];
+      expect(body[0].sampleCount).toBe(5);
+      expect(body[0].userMedianMs).toBe(90_000);
+    });
+
+    it('withholds the comparison when the user has too few timed answers', async () => {
+      const { userId, subjectId, questionId } = await setupSpeedUser();
+      await addReplies(userId, subjectId, questionId, [
+        { durationMs: 70_000 },
+        { durationMs: 90_000 },
+      ]);
+      vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
+
+      const res = await app.request('/api/analysis/speed');
+      const body = (await res.json()) as SpeedItem[];
+      // The user's own median is still reported -- only the comparison
+      // is withheld.
+      expect(body[0].userMedianMs).toBe(80_000);
+      expect(body[0].sampleCount).toBe(2);
+      expect(body[0].deltaMs).toBeNull();
+    });
+
+    it('withholds the comparison when the subject has no platform median', async () => {
+      const { userId, subjectId, questionId } = await setupSpeedUser();
+      await getDb()
+        .update(subjectTable)
+        .set({ durationMedianMs: null })
+        .where(eq(subjectTable.id, subjectId));
+      await addReplies(userId, subjectId, questionId, [
+        { durationMs: 70_000 },
+        { durationMs: 80_000 },
+        { durationMs: 90_000 },
+        { durationMs: 100_000 },
+        { durationMs: 110_000 },
+      ]);
+      vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
+
+      const res = await app.request('/api/analysis/speed');
+      const body = (await res.json()) as SpeedItem[];
+      expect(body[0].platformMedianMs).toBeNull();
+      expect(body[0].deltaMs).toBeNull();
+    });
+
+    it('honours the days window', async () => {
+      const { userId, subjectId, questionId } = await setupSpeedUser();
+      await addReplies(userId, subjectId, questionId, [
+        { durationMs: 70_000 },
+        { durationMs: 80_000 },
+        { durationMs: 90_000 },
+        { durationMs: 100_000 },
+        { durationMs: 110_000 },
+        { durationMs: 999_000, daysOld: 200 },
+      ]);
+      vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
+
+      const res = await app.request('/api/analysis/speed?days=30');
+      const body = (await res.json()) as SpeedItem[];
+      expect(body[0].sampleCount).toBe(5);
+    });
+
+    it('reports a faster-than-median user with a negative delta', async () => {
+      const { userId, subjectId, questionId } = await setupSpeedUser();
+      await addReplies(userId, subjectId, questionId, [
+        { durationMs: 20_000 },
+        { durationMs: 25_000 },
+        { durationMs: 30_000 },
+        { durationMs: 35_000 },
+        { durationMs: 40_000 },
+      ]);
+      vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
+
+      const res = await app.request('/api/analysis/speed');
+      const body = (await res.json()) as SpeedItem[];
+      expect(body[0].deltaMs).toBe(-30_000);
+    });
+
+    it('returns an empty list for a user with no recorded activity', async () => {
+      const { userId } = await seed();
+      await grantSubscription(userId);
+      vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
+
+      const res = await app.request('/api/analysis/speed');
+      expect(await res.json()).toEqual([]);
+    });
+
+    it('rejects a window beyond the allowed maximum', async () => {
+      const { userId } = await seed();
+      await grantSubscription(userId);
+      vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
+
+      const res = await app.request('/api/analysis/speed?days=9999');
+      expect(res.status).toBe(400);
     });
   });
 });

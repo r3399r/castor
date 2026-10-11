@@ -21,6 +21,7 @@ import styles from './analysis.module.css'
 import type {
   DailyMastery,
   ForgettingRiskItem,
+  SpeedComparison,
   GetUserHistoryResponse,
   GetUserStatsResponse,
   StatsSubject,
@@ -417,6 +418,21 @@ const RISK_META: Record<
   low: { label: '低風險', icon: '●', text: '#2F6B4F', bg: '#E8F1EA', bar: '#3F8C66' },
 }
 
+function LockedProCard({ title, blurb }: { title: string; blurb: string }) {
+  return (
+    <div className={styles.card}>
+      <h2 className={`mb-2 ${styles.cardTitle}`}>{title}</h2>
+      <p className={`mb-4 text-sm ${styles.bodyText}`}>{blurb}</p>
+      <button
+        type="button"
+        className="rounded-full bg-[#227578] px-5 py-2 text-sm font-bold text-white transition hover:bg-[#195E62] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#227578]"
+      >
+        查看訂閱方案
+      </button>
+    </div>
+  )
+}
+
 function ForgettingRiskSection() {
   const { subscription } = useAuth()
   const [items, setItems] = useState<ForgettingRiskItem[] | null>(null)
@@ -438,18 +454,10 @@ function ForgettingRiskSection() {
 
   if (!subscribed)
     return (
-      <div className={styles.card}>
-        <h2 className={`mb-2 ${styles.cardTitle}`}>遺忘風險提示</h2>
-        <p className={`mb-4 text-sm ${styles.bodyText}`}>
-          訂閱後可看見哪些觀念正在被遺忘，並依急迫度排出優先複習順序。
-        </p>
-        <button
-          type="button"
-          className="rounded-full bg-[#227578] px-5 py-2 text-sm font-bold text-white transition hover:bg-[#195E62] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#227578]"
-        >
-          查看訂閱方案
-        </button>
-      </div>
+      <LockedProCard
+        title="遺忘風險提示"
+        blurb="訂閱後可看見哪些觀念正在被遺忘，並依急迫度排出優先複習順序。"
+      />
     )
 
   return (
@@ -510,6 +518,137 @@ function ForgettingRiskSection() {
                   上次練習 <span className="tabular-nums">{item.daysSinceReview}</span> 天前 ·
                   {' '}熟練度 <span className="tabular-nums">{item.mastery.toFixed(1)}</span>
                 </p>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+// ─── Answer Speed (subscribers only) ──────────────────────────────────────────
+
+// Diverging pair: two poles with a neutral midpoint at the median.
+// Slower is the one that wants attention, so it takes the warm hue --
+// but neither is labelled good or bad on its own, which is why accuracy
+// sits beside it.
+const SPEED_SLOWER = '#C2561F'
+const SPEED_FASTER = '#2F6B4F'
+
+const toSeconds = (ms: number) => Math.round(ms / 1000)
+
+function SpeedSection() {
+  const { subscription } = useAuth()
+  const [items, setItems] = useState<SpeedComparison[] | null>(null)
+  const [failed, setFailed] = useState(false)
+
+  const subscribed = subscription?.active === true
+
+  useEffect(() => {
+    if (!subscribed) return
+    apiFetch<SpeedComparison[]>('analysis/speed', { days: 90 })
+      .then(setItems)
+      .catch(() => setFailed(true))
+  }, [subscribed])
+
+  if (subscription === null) return null
+
+  if (!subscribed)
+    return (
+      <LockedProCard
+        title="答題速度分析"
+        blurb="訂閱後可比較你在每個科目的答題速度與平台中位數，看出哪一科想太久。"
+      />
+    )
+
+  // One shared scale across rows, so bar lengths are comparable between
+  // subjects rather than each row being self-normalised.
+  const comparable = (items ?? []).filter((i) => i.deltaMs !== null)
+  const maxAbs = Math.max(1, ...comparable.map((i) => Math.abs(i.deltaMs!)))
+
+  return (
+    <div className={styles.card}>
+      <h2 className={`mb-2 ${styles.cardTitle}`}>答題速度分析</h2>
+      <p className={`mb-4 text-sm ${styles.bodyText}`}>
+        近 90 天每題花費時間的中位數，與平台中位數比較。偏慢不一定是壞事，請一併看正確率。
+      </p>
+
+      {failed && <p className="text-sm text-red-600">無法載入答題速度分析，請稍後再試。</p>}
+
+      {!failed && items === null && <p className={`text-sm ${styles.muted}`}>載入中…</p>}
+
+      {!failed && items !== null && items.length === 0 && (
+        <p className={`text-sm ${styles.muted}`}>
+          近 90 天還沒有計時的作答紀錄，練習幾題後這裡就會出現比較。
+        </p>
+      )}
+
+      {!failed && items !== null && items.length > 0 && (
+        <ul className="flex flex-col gap-4">
+          {items.map((item) => {
+            const delta = item.deltaMs
+            const slower = delta !== null && delta > 0
+            const width = delta === null ? 0 : (Math.abs(delta) / maxAbs) * 50
+            const color = delta === null ? '#A8A3A0' : slower ? SPEED_SLOWER : SPEED_FASTER
+            return (
+              <li key={item.subjectId} className="flex flex-col gap-2">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <span className="text-sm font-bold">{item.subject}</span>
+                  <span className={`text-[11px] ${styles.muted}`}>
+                    你 <span className="font-bold tabular-nums">{toSeconds(item.userMedianMs)}s</span>
+                    {item.platformMedianMs !== null && (
+                      <>
+                        {' · '}中位數{' '}
+                        <span className="tabular-nums">{toSeconds(item.platformMedianMs)}s</span>
+                      </>
+                    )}
+                    {' · '}正確率 <span className="tabular-nums">{Math.round(item.accuracy)}%</span>
+                    {' · '}
+                    <span className="tabular-nums">{item.sampleCount}</span> 題
+                  </span>
+                </div>
+
+                {delta === null ? (
+                  // Never render a zero-length bar as if it meant "equal
+                  // to the median" -- the comparison simply is not
+                  // available yet.
+                  <p className={`text-[11px] ${styles.muted}`}>樣本還不足以與平台比較</p>
+                ) : (
+                  <>
+                    <div className="relative h-5">
+                      <div className={`absolute inset-x-0 top-1.5 ${styles.masteryTrack}`} />
+                      <div
+                        aria-hidden
+                        className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-[#C9C3BB]"
+                      />
+                      <div
+                        role="img"
+                        aria-label={`${item.subject}：比平台中位數${slower ? '慢' : '快'} ${Math.abs(toSeconds(delta))} 秒`}
+                        className="absolute top-1.5 h-[10px]"
+                        style={{
+                          width: `${width}%`,
+                          background: color,
+                          // 2px clear of the centre rule so the two sides
+                          // never touch; rounded only on the outer,
+                          // data-carrying end.
+                          ...(slower
+                            ? { left: 'calc(50% + 2px)', borderRadius: '0 2px 2px 0' }
+                            : { right: 'calc(50% + 2px)', borderRadius: '2px 0 0 2px' }),
+                        }}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className={styles.muted}>← 較快</span>
+                      <span className="font-bold tabular-nums" style={{ color }}>
+                        {slower
+                          ? `慢 ${toSeconds(delta)}s`
+                          : `快 ${Math.abs(toSeconds(delta))}s`}
+                      </span>
+                      <span className={styles.muted}>較慢 →</span>
+                    </div>
+                  </>
+                )}
               </li>
             )
           })}
@@ -601,7 +740,10 @@ export default function AnalysisClient() {
         </>
       )}
 
-      <ForgettingRiskSection />
+      <div className={styles.proSections}>
+        <ForgettingRiskSection />
+        <SpeedSection />
+      </div>
 
       {stats && stats.length > 0 && (
         <>
