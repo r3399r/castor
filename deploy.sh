@@ -23,6 +23,13 @@ echo ===========================================================================
 
 echo deploy webapp SSG to S3...
 cd ../webapp
+# next dev and next build share .next, but produce incompatible output
+# (next.config.ts only sets output:'export' when NODE_ENV=production).
+# A local dev run therefore leaves artifacts that make this build fail in
+# page-data collection with a misleading "Cannot find module for page".
+# Clearing out too, so pages deleted since the last deploy are not
+# re-synced to S3 from a stale export.
+rm -rf .next out
 npm run build
 aws s3 sync ./out s3://$project-$env-y --delete --cache-control "no-cache"
 aws s3 sync ./out/_next/static s3://$project-$env-y/_next/static --cache-control "public, max-age=31536000, immutable"

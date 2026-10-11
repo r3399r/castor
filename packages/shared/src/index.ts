@@ -426,8 +426,6 @@ export type ForgettingRiskItem = {
   level: 'high' | 'medium' | 'low';
 };
 
-export type GetForgettingRiskResponse = ForgettingRiskItem[];
-
 // Subscriber-only. platformMedianMs is null until a subject has enough
 // samples platform-wide; deltaMs is null whenever the comparison would be
 // unsound -- either because of that, or because the user has too few timed
@@ -442,7 +440,13 @@ export type SpeedComparison = {
   sampleCount: number;
 };
 
-export type GetSpeedResponse = SpeedComparison[];
+// One request for the whole subscriber-only section of the analysis
+// page -- both halves share a gate and a lifecycle, so they are fetched
+// together.
+export type GetAnalysisOverviewResponse = {
+  forgettingRisk: ForgettingRiskItem[];
+  speed: SpeedComparison[];
+};
 
 export type GetUserMeResponse = User;
 

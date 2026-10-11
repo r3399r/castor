@@ -134,6 +134,8 @@ const addStat = async (
   });
 };
 
+type Overview = { forgettingRisk: RiskItem[]; speed: SpeedItem[] };
+
 type SpeedItem = {
   subject: string;
   userMedianMs: number;
@@ -168,14 +170,14 @@ describe('analysis', () => {
       await seed();
       vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
 
-      const res = await app.request('/api/analysis/forgetting-risk');
+      const res = await app.request('/api/analysis/overview');
       expect(res.status).toBe(403);
       expect(await res.json()).toMatchObject({ code: 'SUBSCRIPTION_REQUIRED' });
     });
 
     it('rejects with 401 when there is no valid identity', async () => {
       vi.mocked(verifyIdTokenUid).mockResolvedValue(null);
-      const res = await app.request('/api/analysis/forgetting-risk');
+      const res = await app.request('/api/analysis/overview');
       expect(res.status).toBe(401);
     });
 
@@ -184,12 +186,12 @@ describe('analysis', () => {
       await grantSubscription(userId);
       vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
 
-      const res = await app.request('/api/analysis/forgetting-risk');
+      const res = await app.request('/api/analysis/overview');
       expect(res.status).toBe(200);
     });
   });
 
-  describe('GET /api/analysis/forgetting-risk', () => {
+  describe('GET /api/analysis/overview -- forgettingRisk', () => {
     it('ranks the least-retained concept first', async () => {
       const { userId, groupId } = await seed();
       await grantSubscription(userId);
@@ -199,8 +201,8 @@ describe('analysis', () => {
       await addStat(userId, await addConcept(groupId, 'fresh'), { mastery: 5, days: 1 });
       vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
 
-      const res = await app.request('/api/analysis/forgetting-risk');
-      const body = (await res.json()) as RiskItem[];
+      const res = await app.request('/api/analysis/overview');
+      const body = ((await res.json()) as Overview).forgettingRisk;
 
       expect(body).toHaveLength(2);
       expect(body[0].concept).toBe('stale');
@@ -220,8 +222,8 @@ describe('analysis', () => {
       await addStat(userId, await addConcept(groupId, 'strong'), { mastery: 9, days: 14 });
       vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
 
-      const res = await app.request('/api/analysis/forgetting-risk');
-      const body = (await res.json()) as RiskItem[];
+      const res = await app.request('/api/analysis/overview');
+      const body = ((await res.json()) as Overview).forgettingRisk;
 
       expect(body[0].concept).toBe('weak');
       expect(body[1].concept).toBe('strong');
@@ -234,11 +236,15 @@ describe('analysis', () => {
       await addConcept(groupId, 'untouched');
       vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
 
-      const res = await app.request('/api/analysis/forgetting-risk');
-      expect(await res.json()).toEqual([]);
+      const res = await app.request('/api/analysis/overview');
+      expect(((await res.json()) as Overview).forgettingRisk).toEqual([]);
     });
 
-    it('filters to one subject when asked', async () => {
+    // subjectId filtering went when the two endpoints merged -- nothing
+    // used it, and applying it to only one half of the response would
+    // have been incoherent. What matters now is that every subject the
+    // user studies is represented.
+    it('covers concepts across every subject the user studies', async () => {
       const db = getDb();
       const { userId, groupId } = await seed();
       await grantSubscription(userId);
@@ -253,10 +259,10 @@ describe('analysis', () => {
       await addStat(userId, await addConcept(otherGroupId, 'chinese concept'), { mastery: 5, days: 10 });
       vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
 
-      const res = await app.request(`/api/analysis/forgetting-risk?subjectId=${otherSubjectId}`);
-      const body = (await res.json()) as RiskItem[];
-      expect(body).toHaveLength(1);
-      expect(body[0].concept).toBe('chinese concept');
+      const res = await app.request('/api/analysis/overview');
+      const body = ((await res.json()) as Overview).forgettingRisk;
+      expect(body).toHaveLength(2);
+      expect(body.map((r) => r.subject).sort()).toEqual(['國文', '數學']);
     });
 
     it('caps the list at the requested limit, keeping the most urgent', async () => {
@@ -267,8 +273,8 @@ describe('analysis', () => {
       await addStat(userId, await addConcept(groupId, 'c'), { mastery: 5, days: 1 });
       vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
 
-      const res = await app.request('/api/analysis/forgetting-risk?limit=2');
-      const body = (await res.json()) as RiskItem[];
+      const res = await app.request('/api/analysis/overview?riskLimit=2');
+      const body = ((await res.json()) as Overview).forgettingRisk;
       expect(body.map((r) => r.concept)).toEqual(['a', 'b']);
     });
 
@@ -283,8 +289,8 @@ describe('analysis', () => {
       await addStat(otherUserId, await addConcept(groupId, 'theirs'), { mastery: 5, days: 50 });
       vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
 
-      const res = await app.request('/api/analysis/forgetting-risk');
-      const body = (await res.json()) as RiskItem[];
+      const res = await app.request('/api/analysis/overview');
+      const body = ((await res.json()) as Overview).forgettingRisk;
       expect(body).toHaveLength(1);
       expect(body[0].concept).toBe('mine');
     });
@@ -294,7 +300,7 @@ describe('analysis', () => {
       await grantSubscription(userId);
       vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
 
-      const res = await app.request('/api/analysis/forgetting-risk?limit=999');
+      const res = await app.request('/api/analysis/overview?riskLimit=999');
       expect(res.status).toBe(400);
     });
 
@@ -306,14 +312,14 @@ describe('analysis', () => {
       await addStat(userId, await addConcept(groupId, 'today'), { mastery: 5, days: 0 });
       vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
 
-      const res = await app.request('/api/analysis/forgetting-risk');
-      const body = (await res.json()) as RiskItem[];
+      const res = await app.request('/api/analysis/overview');
+      const body = ((await res.json()) as Overview).forgettingRisk;
       expect(body[0].retention).toBe(1);
       expect(body[0].daysSinceReview).toBe(0);
     });
   });
 
-  describe('GET /api/analysis/speed', () => {
+  describe('GET /api/analysis/overview -- speed', () => {
     const setupSpeedUser = async () => {
       const { userId, subjectId } = await seed();
       await grantSubscription(userId);
@@ -330,7 +336,7 @@ describe('analysis', () => {
       await seed();
       vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
 
-      const res = await app.request('/api/analysis/speed');
+      const res = await app.request('/api/analysis/overview');
       expect(res.status).toBe(403);
     });
 
@@ -345,9 +351,9 @@ describe('analysis', () => {
       ]);
       vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
 
-      const res = await app.request('/api/analysis/speed');
+      const res = await app.request('/api/analysis/overview');
       expect(res.status).toBe(200);
-      const body = (await res.json()) as SpeedItem[];
+      const body = ((await res.json()) as Overview).speed;
 
       expect(body).toHaveLength(1);
       expect(body[0].userMedianMs).toBe(90_000);
@@ -371,8 +377,8 @@ describe('analysis', () => {
       ]);
       vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
 
-      const res = await app.request('/api/analysis/speed');
-      const body = (await res.json()) as SpeedItem[];
+      const res = await app.request('/api/analysis/overview');
+      const body = ((await res.json()) as Overview).speed;
       expect(body[0].sampleCount).toBe(5);
       expect(body[0].userMedianMs).toBe(90_000);
     });
@@ -385,8 +391,8 @@ describe('analysis', () => {
       ]);
       vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
 
-      const res = await app.request('/api/analysis/speed');
-      const body = (await res.json()) as SpeedItem[];
+      const res = await app.request('/api/analysis/overview');
+      const body = ((await res.json()) as Overview).speed;
       // The user's own median is still reported -- only the comparison
       // is withheld.
       expect(body[0].userMedianMs).toBe(80_000);
@@ -409,8 +415,8 @@ describe('analysis', () => {
       ]);
       vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
 
-      const res = await app.request('/api/analysis/speed');
-      const body = (await res.json()) as SpeedItem[];
+      const res = await app.request('/api/analysis/overview');
+      const body = ((await res.json()) as Overview).speed;
       expect(body[0].platformMedianMs).toBeNull();
       expect(body[0].deltaMs).toBeNull();
     });
@@ -427,8 +433,8 @@ describe('analysis', () => {
       ]);
       vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
 
-      const res = await app.request('/api/analysis/speed?days=30');
-      const body = (await res.json()) as SpeedItem[];
+      const res = await app.request('/api/analysis/overview?days=30');
+      const body = ((await res.json()) as Overview).speed;
       expect(body[0].sampleCount).toBe(5);
     });
 
@@ -443,8 +449,8 @@ describe('analysis', () => {
       ]);
       vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
 
-      const res = await app.request('/api/analysis/speed');
-      const body = (await res.json()) as SpeedItem[];
+      const res = await app.request('/api/analysis/overview');
+      const body = ((await res.json()) as Overview).speed;
       expect(body[0].deltaMs).toBe(-30_000);
     });
 
@@ -453,8 +459,8 @@ describe('analysis', () => {
       await grantSubscription(userId);
       vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
 
-      const res = await app.request('/api/analysis/speed');
-      expect(await res.json()).toEqual([]);
+      const res = await app.request('/api/analysis/overview');
+      expect(((await res.json()) as Overview).forgettingRisk).toEqual([]);
     });
 
     it('rejects a window beyond the allowed maximum', async () => {
@@ -462,7 +468,7 @@ describe('analysis', () => {
       await grantSubscription(userId);
       vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
 
-      const res = await app.request('/api/analysis/speed?days=9999');
+      const res = await app.request('/api/analysis/overview?days=9999');
       expect(res.status).toBe(400);
     });
   });

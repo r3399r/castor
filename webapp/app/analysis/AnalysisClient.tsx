@@ -21,6 +21,7 @@ import styles from './analysis.module.css'
 import type {
   DailyMastery,
   ForgettingRiskItem,
+  GetAnalysisOverviewResponse,
   SpeedComparison,
   GetUserHistoryResponse,
   GetUserStatsResponse,
@@ -433,33 +434,13 @@ function LockedProCard({ title, blurb }: { title: string; blurb: string }) {
   )
 }
 
-function ForgettingRiskSection() {
-  const { subscription } = useAuth()
-  const [items, setItems] = useState<ForgettingRiskItem[] | null>(null)
-  const [failed, setFailed] = useState(false)
-
-  const subscribed = subscription?.active === true
-
-  useEffect(() => {
-    if (!subscribed) return
-    apiFetch<ForgettingRiskItem[]>('analysis/forgetting-risk', { limit: 10 })
-      .then(setItems)
-      .catch(() => setFailed(true))
-  }, [subscribed])
-
-  // null means sync has not answered yet, which is not the same as "not
-  // subscribed" -- returning nothing keeps a subscriber from seeing the
-  // locked state flash before their entitlement is known.
-  if (subscription === null) return null
-
-  if (!subscribed)
-    return (
-      <LockedProCard
-        title="遺忘風險提示"
-        blurb="訂閱後可看見哪些觀念正在被遺忘，並依急迫度排出優先複習順序。"
-      />
-    )
-
+function ForgettingRiskCard({
+  items,
+  failed,
+}: {
+  items: ForgettingRiskItem[] | null
+  failed: boolean
+}) {
   return (
     <div className={styles.card}>
       <h2 className={`mb-2 ${styles.cardTitle}`}>遺忘風險提示</h2>
@@ -538,30 +519,13 @@ const SPEED_FASTER = '#2F6B4F'
 
 const toSeconds = (ms: number) => Math.round(ms / 1000)
 
-function SpeedSection() {
-  const { subscription } = useAuth()
-  const [items, setItems] = useState<SpeedComparison[] | null>(null)
-  const [failed, setFailed] = useState(false)
-
-  const subscribed = subscription?.active === true
-
-  useEffect(() => {
-    if (!subscribed) return
-    apiFetch<SpeedComparison[]>('analysis/speed', { days: 90 })
-      .then(setItems)
-      .catch(() => setFailed(true))
-  }, [subscribed])
-
-  if (subscription === null) return null
-
-  if (!subscribed)
-    return (
-      <LockedProCard
-        title="答題速度分析"
-        blurb="訂閱後可比較你在每個科目的答題速度與平台中位數，看出哪一科想太久。"
-      />
-    )
-
+function SpeedCard({
+  items,
+  failed,
+}: {
+  items: SpeedComparison[] | null
+  failed: boolean
+}) {
   // One shared scale across rows, so bar lengths are comparable between
   // subjects rather than each row being self-normalised.
   const comparable = (items ?? []).filter((i) => i.deltaMs !== null)
@@ -658,6 +622,50 @@ function SpeedSection() {
   )
 }
 
+// Owns the one request and the one entitlement decision for the whole
+// subscriber-only section. Both cards below are presentational, so
+// there is no way for them to drift into fetching separately again.
+function ProAnalysisSections() {
+  const { subscription } = useAuth()
+  const [data, setData] = useState<GetAnalysisOverviewResponse | null>(null)
+  const [failed, setFailed] = useState(false)
+
+  const subscribed = subscription?.active === true
+
+  useEffect(() => {
+    if (!subscribed) return
+    apiFetch<GetAnalysisOverviewResponse>('analysis/overview', { days: 90, riskLimit: 10 })
+      .then(setData)
+      .catch(() => setFailed(true))
+  }, [subscribed])
+
+  // null means sync has not answered yet, which is not the same as "not
+  // subscribed" -- rendering nothing keeps a subscriber from seeing the
+  // locked state flash before their entitlement is known.
+  if (subscription === null) return null
+
+  if (!subscribed)
+    return (
+      <>
+        <LockedProCard
+          title="遺忘風險提示"
+          blurb="訂閱後可看見哪些觀念正在被遺忘，並依急迫度排出優先複習順序。"
+        />
+        <LockedProCard
+          title="答題速度分析"
+          blurb="訂閱後可比較你在每個科目的答題速度與平台中位數，看出哪一科想太久。"
+        />
+      </>
+    )
+
+  return (
+    <>
+      <ForgettingRiskCard items={data?.forgettingRisk ?? null} failed={failed} />
+      <SpeedCard items={data?.speed ?? null} failed={failed} />
+    </>
+  )
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function AnalysisClient() {
@@ -741,8 +749,7 @@ export default function AnalysisClient() {
       )}
 
       <div className={styles.proSections}>
-        <ForgettingRiskSection />
-        <SpeedSection />
+        <ProAnalysisSections />
       </div>
 
       {stats && stats.length > 0 && (
