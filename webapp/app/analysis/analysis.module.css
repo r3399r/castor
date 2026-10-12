@@ -51,27 +51,6 @@
   padding-top: 16px;
 }
 
-.titleLandscape {
-  position: absolute;
-  right: 0;
-  bottom: -62px;
-  z-index: var(--layer-decoration);
-  width: 88%;
-  height: 200px;
-  opacity: 0;
-  pointer-events: none;
-  transform: scale(1.6);
-  transform-origin: right bottom;
-}
-
-.titleLandscapeImage {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  object-position: right bottom;
-}
-
 .pageTitle {
   margin: 0;
   color: var(--color-spirit-canopy);
@@ -397,20 +376,6 @@
     padding-top: 0;
   }
 
-  .titleLandscape {
-    top: 20px;
-    right: -10%;
-    bottom: auto;
-    width: 110%;
-    height: 200px;
-    transform: scale(1.22);
-    transform-origin: right bottom;
-  }
-
-  .titleLandscapeImage {
-    object-position: right bottom;
-  }
-
   .summaryGrid {
     gap: 20px;
     margin-bottom: 10px;
@@ -472,22 +437,6 @@
     width: min(72%, 250px);
     align-self: flex-start;
     padding-top: 12px;
-  }
-
-  .titleLandscape {
-    top: auto;
-    right: auto;
-    bottom: -34px;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    transform: scale(1.35);
-    transform-origin: left bottom;
-  }
-
-  .titleLandscapeImage {
-    object-fit: cover;
-    object-position: 20% 100%;
   }
 
   .summaryGrid {

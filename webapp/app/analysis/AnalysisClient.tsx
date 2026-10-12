@@ -16,7 +16,6 @@ import { apiFetch } from '@/lib/api'
 import { useAuth } from '@/contexts/AuthContext'
 import Chip from '@/components/Chip'
 import { LoadingState } from '@/components/ui'
-import AnalysisHeaderLandscape from './AnalysisHeaderLandscape'
 import styles from './analysis.module.css'
 import type {
   DailyMastery,
@@ -764,7 +763,6 @@ export default function AnalysisClient() {
                   <p>掌握練習成果，看見每一次進步</p>
                 </div>
               </div>
-              <AnalysisHeaderLandscape />
             </div>
             <div className={styles.summaryGrid}>
               <StatCard
