@@ -21,7 +21,7 @@ export default function Footer({ variant = 'default' }: FooterProps) {
         </a>
       </nav>
       <p className={`site-footer__copyright mt-4 text-xs ${learning ? '' : 'text-spirit-on-dark/75'}`}>
-        © 2026 celetiao studios. All rights reserved.
+        © 2026 celestial studio. All rights reserved.
       </p>
     </footer>
   )
