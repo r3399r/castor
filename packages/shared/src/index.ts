@@ -454,6 +454,18 @@ export type GetAnalysisOverviewResponse = {
   speed: SpeedComparison[];
 };
 
+// The admin listing carries each user's entitlement so the page can
+// show and toggle it without a request per row.
+export type AdminUser = User & { subscription: SubscriptionStatus };
+
+export type PutUserSubscriptionRequest = {
+  active: boolean;
+  plan?: string;
+  days?: number;
+};
+
+export type PutUserSubscriptionResponse = SubscriptionStatus;
+
 export type GetUserMeResponse = User;
 
 export type PutUserMeRequest = { name: string };

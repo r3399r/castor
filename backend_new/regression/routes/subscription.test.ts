@@ -9,7 +9,8 @@ import { requireUser } from 'src/middleware/requireUser';
 import { transaction } from 'src/middleware/transaction';
 
 vi.mock('src/lib/firebaseAdmin', () => ({ verifyIdToken: vi.fn(), verifyIdTokenUid: vi.fn() }));
-import { verifyIdTokenUid } from 'src/lib/firebaseAdmin';
+import { verifyIdToken, verifyIdTokenUid } from 'src/lib/firebaseAdmin';
+import { ADMIN_EMAILS } from 'src/middleware/adminAuth';
 
 const FIXTURE_UID = 'subscription-fixture-uid';
 
@@ -223,6 +224,151 @@ describe('subscription', () => {
       const rows = await getDb().select().from(userSubscriptionTable);
       expect(rows).toHaveLength(4);
       expect(rows.filter((r) => r.status === 'active')).toHaveLength(1);
+    });
+  });
+
+  describe('PUT /api/user/:id/subscription', () => {
+    const putSubscription = (userId: number, body: unknown) =>
+      app.request(`/api/user/${userId}/subscription`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+    const asAdmin = () => vi.mocked(verifyIdToken).mockResolvedValue(ADMIN_EMAILS[0]);
+
+    // The whole point of the gate: a user must not be able to hand
+    // themselves paid features.
+    it('refuses a caller who is not an admin', async () => {
+      const userId = await seedUser();
+      vi.mocked(verifyIdToken).mockResolvedValue(null);
+
+      const res = await putSubscription(userId, { active: true });
+      expect(res.status).toBe(401);
+
+      const rows = await getDb().select().from(userSubscriptionTable);
+      expect(rows).toHaveLength(0);
+    });
+
+    it('404s for an unknown user', async () => {
+      asAdmin();
+      const res = await putSubscription(999_999, { active: true });
+      expect(res.status).toBe(404);
+    });
+
+    it('grants a subscription and reports the resulting state', async () => {
+      const userId = await seedUser();
+      asAdmin();
+
+      const res = await putSubscription(userId, { active: true });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { active: boolean; plan: string; expiresAt: string };
+      expect(body.active).toBe(true);
+      expect(new Date(body.expiresAt).getTime()).toBeGreaterThan(Date.now());
+
+      // And the gate now actually lets them through.
+      vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
+      expect((await gatedApp.request('/gated/thing')).status).toBe(200);
+    });
+
+    it('revokes a subscription, and the gate closes again', async () => {
+      const userId = await seedUser();
+      await grant(userId);
+      asAdmin();
+
+      const res = await putSubscription(userId, { active: false });
+      expect((await res.json()) as { active: boolean }).toMatchObject({ active: false });
+
+      vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
+      expect((await gatedApp.request('/gated/thing')).status).toBe(403);
+    });
+
+    // Revoking keeps the row -- it is the history -- rather than deleting.
+    it('keeps the revoked period as history', async () => {
+      const userId = await seedUser();
+      await grant(userId);
+      asAdmin();
+      await putSubscription(userId, { active: false });
+
+      const rows = await getDb().select().from(userSubscriptionTable);
+      expect(rows).toHaveLength(1);
+      expect(rows[0].status).toBe('cancelled');
+    });
+
+    // Clicking the button twice must not fail or create a second period:
+    // the table only permits one active row per user.
+    it('is idempotent when granting twice', async () => {
+      const userId = await seedUser();
+      asAdmin();
+
+      await putSubscription(userId, { active: true });
+      const second = await putSubscription(userId, { active: true });
+      expect(second.status).toBe(200);
+
+      const rows = await getDb().select().from(userSubscriptionTable);
+      expect(rows).toHaveLength(1);
+      expect(rows[0].status).toBe('active');
+    });
+
+    it('is idempotent when revoking twice', async () => {
+      const userId = await seedUser();
+      await grant(userId);
+      asAdmin();
+
+      await putSubscription(userId, { active: false });
+      const second = await putSubscription(userId, { active: false });
+      expect(second.status).toBe(200);
+
+      const rows = await getDb().select().from(userSubscriptionTable);
+      expect(rows.filter((r) => r.status === 'active')).toHaveLength(0);
+    });
+
+    // A row left saying 'active' after its period elapsed would otherwise
+    // collide with the new one on unique_active_subscription.
+    it('replaces a lapsed-but-still-active row rather than colliding with it', async () => {
+      const userId = await seedUser();
+      await grant(userId, { endsInDays: -1 });
+      asAdmin();
+
+      const res = await putSubscription(userId, { active: true });
+      expect(res.status).toBe(200);
+
+      const rows = await getDb().select().from(userSubscriptionTable);
+      expect(rows).toHaveLength(2);
+      expect(rows.filter((r) => r.status === 'active')).toHaveLength(1);
+    });
+
+    it('honours a custom period length', async () => {
+      const userId = await seedUser();
+      asAdmin();
+
+      const res = await putSubscription(userId, { active: true, days: 1, plan: 'annual' });
+      const body = (await res.json()) as { plan: string; expiresAt: string };
+      expect(body.plan).toBe('annual');
+      const ends = new Date(body.expiresAt).getTime() - Date.now();
+      expect(ends).toBeLessThan(2 * 24 * 60 * 60 * 1000);
+    });
+
+    it('rejects a malformed body', async () => {
+      const userId = await seedUser();
+      asAdmin();
+      const res = await putSubscription(userId, { active: 'yes' });
+      expect(res.status).toBe(400);
+    });
+  });
+
+  describe('GET /api/user -- admin listing', () => {
+    it('reports each user\'s entitlement', async () => {
+      const userId = await seedUser();
+      await grant(userId, { plan: 'annual' });
+      vi.mocked(verifyIdToken).mockResolvedValue(ADMIN_EMAILS[0]);
+
+      const res = await app.request('/api/user');
+      const body = (await res.json()) as {
+        data: { id: number; subscription: { active: boolean; plan: string | null } }[];
+      };
+      const row = body.data.find((u) => u.id === userId);
+      expect(row?.subscription).toMatchObject({ active: true, plan: 'annual' });
     });
   });
 });

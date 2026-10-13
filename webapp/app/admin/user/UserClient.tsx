@@ -1,11 +1,13 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { apiFetch, LIMIT } from '@/lib/api'
+import { apiFetch, apiPut, LIMIT } from '@/lib/api'
 import Pagination from '@/components/Pagination'
 import { ErrorState, LoadingState, PageHeader, TableFrame } from '@/components/ui'
 import SortableTh, { type SortDirection } from '@/components/SortableTh'
 import type { Paginate } from '@/types/api'
+
+type SubscriptionStatus = { active: boolean; plan: string | null; expiresAt: string | null }
 
 type UserDto = {
   id: number
@@ -13,6 +15,7 @@ type UserDto = {
   name: string | null
   avatar: string | null
   lastLoginAt: string | null
+  subscription: SubscriptionStatus
 }
 
 type SortColumn = 'id' | 'email' | 'name' | 'lastLoginAt'
@@ -22,6 +25,7 @@ const formatDateTime = (value: string | null) =>
 
 export default function UserClient() {
   const [users, setUsers] = useState<UserDto[] | null>(null)
+  const [togglingId, setTogglingId] = useState<number | null>(null)
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [loading, setLoading] = useState(true)
@@ -29,6 +33,26 @@ export default function UserClient() {
 
   const [sortColumn, setSortColumn] = useState<SortColumn>('id')
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
+
+  // Patches the one row in place rather than refetching the page: a
+  // reload would lose the admin's scroll position and re-sort, and the
+  // response already says what the new state is.
+  const toggleSubscription = async (user: UserDto) => {
+    setTogglingId(user.id)
+    setError(null)
+    try {
+      const next = await apiPut<SubscriptionStatus>(`user/${user.id}/subscription`, {
+        active: !user.subscription.active,
+      })
+      setUsers((prev) =>
+        (prev ?? []).map((u) => (u.id === user.id ? { ...u, subscription: next } : u))
+      )
+    } catch {
+      setError(`無法切換 ${user.email ?? user.id} 的訂閱狀態。`)
+    } finally {
+      setTogglingId(null)
+    }
+  }
 
   const load = async (
     targetPage: number,
@@ -87,13 +111,14 @@ export default function UserClient() {
               <SortableTh label="Email" column="email" activeColumn={sortColumn} direction={sortDirection} onSort={handleSort} />
               <SortableTh label="名稱" column="name" activeColumn={sortColumn} direction={sortDirection} onSort={handleSort} />
               <th className="px-4 py-3">大頭貼</th>
+              <th className="px-4 py-3">訂閱</th>
               <SortableTh label="最後登入時間" column="lastLoginAt" activeColumn={sortColumn} direction={sortDirection} onSort={handleSort} />
             </tr>
           </thead>
           <tbody>
             {(users ?? []).length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-black-300">
+                <td colSpan={6} className="px-4 py-8 text-center text-black-300">
                   尚無使用者
                 </td>
               </tr>
@@ -114,6 +139,31 @@ export default function UserClient() {
                   ) : (
                     <span className="text-black-300">-</span>
                   )}
+                </td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                        user.subscription.active
+                          ? 'bg-[#E8F1EA] text-[#2F6B4F]'
+                          : 'bg-beige-200 text-black-500'
+                      }`}
+                    >
+                      {user.subscription.active ? '訂閱中' : '未訂閱'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => toggleSubscription(user)}
+                      disabled={togglingId === user.id}
+                      className="rounded-md border border-brown-300 px-3 py-1.5 text-xs text-black-700 transition hover:bg-beige-200 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {togglingId === user.id
+                        ? '處理中…'
+                        : user.subscription.active
+                          ? '取消訂閱'
+                          : '開通訂閱'}
+                    </button>
+                  </div>
                 </td>
                 <td className="px-4 py-3 text-black-500">{formatDateTime(user.lastLoginAt)}</td>
               </tr>

@@ -13,7 +13,11 @@ import {
 } from 'src/db/schema';
 import { buildDateSubjectMap, loadMasteryHistoryRows } from 'src/lib/masteryHistory';
 import { DEFAULT_LIMIT, genPagination, MAX_LIMIT } from 'src/lib/paginator';
-import { findActiveSubscription } from 'src/lib/subscription';
+import {
+  findActiveSubscription,
+  findActiveSubscriptions,
+  setSubscription,
+} from 'src/lib/subscription';
 import { verifyIdTokenFull } from 'src/lib/firebaseAdmin';
 import { requireAdmin } from 'src/middleware/adminAuth';
 import { requireUser, UserEnv } from 'src/middleware/requireUser';
@@ -37,6 +41,13 @@ export const userListQuerySchema = z.object({
 // all whitespace can't sneak through as "set".
 export const userUpdateMeBodySchema = z.object({
   name: z.string().trim().min(1).max(255),
+});
+
+export const userSubscriptionBodySchema = z.object({
+  active: z.boolean(),
+  plan: z.string().min(1).max(32).optional(),
+  // Length of the granted period. Ignored when active is false.
+  days: z.number().int().positive().max(3650).optional(),
 });
 
 // A user's current streak, counted back from the most recent recorded
@@ -75,12 +86,31 @@ export const user = new Hono<UserEnv>()
 
     const [{ total }] = await db.select({ total: count() }).from(userTable);
     const sortColumn = USER_SORT_COLUMNS[sort];
-    const data = await db
+    const rows = await db
       .select()
       .from(userTable)
       .orderBy(order === 'desc' ? desc(sortColumn) : asc(sortColumn))
       .limit(limit)
       .offset(offset);
+
+    // One extra query for the whole page rather than one per row, so the
+    // admin list can show and toggle entitlement without a second
+    // round trip per user.
+    const subscriptions = await findActiveSubscriptions(
+      db,
+      rows.map((r) => r.id)
+    );
+    const data = rows.map((row) => {
+      const active = subscriptions.get(row.id);
+      return {
+        ...row,
+        subscription: {
+          active: active !== undefined,
+          plan: active?.plan ?? null,
+          expiresAt: active?.currentPeriodEnd ?? null,
+        },
+      };
+    });
 
     return c.json({ data, paginate: genPagination(total, limit, offset) });
   })
@@ -273,6 +303,40 @@ export const user = new Hono<UserEnv>()
 
     return c.json({ totalAttempts, overallAccuracy, streakDays, activityMap });
   })
+  /**
+   * Grants or revokes a user's subscription. Admin only.
+   *
+   * Exists because there is no payment integration yet: without it the
+   * only way to exercise anything behind the paywall is to write to the
+   * database by hand. Deliberately NOT something a user can call on
+   * themselves -- that would let anyone grant themselves paid features
+   * and make the gate decorative.
+   *
+   * Idempotent in both directions, so the button can be clicked twice
+   * without creating a second period or failing.
+   */
+  .put(
+    '/:id/subscription',
+    requireAdmin,
+    zValidator('json', userSubscriptionBodySchema),
+    async (c) => {
+      const db = c.get('db');
+      const id = Number(c.req.param('id'));
+      const { active, plan, days } = c.req.valid('json');
+      console.log(`PUT /api/user/${id}/subscription active=${active}`);
+
+      const [found] = await db.select().from(userTable).where(eq(userTable.id, id));
+      if (found === undefined) throw new NotFoundError(`user ${id} not found`);
+
+      const result = await setSubscription(db, id, active, { plan, days });
+
+      return c.json({
+        active: result !== undefined,
+        plan: result?.plan ?? null,
+        expiresAt: result?.currentPeriodEnd ?? null,
+      });
+    }
+  )
   // The signed-in user's own profile -- unlike GET /:id below, this needs
   // no admin check since it can only ever read the caller's own row.
   .get('/me', requireUser, async (c) => {

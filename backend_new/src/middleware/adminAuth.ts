@@ -5,7 +5,7 @@ import { ForbiddenError, UnauthorizedError } from 'src/model/error';
 // Hard-coded on purpose -- there's no admin/role concept in the data model
 // yet, and adding one for a single-person allowlist would be premature.
 // Add more addresses here as needed.
-export const ADMIN_EMAILS = ['lamplighter.planet@gmail.com'];
+export const ADMIN_EMAILS = ['lamplighter.planet@gmail.com', 'kaxisch@gmail.com'];
 
 const WRITE_METHODS = new Set(['POST', 'PUT', 'DELETE']);
 

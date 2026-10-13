@@ -1,4 +1,4 @@
-import { and, desc, eq, gt } from 'drizzle-orm';
+import { and, desc, eq, gt, inArray } from 'drizzle-orm';
 import { userSubscriptionTable } from 'src/db/schema';
 import { TransactionEnv } from 'src/middleware/transaction';
 
@@ -78,3 +78,111 @@ export const listSubscriptionHistory = async (
     .from(userSubscriptionTable)
     .where(eq(userSubscriptionTable.userId, userId))
     .orderBy(desc(userSubscriptionTable.createdAt));
+
+export const SUBSCRIPTION_STATUS_CANCELLED = 'cancelled';
+
+/** Default length of a period granted by hand, in days. */
+export const DEFAULT_GRANT_DAYS = 30;
+
+/**
+ * Live subscriptions for a set of users, keyed by user id.
+ *
+ * The single-user lookup repeated per row would be one query per user on
+ * a listing page; this keeps it to one for the page.
+ */
+export const findActiveSubscriptions = async (
+  db: Db,
+  userIds: number[]
+): Promise<Map<number, ActiveSubscription>> => {
+  if (userIds.length === 0) return new Map();
+
+  const rows = await db
+    .select({
+      userId: userSubscriptionTable.userId,
+      plan: userSubscriptionTable.plan,
+      currentPeriodEnd: userSubscriptionTable.currentPeriodEnd,
+    })
+    .from(userSubscriptionTable)
+    .where(
+      and(
+        inArray(userSubscriptionTable.userId, userIds),
+        eq(userSubscriptionTable.status, SUBSCRIPTION_STATUS_ACTIVE),
+        gt(userSubscriptionTable.currentPeriodEnd, new Date())
+      )
+    );
+
+  return new Map(
+    rows.map((r) => [r.userId, { plan: r.plan, currentPeriodEnd: r.currentPeriodEnd }])
+  );
+};
+
+/**
+ * Turns a user's subscription on or off, idempotently.
+ *
+ * Granting when one is already live is a no-op rather than a second row:
+ * the table allows only one active period per user, so inserting blindly
+ * would hit unique_active_subscription. Revoking marks the period
+ * cancelled instead of deleting it, because the row is the history --
+ * deleting would erase the fact that they ever subscribed.
+ *
+ * Returns the resulting state, so the caller never has to re-read to
+ * find out what happened.
+ */
+export const setSubscription = async (
+  db: Db,
+  userId: number,
+  active: boolean,
+  { plan = 'monthly', days = DEFAULT_GRANT_DAYS }: { plan?: string; days?: number } = {}
+): Promise<ActiveSubscription | undefined> => {
+  const existing = await db
+    .select({
+      id: userSubscriptionTable.id,
+      plan: userSubscriptionTable.plan,
+      currentPeriodEnd: userSubscriptionTable.currentPeriodEnd,
+    })
+    .from(userSubscriptionTable)
+    .where(
+      and(
+        eq(userSubscriptionTable.userId, userId),
+        eq(userSubscriptionTable.status, SUBSCRIPTION_STATUS_ACTIVE)
+      )
+    )
+    .limit(1);
+  const current = existing[0];
+
+  if (!active) {
+    if (current !== undefined)
+      await db
+        .update(userSubscriptionTable)
+        .set({ status: SUBSCRIPTION_STATUS_CANCELLED, updatedAt: new Date() })
+        .where(eq(userSubscriptionTable.id, current.id));
+    return undefined;
+  }
+
+  // Already live -- including a row whose period has elapsed but which
+  // nothing has swept yet. Extending it would be a different operation
+  // from "make sure this user has access", which is what this is.
+  if (current !== undefined && current.currentPeriodEnd > new Date())
+    return { plan: current.plan, currentPeriodEnd: current.currentPeriodEnd };
+
+  // A lapsed-but-still-'active' row has to be closed first, or the new
+  // period collides with it on unique_active_subscription.
+  if (current !== undefined)
+    await db
+      .update(userSubscriptionTable)
+      .set({ status: 'expired', updatedAt: new Date() })
+      .where(eq(userSubscriptionTable.id, current.id));
+
+  const now = new Date();
+  const currentPeriodEnd = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+  await db.insert(userSubscriptionTable).values({
+    userId,
+    plan,
+    status: SUBSCRIPTION_STATUS_ACTIVE,
+    currentPeriodStart: now,
+    currentPeriodEnd,
+    createdAt: now,
+  });
+
+  return { plan, currentPeriodEnd };
+};
