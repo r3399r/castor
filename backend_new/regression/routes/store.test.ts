@@ -7,7 +7,7 @@ import { guardianTable, pointTransactionTable, userGuardianTable, userTable } fr
 vi.mock('src/lib/firebaseAdmin', () => ({ verifyIdTokenUid: vi.fn() }));
 import { verifyIdTokenUid } from 'src/lib/firebaseAdmin';
 
-type GuardianSpeciesDto = { id: number; code: string; name: string; theme: string; cost: number; owned: boolean };
+type GuardianSpeciesDto = { id: number; code: string; name: string; theme: string; cost: number; owned: boolean; level: number | null };
 type GetStoreSpeciesResponse = { data: GuardianSpeciesDto[]; totalPoints: number };
 type PostRedeemResponse = { guardian: { id: number; speciesId: number; level: number; xp: number }; totalPoints: number };
 type ErrorBody = { message: string; code?: string };
@@ -90,6 +90,9 @@ describe('store routes', () => {
       expect(body.totalPoints).toBe(50);
       expect(body.data.map((s) => s.code)).toEqual(['forest', 'ocean']);
       expect(body.data.every((s) => s.owned === false)).toBe(true);
+      // null, not 0: the species has no level at all, which the
+      // collection view renders differently from "owned but at LV1".
+      expect(body.data.every((s) => s.level === null)).toBe(true);
     });
 
     it('excludes inactive species from the listing', async () => {
@@ -111,6 +114,21 @@ describe('store routes', () => {
       const res = await getSpecies();
       const body = (await res.json()) as GetStoreSpeciesResponse;
       expect(body.data[0].owned).toBe(true);
+      expect(body.data[0].level).toBe(1);
+    });
+
+    // The collection view sorts by progress, so it needs the grown level
+    // and not merely the fact of ownership.
+    it('reports the grown level of an owned species', async () => {
+      const userId = await seedUser(50);
+      const speciesId = await seedSpecies();
+      await getDb()
+        .insert(userGuardianTable)
+        .values({ userId, guardianId: speciesId, level: 4, xp: 120, createdAt: new Date(), updatedAt: new Date() });
+
+      const res = await getSpecies();
+      const body = (await res.json()) as GetStoreSpeciesResponse;
+      expect(body.data[0].level).toBe(4);
     });
   });
 

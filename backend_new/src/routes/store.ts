@@ -15,6 +15,10 @@ type GuardianSpeciesDto = {
   theme: string;
   cost: number;
   owned: boolean;
+  // How far this species has been grown, or null when not owned. The
+  // collection view needs the level, not just whether it is owned: it
+  // shows progress per species and sorts the started ones first.
+  level: number | null;
 };
 
 export const store = new Hono<UserEnv>()
@@ -30,7 +34,7 @@ export const store = new Hono<UserEnv>()
       .orderBy(asc(guardianTable.sortOrder));
 
     const owned = await db
-      .select({ guardianId: userGuardianTable.guardianId })
+      .select({ guardianId: userGuardianTable.guardianId, level: userGuardianTable.level })
       .from(userGuardianTable)
       .where(
         and(
@@ -41,7 +45,7 @@ export const store = new Hono<UserEnv>()
           )
         )
       );
-    const ownedSpeciesIds = new Set(owned.map((o) => o.guardianId));
+    const levelBySpeciesId = new Map(owned.map((o) => [o.guardianId, o.level]));
 
     const data: GuardianSpeciesDto[] = species.map((s) => ({
       id: s.id,
@@ -49,7 +53,8 @@ export const store = new Hono<UserEnv>()
       name: s.name,
       theme: s.theme,
       cost: s.cost,
-      owned: ownedSpeciesIds.has(s.id),
+      owned: levelBySpeciesId.has(s.id),
+      level: levelBySpeciesId.get(s.id) ?? null,
     }));
 
     return c.json({ data, totalPoints: user.totalPoints });

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   ArrowRight,
   BookOpen,
@@ -33,20 +33,41 @@ import {
   SpiritStatusCard,
 } from '@/components/spirit'
 import { spiritCatalog, type SpiritSpecies } from '@/lib/guardianArtwork'
-import { collectionSeries, demoStates, guardians, storeEggs } from './demoData'
+import { apiFetch, apiPost } from '@/lib/api'
 import SupportNote from './SupportNote'
 
-// Artwork mapping is deliberately separate from existing demo/API identifiers.
-// The old ocean demo has no matching artwork; never represent it as a bird.
-const artworkById: Partial<Record<string, SpiritSpecies>> = {
+type GuardianDto = {
+  id: number
+  guardianId: number
+  code: string
+  name: string
+  theme: string
+  level: number
+  xp: number
+  nextLevelXp: number | null
+}
+
+type SpeciesDto = {
+  id: number
+  code: string
+  name: string
+  theme: string
+  cost: number
+  owned: boolean
+  level: number | null
+}
+
+// Keyed on the guardian table's stable `code` slug. Only these two have
+// artwork drawn; every other species falls back to the shared locked egg
+// rather than borrowing a picture that is not of it.
+const artworkByCode: Partial<Record<string, SpiritSpecies>> = {
   children: 'cat',
   forest: 'deer',
   wisdom: 'bird',
 }
-const displayedEggs = [...storeEggs]
-const displayedCollection = [...collectionSeries].sort(
-  (a, b) => Number(b.unlockedLevel > 0) - Number(a.unlockedLevel > 0),
-)
+
+/** Levels in a complete collection series, matching the backend's MAX_LEVEL. */
+const MAX_LEVEL = 5
 const tabs = [
   {
     value: 'growing',
@@ -83,13 +104,16 @@ export default function BoxClient() {
   const [activeTab, setActiveTab] = useState<
     'growing' | 'store' | 'collection'
   >('growing')
-  const [selectedGuardianId, setSelectedGuardianId] = useState(guardians[0].id)
+  const [guardians, setGuardians] = useState<GuardianDto[]>([])
+  const [species, setSpecies] = useState<SpeciesDto[]>([])
+  const [totalPoints, setTotalPoints] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [selectedGuardianId, setSelectedGuardianId] = useState<number | null>(null)
   const [pointsToUse, setPointsToUse] = useState(1)
-  const [demoStateId, setDemoStateId] =
-    useState<(typeof demoStates)[number]['id']>('ready')
-  const [eggToExchange, setEggToExchange] = useState<
-    (typeof storeEggs)[number] | null
-  >(null)
+  const [eggToExchange, setEggToExchange] = useState<SpeciesDto | null>(null)
   const [showInvestDialog, setShowInvestDialog] = useState(false)
   const [collectionPreview, setCollectionPreview] = useState<{
     name: string
@@ -98,21 +122,69 @@ export default function BoxClient() {
     species?: SpiritSpecies
   } | null>(null)
   const [previewLevel, setPreviewLevel] = useState<number | null>(null)
+  // Both endpoints report totalPoints, and both are invalidated by either
+  // action (redeeming changes the store and the balance; investing changes
+  // the guardian and the balance), so they are always refreshed together.
+  const reload = useCallback(async () => {
+    const [guardianRes, storeRes] = await Promise.all([
+      apiFetch<{ data: GuardianDto[]; totalPoints: number }>('guardian'),
+      apiFetch<{ data: SpeciesDto[]; totalPoints: number }>('store/species'),
+    ])
+    setGuardians(guardianRes.data)
+    setSpecies(storeRes.data)
+    setTotalPoints(guardianRes.totalPoints)
+    setPointsToUse((value) => Math.min(Math.max(value, 1), guardianRes.totalPoints))
+  }, [])
+
+  useEffect(() => {
+    reload()
+      .catch(() => setLoadError('無法載入精靈資料，請稍後再試。'))
+      .finally(() => setLoading(false))
+  }, [reload])
+
+  const hasGuardian = guardians.length > 0
   const guardian =
     guardians.find((item) => item.id === selectedGuardianId) ?? guardians[0]
-  const species = artworkById[guardian.id]
-  const demoState =
-    demoStates.find((item) => item.id === demoStateId) ?? demoStates[3]
-  const availablePoints = demoState.points
-  const complete = demoStateId === 'complete'
-  const level = complete ? 5 : guardian.level
+  const artwork = guardian ? artworkByCode[guardian.code] : undefined
+  const availablePoints = totalPoints
+  const level = guardian?.level ?? 1
+  const complete = level >= MAX_LEVEL
   const shownLevel = previewLevel ?? level
-  const changeDemoState = (state: (typeof demoStates)[number]) => {
-    setDemoStateId(state.id)
-    setPreviewLevel(null)
-    setPointsToUse(
-      state.points === 0 ? 0 : Math.min(Math.max(pointsToUse, 1), state.points),
-    )
+
+  // Started species first, so the collection opens on what the user has
+  // actually been growing.
+  const collection = [...species].sort(
+    (a, b) => Number((b.level ?? 0) > 0) - Number((a.level ?? 0) > 0),
+  )
+
+  const confirmRedeem = async () => {
+    if (eggToExchange === null) return
+    setBusy(true)
+    setActionError(null)
+    try {
+      await apiPost('store/redeem', { speciesId: eggToExchange.id })
+      await reload()
+      setEggToExchange(null)
+    } catch {
+      setActionError('兌換失敗，請確認積分是否足夠後再試一次。')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const confirmInvest = async () => {
+    if (guardian === undefined) return
+    setBusy(true)
+    setActionError(null)
+    try {
+      await apiPost(`guardian/${guardian.id}/invest`, { points: pointsToUse })
+      await reload()
+      setShowInvestDialog(false)
+    } catch {
+      setActionError('投入失敗，請稍後再試一次。')
+    } finally {
+      setBusy(false)
+    }
   }
   const investControls = (
     <div className="sp-invest">
@@ -196,18 +268,18 @@ export default function BoxClient() {
       <span>切換精靈</span>
       <span className="sp-select-control">
         <select
-          value={selectedGuardianId}
+          value={guardian?.id ?? ''}
           onChange={(event) => {
-            setSelectedGuardianId(event.target.value)
+            setSelectedGuardianId(Number(event.target.value))
             setPreviewLevel(null)
           }}
         >
           {guardians.map((item) => (
             <option key={item.id} value={item.id}>
-              {artworkById[item.id]
-                ? spiritCatalog[artworkById[item.id]!].name
+              {artworkByCode[item.code]
+                ? spiritCatalog[artworkByCode[item.code]!].name
                 : item.name}{' '}
-              · LV{complete ? 5 : item.level}
+              · LV{item.level}
             </option>
           ))}
         </select>
@@ -215,6 +287,20 @@ export default function BoxClient() {
       </span>
     </label>
   )
+
+  if (loading)
+    return (
+      <div className="sp-box">
+        <p className="sp-description">載入中…</p>
+      </div>
+    )
+
+  if (loadError !== null)
+    return (
+      <div className="sp-box">
+        <p className="sp-inline-notice">{loadError}</p>
+      </div>
+    )
 
   return (
     <div className="sp-box">
@@ -271,13 +357,13 @@ export default function BoxClient() {
         >
           {activeTab === 'growing' ? (
             <>
-              {demoState.hasGuardian ? (
+              {hasGuardian ? (
                 <>
                   <div className="sp-growing-layout">
                     <div className="sp-companion-art">
-                      {species ? (
+                      {artwork ? (
                         <SpiritScene
-                          species={species}
+                          species={artwork}
                           level={shownLevel}
                           priority
                           caption={`LV${shownLevel}`}
@@ -286,10 +372,10 @@ export default function BoxClient() {
                         <ArtworkPlaceholder />
                       )}
                     </div>
-                    {species ? (
+                    {artwork ? (
                       <SpiritStatusCard
                         headerAction={guardianSelector}
-                        species={species}
+                        species={artwork}
                         level={level}
                         xp={guardian.xp}
                         nextLevelXp={complete ? null : guardian.nextLevelXp}
@@ -323,7 +409,7 @@ export default function BoxClient() {
                         <Progress
                           label="成長經驗"
                           value={complete ? 1 : guardian.xp}
-                          max={complete ? 1 : guardian.nextLevelXp}
+                          max={complete ? 1 : (guardian.nextLevelXp ?? 1)}
                         />
                         {complete ? (
                           <RewardBanner title="已完成培育">
@@ -335,13 +421,13 @@ export default function BoxClient() {
                       </ContentPanel>
                     )}
                   </div>
-                  {species && (
+                  {artwork && (
                     <ContentPanel className="sp-journey">
                       <div className="sp-section-heading">
                         <h2>成長進度</h2>
                       </div>
                       <GrowthTrack
-                        species={species}
+                        species={artwork}
                         unlockedLevel={level}
                         xp={guardian.xp}
                         nextLevelXp={complete ? null : guardian.nextLevelXp}
@@ -422,11 +508,11 @@ export default function BoxClient() {
                 </RewardBanner>
               )}
               <div className="sp-store-grid">
-                {displayedEggs.map((egg) => {
+                {species.map((egg) => {
                   const pointsNeeded = Math.max(egg.cost - availablePoints, 0)
                   const canAfford = availablePoints >= egg.cost
-                  const isOwned = egg.owned && demoState.hasGuardian
-                  const art = artworkById[egg.id]
+                  const isOwned = egg.owned
+                  const art = artworkByCode[egg.code]
                   return (
                     <Card key={egg.id} className="sp-store-card">
                       <div className="sp-store-art">
@@ -507,17 +593,11 @@ export default function BoxClient() {
                 </div>
                 <Badge tone="growth">
                   已解鎖圖鑑{' '}
-                  {demoState.hasGuardian
-                    ? collectionSeries.reduce(
-                        (sum, series) =>
-                          sum + (complete ? 5 : series.unlockedLevel),
-                        0,
-                      )
-                    : 0}{' '}
-                  / {collectionSeries.length * 5}
+                  {collection.reduce((sum, item) => sum + (item.level ?? 0), 0)}{' '}
+                  / {collection.length * MAX_LEVEL}
                 </Badge>
               </div>
-              {!demoState.hasGuardian && (
+              {!hasGuardian && (
                 <IllustratedEmptyState
                   title="你的圖鑑還是空的"
                   lockedEgg
@@ -530,13 +610,9 @@ export default function BoxClient() {
                   兌換並培育精靈後，每個解鎖的成長階段都會收藏在這裡。
                 </IllustratedEmptyState>
               )}
-              {displayedCollection.map((series) => {
-                const unlockedLevel = demoState.hasGuardian
-                  ? complete
-                    ? 5
-                    : series.unlockedLevel
-                  : 0
-                const art = artworkById[series.id]
+              {collection.map((series) => {
+                const unlockedLevel = series.level ?? 0
+                const art = artworkByCode[series.code]
                 const name = art ? spiritCatalog[art].name : series.name
                 return (
                   <ContentPanel
@@ -616,25 +692,6 @@ export default function BoxClient() {
             </>
           )}
         </main>
-        <details className="sp-demo">
-          <summary>版面預覽設定 · Demo 積分狀態</summary>
-          <p>僅供預覽，不會變更任何真實資料。</p>
-          <div>
-            {demoStates.map((option) => (
-              <Button
-                key={option.id}
-                variant="secondary"
-                aria-pressed={demoStateId === option.id}
-                onClick={() => changeDemoState(option)}
-              >
-                {demoStateId === option.id && (
-                  <Check size={14} aria-hidden="true" />
-                )}
-                {option.label}
-              </Button>
-            ))}
-          </div>
-        </details>
       </div>
       {eggToExchange && (
         <Modal
@@ -643,9 +700,9 @@ export default function BoxClient() {
         >
           <div className="sp-dialog-item">
             <div>
-              {artworkById[eggToExchange.id] ? (
+              {artworkByCode[eggToExchange.code] ? (
                 <SpiritArtwork
-                  species={artworkById[eggToExchange.id]!}
+                  species={artworkByCode[eggToExchange.code]!}
                   level={1}
                 />
               ) : (
@@ -663,14 +720,18 @@ export default function BoxClient() {
             amount={eggToExchange.cost}
             label="本次兌換"
           />
-          <p className="sp-caption">
-            目前為前端 Demo，確認後不會實際扣除積分或新增精靈。
-          </p>
+          {actionError && <p className="sp-inline-notice">{actionError}</p>}
           <div className="sp-dialog-actions">
-            <Button variant="secondary" onClick={() => setEggToExchange(null)}>
+            <Button
+              variant="secondary"
+              disabled={busy}
+              onClick={() => setEggToExchange(null)}
+            >
               取消
             </Button>
-            <Button onClick={() => setEggToExchange(null)}>確認兌換</Button>
+            <Button disabled={busy} onClick={confirmRedeem}>
+              {busy ? '兌換中…' : '確認兌換'}
+            </Button>
           </div>
         </Modal>
       )}
@@ -681,24 +742,25 @@ export default function BoxClient() {
         >
           <Card className="sp-note">
             <p>培育對象</p>
-            <h3>{species ? spiritCatalog[species].name : guardian.name}</h3>
+            <h3>{artwork ? spiritCatalog[artwork].name : (guardian?.name ?? '')}</h3>
           </Card>
           <TransactionSummary
             available={availablePoints}
             amount={pointsToUse}
             label="本次投入"
           />
-          <p className="sp-caption">
-            目前為前端 Demo，確認後不會實際扣除積分或增加成長經驗。
-          </p>
+          {actionError && <p className="sp-inline-notice">{actionError}</p>}
           <div className="sp-dialog-actions">
             <Button
               variant="secondary"
+              disabled={busy}
               onClick={() => setShowInvestDialog(false)}
             >
               取消
             </Button>
-            <Button onClick={() => setShowInvestDialog(false)}>確認投入</Button>
+            <Button disabled={busy} onClick={confirmInvest}>
+              {busy ? '投入中…' : '確認投入'}
+            </Button>
           </div>
         </Modal>
       )}
