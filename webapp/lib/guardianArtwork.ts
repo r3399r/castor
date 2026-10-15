@@ -18,8 +18,9 @@ export const spiritCatalog: Record<SpiritSpecies, SpiritDefinition> = {
   cat: {
     name: '貓精靈',
     category: '兒少、家庭與婦幼',
+    artwork: '/illustrations/guardians/cat',
     tone: 'forest',
-    stages: [],
+    stages: ['初生', '萌芽', '探索', '茁壯', '綻放'],
   },
   otter: {
     name: '水獺精靈',

@@ -39,6 +39,7 @@ import SupportNote from './SupportNote'
 // Artwork mapping is deliberately separate from existing demo/API identifiers.
 // The old ocean demo has no matching artwork; never represent it as a bird.
 const artworkById: Partial<Record<string, SpiritSpecies>> = {
+  children: 'cat',
   forest: 'deer',
   wisdom: 'bird',
 }
