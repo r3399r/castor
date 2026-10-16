@@ -132,10 +132,9 @@ const putQuestionEnabled = (id: number | string, body: unknown) =>
     body: JSON.stringify(body),
   });
 
-// Questions are created disabled (admin review gate), but almost every
-// test below is about something else and wants a question a user could
-// actually be served -- so this enables by default. Pass enabled: false
-// to keep a question in its as-created state.
+// Questions are created enabled, which is what almost every test below
+// wants. Pass enabled: false to get a hidden one -- that now takes an
+// explicit flip, where it used to be the as-created state.
 const createQuestion = async (
   subjectId: number,
   examId: number,
@@ -167,7 +166,7 @@ const createQuestion = async (
   });
   const body = (await res.json()) as QuestionDto[][];
   const question = body[0][0];
-  if (enabled) await putQuestionEnabled(question.id, { enabled: true });
+  if (!enabled) await putQuestionEnabled(question.id, { enabled: false });
   return question;
 };
 
@@ -1155,7 +1154,52 @@ describe('question routes', () => {
   });
 
   describe('PUT /:id/enabled', () => {
-    it('creates questions disabled', async () => {
+    // The Facebook auto-poster disarms its own EventBridge rule when it
+    // finds nothing enabled to post, so a question left disabled on
+    // creation silently stops the whole poster until someone notices.
+    it('creates questions enabled', async () => {
+      const { subjectId, examId, conceptId } = await seedFixture();
+      const q = await createQuestion(subjectId, examId, { conceptIds: [conceptId] });
+
+      const res = await getQuestion(q.id);
+      expect(((await res.json()) as { enabled: boolean }).enabled).toBe(true);
+    });
+
+    it("creates a group's children enabled alongside their parent", async () => {
+      const { subjectId, examId, conceptId } = await seedFixture();
+      const res = await postQuestions({
+        subjectId,
+        examId,
+        questions: [
+          {
+            type: 'GROUP',
+            content: 'passage',
+            difficulty: 5,
+            conceptIds: [conceptId],
+            childQuestions: [
+              {
+                type: 'SINGLE',
+                sortOrder: 0,
+                content: 'child',
+                options: 'A|B',
+                answer: 'A',
+                difficulty: 5,
+              },
+            ],
+          },
+        ],
+      });
+      const [[parent]] = (await res.json()) as { id: number }[][];
+
+      const children = await getDb()
+        .select({ enabled: questionTable.enabled })
+        .from(questionTable)
+        .where(eq(questionTable.parentId, parent.id));
+      expect(children).toHaveLength(1);
+      expect(children[0].enabled).toBe(true);
+    });
+
+    it('can be created hidden by disabling it afterwards', async () => {
       const { subjectId, examId, conceptId } = await seedFixture();
       const q = await createQuestion(subjectId, examId, {
         conceptIds: [conceptId],

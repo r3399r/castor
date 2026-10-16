@@ -5,11 +5,13 @@ CREATE TABLE IF NOT EXISTS castor.question (
     parent_id INT UNSIGNED NULL,
     fb_post_id VARCHAR(255) NULL,
     is_group TINYINT NOT NULL DEFAULT 0,
-    -- Admin review gate: questions are created disabled and only reach
-    -- users (question/adaptive, question/count, the Facebook auto-poster)
-    -- once an admin has checked them and flipped this on. A group's
-    -- children carry the same value as their parent, but only the parent
-    -- is ever filtered on -- children are reached through it.
+    -- Visibility gate: controls whether a question reaches users
+    -- (question/adaptive, question/count, the Facebook auto-poster).
+    -- The API creates questions with this set to 1, because review
+    -- happens in the admin preview before submission; the column default
+    -- stays 0 so a hand-written INSERT does not publish by accident.
+    -- A group's children carry the same value as their parent, but only
+    -- the parent is ever filtered on -- children are reached through it.
     enabled TINYINT NOT NULL DEFAULT 0,
     type VARCHAR(255) NOT NULL, -- GROUP, SINGLE, MULTIPLE, TRUE_FALSE, FILL
     sort_order INT NULL, -- for GROUP

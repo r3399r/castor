@@ -55,8 +55,6 @@ export const processNextQuestion = async (db: Db): Promise<void> => {
     .where(
       and(
         isNull(questionTable.parentId),
-        // Never auto-post a question an admin hasn't signed off on -- this
-        // page is public, and questions are created disabled.
         eq(questionTable.enabled, true),
         isNull(questionTable.fbPostId),
         isNotNull(questionTable.content)

@@ -483,10 +483,14 @@ const createOneQuestion = async (
     answer: item.answer ?? null,
     difficulty: item.difficulty,
     adjustedDifficulty: item.difficulty,
-    // Disabled until an admin reviews it -- see PUT /:id/enabled. Set
-    // explicitly rather than left to the column default so the intent is
-    // visible at the only place questions are created.
-    enabled: false,
+    // Live on creation. The review an admin does happens before this
+    // point -- in the preview on /admin/subject/new-question -- so a
+    // second manual flip afterwards was pure friction, and forgetting it
+    // silently stopped the Facebook auto-poster, which disarms its own
+    // schedule when it finds nothing enabled to post. Set explicitly
+    // rather than left to the column default, which stays 0 so a
+    // hand-written INSERT never publishes by accident.
+    enabled: true,
     createdAt: now,
     updatedAt: now,
   });
@@ -514,12 +518,12 @@ const createOneQuestion = async (
       parentId: questionId,
       fbPostId: null,
       isGroup: false,
-      // Mirrors the parent (which is always false here), and PUT
-      // /:id/enabled keeps them in step afterwards. Nothing filters
-      // children on it -- they're only ever reached through the parent --
-      // but a child row contradicting its parent would be a trap for the
-      // next query written against this table.
-      enabled: false,
+      // Mirrors the parent (always true here), and PUT /:id/enabled
+      // keeps them in step afterwards. Nothing filters children on it --
+      // they're only ever reached through the parent -- but a child row
+      // contradicting its parent would be a trap for the next query
+      // written against this table.
+      enabled: true,
       type: child.type,
       sortOrder: child.sortOrder,
       content: child.content,
