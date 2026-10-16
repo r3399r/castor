@@ -110,6 +110,7 @@ export default function BoxClient() {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [refreshFailed, setRefreshFailed] = useState(false)
   const [busy, setBusy] = useState(false)
   const [selectedGuardianId, setSelectedGuardianId] = useState<number | null>(null)
   const [pointsToUse, setPointsToUse] = useState(1)
@@ -157,19 +158,34 @@ export default function BoxClient() {
     (a, b) => Number((b.level ?? 0) > 0) - Number((a.level ?? 0) > 0),
   )
 
+  /**
+   * Refreshes the view after an action that already succeeded.
+   *
+   * Deliberately outside the action's own try/catch. A failure here means
+   * the figures on screen are stale, NOT that the action failed --
+   * reporting it as a failure would invite a retry, and a retried redeem
+   * answers ALREADY_OWNED while a retried invest spends the points a
+   * second time.
+   */
+  const refreshAfterAction = () => {
+    setRefreshFailed(false)
+    reload().catch(() => setRefreshFailed(true))
+  }
+
   const confirmRedeem = async () => {
     if (eggToExchange === null) return
     setBusy(true)
     setActionError(null)
     try {
       await apiPost('store/redeem', { speciesId: eggToExchange.id })
-      await reload()
-      setEggToExchange(null)
     } catch {
       setActionError('兌換失敗，請確認積分是否足夠後再試一次。')
-    } finally {
       setBusy(false)
+      return
     }
+    setEggToExchange(null)
+    setBusy(false)
+    refreshAfterAction()
   }
 
   const confirmInvest = async () => {
@@ -178,13 +194,14 @@ export default function BoxClient() {
     setActionError(null)
     try {
       await apiPost(`guardian/${guardian.id}/invest`, { points: pointsToUse })
-      await reload()
-      setShowInvestDialog(false)
     } catch {
       setActionError('投入失敗，請稍後再試一次。')
-    } finally {
       setBusy(false)
+      return
     }
+    setShowInvestDialog(false)
+    setBusy(false)
+    refreshAfterAction()
   }
   const investControls = (
     <div className="sp-invest">
@@ -355,6 +372,11 @@ export default function BoxClient() {
           aria-labelledby={`gift-tabs-${activeTab}`}
           tabIndex={0}
         >
+          {refreshFailed && (
+            <p className="sp-inline-notice" role="status">
+              操作已完成，但畫面上的數字可能不是最新的。請重新整理頁面。
+            </p>
+          )}
           {activeTab === 'growing' ? (
             <>
               {hasGuardian ? (

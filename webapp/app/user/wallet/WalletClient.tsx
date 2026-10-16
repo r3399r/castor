@@ -8,8 +8,14 @@ import { ButtonLink, EmptyState, ErrorState, LoadingState, PageHeader } from '@/
 import type { GetWalletResponse, PointTransaction } from '@/types/api'
 import styles from '../user.module.css'
 
+// Every type the backend currently writes. The column is deliberately
+// open-ended (see db/table/point_transaction.sql), so the raw code is
+// still rendered as a fallback rather than hiding a movement the user
+// can see in their balance but not in this list.
 const typeLabel: Record<string, string> = {
   EARN_REPLY: '答題獲得',
+  SPEND_EGG_REDEEM: '兌換精靈蛋',
+  SPEND_GUARDIAN_INVEST: '投入培育',
 }
 
 function formatDate(dateStr: string | null): string {
