@@ -12,6 +12,7 @@ const ADMIN_FUNCTIONS = [
   { label: '觀念管理', description: '新增、編輯、刪除觀念', href: '/admin/concept' },
   { label: '篩選維度管理', description: '新增、編輯、刪除篩選維度', href: '/admin/filter-dimension' },
   { label: '篩選選項管理', description: '新增、編輯、刪除篩選選項', href: '/admin/filter-option' },
+  { label: '精靈圖鑑', description: '檢視所有精靈種類與各等級圖卡（唯讀）', href: '/admin/species' },
   { label: '使用者管理', description: '檢視使用者列表', href: '/admin/user' },
 ]
 

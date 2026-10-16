@@ -61,6 +61,20 @@ export const spiritCatalog: Record<SpiritSpecies, SpiritDefinition> = {
     stages: ['初生', '萌芽', '探索', '茁壯', '綻放'],
   },
 }
+/**
+ * guardian.code (the database slug) to the drawn spirit it depicts.
+ *
+ * Lives here rather than in a page because artwork is shipped as files
+ * plus this mapping, and two copies would silently disagree -- a code
+ * missing from one page shows the locked egg while the other shows the
+ * spirit. A code absent here has no artwork yet, which is a normal state.
+ */
+export const artworkByCode: Partial<Record<string, SpiritSpecies>> = {
+  children: 'cat',
+  forest: 'deer',
+  wisdom: 'bird',
+}
+
 export function spiritImage(species: SpiritSpecies, level: number) {
   const root = spiritCatalog[species].artwork
   return root

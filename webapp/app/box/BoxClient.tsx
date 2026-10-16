@@ -32,7 +32,7 @@ import {
   SpiritScene,
   SpiritStatusCard,
 } from '@/components/spirit'
-import { spiritCatalog, type SpiritSpecies } from '@/lib/guardianArtwork'
+import { artworkByCode, spiritCatalog, type SpiritSpecies } from '@/lib/guardianArtwork'
 import { apiFetch, apiPost } from '@/lib/api'
 import SupportNote from './SupportNote'
 
@@ -55,15 +55,6 @@ type SpeciesDto = {
   cost: number
   owned: boolean
   level: number | null
-}
-
-// Keyed on the guardian table's stable `code` slug. Only these two have
-// artwork drawn; every other species falls back to the shared locked egg
-// rather than borrowing a picture that is not of it.
-const artworkByCode: Partial<Record<string, SpiritSpecies>> = {
-  children: 'cat',
-  forest: 'deer',
-  wisdom: 'bird',
 }
 
 /** Levels in a complete collection series, matching the backend's MAX_LEVEL. */

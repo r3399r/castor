@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { toErrorResponse } from 'src/lib/errorResponse';
-import { adminAuth } from 'src/middleware/adminAuth';
+import { adminAuth, requireAdmin } from 'src/middleware/adminAuth';
 import { requestLogger } from 'src/middleware/requestLogger';
 import { requireSubscription } from 'src/middleware/requireSubscription';
 import { requireUser } from 'src/middleware/requireUser';
@@ -16,6 +16,7 @@ import { guardian } from 'src/routes/guardian';
 import { info } from 'src/routes/info';
 import { question } from 'src/routes/question';
 import { reply } from 'src/routes/reply';
+import { species } from 'src/routes/species';
 import { store } from 'src/routes/store';
 import { subject } from 'src/routes/subject';
 import { subscription } from 'src/routes/subscription';
@@ -77,6 +78,11 @@ export const app = new Hono()
   .use('/api/wallet/*', transaction)
   .use('/api/wallet/*', requireUser)
   .route('/api/wallet', wallet)
+  // Read-only catalog view for the admin UI. requireAdmin, not adminAuth:
+  // adminAuth lets GETs through, which on a GET-only route is no gate.
+  .use('/api/species/*', transaction)
+  .use('/api/species/*', requireAdmin)
+  .route('/api/species', species)
   .use('/api/store/*', transaction)
   .use('/api/store/*', requireUser)
   .route('/api/store', store)
