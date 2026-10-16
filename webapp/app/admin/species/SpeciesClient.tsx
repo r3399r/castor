@@ -18,7 +18,8 @@ type SpeciesDto = {
   cost: number
   sortOrder: number
   isActive: boolean
-  ownerCount: number
+  /** Keyed by level; a level with no owners is absent. */
+  ownersByLevel: Record<string, number>
 }
 
 const LEVELS = [1, 2, 3, 4, 5]
@@ -37,7 +38,15 @@ function Badge({ tone, children }: { tone: 'ok' | 'muted' | 'warn'; children: Re
 }
 
 /** One level's card, or a placeholder when that level has no file yet. */
-function LevelThumb({ species, level }: { species: SpiritSpecies | undefined; level: number }) {
+function LevelThumb({
+  species,
+  level,
+  owners,
+}: {
+  species: SpiritSpecies | undefined
+  level: number
+  owners: number
+}) {
   const src = species ? spiritImage(species, level) : undefined
   return (
     <figure className="flex w-[84px] shrink-0 flex-col items-center gap-1">
@@ -54,7 +63,13 @@ function LevelThumb({ species, level }: { species: SpiritSpecies | undefined; le
           <span className="text-[11px] text-black-300">無圖</span>
         )}
       </div>
-      <figcaption className="text-[11px] text-black-500">LV{level}</figcaption>
+      <figcaption className="text-center text-[11px] text-black-500">
+        LV{level}
+        <br />
+        <span className={owners > 0 ? 'font-bold text-black-900 tabular-nums' : 'text-black-300'}>
+          {owners} 人
+        </span>
+      </figcaption>
     </figure>
   )
 }
@@ -121,7 +136,10 @@ export default function SpeciesClient() {
                 </div>
                 <span className="text-xs text-black-500">
                   商店名稱 {row.name} · {row.cost} 點 · 排序 {row.sortOrder} ·{' '}
-                  <span className="tabular-nums">{row.ownerCount}</span> 人擁有
+                  <span className="tabular-nums">
+                    {Object.values(row.ownersByLevel).reduce((sum, n) => sum + n, 0)}
+                  </span>{' '}
+                  人擁有
                 </span>
               </div>
 
@@ -129,7 +147,12 @@ export default function SpeciesClient() {
 
               <div className="flex flex-wrap gap-3">
                 {LEVELS.map((level) => (
-                  <LevelThumb key={level} species={art} level={level} />
+                  <LevelThumb
+                    key={level}
+                    species={art}
+                    level={level}
+                    owners={row.ownersByLevel[String(level)] ?? 0}
+                  />
                 ))}
               </div>
             </section>

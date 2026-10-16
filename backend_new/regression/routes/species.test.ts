@@ -15,7 +15,7 @@ type SpeciesDto = {
   cost: number;
   sortOrder: number;
   isActive: boolean;
-  ownerCount: number;
+  ownersByLevel: Record<string, number>;
 };
 
 const getSpecies = () => app.request('/api/species');
@@ -101,27 +101,31 @@ describe('species', () => {
       expect(body.map((s) => s.code)).toEqual(['first', 'second', 'third']);
     });
 
-    // Lets an admin tell a species nobody has from one that is merely
-    // retired -- the two look identical otherwise.
-    it('counts how many users own each species', async () => {
+    // A flat total would not answer what the page is for: whether anyone
+    // reaches the later stages, or everyone stalls at LV1.
+    it('breaks owners down by the level they have reached', async () => {
       const db = getDb();
       const ownedId = await seedSpecies('owned', { sortOrder: 1 });
       await seedSpecies('unowned', { sortOrder: 2 });
-      const [{ insertId: userA }] = await db
-        .insert(userTable)
-        .values({ firebaseUid: 'a', email: 'a@example.com', createdAt: new Date() });
-      const [{ insertId: userB }] = await db
-        .insert(userTable)
-        .values({ firebaseUid: 'b', email: 'b@example.com', createdAt: new Date() });
+      const users = [];
+      for (const uid of ['a', 'b', 'c']) {
+        const [{ insertId }] = await db
+          .insert(userTable)
+          .values({ firebaseUid: uid, email: uid + '@example.com', createdAt: new Date() });
+        users.push(insertId);
+      }
       await db.insert(userGuardianTable).values([
-        { userId: userA, guardianId: ownedId, createdAt: new Date(), updatedAt: new Date() },
-        { userId: userB, guardianId: ownedId, createdAt: new Date(), updatedAt: new Date() },
+        { userId: users[0], guardianId: ownedId, level: 1, createdAt: new Date(), updatedAt: new Date() },
+        { userId: users[1], guardianId: ownedId, level: 1, createdAt: new Date(), updatedAt: new Date() },
+        { userId: users[2], guardianId: ownedId, level: 4, createdAt: new Date(), updatedAt: new Date() },
       ]);
       vi.mocked(verifyIdToken).mockResolvedValue(ADMIN_EMAILS[0]);
 
       const body = (await (await getSpecies()).json()) as SpeciesDto[];
-      expect(body.find((s) => s.code === 'owned')?.ownerCount).toBe(2);
-      expect(body.find((s) => s.code === 'unowned')?.ownerCount).toBe(0);
+      expect(body.find((s) => s.code === 'owned')?.ownersByLevel).toEqual({ '1': 2, '4': 1 });
+      // A level nobody has reached is absent rather than zero.
+      expect(body.find((s) => s.code === 'owned')?.ownersByLevel['2']).toBeUndefined();
+      expect(body.find((s) => s.code === 'unowned')?.ownersByLevel).toEqual({});
     });
 
     it('exposes no write verbs', async () => {

@@ -28,16 +28,25 @@ export const species = new Hono<TransactionEnv>().get('/', async (c) => {
     .from(guardianTable)
     .orderBy(asc(guardianTable.sortOrder), asc(guardianTable.id));
 
-  // How many users hold each species, so an admin can tell a species
-  // nobody has from one that is merely retired.
+  // Owners broken down by the level they have grown to, which is what
+  // the catalog page shows beneath each level's artwork. A bare total
+  // would not answer the question the page is for -- whether anyone has
+  // actually reached the later stages, or everyone stalls at LV1.
   const owners = await db
     .select({
       guardianId: userGuardianTable.guardianId,
+      level: userGuardianTable.level,
       ownerCount: sql<number>`count(*)`,
     })
     .from(userGuardianTable)
-    .groupBy(userGuardianTable.guardianId);
-  const ownerCountById = new Map(owners.map((o) => [o.guardianId, Number(o.ownerCount)]));
+    .groupBy(userGuardianTable.guardianId, userGuardianTable.level);
+
+  const ownersByLevelById = new Map<number, Record<number, number>>();
+  for (const row of owners) {
+    const byLevel = ownersByLevelById.get(row.guardianId) ?? {};
+    byLevel[row.level] = Number(row.ownerCount);
+    ownersByLevelById.set(row.guardianId, byLevel);
+  }
 
   return c.json(
     rows.map((row) => ({
@@ -48,7 +57,9 @@ export const species = new Hono<TransactionEnv>().get('/', async (c) => {
       cost: row.cost,
       sortOrder: row.sortOrder,
       isActive: row.isActive,
-      ownerCount: ownerCountById.get(row.id) ?? 0,
+      // Keyed by level. Absent levels simply have no owners; the caller
+      // decides which levels to display.
+      ownersByLevel: ownersByLevelById.get(row.id) ?? {},
     }))
   );
 });
