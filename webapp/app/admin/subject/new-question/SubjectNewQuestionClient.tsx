@@ -46,6 +46,21 @@ type QuestionDraft = {
 }
 
 const QUESTION_TYPES = ['GROUP', 'SINGLE', 'MULTIPLE', 'TRUE_FALSE', 'FILL']
+
+/**
+ * A GROUP carries no options or answer of its own -- its children are what
+ * gets answered -- but the model sometimes fills them in anyway (`"GROUP"`
+ * has been seen). The value is meaningless rather than wrong, so it is
+ * stripped on submit instead of blocking the batch, and surfaced in the
+ * preview so a recurring prompt problem stays visible.
+ */
+const strayGroupFields = (q: QuestionDraft): string[] => {
+  if (q.type !== 'GROUP') return []
+  const stray: string[] = []
+  if (q.options !== undefined && q.options !== null && q.options !== '') stray.push('options')
+  if (q.answer !== undefined && q.answer !== null && q.answer !== '') stray.push('answer')
+  return stray
+}
 const CHILD_QUESTION_TYPES = ['SINGLE', 'MULTIPLE', 'TRUE_FALSE', 'FILL']
 
 // Mirrors backend_new's questionBodySchema closely enough that anything
@@ -177,8 +192,11 @@ export default function SubjectNewQuestionClient() {
         questions: parsedQuestions.map((question, i) => ({
           type: question.type,
           content: question.content,
-          options: question.options,
-          answer: question.answer,
+          // Dropped for a GROUP rather than passed through: the server
+          // would happily store the string, leaving a question that is
+          // never answered holding an answer.
+          options: question.type === 'GROUP' ? undefined : question.options,
+          answer: question.type === 'GROUP' ? undefined : question.answer,
           difficulty: question.difficulty,
           conceptIds: question.conceptIds,
           tagIds: (tagSelections[i] ?? []).map(Number),
@@ -408,6 +426,88 @@ export default function SubjectNewQuestionClient() {
                     </span>
                   </div>
                 </div>
+
+                {strayGroupFields(question).length > 0 && (
+                  <p className="mt-2 text-xs text-[#7A5713]">
+                    題組不應有 {strayGroupFields(question).join(' 與 ')}
+                    ，送出時會自動忽略。
+                  </p>
+                )}
+
+                {/*
+                  A GROUP's children are validated and submitted, but were
+                  not shown here -- so the only way to check the AI had read
+                  the sub-questions correctly was to read the raw JSON.
+                */}
+                {question.childQuestions && question.childQuestions.length > 0 && (
+                  <div className="mt-3 border-t border-spirit-line pt-3">
+                    <p className="mb-2 text-sm font-medium text-black-500">
+                      子題（{question.childQuestions.length}）
+                    </p>
+                    <div className="flex flex-col gap-3">
+                      {[...question.childQuestions]
+                        // Displayed in the order they will be stored, which
+                        // is sortOrder, not the order they arrived in.
+                        .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+                        .map((child, childIndex) => (
+                          <div
+                            key={childIndex}
+                            className="rounded-lg border border-brown-300 bg-beige-100 p-4"
+                          >
+                            <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
+                              <span className="font-bold text-black-900">
+                                子題 {(child.sortOrder ?? childIndex) + 1}
+                              </span>
+                              {child.type && (
+                                <span className="rounded-full bg-beige-200 px-2 py-0.5 text-black-700">
+                                  {child.type}
+                                </span>
+                              )}
+                            </div>
+
+                            {child.content ? (
+                              <MathJax dynamic>
+                                <div
+                                  dangerouslySetInnerHTML={{ __html: child.content }}
+                                  className="prose prose-sm max-w-none"
+                                />
+                              </MathJax>
+                            ) : (
+                              <p className="text-sm text-black-200">此子題無 content</p>
+                            )}
+
+                            <div className="mt-2 space-y-1 text-sm">
+                              <div className="flex gap-2">
+                                <span className="w-20 shrink-0 font-medium text-black-500">
+                                  options:
+                                </span>
+                                <span className="text-black-900">{child.options ?? '—'}</span>
+                              </div>
+                              <div className="flex gap-2">
+                                <span className="w-20 shrink-0 font-medium text-black-500">
+                                  answer:
+                                </span>
+                                <span className="text-black-900">{child.answer ?? '—'}</span>
+                              </div>
+                              <div className="flex gap-2">
+                                <span className="w-20 shrink-0 font-medium text-black-500">
+                                  difficulty:
+                                </span>
+                                <span className="text-black-900">{child.difficulty ?? '—'}</span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+
+                {question.type === 'GROUP' &&
+                  (!question.childQuestions || question.childQuestions.length === 0) && (
+                    <p className="mt-3 border-t border-spirit-line pt-3 text-sm text-red-600">
+                      題組沒有任何子題。
+                    </p>
+                  )}
 
                 {subject.tags.length > 0 && (
                   <div className="mt-3 border-t border-spirit-line pt-3">
