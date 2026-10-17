@@ -22,7 +22,10 @@ const wrapHtml = (content: string) => `<!DOCTYPE html>
   <meta charset="UTF-8">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
+  <!-- Noto Serif TC supplies the Ming (明體) face. A webfont is not
+       optional here: the Lambda Chromium image ships essentially no
+       system fonts, so anything not downloaded renders as tofu. -->
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700&family=Tinos:ital,wght@0,400;0,700;1,400&family=LXGW+WenKai+TC:wght@400;700&display=swap" rel="stylesheet">
   <script>
     window.MathJax = {
       tex: {
@@ -33,7 +36,13 @@ const wrapHtml = (content: string) => `<!DOCTYPE html>
   </script>
   <script id="MathJax-script" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
   <style>
-    body { margin: 20px 24px; font-family: 'Noto Sans TC', sans-serif; font-size: 16px; line-height: 1.6; background: #fff; color: #1a1a1a; }
+    /* Printed-exam look for the posted image: Times for Latin, Ming for
+       CJK. Times New Roman is named first for the machines that have it;
+       Tinos is its metrically-compatible stand-in and is what Lambda
+       actually gets. Latin glyphs come from those two, and the CJK
+       characters they have no glyph for fall through to Noto Serif TC.
+       The app's own question rendering does NOT share this stack. */
+    body { margin: 20px 24px; font-family: 'Times New Roman', 'Tinos', 'Noto Serif TC', serif; font-size: 16px; line-height: 1.6; background: #fff; color: #1a1a1a; }
     img { max-width: 100%; }
     /* Separates a GROUP's sub-questions, which otherwise read as one
        run-on paragraph (see facebookPoster.ts). */

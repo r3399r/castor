@@ -31,6 +31,18 @@ export const QUESTION_EXTRACT_INSTRUCTION = `
 - conceptIds 至少要有一個，必須從使用者提供的觀念清單中挑選。不可以回傳空陣列 []；若沒有完全吻合的，挑最接近的那一個
 - 若截圖模糊、殘缺或裁切到看不出完整題目，回傳空 array []，不要猜測內容
 
+## 字體
+
+預設不要指定字體。Facebook 貼文圖的模版已經把英文設為 Times New Roman、中文設為明體，多寫一次只會變得難維護。
+
+只有當截圖中某段文字「明顯不是明體」且該字體是題意的一部分（例如文言文引文用楷體、書法舉例）時，才在「最小範圍」的元素上加 inline style：
+
+- 楷體：\`style="font-family:'DFKai-SB','標楷體','Kaiti TC','LXGW WenKai TC',serif"\`
+- 黑體／等線體：\`style="font-family:'Microsoft JhengHei','PingFang TC',sans-serif"\`
+- 等寬（程式碼、對齊的數字表）：\`style="font-family:monospace"\`
+
+不要為了「看起來像原卷」而把整篇文章或每一個段落都標上字體；截圖裡普通的內文一律當作預設處理。
+
 ## 數學公式
 
 題目中的數學式一律使用 LaTeX（MathJax）語法，不要用 CSS、<sup>、<sub>、<table> 或純文字拼湊出數學排版：
