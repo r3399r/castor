@@ -121,8 +121,13 @@ const describeRecognizeError = (e: unknown): string => {
     return `辨識失敗：${e instanceof Error ? e.message : String(e)}`
 
   switch (e.code) {
-    // The provider itself said "later" -- Gemini answers an overloaded
-    // model with 503, and a rate-limited key with 429.
+    // Our own quota, not the provider's capacity. Clicking again straight
+    // away spends more of an allowance that is already gone, so this is
+    // the one case that asks for a wait with a number on it.
+    case 'AI_RATE_LIMITED':
+      return 'AI 辨識次數已達上限，請等待約一分鐘再試。連續點按會讓等待時間變長。'
+    // The provider itself said "later": Gemini answers an overloaded
+    // model with 503.
     case 'AI_UNAVAILABLE':
     case 'AI_REQUEST_FAILED':
     case 'AI_EMPTY_RESPONSE':
@@ -140,6 +145,8 @@ const describeRecognizeError = (e: unknown): string => {
       return '伺服器尚未完成 AI 設定（金鑰或模型），請聯絡系統管理員。'
   }
 
+  if (e.status === 429)
+    return '請求過於頻繁，請稍等一分鐘再試。'
   if (e.status === 400)
     return '圖片格式或大小不符，或此科目尚未建立觀念（需先新增觀念才能辨識）。'
   if (e.status === 404) return '找不到此科目。'

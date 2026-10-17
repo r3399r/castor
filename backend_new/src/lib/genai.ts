@@ -1,5 +1,5 @@
 import { GoogleGenAI, ThinkingLevel } from '@google/genai';
-import { BadGatewayError } from 'src/model/error';
+import { BadGatewayError, TooManyRequestsError } from 'src/model/error';
 
 // Required, with no hard-coded default: the id is pinned on the stack
 // (template.yaml) so that changing models is a parameter change, and a
@@ -36,11 +36,24 @@ const MAX_ATTEMPTS = 4;
 const BASE_BACKOFF_MS = 400;
 
 // 503 UNAVAILABLE is what an overloaded model returns and is the case
-// this retry exists for; 429 is a throttled key and 500/502/504 are
-// transient faults. Anything else -- 400 malformed request, 403 bad key,
-// 404 unknown model -- fails identically however often it is sent, so it
-// propagates immediately instead of burning the budget.
-const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504]);
+// this retry exists for; 500/502/504 are transient faults. Anything else
+// -- 400 malformed request, 403 bad key, 404 unknown model -- fails
+// identically however often it is sent, so it propagates immediately
+// instead of burning the budget.
+const RETRYABLE_STATUSES = new Set([500, 502, 503, 504]);
+
+// 429 is deliberately NOT retryable here, though it used to be. It is a
+// quota wall, not a capacity dip, and the two want opposite handling:
+// the shortest useful wait for a per-minute quota is tens of seconds,
+// which does not fit in the budget below, so every retry is spent before
+// the window can reset. Worse, each one consumes more of the quota that
+// is already exhausted. Prod bore this out -- a request at 06:56 burned
+// all four attempts in 2.9s, every one a 429, the fallback model
+// included (the quota is per project, not per model, so switching models
+// buys nothing either). Failing immediately returns the budget to the
+// 503 path and lets the caller say "wait a minute" instead of "the
+// provider is busy", which is a different instruction to the admin.
+const RATE_LIMIT_STATUS = 429;
 
 // Pulled out of the generic failure path because this is the shape a
 // model retirement takes: the id stops resolving and every call 404s
@@ -158,6 +171,11 @@ export const generateJsonFromImages = async (
         // Worth distinguishing: a provider that was busy for the whole
         // budget should tell the admin to try again, not imply their
         // screenshot was at fault.
+        // Surfaced as a real 429 rather than a 502: this is the one
+        // failure here the admin can act on by simply slowing down, and
+        // the status is what lets the UI say so without string-matching.
+        if (status === RATE_LIMIT_STATUS)
+          throw new TooManyRequestsError('AI provider rate limit reached', 'AI_RATE_LIMITED');
         if (status === MODEL_NOT_FOUND_STATUS)
           throw new BadGatewayError(`AI model ${useModel} not found`, 'AI_MODEL_NOT_FOUND');
         if (retryable) throw new BadGatewayError('AI provider is unavailable', 'AI_UNAVAILABLE');

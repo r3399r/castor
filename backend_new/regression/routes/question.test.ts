@@ -51,6 +51,7 @@ vi.mock('src/lib/facebookEventBridge', () => ({ enableFacebookEventBridge: vi.fn
 // needing an API key) on every run.
 vi.mock('src/lib/genai', () => ({ generateJsonFromImages: vi.fn() }));
 import { generateJsonFromImages } from 'src/lib/genai';
+import { BadGatewayError, TooManyRequestsError } from 'src/model/error';
 
 type QuestionDto = {
   id: number;
@@ -1448,6 +1449,46 @@ describe('question routes', () => {
       // Structured output is what keeps the reply parseable -- a call that
       // forgot the schema would still pass every other assertion here.
       expect(schema).toMatchObject({ type: 'array' });
+    });
+
+    // The whole point of the 429 is that it reaches the browser as a 429.
+    // genai.ts classifies the provider's refusal, errorResponse.ts maps it,
+    // and the UI switches on the code -- so a regression anywhere in that
+    // chain shows up as the admin being told to retry a quota wall.
+    it('surfaces an AI rate limit as 429 with code AI_RATE_LIMITED', async () => {
+      const { subjectId } = await seedFixture();
+      vi.mocked(generateJsonFromImages).mockRejectedValue(
+        new TooManyRequestsError('AI provider rate limit reached', 'AI_RATE_LIMITED')
+      );
+
+      const res = await postQuestionImage({
+        subjectId,
+        images: [{ mimeType: 'image/png', data: PNG_BASE64 }],
+      });
+
+      expect(res.status).toBe(429);
+      expect(await res.json()).toMatchObject({
+        status: 429,
+        name: 'TooManyRequestsError',
+        code: 'AI_RATE_LIMITED',
+      });
+    });
+
+    // A capacity dip has to stay distinguishable from the quota wall
+    // above, because the two tell the admin different things.
+    it('keeps a provider outage as 502 with code AI_UNAVAILABLE', async () => {
+      const { subjectId } = await seedFixture();
+      vi.mocked(generateJsonFromImages).mockRejectedValue(
+        new BadGatewayError('AI provider is unavailable', 'AI_UNAVAILABLE')
+      );
+
+      const res = await postQuestionImage({
+        subjectId,
+        images: [{ mimeType: 'image/png', data: PNG_BASE64 }],
+      });
+
+      expect(res.status).toBe(502);
+      expect(await res.json()).toMatchObject({ status: 502, code: 'AI_UNAVAILABLE' });
     });
 
     it('appends an optional note to the prompt', async () => {
