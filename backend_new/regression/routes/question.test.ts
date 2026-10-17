@@ -104,6 +104,9 @@ const postQuestionImage = (body: unknown) =>
     body: JSON.stringify(body),
   });
 
+const getQuestionImagePrompt = (query: string) =>
+  app.request(`/api/question/image/prompt${query}`);
+
 const getQuestionTag = (id: number | string) => app.request(`/api/question/${id}/tag`);
 
 const putQuestionTag = (id: number | string, body: unknown) =>
@@ -1394,6 +1397,92 @@ describe('question routes', () => {
       expect(
         body.data.some((group) => group.children.some((child) => child.questionId === q.id))
       ).toBe(true);
+    });
+  });
+
+  describe('GET /image/prompt', () => {
+    it('returns the same prompt POST /image would have sent', async () => {
+      const { subjectId, conceptId } = await seedFixture();
+
+      const res = await getQuestionImagePrompt(`?subjectId=${subjectId}`);
+      expect(res.status).toBe(200);
+      const body = await res.json();
+
+      expect(body).toMatchObject({ subjectId, subjectName: 'fixture subject', imageCount: 1 });
+      // The point of the endpoint: what an admin pastes into a chat GUI
+      // has to carry the rules AND the subject's concept list, or the
+      // JSON that comes back cannot be assigned to a concept.
+      expect(body.userPrompt).toContain(`fixture concept=${conceptId}`);
+      expect(body.userPrompt).toContain('fixture subject');
+      expect(body.systemInstruction).toContain('JSON');
+      // The two halves stay separate so a GUI with a system-instruction
+      // field can mirror the API call; nothing pre-joins them.
+      expect(body).not.toHaveProperty('prompt');
+    });
+
+    // A prompt fetched for one image but used with several crops would
+    // invite the "N crops came back as N questions" mistake.
+    it('reflects imageCount and the optional note', async () => {
+      const { subjectId } = await seedFixture();
+
+      const res = await getQuestionImagePrompt(
+        `?subjectId=${subjectId}&imageCount=3&note=${encodeURIComponent('the answer is B')}`
+      );
+      expect(res.status).toBe(200);
+      const body = await res.json();
+
+      expect(body.imageCount).toBe(3);
+      expect(body.userPrompt).toContain('3');
+      expect(body.userPrompt).toContain('the answer is B');
+    });
+
+    // This drift is the one that would make the manual fallback useless
+    // without failing: the same inputs must produce the same prompt the
+    // automatic path builds.
+    it('matches the prompt POST /image passes to the model', async () => {
+      const { subjectId } = await seedFixture();
+      vi.mocked(generateJsonFromImages).mockReset();
+      vi.mocked(generateJsonFromImages).mockResolvedValue('[]');
+
+      await postQuestionImage({
+        subjectId,
+        images: [{ mimeType: 'image/png', data: PNG_BASE64 }],
+        note: 'shared note',
+      });
+      const [sentInstruction, sentPrompt] = vi.mocked(generateJsonFromImages).mock.calls[0];
+
+      const res = await getQuestionImagePrompt(
+        `?subjectId=${subjectId}&note=${encodeURIComponent('shared note')}`
+      );
+      const body = await res.json();
+
+      // Exact equality, not containment: each half has to be what the API
+      // sends and nothing else, or the manual route quietly produces
+      // different JSON than the automatic one.
+      expect(body.systemInstruction).toBe(sentInstruction.trim());
+      expect(body.userPrompt).toBe(sentPrompt);
+    });
+
+    // adminAuth lets GETs through, so this route carries requireAdmin.
+    // Without it any signed-in user could read the full instruction.
+    it('rejects a caller who is not an admin', async () => {
+      const { subjectId } = await seedFixture();
+
+      vi.mocked(verifyIdToken).mockResolvedValue(null);
+      expect((await getQuestionImagePrompt(`?subjectId=${subjectId}`)).status).toBe(401);
+
+      vi.mocked(verifyIdToken).mockResolvedValue('someone-else@example.com');
+      expect((await getQuestionImagePrompt(`?subjectId=${subjectId}`)).status).toBe(403);
+    });
+
+    it('404s an unknown subject and 400s one with no concepts', async () => {
+      expect((await getQuestionImagePrompt('?subjectId=999999')).status).toBe(404);
+
+      const db = getDb();
+      const [{ insertId: bareSubjectId }] = await db
+        .insert(subjectTable)
+        .values({ name: 'no concepts', createdAt: new Date() });
+      expect((await getQuestionImagePrompt(`?subjectId=${bareSubjectId}`)).status).toBe(400);
     });
   });
 

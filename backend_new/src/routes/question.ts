@@ -218,6 +218,34 @@ export const questionImageResponseJsonSchema = {
   },
 };
 
+/**
+ * Loads everything the extraction prompt is built from.
+ *
+ * Shared by POST /image and GET /image/prompt deliberately: the whole
+ * value of handing the prompt out is that it is the *same* prompt the API
+ * would have sent, so a divergence here would silently make the manual
+ * fallback produce different JSON than the automatic path.
+ */
+const loadPromptInputs = async (db: Db, subjectId: number) => {
+  const [subject] = await db.select().from(subjectTable).where(eq(subjectTable.id, subjectId));
+  if (subject === undefined) throw new NotFoundError(`subject ${subjectId} not found`);
+
+  // Resolved from the DB rather than accepted from the client: the
+  // prompt makes the model pick conceptIds out of this list, so the
+  // same list doubles as the allowlist its answer is filtered against.
+  const concepts = await db
+    .select({ id: conceptTable.id, name: conceptTable.name })
+    .from(conceptTable)
+    .innerJoin(conceptGroupTable, eq(conceptGroupTable.id, conceptTable.conceptGroupId))
+    .where(eq(conceptGroupTable.subjectId, subjectId));
+  // The extraction prompt refuses to start without a concept list, so
+  // there's nothing to gain by spending an AI call to find that out.
+  if (concepts.length === 0)
+    throw new BadRequestError(`subject ${subjectId} has no concepts to assign questions to`);
+
+  return { subject, concepts };
+};
+
 const QUESTION_SORT_COLUMNS = {
   id: questionTable.id,
   subject: subjectTable.name,
@@ -230,6 +258,16 @@ export const questionListQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).optional().default(0),
   sort: z.enum(['id', 'subject', 'type', 'difficulty']).optional().default('id'),
   order: z.enum(['asc', 'desc']).optional().default('desc'),
+});
+
+// imageCount matters because the prompt says something different for a
+// multi-crop question ("these N images are one question") -- a prompt
+// fetched for 1 image and then used with 3 crops would invite exactly the
+// mistake that wording exists to prevent.
+export const questionImagePromptQuerySchema = z.object({
+  subjectId: z.coerce.number().int().positive(),
+  imageCount: z.coerce.number().int().positive().max(10).optional().default(1),
+  note: z.string().optional(),
 });
 
 export const questionCountQuerySchema = z.object({
@@ -946,6 +984,38 @@ export const question = new Hono<UserEnv>()
 
     return c.json(results, 201);
   })
+  // Manual escape hatch for when the Gemini quota is gone: hands back the
+  // exact prompt POST /image would have sent, to paste into a chat GUI
+  // along with the screenshot. The JSON that comes back drops into the
+  // same preview box the automatic path fills, so the review step is
+  // unchanged -- only who calls the model differs.
+  //
+  // GET with nothing written, so it is safe to call repeatedly while
+  // fiddling with the note. Gated by requireAdmin in app.ts rather than
+  // the group's adminAuth, which lets GETs through: this returns the
+  // subject's whole concept list and the full instruction text.
+  .get('/image/prompt', zValidator('query', questionImagePromptQuerySchema), async (c) => {
+    const { subjectId, imageCount, note } = c.req.valid('query');
+    console.log(`GET /api/question/image/prompt subjectId=${subjectId} imageCount=${imageCount}`);
+    const db = c.get('db');
+
+    const { subject, concepts } = await loadPromptInputs(db, subjectId);
+    const userPrompt = buildQuestionExtractPrompt(subject.name, concepts, imageCount, note);
+
+    // Returned as the same two parts the API sends, not pre-joined: a GUI
+    // with a system-instruction field (AI Studio) reproduces the
+    // automatic path exactly when each half goes in its own box, and
+    // joining them here would throw away the boundary that makes that
+    // possible. A GUI with only one message box can still paste them one
+    // after the other.
+    return c.json({
+      subjectId,
+      subjectName: subject.name,
+      imageCount,
+      systemInstruction: QUESTION_EXTRACT_INSTRUCTION.trim(),
+      userPrompt,
+    });
+  })
   // Draft-generation, not persistence: takes a screenshot of one question
   // and hands back the array an admin then reviews (and edits) in the
   // preview page before POSTing it to / above. Still an array, because a
@@ -959,25 +1029,7 @@ export const question = new Hono<UserEnv>()
     console.log(`POST /api/question/image subjectId=${subjectId} images=${images.length}`);
     const db = c.get('db');
 
-    const [subject] = await db
-      .select()
-      .from(subjectTable)
-      .where(eq(subjectTable.id, subjectId));
-    if (subject === undefined) throw new NotFoundError(`subject ${subjectId} not found`);
-
-    // Resolved from the DB rather than accepted from the client: the
-    // prompt makes the model pick conceptIds out of this list, so the
-    // same list doubles as the allowlist its answer is filtered against
-    // below.
-    const concepts = await db
-      .select({ id: conceptTable.id, name: conceptTable.name })
-      .from(conceptTable)
-      .innerJoin(conceptGroupTable, eq(conceptGroupTable.id, conceptTable.conceptGroupId))
-      .where(eq(conceptGroupTable.subjectId, subjectId));
-    // The extraction prompt refuses to start without a concept list, so
-    // there's nothing to gain by spending an AI call to find that out.
-    if (concepts.length === 0)
-      throw new BadRequestError(`subject ${subjectId} has no concepts to assign questions to`);
+    const { subject, concepts } = await loadPromptInputs(db, subjectId);
 
     const raw = await generateJsonFromImages(
       QUESTION_EXTRACT_INSTRUCTION,

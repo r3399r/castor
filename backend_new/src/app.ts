@@ -68,6 +68,11 @@ export const app = new Hono()
   .use('/api/question/*', adminAuth)
   .use('/api/question/*', transaction)
   .use('/api/question/adaptive', requireUser)
+  // requireAdmin on top of the group's adminAuth, which only gates
+  // mutating methods -- this is a GET, so adminAuth alone would leave it
+  // open to any signed-in user. It returns the full extraction
+  // instruction and the subject's entire concept list.
+  .use('/api/question/image/prompt', requireAdmin)
   .route('/api/question', question)
   .use('/api/reply/*', transaction)
   .use('/api/reply/*', requireUser)

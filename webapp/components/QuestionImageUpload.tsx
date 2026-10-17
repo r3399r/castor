@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ApiError, apiPost } from '@/lib/api'
+import { ApiError, apiFetch, apiPost } from '@/lib/api'
 
 // Mirrors backend_new's questionImageBodySchema. Kept in step by hand --
 // the point of checking here is to say "that file is too big" while the
@@ -157,6 +157,32 @@ const describeRecognizeError = (e: unknown): string => {
   return `辨識失敗（${e.status}），請再試一次。`
 }
 
+type PromptPart = 'systemInstruction' | 'userPrompt'
+
+// Module scope so the array is not rebuilt on every render, and so the
+// labels sit next to the type they enumerate.
+const PROMPT_PARTS: { part: PromptPart; label: string }[] = [
+  { part: 'systemInstruction', label: '複製系統指示' },
+  { part: 'userPrompt', label: '複製題目 prompt' },
+]
+
+/**
+ * Failures for the prompt fetch, which shares almost nothing with the
+ * recognition errors above: no model is called, so none of the AI_* codes
+ * can appear and "try again in a few seconds" would be wrong advice. What
+ * is left is configuration (no concepts yet) and access.
+ */
+const describeCopyPromptError = (e: unknown): string => {
+  if (!(e instanceof ApiError))
+    return `取得 prompt 失敗：${e instanceof Error ? e.message : String(e)}`
+
+  if (e.status === 400) return '此科目尚未建立觀念，請先新增觀念。'
+  if (e.status === 404) return '找不到此科目。'
+  // The route is requireAdmin, unlike the rest of this page's reads.
+  if (e.status === 401 || e.status === 403) return '需要管理員權限才能取得 prompt。'
+  return `取得 prompt 失敗（${e.status}），請再試一次。`
+}
+
 export default function QuestionImageUpload({
   subjectId,
   onQuestions,
@@ -170,6 +196,13 @@ export default function QuestionImageUpload({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [dragging, setDragging] = useState(false)
+  // Which half is in flight, and which was copied last -- tracked per
+  // part so the two buttons report their own state independently.
+  const [copying, setCopying] = useState<PromptPart | null>(null)
+  const [copied, setCopied] = useState<PromptPart | null>(null)
+  // Holds the text only when the clipboard write failed, so what was
+  // fetched is still reachable instead of lost to a dead end.
+  const [promptFallback, setPromptFallback] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
   // Read inside addFiles, which is async and must not compute "how many
@@ -246,6 +279,64 @@ export default function QuestionImageUpload({
   const removeFile = (key: string) => {
     setFiles((prev) => prev.filter((f) => f.key !== key))
     setError(null)
+  }
+
+  /**
+   * Copies one half of the prompt this component would have sent, for
+   * pasting into a chat GUI with the screenshot attached by hand.
+   *
+   * The escape hatch for a spent Gemini quota: the JSON that comes back
+   * from the GUI goes into the same textarea below, so the review step is
+   * identical -- only who calls the model changes.
+   *
+   * The halves stay separate all the way to the clipboard because a GUI
+   * with a system-instruction field reproduces the API call exactly when
+   * each one goes in its own box. In a single-box GUI they can be pasted
+   * one after the other.
+   *
+   * Refetched on every click rather than cached: the note and the file
+   * count feed the user half, so a cached copy would go stale as soon as
+   * the note was edited -- and a stale prompt copies successfully, which
+   * is the worst way for this to break.
+   *
+   * Deliberately not disabled when no file is picked: the screenshot gets
+   * attached in the GUI, not here. The count is still sent when files are
+   * present, because the prompt says something different for several
+   * crops of one question.
+   */
+  const handleCopyPrompt = async (part: PromptPart) => {
+    if (copying !== null) return
+    setCopying(part)
+    setError(null)
+    setPromptFallback(null)
+    let text: string
+    try {
+      const res = await apiFetch<Record<PromptPart, string>>('question/image/prompt', {
+        subjectId,
+        imageCount: files.length === 0 ? 1 : files.length,
+        note: note.trim() === '' ? undefined : note.trim(),
+      })
+      text = res[part]
+    } catch (e) {
+      setCopying(null)
+      setError(describeCopyPromptError(e))
+      return
+    }
+    // Separated from the fetch above: a clipboard rejection (insecure
+    // context, denied permission) is not a failed request, and treating
+    // it as one would throw away text that arrived perfectly well.
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopying(null)
+      setCopied(part)
+      // Guarded so that copying the other half next is not cleared early
+      // by this timer firing after it.
+      window.setTimeout(() => setCopied((current) => (current === part ? null : current)), 2000)
+    } catch {
+      setCopying(null)
+      setPromptFallback(text)
+      setError('無法寫入剪貼簿，請從下方框內自行複製。')
+    }
   }
 
   const handleRecognize = async () => {
@@ -392,6 +483,37 @@ export default function QuestionImageUpload({
           </button>
         )}
         {busy && <span className="text-xs text-black-300">辨識需要幾秒鐘，請勿離開此頁</span>}
+      </div>
+
+      {/* The manual route, kept visually secondary -- it is the fallback
+          for a spent quota, not the normal way to add a question. */}
+      <div className="mt-4 border-t border-brown-300 pt-4">
+        <div className="flex flex-wrap items-center gap-3">
+          {PROMPT_PARTS.map(({ part, label }) => (
+            <button
+              key={part}
+              type="button"
+              onClick={() => void handleCopyPrompt(part)}
+              disabled={copying !== null}
+              className="rounded-md border border-brown-300 px-4 py-2 text-sm text-black-700 transition hover:bg-beige-200 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {copying === part ? '取得中…' : copied === part ? '已複製 ✓' : label}
+            </button>
+          ))}
+        </div>
+        <p className="mt-2 text-xs text-black-500">
+          AI 額度用完時，把這兩段貼到 ChatGPT／Gemini 網頁版（有系統指示欄位就分開貼，否則依序貼在
+          同一個對話框），自行附上截圖，再把回傳的 JSON 貼到下方欄位。
+        </p>
+        {promptFallback !== null && (
+          <textarea
+            readOnly
+            value={promptFallback}
+            onFocus={(e) => e.currentTarget.select()}
+            rows={8}
+            className="mt-3 w-full rounded-md border border-brown-300 bg-white/60 p-2 font-mono text-xs text-black-800"
+          />
+        )}
       </div>
     </section>
   )
