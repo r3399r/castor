@@ -48,6 +48,28 @@ const buildCaption = (terms: (string | undefined)[]): string =>
  * nothing left to post, disables the rule so it stops polling until the
  * next question creation re-arms it.
  */
+/**
+ * True when a child's content says nothing beyond which blank it is.
+ *
+ * 文意選填 and 篇章結構 keep every blank inside the passage and share one
+ * option list, so each child exists only to carry an answer -- its content
+ * is a bare marker like "第 21 題". Rendering those appends a run of
+ * meaningless digits to the posted image ("21222324252627282930").
+ *
+ * Judged on the text, not the question type: a cloze whose blanks each
+ * have their own options (`11. (A) what is more ...`) is also a GROUP of
+ * SINGLEs, and those children must still be shown. The difference is
+ * whether the child carries real text, which is exactly what this tests.
+ */
+const isBlankMarkerOnly = (content: string): boolean => {
+  const text = content
+    .replace(/<[^>]*>/g, '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&[a-z]+;/gi, '')
+    .trim();
+  return text === '' || /^[(（]?\s*第?\s*\d+\s*題?\s*[.、)）]?\s*$/.test(text);
+};
+
 export const processNextQuestion = async (db: Db): Promise<void> => {
   const [question] = await db
     .select()
@@ -105,7 +127,22 @@ export const processNextQuestion = async (db: Db): Promise<void> => {
     ...concepts.map((c) => c.name),
   ]);
 
-  const fullContent = [question.content, ...children.map((c) => c.content)].filter(Boolean).join('');
+  // Each kept child goes in its own block. A child's content is usually
+  // bare text with no element of its own (`11. (A) ... (D) all in all`),
+  // so concatenating them directly ran consecutive questions together in
+  // the rendered image -- "all in all12. (A) demonstrate". A div rather
+  // than a p because a child may already contain block markup, and p
+  // cannot nest.
+  const fullContent = [
+    question.content,
+    ...children.map((c) =>
+      c.content === null || isBlankMarkerOnly(c.content)
+        ? null
+        : `<div class="child-question">${c.content}</div>`
+    ),
+  ]
+    .filter(Boolean)
+    .join('');
 
   const { url, key } = await htmlToS3Url(fullContent);
   try {

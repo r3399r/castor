@@ -8,6 +8,14 @@ import chromium from '@sparticuz/chromium';
 import { randomUUID } from 'node:crypto';
 import puppeteer from 'puppeteer-core';
 
+// Width of the rendered page in CSS pixels. The PNG comes out at this
+// times DEVICE_SCALE, so 720 x 2 = 1440px wide -- comfortably above the
+// 1200px Facebook wants for a feed photo. Widened from 560 because a
+// reading-comprehension passage wrapped into a very tall, narrow image;
+// the text column is this minus the body margins (24px each side).
+const VIEWPORT_WIDTH = 720;
+const DEVICE_SCALE = 2;
+
 const wrapHtml = (content: string) => `<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
@@ -27,6 +35,9 @@ const wrapHtml = (content: string) => `<!DOCTYPE html>
   <style>
     body { margin: 20px 24px; font-family: 'Noto Sans TC', sans-serif; font-size: 16px; line-height: 1.6; background: #fff; color: #1a1a1a; }
     img { max-width: 100%; }
+    /* Separates a GROUP's sub-questions, which otherwise read as one
+       run-on paragraph (see facebookPoster.ts). */
+    .child-question { margin-top: 14px; }
   </style>
 </head>
 <body>${content}</body>
@@ -48,7 +59,7 @@ export const htmlToS3Url = async (html: string): Promise<{ url: string; key: str
 
   try {
     const page = await browser.newPage();
-    await page.setViewport({ width: 560, height: 600, deviceScaleFactor: 2 });
+    await page.setViewport({ width: VIEWPORT_WIDTH, height: 600, deviceScaleFactor: DEVICE_SCALE });
     // 'load' waits for the <script> tags (including the MathJax CDN) to
     // finish executing.
     await page.setContent(wrapHtml(html), { waitUntil: 'load', timeout: 20000 });

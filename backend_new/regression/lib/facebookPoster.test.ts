@@ -183,7 +183,81 @@ describe('facebookPoster', () => {
 
       await processNextQuestion(getDb());
 
-      expect(htmlToS3Url).toHaveBeenCalledWith('<p>group header</p><p>child A</p><p>child B</p>');
+      expect(htmlToS3Url).toHaveBeenCalledWith(
+        '<p>group header</p>' +
+          '<div class="child-question"><p>child A</p></div>' +
+          '<div class="child-question"><p>child B</p></div>'
+      );
+    });
+
+    // The case above passes even unwrapped, because its fixtures carry
+    // their own <p>. Real children are bare text, which is what actually
+    // ran together in the posted image.
+    it('keeps bare-text children from running into each other', async () => {
+      const { subjectId } = await seedFixture();
+      const groupId = await insertQuestion(subjectId, { content: '<p>passage</p>' });
+      await insertQuestion(subjectId, {
+        content: '11. (A) what is more (D) all in all',
+        parentId: groupId,
+        sortOrder: 0,
+      });
+      await insertQuestion(subjectId, {
+        content: '12. (A) demonstrate (D) manipulate',
+        parentId: groupId,
+        sortOrder: 1,
+      });
+
+      vi.mocked(htmlToS3Url).mockResolvedValue({ url: 'https://s3.example.com/img.png', key: 'k' });
+      vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ post_id: 'p_1' }), { status: 200 }));
+
+      await processNextQuestion(getDb());
+
+      const html = vi.mocked(htmlToS3Url).mock.calls[0][0];
+      expect(html).not.toContain('all in all12.');
+      expect(html).toContain('<div class="child-question">11. (A) what is more (D) all in all</div>');
+      expect(html).toContain('<div class="child-question">12. (A) demonstrate (D) manipulate</div>');
+    });
+
+
+    // 文意選填 / 篇章結構: the blanks and the shared option list are already
+    // in the passage, so the children only ever held answers. Rendering
+    // them produced a run of bare digits under the passage.
+    it('omits children whose content is only the blank number', async () => {
+      const { subjectId } = await seedFixture();
+      const groupId = await insertQuestion(subjectId, {
+        content: '<p>passage with 21 and 22 and the (A)-(J) list</p>',
+      });
+      await insertQuestion(subjectId, { content: '第 21 題', parentId: groupId, sortOrder: 0 });
+      await insertQuestion(subjectId, { content: '22', parentId: groupId, sortOrder: 1 });
+      await insertQuestion(subjectId, { content: '(23)', parentId: groupId, sortOrder: 2 });
+
+      vi.mocked(htmlToS3Url).mockResolvedValue({ url: 'https://s3.example.com/img.png', key: 'k' });
+      vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ post_id: 'p_1' }), { status: 200 }));
+
+      await processNextQuestion(getDb());
+
+      expect(htmlToS3Url).toHaveBeenCalledWith(
+        '<p>passage with 21 and 22 and the (A)-(J) list</p>'
+      );
+    });
+
+    // The distinction is the text, not the question type -- these children
+    // are the same SINGLE-inside-GROUP shape as the ones above.
+    it('keeps children that carry their own option text', async () => {
+      const { subjectId } = await seedFixture();
+      const groupId = await insertQuestion(subjectId, { content: '<p>passage</p>' });
+      await insertQuestion(subjectId, {
+        content: '11. (A) what is more (D) all in all',
+        parentId: groupId,
+        sortOrder: 0,
+      });
+
+      vi.mocked(htmlToS3Url).mockResolvedValue({ url: 'https://s3.example.com/img.png', key: 'k' });
+      vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ post_id: 'p_1' }), { status: 200 }));
+
+      await processNextQuestion(getDb());
+
+      expect(vi.mocked(htmlToS3Url).mock.calls[0][0]).toContain('11. (A) what is more');
     });
 
     it('skips already-posted and content-less questions, picking the oldest valid one', async () => {
