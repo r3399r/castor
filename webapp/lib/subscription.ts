@@ -59,6 +59,14 @@ export type SubscriptionView =
       entitlementEndsAt: string
     }
   | {
+      kind: 'scheduled_change'
+      planCode: string
+      entitlementEndsAt: string
+      pendingPlanCode: string
+      pendingPlanEffectiveAt: string
+      pendingPlanAmount: number
+    }
+  | {
       kind: 'cancelled'
       planCode: string
       entitlementEndsAt: string
@@ -82,6 +90,24 @@ export function deriveSubscriptionView(
   current: SubscriptionStatus,
   history: GetSubscriptionHistoryResponse,
 ): SubscriptionView {
+  if (
+    current.active &&
+    current.plan &&
+    current.expiresAt &&
+    current.pendingPlan &&
+    current.pendingPlanEffectiveAt &&
+    typeof current.pendingPlanAmount === 'number'
+  ) {
+    return {
+      kind: 'scheduled_change',
+      planCode: current.plan,
+      entitlementEndsAt: current.expiresAt,
+      pendingPlanCode: current.pendingPlan,
+      pendingPlanEffectiveAt: current.pendingPlanEffectiveAt,
+      pendingPlanAmount: current.pendingPlanAmount,
+    }
+  }
+
   if (current.active && current.plan && current.expiresAt) {
     return {
       kind: 'active',

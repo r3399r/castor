@@ -404,6 +404,10 @@ export type SubscriptionStatus = {
   active: boolean;
   plan: string | null;
   expiresAt: string | null;
+  autoRenew?: boolean | null;
+  pendingPlan?: string | null;
+  pendingPlanEffectiveAt?: string | null;
+  pendingPlanAmount?: number | null;
 };
 
 export type SubscriptionHistoryItem = {

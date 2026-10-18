@@ -23,7 +23,7 @@ import type {
 } from '@/types/api'
 import styles from './user.module.css'
 
-type ManagementDialog = 'cancel' | 'resume'
+type ManagementDialog = 'cancel'
 
 function PlanLine({ planCode }: { planCode: string }) {
   const plan = getSubscriptionPlan(planCode)
@@ -61,15 +61,29 @@ function SubscriptionDetails({ view }: { view: SubscriptionView }) {
     )
   }
 
+  if (view.kind === 'scheduled_change') {
+    const pendingPlan = getSubscriptionPlan(view.pendingPlanCode)
+    return (
+      <>
+        <Badge tone="complete" className={styles.subscriptionBadge}>訂閱中</Badge>
+        <PlanLine planCode={view.planCode} />
+        <p className={styles.subscriptionMeta}>
+          將於 {formatTaiwanDate(view.pendingPlanEffectiveAt)} 變更為{' '}
+          {pendingPlan?.name ?? view.pendingPlanCode}，扣款 NT${view.pendingPlanAmount.toLocaleString('zh-TW')}。
+        </p>
+      </>
+    )
+  }
+
   if (view.kind === 'cancelled') {
     return (
       <>
         <Badge tone="neutral" className={`${styles.subscriptionBadge} ${styles.cancelledBadge}`}>
-          已取消
+          已取消續訂
         </Badge>
         <PlanLine planCode={view.planCode} />
         <p className={styles.subscriptionMeta}>
-          原訂閱期間至：{formatTaiwanDate(view.entitlementEndsAt)}
+          訂閱權益可使用至：{formatTaiwanDate(view.entitlementEndsAt)}。到期後恢復免費會員，不再自動扣款。
         </p>
       </>
     )
@@ -123,7 +137,7 @@ export default function SubscriptionCard() {
     load()
   }, [load])
 
-  const active = view?.kind === 'active'
+  const active = view?.kind === 'active' || view?.kind === 'scheduled_change'
   const cancelled = view?.kind === 'cancelled'
   const free = view?.kind === 'free' || view?.kind === 'expired'
   const paymentFailed = view?.kind === 'payment_failed'
@@ -160,7 +174,9 @@ export default function SubscriptionCard() {
           {free && <ButtonLink href="/subscription">查看訂閱方案</ButtonLink>}
           {active && (
             <>
-              <ButtonLink href="/subscription" variant="secondary">查看方案</ButtonLink>
+              <ButtonLink href="/subscription">
+                {view.kind === 'scheduled_change' ? '查看／變更方案' : '變更訂閱方案'}
+              </ButtonLink>
               <Button
                 variant="secondary"
                 className={styles.cancelSubscriptionButton}
@@ -171,12 +187,7 @@ export default function SubscriptionCard() {
             </>
           )}
           {cancelled && (
-            <>
-              <Button variant="primary" onClick={() => setDialog('resume')}>
-                恢復訂閱
-              </Button>
-              <ButtonLink href="/subscription" variant="secondary">查看方案</ButtonLink>
-            </>
+            <ButtonLink href="/subscription">查看訂閱方案</ButtonLink>
           )}
           {paymentFailed && (
             <>
@@ -187,30 +198,26 @@ export default function SubscriptionCard() {
         </div>
       )}
 
-      {dialog && view && (view.kind === 'active' || view.kind === 'cancelled') && (
+      {dialog && view && (view.kind === 'active' || view.kind === 'scheduled_change') && (
         <Modal
-          title={dialog === 'cancel' ? '取消續訂？' : '恢復訂閱？'}
+          title="取消續訂？"
           onClose={() => setDialog(null)}
         >
-          {dialog === 'cancel' && view.kind === 'active' ? (
-            <p className={styles.dialogCopy}>
-              取消後將不再自動扣款，並預計可使用訂閱功能至{' '}
-              {formatTaiwanDate(view.entitlementEndsAt)}。目前線上取消功能尚未開放，無法在此變更訂閱狀態。
-            </p>
-          ) : (
-            <p className={styles.dialogCopy}>
-              恢復後會在原訂閱週期結束時續訂，不會立即扣款。目前線上恢復訂閱功能尚未開放。
-            </p>
-          )}
+          <p className={styles.dialogCopy}>
+            取消後將不再自動扣款，並預計可使用訂閱功能至{' '}
+            {formatTaiwanDate(view.entitlementEndsAt)}。
+            {view.kind === 'scheduled_change' ? '已安排的方案變更也會一併取消。' : ''}
+            目前線上取消功能尚未開放，無法在此變更訂閱狀態。
+          </p>
           <div className={styles.managementNotice} role="note">
             訂閱管理 API 尚未串接，這個視窗目前僅供確認流程與文案。
           </div>
           <div className="sp-dialog-actions">
             <Button variant="secondary" onClick={() => setDialog(null)}>
-              {dialog === 'cancel' ? '維持訂閱' : '暫不恢復'}
+              維持訂閱
             </Button>
-            <Button variant={dialog === 'cancel' ? 'danger' : 'primary'} disabled>
-              {dialog === 'cancel' ? '確認取消續訂' : '確認恢復訂閱'}
+            <Button variant="danger" disabled>
+              確認取消續訂
             </Button>
           </div>
         </Modal>
