@@ -1095,6 +1095,68 @@ describe('question routes', () => {
       expect(rowB.numberOfQuestions).toBe(1);
     });
 
+    // The prompt plants this sentinel wherever a figure could not be
+    // transcribed. Nothing replaces it automatically, so a stored one is
+    // a permanently broken question -- and an enabled one, which makes it
+    // a candidate for the public Facebook post.
+    it('rejects a question whose content still has an image placeholder', async () => {
+      const { subjectId, examId, conceptId } = await seedFixture();
+
+      const res = await postQuestions({
+        subjectId,
+        examId,
+        questions: [
+          {
+            type: 'SINGLE',
+            content: '<p>看圖作答 <img src="https://img-placeholder-1" style="max-width:100%"/></p>',
+            options: 'A|B|C|D',
+            answer: 'A',
+            difficulty: 2,
+            conceptIds: [conceptId],
+          },
+        ],
+      });
+
+      expect(res.status).toBe(400);
+      expect(await res.json()).toMatchObject({ code: 'QUESTION_IMAGE_PLACEHOLDER' });
+
+      // Nothing was written -- the whole batch rolls back.
+      const rows = await getDb().select().from(questionTable);
+      expect(rows).toHaveLength(0);
+    });
+
+    // A GROUP's figure usually sits in the shared passage, but a child can
+    // carry one too, and the child path is the easier one to forget.
+    it('rejects a child question holding an image placeholder', async () => {
+      const { subjectId, examId, conceptId } = await seedFixture();
+
+      const res = await postQuestions({
+        subjectId,
+        examId,
+        questions: [
+          {
+            type: 'GROUP',
+            content: '<p>題組說明</p>',
+            difficulty: 5,
+            conceptIds: [conceptId],
+            childQuestions: [
+              {
+                type: 'SINGLE',
+                sortOrder: 0,
+                content: '1. <img src="https://img-placeholder-2"/> 哪一個正確？',
+                options: 'A|B|C|D',
+                answer: 'A',
+                difficulty: 5,
+              },
+            ],
+          },
+        ],
+      });
+
+      expect(res.status).toBe(400);
+      expect(await res.json()).toMatchObject({ code: 'QUESTION_IMAGE_PLACEHOLDER' });
+    });
+
     it('rejects an empty conceptIds with 400', async () => {
       const { subjectId, examId, conceptId } = await seedFixture();
       const created = await createQuestion(subjectId, examId, { conceptIds: [conceptId] });

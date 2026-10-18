@@ -29,6 +29,31 @@ import { UserEnv } from 'src/middleware/requireUser';
 import { TransactionEnv } from 'src/middleware/transaction';
 import { BadGatewayError, BadRequestError, NotFoundError } from 'src/model/error';
 
+/**
+ * The sentinel the extraction prompt plants where the screenshot had a
+ * figure (<img src="https://img-placeholder-1">), to be swapped for a
+ * real URL by a human.
+ *
+ * Nothing replaces it automatically, so storing one leaves a question
+ * that is broken forever: the img resolves to nothing in the app, in the
+ * admin preview, and -- because new questions are enabled by default --
+ * in the Facebook post image, which would publish the broken figure.
+ *
+ * Rejected rather than stripped. Dropping the tag would lose the one
+ * piece of information worth keeping, which is that a figure belongs
+ * there at all; the question would then look complete while silently
+ * missing its diagram.
+ */
+const IMAGE_PLACEHOLDER = 'img-placeholder';
+
+const assertNoImagePlaceholder = (content: string | undefined, where: string): void => {
+  if (content !== undefined && content.toLowerCase().includes(IMAGE_PLACEHOLDER))
+    throw new BadRequestError(
+      `${where} still contains an unreplaced image placeholder`,
+      'QUESTION_IMAGE_PLACEHOLDER'
+    );
+};
+
 type Db = TransactionEnv['Variables']['db'];
 
 const childQuestionSchema = z.object({
@@ -966,6 +991,13 @@ export const question = new Hono<UserEnv>()
 
     await validateExamForSubject(db, data.subjectId, data.examId);
 
+    data.questions.forEach((item, i) => {
+      assertNoImagePlaceholder(item.content, `questions[${i}].content`);
+      item.childQuestions?.forEach((child, j) =>
+        assertNoImagePlaceholder(child.content, `questions[${i}].childQuestions[${j}].content`)
+      );
+    });
+
     // Sequential, not Promise.all -- each question's numberOfQuestions
     // increment and insert needs to see the previous one's effects (and
     // parallel writes inside one transaction would just serialize on the
@@ -1083,6 +1115,8 @@ export const question = new Hono<UserEnv>()
 
     const [found] = await db.select().from(questionTable).where(eq(questionTable.id, id));
     if (found === undefined) throw new NotFoundError(`question ${id} not found`);
+
+    assertNoImagePlaceholder(data.content, 'content');
 
     await validateExamForSubject(db, found.subjectId, data.examId);
 
