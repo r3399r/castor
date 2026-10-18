@@ -15,7 +15,7 @@ import { ActivityCalendar } from 'react-activity-calendar'
 import { apiFetch } from '@/lib/api'
 import { useAuth } from '@/contexts/AuthContext'
 import Chip from '@/components/Chip'
-import { LoadingState } from '@/components/ui'
+import { ButtonLink, LoadingState } from '@/components/ui'
 import styles from './analysis.module.css'
 import type {
   DailyMastery,
@@ -379,12 +379,9 @@ function LockedProCard({ title, blurb }: { title: string; blurb: string }) {
     <div className={styles.card}>
       <h2 className={`mb-2 ${styles.cardTitle}`}>{title}</h2>
       <p className={`mb-4 text-sm ${styles.bodyText}`}>{blurb}</p>
-      <button
-        type="button"
-        className="rounded-full bg-[#227578] px-5 py-2 text-sm font-bold text-white transition hover:bg-[#195E62] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#227578]"
-      >
+      <ButtonLink href="/subscription" size="sm">
         查看訂閱方案
-      </button>
+      </ButtonLink>
     </div>
   )
 }
