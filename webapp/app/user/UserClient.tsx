@@ -6,6 +6,7 @@ import { apiFetch, apiPut } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import { Button, ButtonLink, ErrorState, LoadingState, PageHeader } from '@/components/ui'
 import type { GetUserMeResponse, PutUserMeRequest, PutUserMeResponse } from '@/types/api'
+import SubscriptionCard from './SubscriptionCard'
 import styles from './user.module.css'
 
 export default function UserClient() {
@@ -123,11 +124,13 @@ export default function UserClient() {
         </Button>
       </div>
 
+      <SubscriptionCard />
+
       <div className={`${styles.card} ${styles.pointsCard}`}>
-        <div className="flex items-center gap-3">
+        <div className={styles.pointsInfo}>
           <span className={styles.pointsIcon}><Coins size={24} strokeWidth={1.8} /></span>
-          <div>
-            <p className={`${styles.muted} text-sm`}>累積積分</p>
+          <div className={styles.pointsCopy}>
+            <p className={styles.pointsTitle}>累積積分</p>
             <p className={styles.pointsValue}>{me.lifetimePoints}</p>
           </div>
         </div>

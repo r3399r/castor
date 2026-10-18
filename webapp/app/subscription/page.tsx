@@ -4,6 +4,7 @@ import LearningFooterFoliage from '@/components/learning/LearningFooterFoliage'
 import Navbar from '@/components/Navbar'
 import { PageContainer } from '@/components/layout'
 import { Badge, Button, Card, ContentPanel, PageHeader } from '@/components/ui'
+import { subscriptionPlans } from '@/lib/subscription'
 import styles from './subscription.module.css'
 
 const coreBenefits = [
@@ -33,22 +34,6 @@ const analysisFeatures = [
   {
     title: '答題速度分析',
     description: '比較各科答題速度與平台中位數，理解自己的作答節奏。',
-  },
-]
-
-const plans = [
-  {
-    name: '月繳方案',
-    price: 'NT$199',
-    period: '／月',
-    note: '按月計費，可隨時取消',
-  },
-  {
-    name: '年繳方案',
-    price: 'NT$1,990',
-    period: '／年',
-    note: '平均每月約 NT$166（暫定）',
-    recommended: true,
   },
 ]
 
@@ -98,12 +83,12 @@ export default function SubscriptionPage() {
               <fieldset>
                 <legend>選擇計費週期</legend>
                 <div className={styles.planOptions}>
-                  {plans.map((plan) => (
+                  {subscriptionPlans.map((plan) => (
                     <label key={plan.name} className={styles.planOption}>
                       <input
                         type="radio"
                         name="billing-period"
-                        value={plan.name}
+                        value={plan.code}
                         defaultChecked={plan.recommended}
                       />
                       <span className={styles.radioMark} aria-hidden="true" />
@@ -113,8 +98,8 @@ export default function SubscriptionPage() {
                           {plan.recommended && <Badge tone="complete">推薦</Badge>}
                         </span>
                         <span className={styles.planOptionPrice}>
-                          <strong>{plan.price}</strong>
-                          <span>{plan.period}</span>
+                          <strong>NT${plan.price.toLocaleString('zh-TW')}</strong>
+                          <span>／{plan.periodLabel}</span>
                         </span>
                         <small>{plan.note}</small>
                       </span>

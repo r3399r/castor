@@ -406,6 +406,16 @@ export type SubscriptionStatus = {
   expiresAt: string | null;
 };
 
+export type SubscriptionHistoryItem = {
+  id: number;
+  plan: string;
+  status: 'active' | 'cancelled' | 'expired' | 'past_due' | string;
+  currentPeriodStart: string;
+  currentPeriodEnd: string;
+};
+
+export type GetSubscriptionHistoryResponse = SubscriptionHistoryItem[];
+
 // Sync returns the subscription alongside the user so sign-in needs one
 // authenticated request rather than two.
 export type PostUserSyncResponse = User & { subscription: SubscriptionStatus };
