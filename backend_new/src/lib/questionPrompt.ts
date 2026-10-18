@@ -25,11 +25,31 @@ export const QUESTION_EXTRACT_INSTRUCTION = `
 ## 輸出規則
 
 - 只回覆 JSON array，不要任何說明文字、標題或 markdown code block
-- 內容使用 HTML 格式，盡量符合原題目的排版，css使用html inline style，不含多餘空白與換行（數學公式除外，見「數學公式」一節）
+- 內容使用 HTML 格式，盡量符合原題目的排版，css使用html inline style，不含多餘空白與換行（數學公式除外，見「數學公式」一節；排版的限制見「排版與手機寬度」一節）
 - 所有字串中的雙引號需正確跳脫
 - 只辨識截圖中實際存在的內容，不要自行補上截圖外的題目或選項
 - conceptIds 至少要有一個，必須從使用者提供的觀念清單中挑選。不可以回傳空陣列 []；若沒有完全吻合的，挑最接近的那一個
 - 若截圖模糊、殘缺或裁切到看不出完整題目，回傳空 array []，不要猜測內容
+
+## 排版與手機寬度
+
+題目會在手機上顯示，可用寬度可能只有 320px。「排版像原卷」的優先度低於「在窄螢幕上讀得完整」，兩者衝突時一律選後者。
+
+不要使用下列寫法。它們在寬螢幕看起來正確，但在手機上會擠壓變形、文字疊在一起或超出畫面：
+- 用 <table> 做「視覺對齊」，例如把四個選項排成兩欄兩列
+- 固定或百分比寬度的並排欄位，例如 <span style="display:inline-block;width:48%">、float:left、position:absolute
+- 以 width、margin-left 等指定的像素值排版
+- 用 &nbsp; 或連續空白讓不同行的文字上下對齊成欄位（一旦換行，對齊就沒了）
+
+改用會自動換行的寫法：
+- 選項排在同一行或各自一行都可以。同一行時用 &nbsp; 分隔即可，例如 11. (A) what is more&nbsp;&nbsp;(B) it turns out&nbsp;&nbsp;(C) in other words&nbsp;&nbsp;(D) all in all
+- 填空處用 <u>&nbsp;&nbsp;11&nbsp;&nbsp;</u> 這種寫法是安全的
+- 重點是文字能自然換行，不是一行幾個選項
+- 條列用 <ol>／<ul>
+- 段落縮排用 <p style="text-indent:2em">，這在窄螢幕是安全的
+- 圖片一律帶 style="max-width:100%"
+
+只有一種情況可以用 <table>：原題目本身就是一張資料表格（統計表、對照表、課表等），內容必須靠行列關係才讀得懂。此時加上 style="width:100%"，欄數盡量少，不要為了對齊補空白欄。
 
 ## 字體
 
@@ -45,19 +65,20 @@ export const QUESTION_EXTRACT_INSTRUCTION = `
 
 ## 數學公式
 
-題目中的數學式一律使用 LaTeX（MathJax）語法，不要用 CSS、<sup>、<sub>、<table> 或純文字拼湊出數學排版：
+題目中的數學式一律使用 LaTeX（MathJax）語法。不要用 CSS、<sup>、<sub>、<table> 或純文字去拼湊「數學排版」：
 
 - 行內公式用 $...$，獨立成行的公式用 $$...$$
 - JSON 字串裡的反斜線必須寫成雙反斜線，例如 $\\\\frac{1}{2}$、$x^{2}+y^{2}=r^{2}$、$\\\\sqrt{3}$、$\\\\int_{0}^{1}f(x)dx$
 - 單一個反斜線在 JSON 中會被當成其他跳脫字元（\\f 是換頁、\\t 是定位），公式會整段損毀，務必使用雙反斜線
-- inline style 與 HTML 標籤只負責圖片與版面結構（分欄、表格、對齊），不要用來模擬分數、根號或次方
+- inline style 與 HTML 標籤只負責圖片與段落結構，不要用來模擬分數、根號或次方
 - 純文字就能表達的數字與單位（例如 3 公分、50%）不需要包成公式
+- <sup>／<sub> 並非全面禁用，只是不可以拿來代替公式。英文序數（20<sup>th</sup>）、化學式（H<sub>2</sub>O）、註腳標記請照原卷使用
 
 ## 圖片處理
 
 若題目或題組說明中包含圖片、圖表、座標平面、幾何圖形等視覺元素：
 - 在 content 中以 <img src="https://img-placeholder-N" style="max-width:100%"/> 佔位，N 從 1 開始遞增（同一次上傳內連續編號）
-- 盡量符合原題目的排版
+- 盡量符合原題目的排版（但不要為了對齊使用 table 或固定寬度，見「排版與手機寬度」一節）
 
 ## 答案處理
 
@@ -80,7 +101,7 @@ export const QUESTION_EXTRACT_INSTRUCTION = `
 - SINGLE：單選題
 - MULTIPLE：多選題
 - TRUE_FALSE：是非題
-- FILL：選填題
+- FILL：選填題（數字作答，options 固定為數字鍵盤）。「文意選填」不是 FILL，一律做成題組，見「題組格式」
 
 ## options 格式
 
@@ -139,7 +160,7 @@ sortOrder 從 0 開始遞增。
 
 - 文章（含編號空格與後面的選項清單）放在 GROUP 的 content
 - 每一個編號空格對應一個子題，子題數量必須等於空格數量
-- 子題的 content 寫「第 N 題」（N 是該空格的編號）
+- 子題的 content 寫「N」（N 是該空格的編號）
 - 每個子題的 options 都填同一組共用選項（例如 "A|B|C|D|E"），answer 填該空格的答案
 - 第一個空格也是子題，不要把它的答案放在 GROUP 上
 
