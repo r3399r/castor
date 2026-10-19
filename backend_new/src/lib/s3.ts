@@ -27,9 +27,10 @@ const bucketName = (): string => {
  * Stores one object and returns the URL to reference it by.
  *
  * The caller owns the key, because the key is the only thing that makes
- * an object findable later -- a prefix per purpose (questions/,
- * question-figures/) is what lets anyone tell apart a transient Facebook
- * render from a figure a question depends on forever.
+ * an object findable later -- questions/<uuid>.png for a transient
+ * Facebook render, questions/figures/<uuid>.png for a figure a question
+ * depends on forever. Both live under questions/ because that is the only
+ * prefix the bucket policy grants public read on.
  */
 export const uploadToS3 = async (
   body: Buffer,

@@ -1480,17 +1480,17 @@ describe('question routes', () => {
       vi.mocked(uploadToS3).mockReset();
     });
 
-    it('stores the figure under question-figures/ and returns its url', async () => {
+    it('stores the figure under questions/figures/ and returns its url', async () => {
       vi.mocked(uploadToS3).mockResolvedValue({
-        url: 'https://bucket.s3.ap-east-2.amazonaws.com/question-figures/abc.png',
-        key: 'question-figures/abc.png',
+        url: 'https://bucket.s3.ap-east-2.amazonaws.com/questions/figures/abc.png',
+        key: 'questions/figures/abc.png',
       });
 
       const res = await postQuestionFigure({ mimeType: 'image/png', data: PNG_BASE64 });
 
       expect(res.status).toBe(200);
       expect(await res.json()).toEqual({
-        url: 'https://bucket.s3.ap-east-2.amazonaws.com/question-figures/abc.png',
+        url: 'https://bucket.s3.ap-east-2.amazonaws.com/questions/figures/abc.png',
       });
 
       const [body, contentType, key] = vi.mocked(uploadToS3).mock.calls[0];
@@ -1499,9 +1499,11 @@ describe('question routes', () => {
       expect(Buffer.isBuffer(body)).toBe(true);
       expect(body.equals(Buffer.from(PNG_BASE64, 'base64'))).toBe(true);
       expect(contentType).toBe('image/png');
-      // The prefix is what keeps these clear of the transient Facebook
-      // renders under questions/, which get deleted after posting.
-      expect(key).toMatch(/^question-figures\/[0-9a-f-]+\.png$/);
+      // Under questions/ because that is the only prefix the bucket
+      // grants public read on; the nested figures/ still keeps these clear
+      // of the transient Facebook renders at questions/<uuid>.png, which
+      // get deleted after posting.
+      expect(key).toMatch(/^questions\/figures\/[0-9a-f-]+\.png$/);
     });
 
     // These types reach a student's browser in an <img>, unlike the ones

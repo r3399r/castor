@@ -62,16 +62,20 @@ Resources:
                   - sqs:SendMessage
                 Resource: !Sub arn:aws:sqs:${AWS::Region}:${AWS::AccountId}:polaris-${TargetEnvr}-logger-queue
               # POST /question/image/figure stores a cropped diagram that a
-              # question's HTML then points at. PutObject without
-              # DeleteObject on purpose: FacebookFunction cleans up the
-              # transient renders it makes under questions/, while a figure
-              # under question-figures/ must outlive nothing-in-particular
-              # -- it is referenced by a stored question, so this role has
-              # no reason to be able to remove one.
+              # question's HTML then points at. Scoped to questions/figures/
+              # because the bucket's policy grants public read on questions/*
+              # only -- a figure written anywhere else is unreadable by the
+              # browsers that have to display it.
+              #
+              # PutObject without DeleteObject on purpose: FacebookFunction
+              # cleans up the transient renders it makes under questions/,
+              # while a figure is referenced by a stored question for as long
+              # as that question exists, so this role has no reason to be
+              # able to remove one.
               - Effect: Allow
                 Action:
                   - s3:PutObject
-                Resource: !Sub arn:aws:s3:::${Project}-public-bucket/question-figures/*
+                Resource: !Sub arn:aws:s3:::${Project}-public-bucket/questions/figures/*
 
   RestApi:
     Type: AWS::Serverless::Api

@@ -92,8 +92,9 @@ export const htmlToS3Url = async (html: string): Promise<{ url: string; key: str
       clip: { x: 0, y: 0, width: contentWidth, height: contentHeight },
     })) as Buffer;
 
-    // questions/ rather than question-figures/: this render is a
-    // throwaway that facebookPoster deletes once the post is up.
+    // Directly under questions/, unlike a question figure at
+    // questions/figures/: this render is a throwaway that
+    // facebookPoster deletes once the post is up.
     return uploadToS3(buffer, 'image/png', `questions/${randomUUID()}.png`);
   } finally {
     await browser.close();

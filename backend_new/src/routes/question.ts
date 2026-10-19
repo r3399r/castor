@@ -1052,11 +1052,17 @@ export const question = new Hono<UserEnv>()
     const buffer = Buffer.from(data, 'base64');
     console.log(`POST /api/question/image/figure mimeType=${mimeType} bytes=${buffer.length}`);
 
-    // question-figures/ rather than questions/: objects under the latter
-    // are transient Facebook renders that facebookPoster deletes after
-    // posting. A figure has to outlive the question that shows it, so the
-    // prefix is what keeps any future cleanup from eating them.
-    const key = `question-figures/${randomUUID()}.${FIGURE_EXTENSIONS[mimeType]}`;
+    // Under questions/, not a sibling prefix, because the bucket policy
+    // grants public s3:GetObject on questions/* and nothing else -- a
+    // figure stored outside it uploads fine and then answers 403 to every
+    // browser, showing up as a broken image with no error anywhere.
+    //
+    // The nested figures/ still separates these from the transient
+    // Facebook renders, which sit directly at questions/<uuid>.png and are
+    // deleted once posted. facebookPoster deletes by exact key, so these
+    // are safe today; a future blanket cleanup over questions/ would have
+    // to exclude this sub-prefix.
+    const key = `questions/figures/${randomUUID()}.${FIGURE_EXTENSIONS[mimeType]}`;
     const { url } = await uploadToS3(buffer, mimeType, key);
 
     return c.json({ url });
