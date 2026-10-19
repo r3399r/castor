@@ -301,6 +301,7 @@ export default function AdaptiveClient({
   const [showResultModal, setShowResultModal] = useState(false)
   const [showLeaveModal, setShowLeaveModal] = useState(false)
   const [showBottomNav, setShowBottomNav] = useState(false)
+  const [mobileQuestionPanelOpen, setMobileQuestionPanelOpen] = useState(false)
   const [questionNumberEdges, setQuestionNumberEdges] = useState({ left: false, right: false })
   const [loading, setLoading] = useState(false)
 
@@ -343,6 +344,8 @@ export default function AdaptiveClient({
   const questionNavRef = useRef<HTMLDivElement>(null)
   const questionNumberListRef = useRef<HTMLDivElement>(null)
   const questionNumberRefs = useRef<Array<HTMLButtonElement | null>>([])
+  const mobileQuestionTriggerRef = useRef<HTMLButtonElement>(null)
+  const mobileQuestionNumberRefs = useRef<Array<HTMLButtonElement | null>>([])
   const pageEnteredAtRef = useRef<number>(Date.now())
   const pageTimeMsRef = useRef<Map<number, number>>(new Map())
   const submittingRef = useRef(false)
@@ -451,6 +454,67 @@ export default function AdaptiveClient({
       resizeObserver.disconnect()
     }
   }, [adaptiveQuestion.length])
+
+  useEffect(() => {
+    if (!mobileQuestionPanelOpen) return
+
+    const body = document.body
+    const scrollY = window.scrollY
+    const previous = {
+      position: body.style.position,
+      top: body.style.top,
+      width: body.style.width,
+      overflow: body.style.overflow,
+    }
+    body.style.position = 'fixed'
+    body.style.top = `-${scrollY}px`
+    body.style.width = '100%'
+    body.style.overflow = 'hidden'
+
+    const focusFrame = requestAnimationFrame(() => {
+      mobileQuestionNumberRefs.current[currentIndex]?.focus()
+    })
+    const desktopQuery = window.matchMedia('(min-width: 48rem)')
+    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        setMobileQuestionPanelOpen(false)
+        return
+      }
+      if (event.key !== 'Tab') return
+
+      const buttons = mobileQuestionNumberRefs.current.filter(
+        (button): button is HTMLButtonElement => !!button && !button.disabled,
+      )
+      if (buttons.length === 0) return
+      const first = buttons[0]
+      const last = buttons[buttons.length - 1]
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+    const handleDesktopChange = () => {
+      if (desktopQuery.matches) setMobileQuestionPanelOpen(false)
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    desktopQuery.addEventListener('change', handleDesktopChange)
+
+    return () => {
+      cancelAnimationFrame(focusFrame)
+      document.removeEventListener('keydown', handleKeyDown)
+      desktopQuery.removeEventListener('change', handleDesktopChange)
+      body.style.position = previous.position
+      body.style.top = previous.top
+      body.style.width = previous.width
+      body.style.overflow = previous.overflow
+      window.scrollTo(0, scrollY)
+      requestAnimationFrame(() => mobileQuestionTriggerRef.current?.focus())
+    }
+  }, [currentIndex, mobileQuestionPanelOpen])
 
   useEffect(() => {
     apiFetch<Paginate<CategoryOption>>('category', { limit: ALL_ITEMS_LIMIT })
@@ -626,6 +690,7 @@ export default function AdaptiveClient({
     setResponseOffsets([])
     setRepliedAnswer(new Map())
     setCurrentIndex(0)
+    setMobileQuestionPanelOpen(false)
     pageTimeMsRef.current = new Map()
     pageEnteredAtRef.current = Date.now()
     setSelectedFilterOptionByDim({})
@@ -661,6 +726,7 @@ export default function AdaptiveClient({
       : isLastQuestion
         ? '前往未答題'
         : '下一題'
+  const mobilePrimaryActionLabel = primaryActionLabel === '前往未答題' ? '未答題' : primaryActionLabel
 
   useEffect(() => {
     const nav = questionNavRef.current
@@ -1146,7 +1212,10 @@ export default function AdaptiveClient({
           {/* 導覽列：上一題／跳題／下一題 -- 可自由前後切換，不受作答狀態限制 */}
           <div ref={questionNavRef} className={styles.questionNav} role="navigation" aria-label="題目導覽">
             <button
-              onClick={() => goTo(currentIndex - 1)}
+              onClick={() => {
+                setMobileQuestionPanelOpen(false)
+                goTo(currentIndex - 1)
+              }}
               disabled={currentIndex === 0 || loading}
               className={styles.navButton}
             >
@@ -1157,84 +1226,116 @@ export default function AdaptiveClient({
             </button>
 
             <div className={styles.navCenter}>
-              <div
-                className={styles.completionProgress}
-                role="progressbar"
-                aria-label="作答進度"
-                aria-valuemin={0}
-                aria-valuemax={adaptiveQuestion.length}
-                aria-valuenow={completedQuestionCount}
+              <div className={styles.desktopQuestionNavCenter}>
+                <div
+                  className={styles.completionProgress}
+                  role="progressbar"
+                  aria-label="作答進度"
+                  aria-valuemin={0}
+                  aria-valuemax={adaptiveQuestion.length}
+                  aria-valuenow={completedQuestionCount}
+                >
+                  <span
+                    className={styles.completionProgressFill}
+                    style={{ width: `${adaptiveQuestion.length > 0 ? completedQuestionCount / adaptiveQuestion.length * 100 : 0}%` }}
+                  />
+                </div>
+                <div
+                  ref={questionNumberListRef}
+                  className={`${styles.questionNumbers} ${questionNumberEdges.left ? styles.canScrollLeft : ''} ${questionNumberEdges.right ? styles.canScrollRight : ''}`}
+                >
+                <div className={styles.questionNumberTrack}>
+                {adaptiveQuestion.map((q, i) => {
+                  const progress = questionProgress[i]
+                  return (
+                    <button
+                      key={q.id}
+                      ref={(node) => { questionNumberRefs.current[i] = node }}
+                      onClick={() => goTo(i)}
+                      disabled={loading}
+                      aria-current={i === currentIndex ? 'step' : undefined}
+                      aria-label={`第 ${i + 1} 題，${progress.label}${i === currentIndex ? '，目前題目' : ''}`}
+                      className={`${styles.questionNumber} ${
+                        progress.graded
+                          ? progress.result === 'wrong'
+                            ? styles.questionNumberWrong
+                            : styles.questionNumberCorrect
+                          : progress.answered
+                            ? styles.questionNumberAnswered
+                            : ''
+                      } ${i === currentIndex ? styles.questionNumberCurrent : ''}`}
+                    >
+                      {progress.graded ? (
+                        <svg
+                          className={styles.questionResultIcon}
+                          viewBox="0 0 16 16"
+                          fill="none"
+                          aria-hidden="true"
+                        >
+                          {progress.result === 'wrong' ? (
+                            <path
+                              d="M4 4L12 12M12 4L4 12"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                            />
+                          ) : (
+                            <path
+                              d="M3 8L6.5 11.5L13 4.5"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          )}
+                        </svg>
+                      ) : (
+                        i + 1
+                      )}
+                    </button>
+                  )
+                })}
+                </div>
+                </div>
+              </div>
+              <button
+                ref={mobileQuestionTriggerRef}
+                type="button"
+                className={styles.mobileQuestionTrigger}
+                aria-expanded={mobileQuestionPanelOpen}
+                aria-controls="mobile-question-panel"
+                disabled={loading}
+                onClick={() => setMobileQuestionPanelOpen((open) => !open)}
               >
-                <span
-                  className={styles.completionProgressFill}
-                  style={{ width: `${adaptiveQuestion.length > 0 ? completedQuestionCount / adaptiveQuestion.length * 100 : 0}%` }}
-                />
-              </div>
-              <div
-                ref={questionNumberListRef}
-                className={`${styles.questionNumbers} ${questionNumberEdges.left ? styles.canScrollLeft : ''} ${questionNumberEdges.right ? styles.canScrollRight : ''}`}
-              >
-              <div className={styles.questionNumberTrack}>
-              {adaptiveQuestion.map((q, i) => {
-                const progress = questionProgress[i]
-                return (
-                  <button
-                    key={q.id}
-                    ref={(node) => { questionNumberRefs.current[i] = node }}
-                    onClick={() => goTo(i)}
-                    disabled={loading}
-                    aria-current={i === currentIndex ? 'step' : undefined}
-                    aria-label={`第 ${i + 1} 題，${progress.label}${i === currentIndex ? '，目前題目' : ''}`}
-                    className={`${styles.questionNumber} ${
-                      progress.graded
-                        ? progress.result === 'wrong'
-                          ? styles.questionNumberWrong
-                          : styles.questionNumberCorrect
-                        : progress.answered
-                          ? styles.questionNumberAnswered
-                          : ''
-                    } ${i === currentIndex ? styles.questionNumberCurrent : ''}`}
-                  >
-                    {progress.graded ? (
-                      <svg
-                        className={styles.questionResultIcon}
-                        viewBox="0 0 16 16"
-                        fill="none"
-                        aria-hidden="true"
-                      >
-                        {progress.result === 'wrong' ? (
-                          <path
-                            d="M4 4L12 12M12 4L4 12"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                          />
-                        ) : (
-                          <path
-                            d="M3 8L6.5 11.5L13 4.5"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        )}
-                      </svg>
-                    ) : (
-                      i + 1
-                    )}
-                  </button>
-                )
-              })}
-              </div>
-              </div>
+                <span>第 {currentIndex + 1}／{adaptiveQuestion.length} 題</span>
+                <svg
+                  className={mobileQuestionPanelOpen ? styles.mobileQuestionTriggerIconOpen : undefined}
+                  width="16"
+                  height="16"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  aria-hidden="true"
+                >
+                  <path d="M3 10L8 5L13 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
             </div>
 
             <button
-              onClick={handlePrimaryAction}
+              onClick={() => {
+                setMobileQuestionPanelOpen(false)
+                handlePrimaryAction()
+              }}
               disabled={loading || (!!replyResponse && isLastQuestion)}
+              aria-label={primaryActionLabel}
               className={`${styles.primaryButton} ${styles.navPrimaryButton}`}
             >
-              {loading && canSubmit ? '送出中…' : primaryActionLabel}
+              <span className={styles.primaryActionFull}>
+                {loading && canSubmit ? '送出中…' : primaryActionLabel}
+              </span>
+              <span className={styles.primaryActionShort} aria-hidden="true">
+                {loading && canSubmit ? '送出中…' : mobilePrimaryActionLabel}
+              </span>
               {!loading && (
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <path d="M6 3L11 8L6 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -1242,6 +1343,81 @@ export default function AdaptiveClient({
               )}
             </button>
           </div>
+
+          {mobileQuestionPanelOpen && (
+            <>
+              <button
+                type="button"
+                className={styles.mobileQuestionPanelBackdrop}
+                aria-label="關閉題號面板"
+                onClick={() => setMobileQuestionPanelOpen(false)}
+              />
+              <div
+                id="mobile-question-panel"
+                className={styles.mobileQuestionPanel}
+                role="dialog"
+                aria-modal="true"
+                aria-label="選擇題目"
+              >
+                <div className={styles.mobileQuestionPanelNumbers}>
+                  {adaptiveQuestion.map((question, index) => {
+                    const progress = questionProgress[index]
+                    return (
+                      <button
+                        key={question.id}
+                        ref={(node) => { mobileQuestionNumberRefs.current[index] = node }}
+                        type="button"
+                        onClick={() => {
+                          goTo(index)
+                          setMobileQuestionPanelOpen(false)
+                        }}
+                        disabled={loading}
+                        aria-current={index === currentIndex ? 'step' : undefined}
+                        aria-label={`第 ${index + 1} 題，${progress.label}${index === currentIndex ? '，目前題目' : ''}`}
+                        className={`${styles.questionNumber} ${
+                          progress.graded
+                            ? progress.result === 'wrong'
+                              ? styles.questionNumberWrong
+                              : styles.questionNumberCorrect
+                            : progress.answered
+                              ? styles.questionNumberAnswered
+                              : ''
+                        } ${index === currentIndex ? styles.questionNumberCurrent : ''}`}
+                      >
+                        {progress.graded ? (
+                          <svg
+                            className={styles.questionResultIcon}
+                            viewBox="0 0 16 16"
+                            fill="none"
+                            aria-hidden="true"
+                          >
+                            {progress.result === 'wrong' ? (
+                              <path
+                                d="M4 4L12 12M12 4L4 12"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                              />
+                            ) : (
+                              <path
+                                d="M3 8L6.5 11.5L13 4.5"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                            )}
+                          </svg>
+                        ) : (
+                          index + 1
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            </>
+          )}
 
           <MathJax dynamic>
             <div className={styles.questionCard}>
