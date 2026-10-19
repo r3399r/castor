@@ -3,10 +3,10 @@
 // the rest of this Node-only project) -- needed because the callbacks
 // passed to page.evaluate() below run in the browser Puppeteer controls,
 // not in this process, so they reference window/document.
-import { DeleteObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import chromium from '@sparticuz/chromium';
 import { randomUUID } from 'node:crypto';
 import puppeteer from 'puppeteer-core';
+import { uploadToS3 } from 'src/lib/s3';
 
 // Width of the rendered page in CSS pixels. The PNG comes out at this
 // times DEVICE_SCALE, so 720 x 2 = 1440px wide -- comfortably above the
@@ -92,20 +92,14 @@ export const htmlToS3Url = async (html: string): Promise<{ url: string; key: str
       clip: { x: 0, y: 0, width: contentWidth, height: contentHeight },
     })) as Buffer;
 
-    const s3 = new S3Client({});
-    const key = `questions/${randomUUID()}.png`;
-    await s3.send(
-      new PutObjectCommand({ Bucket: process.env.S3_BUCKET, Key: key, Body: buffer, ContentType: 'image/png' })
-    );
-
-    const region = process.env.AWS_REGION ?? 'ap-east-2';
-    return { url: `https://${process.env.S3_BUCKET}.s3.${region}.amazonaws.com/${key}`, key };
+    // questions/ rather than question-figures/: this render is a
+    // throwaway that facebookPoster deletes once the post is up.
+    return uploadToS3(buffer, 'image/png', `questions/${randomUUID()}.png`);
   } finally {
     await browser.close();
   }
 };
 
-export const deleteS3File = async (key: string): Promise<void> => {
-  const s3 = new S3Client({});
-  await s3.send(new DeleteObjectCommand({ Bucket: process.env.S3_BUCKET, Key: key }));
-};
+// Re-exported under its original name so facebookPoster (and the module
+// mock in its tests) keeps importing it from here.
+export { deleteFromS3 as deleteS3File } from 'src/lib/s3';

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ApiError, apiFetch, apiPost } from '@/lib/api'
+import { downscaleToLimit, MAX_IMAGE_BYTES, readAsDataUrl } from '@/lib/imageFile'
 
 // Mirrors backend_new's questionImageBodySchema. Kept in step by hand --
 // the point of checking here is to say "that file is too big" while the
@@ -15,10 +16,6 @@ const ACCEPTED_MIME_TYPES = [
   'image/heif',
   'application/pdf',
 ]
-// The server caps the base64 string at 2,500,000 characters; base64 costs
-// 4 bytes per 3, so this is the largest file that can survive encoding.
-const MAX_BYTES = Math.floor((2_500_000 * 3) / 4)
-
 type PickedFile = {
   // Stable across re-renders so React keys and the remove button agree
   // even when two screenshots share a name (clipboard pastes are all
@@ -42,69 +39,6 @@ type PickedFile = {
 type QuestionImageResponse = {
   subjectId: number
   questions: unknown[]
-}
-
-const readAsDataUrl = (file: Blob) =>
-  new Promise<string>((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(String(reader.result))
-    reader.onerror = () => reject(new Error('read failed'))
-    reader.readAsDataURL(file)
-  })
-
-const loadImage = (url: string) =>
-  new Promise<HTMLImageElement>((resolve, reject) => {
-    const img = new Image()
-    img.onload = () => resolve(img)
-    img.onerror = () => reject(new Error('decode failed'))
-    img.src = url
-  })
-
-/**
- * Shrinks an oversized image until it fits under MAX_BYTES.
- *
- * Worth doing rather than just rejecting: a phone photo of a question, or
- * a screenshot from a high-DPI display, routinely lands at 3-5MB, and
- * "your file is too big" with no recourse would make the feature useless
- * for exactly the inputs it is meant for. Re-encodes to JPEG because a
- * screenshot PNG stays large even at half the pixels; quality 0.9 keeps
- * small text legible, which is the whole job here.
- *
- * Returns null if it can't be decoded as an image (a PDF, mainly) -- those
- * the caller rejects outright, since there is no cheap way to shrink one
- * in the browser.
- */
-const downscaleToLimit = async (
-  file: File
-): Promise<{ mimeType: string; dataUrl: string } | null> => {
-  let objectUrl: string | null = null
-  try {
-    objectUrl = URL.createObjectURL(file)
-    const img = await loadImage(objectUrl)
-
-    let scale = 1
-    // Each pass drops to 75% per side, so ~56% of the area. Five passes
-    // reach ~5% of the original, which takes any realistic photo under the
-    // cap; the bound stops a pathological input looping forever.
-    for (let attempt = 0; attempt < 5; attempt++) {
-      scale *= 0.75
-      const canvas = document.createElement('canvas')
-      canvas.width = Math.max(1, Math.round(img.naturalWidth * scale))
-      canvas.height = Math.max(1, Math.round(img.naturalHeight * scale))
-      const ctx = canvas.getContext('2d')
-      if (!ctx) return null
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.9)
-      // 4 base64 chars per 3 bytes, ignoring the data: prefix.
-      const bytes = Math.floor((dataUrl.split(',')[1]?.length ?? 0) * 0.75)
-      if (bytes <= MAX_BYTES) return { mimeType: 'image/jpeg', dataUrl }
-    }
-    return null
-  } catch {
-    return null
-  } finally {
-    if (objectUrl) URL.revokeObjectURL(objectUrl)
-  }
 }
 
 /**
@@ -228,10 +162,10 @@ export default function QuestionImageUpload({
       let dataUrl: string
       let downscaled = false
 
-      if (file.size > MAX_BYTES) {
+      if (file.size > MAX_IMAGE_BYTES) {
         const shrunk = await downscaleToLimit(file)
         if (!shrunk) {
-          rejected.push(`${file.name || '檔案'}（超過 ${(MAX_BYTES / 1024 / 1024).toFixed(1)}MB 且無法自動縮小）`)
+          rejected.push(`${file.name || '檔案'}（超過 ${(MAX_IMAGE_BYTES / 1024 / 1024).toFixed(1)}MB 且無法自動縮小）`)
           continue
         }
         mimeType = shrunk.mimeType
@@ -388,7 +322,7 @@ export default function QuestionImageUpload({
       >
         <p className="text-sm text-black-700">點擊選擇檔案，或將截圖拖曳至此</p>
         <p className="mt-1 text-xs text-black-300">
-          支援 PNG / JPEG / WebP / HEIC / PDF，單檔超過 {(MAX_BYTES / 1024 / 1024).toFixed(1)}MB 會自動縮小
+          支援 PNG / JPEG / WebP / HEIC / PDF，單檔超過 {(MAX_IMAGE_BYTES / 1024 / 1024).toFixed(1)}MB 會自動縮小
         </p>
         <input
           ref={inputRef}
