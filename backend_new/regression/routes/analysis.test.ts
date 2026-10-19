@@ -3,10 +3,12 @@ import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { app } from 'src/app';
 import { closeDb, getDb } from 'src/db/client';
 import {
+  categoryTable,
   conceptGroupTable,
   conceptTable,
   questionTable,
   replyTable,
+  subjectCategoryTable,
   subjectTable,
   userStatHistoryTable,
   userConceptStatTable,
@@ -31,7 +33,10 @@ const clearTables = async () => {
   await db.delete(userConceptStatTable);
   await db.delete(conceptTable);
   await db.delete(conceptGroupTable);
+  // Before subject: subject_category holds a foreign key to it.
+  await db.delete(subjectCategoryTable);
   await db.delete(subjectTable);
+  await db.delete(categoryTable);
   await db.delete(userTable);
 };
 
@@ -58,6 +63,15 @@ const grantSubscription = async (userId: number) => {
     currentPeriodEnd: daysAhead(30),
     createdAt: new Date(),
   });
+};
+
+/** subject_category is many-to-many, so a subject can take several. */
+const fileUnderCategory = async (subjectId: number, name: string) => {
+  const [{ insertId: categoryId }] = await getDb()
+    .insert(categoryTable)
+    .values({ name, createdAt: new Date() });
+  await getDb().insert(subjectCategoryTable).values({ subjectId, categoryId });
+  return categoryId;
 };
 
 const addConcept = async (groupId: number, name: string) => {
@@ -143,6 +157,7 @@ type Overview = {
 
 type SpeedItem = {
   subject: string;
+  categories: string[];
   userMedianMs: number;
   platformMedianMs: number | null;
   deltaMs: number | null;
@@ -153,6 +168,7 @@ type SpeedItem = {
 type RiskItem = {
   concept: string;
   subject: string;
+  categories: string[];
   retention: number;
   level: string;
   daysSinceReview: number;
@@ -216,6 +232,57 @@ describe('analysis', () => {
       expect(body[1].level).toBe('low');
       expect(body[0].daysSinceReview).toBe(40);
       expect(body[0].subject).toBe('數學');
+    });
+
+    // Subject names are not unique, so the category is what tells two
+    // 數學 apart on screen.
+    it('reports the categories a concept\u2019s subject belongs to', async () => {
+      const { userId, groupId, subjectId } = await seed();
+      await grantSubscription(userId);
+      await fileUnderCategory(subjectId, '\u5b78\u6e2c');
+      await addStat(userId, await addConcept(groupId, 'c'), { mastery: 5, days: 10 });
+      vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
+
+      const res = await app.request('/api/analysis/overview');
+      const body = ((await res.json()) as Overview).forgettingRisk;
+
+      expect(body).toHaveLength(1);
+      expect(body[0].categories).toEqual(['\u5b78\u6e2c']);
+    });
+
+    // subject_category is many-to-many. Joining it onto the main query
+    // would return one row per pair and so list the concept twice --
+    // which in a list sliced to the worst N also costs another concept
+    // its slot.
+    it('does not duplicate a concept whose subject has several categories', async () => {
+      const { userId, groupId, subjectId } = await seed();
+      await grantSubscription(userId);
+      await fileUnderCategory(subjectId, '\u6307\u8003');
+      await fileUnderCategory(subjectId, '\u5b78\u6e2c');
+      await addStat(userId, await addConcept(groupId, 'c'), { mastery: 5, days: 10 });
+      vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
+
+      const res = await app.request('/api/analysis/overview');
+      const body = ((await res.json()) as Overview).forgettingRisk;
+
+      expect(body).toHaveLength(1);
+      // Name-sorted, so the label does not reshuffle between requests.
+      expect(body[0].categories).toEqual(['\u5b78\u6e2c', '\u6307\u8003']);
+    });
+
+    // An innerJoin onto subject_category would have dropped this row
+    // entirely rather than returning it with no category.
+    it('still lists a concept whose subject has no category', async () => {
+      const { userId, groupId } = await seed();
+      await grantSubscription(userId);
+      await addStat(userId, await addConcept(groupId, 'c'), { mastery: 5, days: 10 });
+      vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
+
+      const res = await app.request('/api/analysis/overview');
+      const body = ((await res.json()) as Overview).forgettingRisk;
+
+      expect(body).toHaveLength(1);
+      expect(body[0].categories).toEqual([]);
     });
 
     // The whole point of folding mastery into the curve: the better you
@@ -343,6 +410,41 @@ describe('analysis', () => {
 
       const res = await app.request('/api/analysis/overview');
       expect(res.status).toBe(403);
+    });
+
+    // Same two hazards as the risk list: many-to-many must not duplicate
+    // the row, and a subject with no category must still be listed.
+    it('reports the subject categories without duplicating the row', async () => {
+      const { userId, subjectId, questionId } = await setupSpeedUser();
+      await fileUnderCategory(subjectId, '指考');
+      await fileUnderCategory(subjectId, '學測');
+      await addReplies(userId, subjectId, questionId, [
+        { durationMs: 70_000 },
+        { durationMs: 80_000 },
+        { durationMs: 90_000 },
+        { durationMs: 100_000 },
+        { durationMs: 110_000 },
+      ]);
+      vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
+
+      const res = await app.request('/api/analysis/overview');
+      const body = ((await res.json()) as Overview).speed;
+
+      expect(body).toHaveLength(1);
+      expect(body[0].subject).toBe('數學');
+      expect(body[0].categories).toEqual(['學測', '指考']);
+    });
+
+    it('returns an empty category list for an uncategorised subject', async () => {
+      const { userId, subjectId, questionId } = await setupSpeedUser();
+      await addReplies(userId, subjectId, questionId, [{ durationMs: 70_000 }]);
+      vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
+
+      const res = await app.request('/api/analysis/overview');
+      const body = ((await res.json()) as Overview).speed;
+
+      expect(body).toHaveLength(1);
+      expect(body[0].categories).toEqual([]);
     });
 
     it('compares the user median against the subject median', async () => {

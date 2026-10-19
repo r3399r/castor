@@ -432,6 +432,13 @@ export type ForgettingRiskItem = {
   concept: string;
   subjectId: number;
   subject: string;
+  /**
+   * Every category the subject belongs to, name-sorted. Subject names are
+   * not unique -- two exams can both have a 數學 -- so the category is
+   * what tells them apart. An array because subject_category is
+   * many-to-many, and empty for a subject filed under no category.
+   */
+  categories: string[];
   mastery: number;
   attemptCount: number;
   lastAttemptAt: string | null;
@@ -447,6 +454,8 @@ export type ForgettingRiskItem = {
 export type SpeedComparison = {
   subjectId: number;
   subject: string;
+  /** See ForgettingRiskItem.categories. */
+  categories: string[];
   userMedianMs: number;
   platformMedianMs: number | null;
   deltaMs: number | null;
