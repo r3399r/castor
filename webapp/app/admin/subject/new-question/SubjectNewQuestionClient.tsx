@@ -67,6 +67,25 @@ const CHILD_QUESTION_TYPES = ['SINGLE', 'MULTIPLE', 'TRUE_FALSE', 'FILL']
 // passing here should also pass the server's own validation -- this is
 // just to surface which field is missing before the round trip, not a
 // replacement for the server-side check.
+/**
+ * Counts the figure placeholders the AI left behind.
+ *
+ * The extraction prompt marks every figure it cannot transcribe with
+ * <img src="https://img-placeholder-N">, meaning "a human puts the real
+ * image here". Nothing substitutes it automatically, so submitting one
+ * stores a question whose diagram is missing forever -- and since new
+ * questions are enabled by default, it also becomes a candidate for the
+ * Facebook auto-post, publishing the broken image.
+ *
+ * Counted rather than merely detected so the message can say how many
+ * are outstanding, which is what tells the admin whether they have
+ * finished replacing them.
+ */
+function countImagePlaceholders(html: string | undefined): number {
+  if (!html) return 0
+  return (html.match(/img-placeholder/gi) ?? []).length
+}
+
 function missingFields(q: QuestionDraft): string[] {
   const problems: string[] = []
   if (!q.type || !QUESTION_TYPES.includes(q.type)) problems.push('type')
@@ -79,6 +98,12 @@ function missingFields(q: QuestionDraft): string[] {
   if (!q.conceptIds || q.conceptIds.length === 0)
     problems.push('conceptIds（至少一個）')
 
+  const parentPlaceholders = countImagePlaceholders(q.content)
+  if (parentPlaceholders > 0)
+    problems.push(
+      `content 有 ${parentPlaceholders} 處圖片佔位尚未替換（需自行截圖上傳後換成真實網址）`
+    )
+
   if (q.type === 'GROUP') {
     if (!q.childQuestions || q.childQuestions.length === 0) {
       problems.push('childQuestions（題組需至少一個子題）')
@@ -89,6 +114,11 @@ function missingFields(q: QuestionDraft): string[] {
         if (typeof child.sortOrder !== 'number')
           problems.push(`childQuestions[${i}].sortOrder`)
         if (!child.content) problems.push(`childQuestions[${i}].content`)
+        const childPlaceholders = countImagePlaceholders(child.content)
+        if (childPlaceholders > 0)
+          problems.push(
+            `childQuestions[${i}].content 有 ${childPlaceholders} 處圖片佔位尚未替換`
+          )
         if (!child.options) problems.push(`childQuestions[${i}].options`)
         if (!child.answer) problems.push(`childQuestions[${i}].answer`)
         if (
