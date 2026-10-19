@@ -15,7 +15,6 @@ export default function SubscriptionPage() {
           <PageHeader
             className={styles.pageHeader}
             title="訂閱方案"
-            subtitle="解鎖完整學習分析，讓精靈陪你一起成長。"
           />
           <SubscriptionPageClient />
         </PageContainer>

@@ -137,7 +137,6 @@
 }
 
 .planAction p { color: var(--color-spirit-ink-soft); line-height: var(--leading-comfortable); }
-.planAction small { color: var(--color-spirit-muted); line-height: 1.5; }
 .subscribeButton { width: min(100%, 460px); }
 
 .statusError {
@@ -181,6 +180,20 @@
 }
 
 .analysisCard { padding: 24px; box-shadow: none; }
+.analysisIcon {
+  display: flex;
+  width: 44px;
+  height: 44px;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 18px;
+  border-radius: 50%;
+}
+
+.analysisIconLeaf { background: var(--color-category-leaf-soft); color: var(--color-spirit-leaf); }
+.analysisIconTeal { background: var(--color-info-soft); color: var(--color-spirit-teal); }
+.analysisIconGold { background: var(--color-category-gold-soft); color: var(--color-spirit-gold-ink); }
+
 .analysisCard h3,
 .spiritBonus h3 {
   margin-bottom: 8px;
@@ -198,6 +211,7 @@
 .spiritSection {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(320px, .8fr);
+  align-items: center;
   gap: 36px;
   padding: 36px;
   border: var(--spirit-border-muted);
@@ -211,21 +225,21 @@
 .checkList li { display: flex; align-items: flex-start; gap: 10px; line-height: 1.5; }
 .checkList svg { flex: none; margin-top: 2px; color: var(--color-spirit-leaf); }
 
-.spiritImagePlaceholder {
+.spiritImageFrame {
+  position: relative;
   display: flex;
-  min-height: 240px;
+  width: min(100%, 280px);
   align-items: center;
   justify-content: center;
-  flex-direction: column;
-  gap: 8px;
-  border: 1px dashed var(--color-spirit-line);
-  border-radius: 12px;
-  background: var(--color-spirit-mist);
-  color: var(--color-spirit-canopy);
-  text-align: center;
+  justify-self: center;
 }
 
-.spiritImagePlaceholder small { color: var(--color-spirit-muted); }
+.spiritImageFrame img {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+}
 
 .spiritBonus {
   display: flex;
@@ -249,7 +263,9 @@
 @media (max-width: 63.999rem) {
   .benefitSummary ul,
   .analysisGrid { grid-template-columns: 1fr; }
-  .spiritSection { grid-template-columns: 1fr; }
+  .spiritSection { grid-template-columns: 1fr; row-gap: 28px; }
+  .spiritImageFrame { width: min(100%, 360px); }
+  .spiritImageFrame img { width: min(100%, 320px); }
 }
 
 @media (max-width: 47.999rem) {
@@ -264,6 +280,8 @@
   .planAction :global(.sp-button) { width: 100%; }
   .section { margin-top: 44px; }
   .analysisCard { padding: 20px 18px; }
+  .spiritImageFrame { width: min(100%, 300px); }
+  .spiritImageFrame img { width: min(100%, 280px); }
   .spiritBonus { align-items: flex-start; flex-direction: column; gap: 16px; }
   .spiritBonus { padding: 20px 18px; }
   .bonusValue { font-size: 2.25rem; }

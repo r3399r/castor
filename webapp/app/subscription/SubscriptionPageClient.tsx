@@ -1,7 +1,16 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { BarChart3, Check, RefreshCw, Sparkles, Zap } from 'lucide-react'
+import {
+  BarChart3,
+  BrainCircuit,
+  Check,
+  Gauge,
+  RefreshCw,
+  Sparkles,
+  TrendingUp,
+  Zap,
+} from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { apiFetch } from '@/lib/api'
 import {
@@ -23,9 +32,24 @@ const benefitSummary = [
 ]
 
 const analysisFeatures = [
-  { title: '進步曲線', description: '查看整體、各科與各觀念的熟練度如何隨時間改變。' },
-  { title: '遺忘風險提示', description: '找出可能逐漸遺忘的觀念，並依優先程度安排複習。' },
-  { title: '答題速度分析', description: '比較各科答題速度與平台中位數，理解自己的作答節奏。' },
+  {
+    title: '進步曲線',
+    description: '查看整體、各科與各觀念的熟練度如何隨時間改變。',
+    icon: TrendingUp,
+    iconClass: styles.analysisIconLeaf,
+  },
+  {
+    title: '遺忘風險提示',
+    description: '找出可能逐漸遺忘的觀念，並依優先程度安排複習。',
+    icon: BrainCircuit,
+    iconClass: styles.analysisIconTeal,
+  },
+  {
+    title: '答題速度分析',
+    description: '比較各科答題速度與平台中位數，理解自己的作答節奏。',
+    icon: Gauge,
+    iconClass: styles.analysisIconGold,
+  },
 ]
 
 const faqs = [
@@ -245,7 +269,6 @@ export default function SubscriptionPageClient() {
               )}
             </>
             )}
-            <small>金額與方案內容皆為暫定，正式上線前會再確認。</small>
         </div>
       </ContentPanel>
 
@@ -288,10 +311,13 @@ export default function SubscriptionPageClient() {
       <section className={styles.section} aria-labelledby="analysis-title">
         <div className={styles.sectionHeading}><h2 id="analysis-title">從練習紀錄找到下一步</h2></div>
         <div className={styles.analysisGrid}>
-          {analysisFeatures.map((feature) => (
-            <Card key={feature.title} className={styles.analysisCard}>
-              <h3>{feature.title}</h3>
-              <p>{feature.description}</p>
+          {analysisFeatures.map(({ title, description, icon: Icon, iconClass }) => (
+            <Card key={title} className={styles.analysisCard}>
+              <span className={`${styles.analysisIcon} ${iconClass}`} aria-hidden="true">
+                <Icon size={22} strokeWidth={1.8} />
+              </span>
+              <h3>{title}</h3>
+              <p>{description}</p>
             </Card>
           ))}
         </div>
@@ -307,13 +333,13 @@ export default function SubscriptionPageClient() {
             <li><Check size={18} aria-hidden="true" />完成培養後選擇支持方向</li>
           </ul>
         </div>
-        <div
-          className={styles.spiritImagePlaceholder}
-          role="img"
-          aria-label="訂閱限定精靈預覽圖預留位置"
-        >
-          <span>這裡可以放圖片</span>
-          <small>訂閱限定精靈預覽</small>
+        <div className={styles.spiritImageFrame}>
+          <img
+            src="/illustrations/subscription/vip-egg.webp"
+            alt="金色緞帶與星光圍繞的訂閱限定精靈蛋"
+            width={1254}
+            height={1254}
+          />
         </div>
         <div className={styles.spiritBonus}>
           <div>
