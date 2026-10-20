@@ -49,11 +49,11 @@ const seed = async () => {
   return { userId, subjectId, groupId };
 };
 
-const grantSubscription = async (userId: number) => {
+const grantSubscription = async (userId: number, status = 'active') => {
   await getDb().insert(userSubscriptionTable).values({
     userId,
     plan: 'monthly',
-    status: 'active',
+    status,
     currentPeriodStart: daysAgo(1),
     currentPeriodEnd: daysAhead(30),
     createdAt: new Date(),
@@ -189,6 +189,15 @@ describe('analysis', () => {
     it('admits a subscriber', async () => {
       const { userId } = await seed();
       await grantSubscription(userId);
+      vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
+
+      const res = await app.request('/api/analysis/overview');
+      expect(res.status).toBe(200);
+    });
+
+    it('admits a cancelled subscriber until the current period ends', async () => {
+      const { userId } = await seed();
+      await grantSubscription(userId, 'cancelled');
       vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
 
       const res = await app.request('/api/analysis/overview');

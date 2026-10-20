@@ -1,5 +1,5 @@
 import { createMiddleware } from 'hono/factory';
-import { ActiveSubscription, findActiveSubscription } from 'src/lib/subscription';
+import { ActiveSubscription, findEntitledSubscription } from 'src/lib/subscription';
 import { ForbiddenError } from 'src/model/error';
 import { UserEnv } from './requireUser';
 
@@ -25,7 +25,7 @@ export type SubscriptionEnv = UserEnv & {
  */
 export const requireSubscription = createMiddleware<SubscriptionEnv>(async (c, next) => {
   const user = c.get('user');
-  const subscription = await findActiveSubscription(c.get('db'), user.id);
+  const subscription = await findEntitledSubscription(c.get('db'), user.id);
   if (subscription === undefined)
     throw new ForbiddenError('Subscription required', 'SUBSCRIPTION_REQUIRED');
 

@@ -662,27 +662,47 @@ function SpeedCard({
 function ProAnalysisSections() {
   const { subscription } = useAuth()
   const [data, setData] = useState<GetAnalysisOverviewResponse | null>(null)
+  const [entitled, setEntitled] = useState<boolean | null>(null)
   const [failed, setFailed] = useState(false)
 
-  const subscribed = subscription?.active === true
-
   useEffect(() => {
-    if (!subscribed) return
+    if (subscription === null) return
+
+    setData(null)
+    setEntitled(null)
+    setFailed(false)
+
     apiFetch<GetAnalysisOverviewResponse>('analysis/overview', {
         speedDays: SPEED_DAYS,
         riskLimit: 10,
         progressDays: PROGRESS_DAYS,
       })
-      .then(setData)
-      .catch(() => setFailed(true))
-  }, [subscribed])
+      .then((overview) => {
+        setData(overview)
+        setEntitled(true)
+      })
+      .catch((error: unknown) => {
+        // The analysis endpoint is the source of truth for entitlement.
+        // In particular, a cancelled subscription remains entitled until
+        // currentPeriodEnd even though its billing state is no longer active.
+        if ((error as { status?: number }).status === 403) {
+          setEntitled(false)
+          return
+        }
 
-  // null means sync has not answered yet, which is not the same as "not
-  // subscribed" -- rendering nothing keeps a subscriber from seeing the
-  // locked state flash before their entitlement is known.
-  if (subscription === null) return null
+        // A network/server failure is not evidence that the user is free.
+        // Keep the analysis cards visible and let their existing error state
+        // offer a retry instead of incorrectly showing an upgrade prompt.
+        setEntitled(true)
+        setFailed(true)
+      })
+  }, [subscription])
 
-  if (!subscribed)
+  // null means sync or the entitlement request has not answered yet. It is
+  // not the same as "not subscribed", so avoid flashing the locked cards.
+  if (subscription === null || entitled === null) return null
+
+  if (!entitled)
     return (
       <>
         <LockedProCard

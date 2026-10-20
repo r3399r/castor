@@ -5,6 +5,7 @@ import { TransactionEnv } from 'src/middleware/transaction';
 type Db = TransactionEnv['Variables']['db'];
 
 export const SUBSCRIPTION_STATUS_ACTIVE = 'active';
+export const SUBSCRIPTION_STATUS_CANCELLED = 'cancelled';
 
 export type ActiveSubscription = {
   plan: string;
@@ -47,6 +48,41 @@ export const findActiveSubscription = async (
   return row;
 };
 
+/**
+ * A subscription period that still grants paid access.
+ *
+ * Cancelling auto-renew changes the billing state to `cancelled`, but does
+ * not end the period the user has already paid for. Keep this lookup
+ * separate from findActiveSubscription so status screens can still report
+ * that auto-renew is off while subscriber-only features remain available
+ * through currentPeriodEnd.
+ */
+export const findEntitledSubscription = async (
+  db: Db,
+  userId: number
+): Promise<ActiveSubscription | undefined> => {
+  const [row] = await db
+    .select({
+      plan: userSubscriptionTable.plan,
+      currentPeriodEnd: userSubscriptionTable.currentPeriodEnd,
+    })
+    .from(userSubscriptionTable)
+    .where(
+      and(
+        eq(userSubscriptionTable.userId, userId),
+        inArray(userSubscriptionTable.status, [
+          SUBSCRIPTION_STATUS_ACTIVE,
+          SUBSCRIPTION_STATUS_CANCELLED,
+        ]),
+        gt(userSubscriptionTable.currentPeriodEnd, new Date())
+      )
+    )
+    .orderBy(desc(userSubscriptionTable.createdAt))
+    .limit(1);
+
+  return row;
+};
+
 export type SubscriptionPeriod = {
   id: number;
   plan: string;
@@ -78,8 +114,6 @@ export const listSubscriptionHistory = async (
     .from(userSubscriptionTable)
     .where(eq(userSubscriptionTable.userId, userId))
     .orderBy(desc(userSubscriptionTable.createdAt));
-
-export const SUBSCRIPTION_STATUS_CANCELLED = 'cancelled';
 
 /** Default length of a period granted by hand, in days. */
 export const DEFAULT_GRANT_DAYS = 30;

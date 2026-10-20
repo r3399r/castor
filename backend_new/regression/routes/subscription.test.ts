@@ -189,9 +189,19 @@ describe('subscription', () => {
       expect(res.status).toBe(403);
     });
 
-    it('rejects a cancelled subscription whose period has not yet ended', async () => {
+    it('admits a cancelled subscription until its paid period ends', async () => {
       const userId = await seedUser();
       await grant(userId, { status: 'cancelled' });
+      vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
+
+      const res = await gatedApp.request('/gated/thing');
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ ok: true });
+    });
+
+    it('rejects a cancelled subscription after its paid period ends', async () => {
+      const userId = await seedUser();
+      await grant(userId, { status: 'cancelled', endsInDays: -1 });
       vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
 
       const res = await gatedApp.request('/gated/thing');

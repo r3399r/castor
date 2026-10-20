@@ -70,7 +70,7 @@ export type SubscriptionView =
       kind: 'cancelled'
       planCode: string
       entitlementEndsAt: string
-      entitlementActive: false
+      entitlementActive: true
     }
   | {
       kind: 'expired'
@@ -83,8 +83,8 @@ export type SubscriptionView =
     }
 
 /**
- * Keeps entitlement and billing state separate. The current API only grants
- * access for status=active and does not expose auto-renew or charge data.
+ * Keeps entitlement and billing state separate. A cancelled period retains
+ * access until its current period ends even though auto-renew is no longer on.
  */
 export function deriveSubscriptionView(
   current: SubscriptionStatus,
@@ -135,7 +135,7 @@ export function deriveSubscriptionView(
       kind: 'cancelled',
       planCode: latest.plan,
       entitlementEndsAt: latest.currentPeriodEnd,
-      entitlementActive: false,
+      entitlementActive: true,
     }
   }
 
