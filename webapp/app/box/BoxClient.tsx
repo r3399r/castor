@@ -8,8 +8,6 @@ import {
   ChevronDown,
   Coins,
   LockKeyhole,
-  Minus,
-  Plus,
   ShoppingBag,
   Sparkles,
   Sprout,
@@ -208,18 +206,11 @@ export default function BoxClient() {
           目前沒有可分配的積分。完成更多練習後，就能繼續培育這隻精靈。
         </p>
       )}
-      <div className="sp-invest-controls">
-        <div className="sp-stepper">
-          <Button
-            variant="quiet"
-            onClick={() => setPointsToUse((value) => Math.max(1, value - 1))}
-            disabled={availablePoints === 0 || pointsToUse <= 1}
-            aria-label="減少投入積分"
-          >
-            <Minus size={17} aria-hidden="true" />
-          </Button>
-          <label>
-            <span className="sr-only">投入積分點數</span>
+      <div className="sp-invest-selector">
+        <div className="sp-invest-value-row">
+          <span>本次投入</span>
+          <label className="sp-invest-value">
+            <span className="sr-only">精確輸入投入積分點數</span>
             <input
               type="number"
               inputMode="numeric"
@@ -244,30 +235,68 @@ export default function BoxClient() {
             />
             <span>點</span>
           </label>
+        </div>
+        <input
+          className="sp-invest-range"
+          type="range"
+          min={availablePoints === 0 ? 0 : 1}
+          max={Math.max(availablePoints, 1)}
+          step={1}
+          value={pointsToUse}
+          disabled={availablePoints === 0}
+          aria-label="選擇投入積分點數"
+          aria-valuetext={`${pointsToUse.toLocaleString('zh-TW')} 點`}
+          onChange={(event) => setPointsToUse(Number(event.target.value))}
+          style={{
+            '--sp-invest-progress': `${
+              availablePoints === 1
+                ? 100
+                : availablePoints > 1
+                ? ((pointsToUse - 1) / (availablePoints - 1)) * 100
+                : 0
+            }%`,
+          } as React.CSSProperties}
+        />
+        <div className="sp-invest-range-labels" aria-hidden="true">
+          <span>{availablePoints === 0 ? '0' : '1'}</span>
+          <span>最多 {availablePoints.toLocaleString('zh-TW')}</span>
+        </div>
+        <div className="sp-invest-actions">
+          <div className="sp-invest-presets" aria-label="快速選擇投入比例">
+            {[
+              { label: '25%', ratio: 0.25 },
+              { label: '50%', ratio: 0.5 },
+              { label: '全部投入', ratio: 1 },
+            ].map(({ label, ratio }) => {
+              const value =
+                availablePoints === 0
+                  ? 0
+                  : Math.max(1, Math.round(availablePoints * ratio))
+              return (
+                <Button
+                  key={label}
+                  variant="secondary"
+                  size="sm"
+                  className="sp-invest-preset"
+                  disabled={availablePoints === 0}
+                  aria-pressed={pointsToUse === value}
+                  onClick={() => setPointsToUse(value)}
+                >
+                  {label}
+                </Button>
+              )
+            })}
+          </div>
           <Button
-            variant="quiet"
-            onClick={() =>
-              setPointsToUse((value) => Math.min(availablePoints, value + 1))
-            }
-            disabled={availablePoints === 0 || pointsToUse >= availablePoints}
-            aria-label="增加投入積分"
+            className="sp-invest-confirm"
+            onClick={() => setShowInvestDialog(true)}
+            disabled={availablePoints === 0 || pointsToUse < 1}
           >
-            <Plus size={17} aria-hidden="true" />
+            <Sparkles size={16} aria-hidden="true" />
+            確認投入
           </Button>
         </div>
-        <Button
-          onClick={() => setShowInvestDialog(true)}
-          disabled={availablePoints === 0 || pointsToUse < 1}
-        >
-          <Sparkles size={16} aria-hidden="true" />
-          確認投入
-        </Button>
       </div>
-      <p className="sp-caption">
-        {availablePoints === 0
-          ? '累積積分後即可在這裡選擇投入數量。'
-          : `最多可投入 ${availablePoints} 點；目前為版面示意，不會扣除積分。`}
-      </p>
     </div>
   )
 

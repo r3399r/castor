@@ -669,10 +669,136 @@
   margin-top: 6px;
   font-size: var(--text-spirit-caption);
 }
-.sp-invest-controls {
-  display: flex;
-  gap: 12px;
+.sp-invest-selector {
   margin-top: 16px;
+}
+.sp-invest-value-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  color: var(--color-spirit-muted);
+  font-size: var(--text-spirit-caption);
+}
+.sp-invest-value {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+  color: var(--color-spirit-ink);
+  font-weight: 700;
+}
+.sp-invest-value input {
+  width: 11ch;
+  max-width: calc(100% - 2.5ch);
+  min-height: 44px;
+  padding: 6px 10px;
+  border: var(--spirit-border);
+  border-radius: var(--radius-spirit-control);
+  background: var(--color-spirit-cream);
+  color: inherit;
+  text-align: right;
+  font-size: var(--text-spirit-body);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  appearance: textfield;
+}
+.sp-invest-value input::-webkit-inner-spin-button,
+.sp-invest-value input::-webkit-outer-spin-button {
+  appearance: none;
+}
+.sp-invest-value input:focus-visible {
+  outline: 2px solid var(--color-spirit-gold);
+  outline-offset: 2px;
+}
+.sp-invest-range {
+  --sp-invest-progress: 0%;
+  display: block;
+  width: 100%;
+  height: 44px;
+  margin-top: 10px;
+  background: transparent;
+  cursor: pointer;
+  appearance: none;
+}
+.sp-invest-range::-webkit-slider-runnable-track {
+  height: 8px;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    var(--color-spirit-teal) 0 var(--sp-invest-progress),
+    var(--color-spirit-mist) var(--sp-invest-progress) 100%
+  );
+}
+.sp-invest-range::-moz-range-track {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--color-spirit-mist);
+}
+.sp-invest-range::-moz-range-progress {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--color-spirit-teal);
+}
+.sp-invest-range::-webkit-slider-thumb {
+  width: 26px;
+  height: 26px;
+  margin-top: -9px;
+  border: 1px solid #b8c8c0;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow:
+    0 1px 2px rgb(34 62 57 / 0.16),
+    0 4px 7px rgb(34 62 57 / 0.22);
+  appearance: none;
+}
+.sp-invest-range::-moz-range-thumb {
+  width: 26px;
+  height: 26px;
+  border: 1px solid #b8c8c0;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow:
+    0 1px 2px rgb(34 62 57 / 0.16),
+    0 4px 7px rgb(34 62 57 / 0.22);
+}
+.sp-invest-range:focus-visible {
+  outline: 2px solid var(--color-spirit-gold);
+  outline-offset: 1px;
+  border-radius: var(--radius-spirit-control);
+}
+.sp-invest-range:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.sp-invest-range-labels {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: -5px;
+  color: var(--color-spirit-muted);
+  font-size: var(--text-spirit-micro);
+  font-variant-numeric: tabular-nums;
+}
+.sp-invest-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 16px;
+}
+.sp-invest-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.sp-invest-preset[aria-pressed='true'] {
+  border-color: var(--color-spirit-canopy);
+  background: var(--color-spirit-mist);
+}
+.sp-invest-confirm {
+  flex: none;
 }
 .sp-button {
   display: inline-flex;
@@ -1534,9 +1660,8 @@
   .sp-scene {
     padding: 24px;
   }
-  .sp-invest-controls {
-    flex-direction: column;
-  }
+  .sp-invest-actions { align-items: stretch; flex-direction: column; }
+  .sp-invest-confirm { width: 100%; }
   .sp-growth-track {
     gap: 12px;
   }
@@ -1621,9 +1746,8 @@
   .sp-status h2 {
     font-size: var(--text-spirit-section);
   }
-  .sp-invest-controls {
-    flex-direction: row;
-  }
+  .sp-invest-actions { align-items: center; flex-direction: row; }
+  .sp-invest-confirm { width: auto; }
   .sp-panel {
     padding: 24px 20px;
     border-radius: var(--radius-spirit-card);
@@ -1718,9 +1842,8 @@
   .sp-store-title {
     flex-direction: row;
   }
-  .sp-invest-controls {
-    flex-direction: column;
-  }
+  .sp-invest-actions { align-items: stretch; flex-direction: column; }
+  .sp-invest-confirm { width: 100%; }
   .sp-status-heading {
     flex-direction: column;
   }
