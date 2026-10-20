@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import { apiFetch, apiPost } from '@/lib/api'
 import MultiSelectField from '@/components/MultiSelectField'
 import { ErrorState, LoadingState, PageHeader } from '@/components/ui'
+import QuestionFigurePanel from '@/components/QuestionFigurePanel'
 import QuestionImageUpload from '@/components/QuestionImageUpload'
 import { takeQuestionDraft } from '@/lib/questionDraft'
 import { MathJax } from 'better-react-mathjax'
@@ -392,6 +393,20 @@ export default function SubjectNewQuestionClient() {
         />
         {parseError && <p className="text-sm text-red-600">{parseError}</p>}
       </section>
+
+      {/* Renders itself only while a placeholder is left. Sits above the
+          preview because it is the blocker: missingFields() refuses to let
+          the batch submit until these are replaced. */}
+      <div className="mt-4">
+        <QuestionFigurePanel
+          questionsJson={questionsInput}
+          onReplace={(next) => {
+            setQuestionsInput(next)
+            setSubmitStatus({})
+            setBatchError(null)
+          }}
+        />
+      </div>
 
       {parsedQuestions.length > 0 && (
         <section className="mt-6 space-y-4">

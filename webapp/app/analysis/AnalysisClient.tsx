@@ -365,6 +365,17 @@ function HistorySection({ history }: { history: GetUserHistoryResponse }) {
 // Status colours, reserved for risk and never reused as a series hue.
 // Each ships with an icon and a word, so the level never rests on colour
 // alone -- the bar beside them is the magnitude, not the identity.
+/**
+ * A subject with the categories it is filed under.
+ *
+ * Subject names are not unique -- two exams can each have a 數學 -- so the
+ * bare name leaves two different rows looking identical. Several
+ * categories are possible because subject_category is many-to-many, and
+ * none at all is normal, in which case this is just the name.
+ */
+const subjectLabel = (subject: string, categories: string[]) =>
+  categories.length === 0 ? subject : `${subject}（${categories.join('、')}）`
+
 const RISK_META: Record<
   ForgettingRiskItem['level'],
   { label: string; icon: string; text: string; bg: string; bar: string }
@@ -502,7 +513,9 @@ function ForgettingRiskCard({
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-bold">{item.concept}</span>
-                    <span className={`text-xs ${styles.muted}`}>{item.subject}</span>
+                    <span className={`text-xs ${styles.muted}`}>
+                      {subjectLabel(item.subject, item.categories)}
+                    </span>
                   </div>
                   <span
                     className="flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold"
@@ -592,7 +605,9 @@ function SpeedCard({
             return (
               <li key={item.subjectId} className="flex flex-col gap-2">
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <span className="text-sm font-bold">{item.subject}</span>
+                  <span className="text-sm font-bold">
+                    {subjectLabel(item.subject, item.categories)}
+                  </span>
                   <span className={`text-[11px] ${styles.muted}`}>
                     你 <span className="font-bold tabular-nums">{toSeconds(item.userMedianMs)}s</span>
                     {item.platformMedianMs !== null && (
@@ -622,7 +637,7 @@ function SpeedCard({
                       />
                       <div
                         role="img"
-                        aria-label={`${item.subject}：比平台中位數${slower ? '慢' : '快'} ${Math.abs(toSeconds(delta))} 秒`}
+                        aria-label={`${subjectLabel(item.subject, item.categories)}：比平台中位數${slower ? '慢' : '快'} ${Math.abs(toSeconds(delta))} 秒`}
                         className="absolute top-1.5 h-[10px]"
                         style={{
                           width: `${width}%`,

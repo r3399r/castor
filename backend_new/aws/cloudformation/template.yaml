@@ -61,6 +61,21 @@ Resources:
                 Action:
                   - sqs:SendMessage
                 Resource: !Sub arn:aws:sqs:${AWS::Region}:${AWS::AccountId}:polaris-${TargetEnvr}-logger-queue
+              # POST /question/image/figure stores a cropped diagram that a
+              # question's HTML then points at. Scoped to questions/figures/
+              # because the bucket's policy grants public read on questions/*
+              # only -- a figure written anywhere else is unreadable by the
+              # browsers that have to display it.
+              #
+              # PutObject without DeleteObject on purpose: FacebookFunction
+              # cleans up the transient renders it makes under questions/,
+              # while a figure is referenced by a stored question for as long
+              # as that question exists, so this role has no reason to be
+              # able to remove one.
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                Resource: !Sub arn:aws:s3:::${Project}-public-bucket/questions/figures/*
 
   RestApi:
     Type: AWS::Serverless::Api
@@ -98,6 +113,10 @@ Resources:
           # POST /question/image transcribes an uploaded paper via Gemini.
           # Same SSM parameter the legacy backend's preview endpoint reads
           # -- one key, one place to rotate it.
+          # Same bucket FacebookFunction writes its post images to, under a
+          # different prefix. Read by src/lib/s3.ts, which throws a
+          # configured-error rather than writing to "undefined" if missing.
+          S3_BUCKET: !Sub ${Project}-public-bucket
           GOOGLE_GENAI_API_KEY: !Sub '{{resolve:ssm:${Project}-google-genai-api-key}}'
           # Pinned here rather than left to genai.ts's built-in default so
           # that swapping models is a stack parameter change instead of a

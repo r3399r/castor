@@ -20,6 +20,7 @@ import {
 } from 'src/db/schema';
 import { enableFacebookEventBridge } from 'src/lib/facebookEventBridge';
 import { generateJsonFromImages } from 'src/lib/genai';
+import { uploadToS3 } from 'src/lib/s3';
 import { DEFAULT_LIMIT, genPagination, MAX_LIMIT } from 'src/lib/paginator';
 import {
   buildQuestionExtractPrompt,
@@ -151,6 +152,24 @@ const base64ImageSchema = z
   .refine((value) => value.length > 0 && /^[A-Za-z0-9+/]+={0,2}$/.test(value), {
     message: 'data must be base64 or a base64 data URL',
   });
+
+// Narrower than QUESTION_IMAGE_MIME_TYPES on purpose. Those feed Gemini,
+// which only has to *read* the file; these end up in an <img> a student
+// looks at, so the type has to render in every browser. PDF cannot be an
+// img source at all, and HEIC/HEIF only decode on Apple platforms -- both
+// would upload happily and then display as nothing.
+const QUESTION_FIGURE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
+
+const FIGURE_EXTENSIONS: Record<(typeof QUESTION_FIGURE_MIME_TYPES)[number], string> = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+};
+
+export const questionFigureBodySchema = z.object({
+  mimeType: z.enum(QUESTION_FIGURE_MIME_TYPES),
+  data: base64ImageSchema,
+});
 
 export const questionImageBodySchema = z.object({
   subjectId: z.number().int().positive(),
@@ -1015,6 +1034,38 @@ export const question = new Hono<UserEnv>()
     await enableFacebookEventBridge();
 
     return c.json(results, 201);
+  })
+  // Stores one figure and returns the URL to put in the question's HTML,
+  // replacing an img-placeholder-N the extraction left behind. The admin
+  // crops the diagram out of the paper themselves, which is both more
+  // accurate than asking the model for bounding boxes and consistent with
+  // the rest of this flow: the AI drafts, a human finishes.
+  //
+  // Nothing is written to the database -- the URL only becomes part of a
+  // question when the admin submits the reviewed JSON to POST / above, so
+  // a figure uploaded for a question that is then abandoned is just an
+  // orphaned object, not a broken row.
+  //
+  // Gated by the group's adminAuth, which does cover POST.
+  .post('/image/figure', zValidator('json', questionFigureBodySchema), async (c) => {
+    const { mimeType, data } = c.req.valid('json');
+    const buffer = Buffer.from(data, 'base64');
+    console.log(`POST /api/question/image/figure mimeType=${mimeType} bytes=${buffer.length}`);
+
+    // Under questions/, not a sibling prefix, because the bucket policy
+    // grants public s3:GetObject on questions/* and nothing else -- a
+    // figure stored outside it uploads fine and then answers 403 to every
+    // browser, showing up as a broken image with no error anywhere.
+    //
+    // The nested figures/ still separates these from the transient
+    // Facebook renders, which sit directly at questions/<uuid>.png and are
+    // deleted once posted. facebookPoster deletes by exact key, so these
+    // are safe today; a future blanket cleanup over questions/ would have
+    // to exclude this sub-prefix.
+    const key = `questions/figures/${randomUUID()}.${FIGURE_EXTENSIONS[mimeType]}`;
+    const { url } = await uploadToS3(buffer, mimeType, key);
+
+    return c.json({ url });
   })
   // Manual escape hatch for when the Gemini quota is gone: hands back the
   // exact prompt POST /image would have sent, to paste into a chat GUI

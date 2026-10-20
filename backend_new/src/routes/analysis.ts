@@ -3,9 +3,11 @@ import { and, eq, gte, inArray, isNotNull } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import {
+  categoryTable,
   conceptGroupTable,
   conceptTable,
   replyTable,
+  subjectCategoryTable,
   subjectTable,
   userConceptStatTable,
   userStatHistoryTable,
@@ -113,6 +115,45 @@ const percentile = (sorted: number[], p: number): number => {
  * -- no reply replay and no new storage, so the cost is one indexed read
  * regardless of how much the user has practised.
  */
+/**
+ * Category names for the given subjects, keyed by subject id.
+ *
+ * A separate query rather than a join onto the two loaders below, because
+ * subject_category is many-to-many: joining would return one row per
+ * (subject, category) pair and so duplicate the thing being listed. In
+ * the risk list that is actively harmful -- it is sliced to the worst N,
+ * so duplicates would spend slots that belong to other concepts. An
+ * innerJoin would also silently drop any subject filed under no category.
+ */
+const loadCategoryNamesBySubject = async (
+  db: Db,
+  subjectIds: number[]
+): Promise<Map<number, string[]>> => {
+  const map = new Map<number, string[]>();
+  if (subjectIds.length === 0) return map;
+
+  const rows = await db
+    .select({ subjectId: subjectCategoryTable.subjectId, name: categoryTable.name })
+    .from(subjectCategoryTable)
+    .innerJoin(categoryTable, eq(categoryTable.id, subjectCategoryTable.categoryId))
+    .where(inArray(subjectCategoryTable.subjectId, subjectIds));
+
+  for (const row of rows) {
+    const names = map.get(row.subjectId) ?? [];
+    names.push(row.name);
+    map.set(row.subjectId, names);
+  }
+  // The join table carries no ordering of its own, so sort for a label
+  // that does not reshuffle between requests. Codepoint order, not
+  // localeCompare: that reads ICU collation data, which differs between
+  // the Node here (nodejs22.x) and whatever runs locally, so the same
+  // categories could come back in a different order in prod than in a
+  // test. Stability is the whole requirement; collation correctness is
+  // not, since these are two or three names shown side by side.
+  for (const names of map.values()) names.sort();
+  return map;
+};
+
 const loadForgettingRisk = async (db: Db, userId: number, limit: number) => {
   const rows = await db
     .select({
@@ -139,7 +180,7 @@ const loadForgettingRisk = async (db: Db, userId: number, limit: number) => {
     );
 
   const now = Date.now();
-  return rows
+  const ranked = rows
     .map((row) => {
       const mastery = row.mastery ?? 0;
       const daysSinceReview = Math.max(
@@ -165,6 +206,17 @@ const loadForgettingRisk = async (db: Db, userId: number, limit: number) => {
     // order by it by recomputing the same curve in SQL.
     .sort((a, b) => a.retention - b.retention)
     .slice(0, limit);
+
+  // After the slice, so the lookup covers only the subjects actually
+  // being returned.
+  const categories = await loadCategoryNamesBySubject(
+    db,
+    [...new Set(ranked.map((item) => item.subjectId))]
+  );
+  return ranked.map((item) => ({
+    ...item,
+    categories: categories.get(item.subjectId) ?? [],
+  }));
 };
 
 /**
@@ -184,7 +236,7 @@ const loadSpeedComparison = async (db: Db, userId: number, speedDays: number) =>
   if (subjectIds.length === 0) return [];
 
   const since = new Date(Date.now() - speedDays * DAY_MS);
-  const [replies, subjects] = await Promise.all([
+  const [replies, subjects, categories] = await Promise.all([
     db
       .select({
         subjectId: replyTable.subjectId,
@@ -212,6 +264,7 @@ const loadSpeedComparison = async (db: Db, userId: number, speedDays: number) =>
       })
       .from(subjectTable)
       .where(inArray(subjectTable.id, subjectIds)),
+    loadCategoryNamesBySubject(db, subjectIds),
   ]);
 
   const bySubject = new Map<number, { durations: number[]; scoreSum: number }>();
@@ -240,6 +293,7 @@ const loadSpeedComparison = async (db: Db, userId: number, speedDays: number) =>
       return {
         subjectId: subject.id,
         subject: subject.name,
+        categories: categories.get(subject.id) ?? [],
         userMedianMs,
         platformMedianMs,
         deltaMs: comparable ? userMedianMs - platformMedianMs : null,

@@ -51,6 +51,12 @@ vi.mock('src/lib/facebookEventBridge', () => ({ enableFacebookEventBridge: vi.fn
 // needing an API key) on every run.
 vi.mock('src/lib/genai', () => ({ generateJsonFromImages: vi.fn() }));
 import { generateJsonFromImages } from 'src/lib/genai';
+
+// POST /question/image/figure's only external dependency. Mocked so the
+// suite covers the mime allowlist, the key shape and the auth gate
+// without needing S3 credentials or a bucket.
+vi.mock('src/lib/s3', () => ({ uploadToS3: vi.fn(), deleteFromS3: vi.fn() }));
+import { uploadToS3 } from 'src/lib/s3';
 import { BadGatewayError, TooManyRequestsError } from 'src/model/error';
 
 type QuestionDto = {
@@ -99,6 +105,13 @@ const PNG_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAAAAAA6fptVAAAACklEQVR4nGMA
 
 const postQuestionImage = (body: unknown) =>
   app.request('/api/question/image', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+const postQuestionFigure = (body: unknown) =>
+  app.request('/api/question/image/figure', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -1459,6 +1472,61 @@ describe('question routes', () => {
       expect(
         body.data.some((group) => group.children.some((child) => child.questionId === q.id))
       ).toBe(true);
+    });
+  });
+
+  describe('POST /image/figure', () => {
+    beforeEach(() => {
+      vi.mocked(uploadToS3).mockReset();
+    });
+
+    it('stores the figure under questions/figures/ and returns its url', async () => {
+      vi.mocked(uploadToS3).mockResolvedValue({
+        url: 'https://bucket.s3.ap-east-2.amazonaws.com/questions/figures/abc.png',
+        key: 'questions/figures/abc.png',
+      });
+
+      const res = await postQuestionFigure({ mimeType: 'image/png', data: PNG_BASE64 });
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({
+        url: 'https://bucket.s3.ap-east-2.amazonaws.com/questions/figures/abc.png',
+      });
+
+      const [body, contentType, key] = vi.mocked(uploadToS3).mock.calls[0];
+      // Decoded before upload -- storing the base64 text would give an
+      // object that serves as a broken image.
+      expect(Buffer.isBuffer(body)).toBe(true);
+      expect(body.equals(Buffer.from(PNG_BASE64, 'base64'))).toBe(true);
+      expect(contentType).toBe('image/png');
+      // Under questions/ because that is the only prefix the bucket
+      // grants public read on; the nested figures/ still keeps these clear
+      // of the transient Facebook renders at questions/<uuid>.png, which
+      // get deleted after posting.
+      expect(key).toMatch(/^questions\/figures\/[0-9a-f-]+\.png$/);
+    });
+
+    // These types reach a student's browser in an <img>, unlike the ones
+    // POST /image sends to Gemini, which only has to read them.
+    it('rejects types that cannot render in an img', async () => {
+      for (const mimeType of ['application/pdf', 'image/heic']) {
+        const res = await postQuestionFigure({ mimeType, data: PNG_BASE64 });
+        expect(res.status).toBe(400);
+      }
+      expect(uploadToS3).not.toHaveBeenCalled();
+    });
+
+    it('rejects a non-admin caller', async () => {
+      vi.mocked(verifyIdToken).mockResolvedValue(null);
+      expect((await postQuestionFigure({ mimeType: 'image/png', data: PNG_BASE64 })).status).toBe(
+        401
+      );
+
+      vi.mocked(verifyIdToken).mockResolvedValue('someone-else@example.com');
+      expect((await postQuestionFigure({ mimeType: 'image/png', data: PNG_BASE64 })).status).toBe(
+        403
+      );
+      expect(uploadToS3).not.toHaveBeenCalled();
     });
   });
 
