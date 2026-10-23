@@ -21,6 +21,7 @@ import styles from './adaptive.module.css'
 // High enough to fetch every category in one page -- there's no realistic
 // dataset near this size yet.
 const ALL_ITEMS_LIMIT = 1000
+const ADAPTIVE_DRAFT_KEY = 'castor:adaptive-practice-draft'
 const examCategoryTabs = ['admission', 'national', 'license'] as const
 type ExamCategoryTab = (typeof examCategoryTabs)[number]
 
@@ -46,6 +47,22 @@ type QuestionProgressState = {
   graded: boolean
   result: 'correct' | 'wrong' | null
   label: '未作答' | '已作答' | '答對' | '答錯'
+}
+type AdaptivePracticeDraft = {
+  selectedCategoryId: string
+  activeExamCategoryTab: ExamCategoryTab
+  selectedSubjectId: string
+  selectedExamIds: string[]
+  selectedConceptIds: string[]
+  selectedTagIds: string[]
+  selectedFilterOptionByDim: Record<number, number>
+  numQuestionsTarget: number
+  questions: Question[]
+  responseOffsets: number[]
+  repliedAnswer: [number, string][]
+  replyResponse: PostReplyResponse | null
+  currentIndex: number
+  pageTimeMs: [number, number][]
 }
 
 const typeLabel: Record<string, string> = {
@@ -300,10 +317,10 @@ export default function AdaptiveClient({
   const [replyResponse, setReplyResponse] = useState<PostReplyResponse | null>(null)
   const [showResultModal, setShowResultModal] = useState(false)
   const [showLeaveModal, setShowLeaveModal] = useState(false)
-  const [showBottomNav, setShowBottomNav] = useState(false)
   const [mobileQuestionPanelOpen, setMobileQuestionPanelOpen] = useState(false)
   const [questionNumberEdges, setQuestionNumberEdges] = useState({ left: false, right: false })
   const [loading, setLoading] = useState(false)
+  const [draftReady, setDraftReady] = useState(false)
 
   const changeExamCategoryTab = (tab: ExamCategoryTab) => {
     setActiveExamCategoryTab(tab)
@@ -341,7 +358,6 @@ export default function AdaptiveClient({
   // tracked in refs, not state, so accumulating it on every render/tick
   // doesn't trigger re-renders -- it's only read when leaving a page.
   const [currentIndex, setCurrentIndex] = useState(0)
-  const questionNavRef = useRef<HTMLDivElement>(null)
   const questionNumberListRef = useRef<HTMLDivElement>(null)
   const questionNumberRefs = useRef<Array<HTMLButtonElement | null>>([])
   const mobileQuestionTriggerRef = useRef<HTMLButtonElement>(null)
@@ -349,6 +365,95 @@ export default function AdaptiveClient({
   const pageEnteredAtRef = useRef<number>(Date.now())
   const pageTimeMsRef = useRef<Map<number, number>>(new Map())
   const submittingRef = useRef(false)
+
+  useEffect(() => {
+    try {
+      const savedDraft = sessionStorage.getItem(ADAPTIVE_DRAFT_KEY)
+      if (savedDraft) {
+        const draft = JSON.parse(savedDraft) as Partial<AdaptivePracticeDraft>
+        if (Array.isArray(draft.questions) && draft.questions.length > 0) {
+          setSelectedCategoryId(typeof draft.selectedCategoryId === 'string' ? draft.selectedCategoryId : '')
+          setActiveExamCategoryTab(examCategoryTabs.includes(draft.activeExamCategoryTab as ExamCategoryTab)
+            ? draft.activeExamCategoryTab as ExamCategoryTab
+            : 'admission')
+          setSelectedSubjectId(typeof draft.selectedSubjectId === 'string' ? draft.selectedSubjectId : '')
+          setSelectedExamIds(Array.isArray(draft.selectedExamIds) ? draft.selectedExamIds : [])
+          setSelectedConceptIds(Array.isArray(draft.selectedConceptIds) ? draft.selectedConceptIds : [])
+          setSelectedTagIds(Array.isArray(draft.selectedTagIds) ? draft.selectedTagIds : [])
+          setSelectedFilterOptionByDim(draft.selectedFilterOptionByDim && typeof draft.selectedFilterOptionByDim === 'object'
+            ? draft.selectedFilterOptionByDim
+            : {})
+          setNumQuestionsTarget(typeof draft.numQuestionsTarget === 'number' ? draft.numQuestionsTarget : 5)
+          setAdaptiveQuestion(draft.questions)
+          setResponseOffsets(Array.isArray(draft.responseOffsets) ? draft.responseOffsets : [])
+          setRepliedAnswer(new Map(Array.isArray(draft.repliedAnswer) ? draft.repliedAnswer : []))
+          setReplyResponse(Array.isArray(draft.replyResponse) ? draft.replyResponse : null)
+          setCurrentIndex(Math.min(
+            Math.max(Number.isInteger(draft.currentIndex) ? draft.currentIndex! : 0, 0),
+            draft.questions.length - 1,
+          ))
+          pageTimeMsRef.current = new Map(Array.isArray(draft.pageTimeMs) ? draft.pageTimeMs : [])
+          pageEnteredAtRef.current = Date.now()
+        } else {
+          sessionStorage.removeItem(ADAPTIVE_DRAFT_KEY)
+        }
+      }
+    } catch (error) {
+      console.error('Failed to restore adaptive practice draft', error)
+      sessionStorage.removeItem(ADAPTIVE_DRAFT_KEY)
+    } finally {
+      setDraftReady(true)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!draftReady) return
+    if (adaptiveQuestion.length === 0) {
+      sessionStorage.removeItem(ADAPTIVE_DRAFT_KEY)
+      return
+    }
+
+    const draft: AdaptivePracticeDraft = {
+      selectedCategoryId,
+      activeExamCategoryTab,
+      selectedSubjectId,
+      selectedExamIds,
+      selectedConceptIds,
+      selectedTagIds,
+      selectedFilterOptionByDim,
+      numQuestionsTarget,
+      questions: adaptiveQuestion,
+      responseOffsets,
+      repliedAnswer: Array.from(repliedAnswer.entries()),
+      replyResponse,
+      currentIndex,
+      pageTimeMs: Array.from(pageTimeMsRef.current.entries()),
+    }
+    try {
+      sessionStorage.setItem(ADAPTIVE_DRAFT_KEY, JSON.stringify(draft))
+    } catch (error) {
+      console.error('Failed to save adaptive practice draft', error)
+    }
+  }, [
+    activeExamCategoryTab,
+    adaptiveQuestion,
+    currentIndex,
+    draftReady,
+    numQuestionsTarget,
+    repliedAnswer,
+    replyResponse,
+    responseOffsets,
+    selectedCategoryId,
+    selectedConceptIds,
+    selectedExamIds,
+    selectedFilterOptionByDim,
+    selectedSubjectId,
+    selectedTagIds,
+  ])
+
+  useEffect(() => {
+    onPracticeStateChange?.(loading || adaptiveQuestion.length > 0)
+  }, [adaptiveQuestion.length, loading, onPracticeStateChange])
 
   const flushCurrentPageTime = () => {
     const now = Date.now()
@@ -524,11 +629,13 @@ export default function AdaptiveClient({
 
   useEffect(() => {
     if (!selectedCategoryId) return
-    setSelectedSubjectId('')
-    setSelectedFilterOptionByDim({})
-    setSelectedExamIds([])
-    setSelectedConceptIds([])
-    setSelectedTagIds([])
+    if (adaptiveQuestion.length === 0) {
+      setSelectedSubjectId('')
+      setSelectedFilterOptionByDim({})
+      setSelectedExamIds([])
+      setSelectedConceptIds([])
+      setSelectedTagIds([])
+    }
 
     apiFetch<{ subjects: SubjectOption[]; filterDimensions: FilterDimensionWithOptions[] }>(
       `category/${selectedCategoryId}/subject`,
@@ -569,9 +676,11 @@ export default function AdaptiveClient({
 
   useEffect(() => {
     if (!selectedSubjectId) return
-    setSelectedExamIds([])
-    setSelectedConceptIds([])
-    setSelectedTagIds([])
+    if (adaptiveQuestion.length === 0) {
+      setSelectedExamIds([])
+      setSelectedConceptIds([])
+      setSelectedTagIds([])
+    }
     apiFetch<SubjectDetail>(`subject/${selectedSubjectId}`)
       .then((detail) => {
         setExamList(detail.exams)
@@ -604,7 +713,6 @@ export default function AdaptiveClient({
 
   const fetchAdaptive = async () => {
     if (!selectedSubjectId) return
-    onPracticeStateChange?.(true)
     setAdaptiveQuestion([])
     setReplyResponse(null)
     setResponseOffsets([])
@@ -624,7 +732,6 @@ export default function AdaptiveClient({
       setAdaptiveQuestion(results)
     } catch (e) {
       console.error(e)
-      onPracticeStateChange?.(false)
     } finally {
       setLoading(false)
     }
@@ -663,10 +770,10 @@ export default function AdaptiveClient({
   }
 
   useEffect(() => {
-    if (!selectedSubjectId) return
+    if (!selectedSubjectId || adaptiveQuestion.length > 0) return
     if (!filteredSubjectList.some((s) => String(s.id) === selectedSubjectId))
       setSelectedSubjectId('')
-  }, [filteredSubjectList])
+  }, [adaptiveQuestion.length, filteredSubjectList, selectedSubjectId])
 
   useEffect(() => {
     setSelectedFilterOptionByDim((prev) => {
@@ -684,7 +791,7 @@ export default function AdaptiveClient({
   }, [visibleOptionsByDim])
 
   const onReset = () => {
-    onPracticeStateChange?.(false)
+    sessionStorage.removeItem(ADAPTIVE_DRAFT_KEY)
     setAdaptiveQuestion([])
     setReplyResponse(null)
     setResponseOffsets([])
@@ -727,77 +834,15 @@ export default function AdaptiveClient({
         ? '前往未答題'
         : '下一題'
   const mobilePrimaryActionLabel = primaryActionLabel === '前往未答題' ? '未答題' : primaryActionLabel
-
-  useEffect(() => {
-    const nav = questionNavRef.current
-    if (!nav || adaptiveQuestion.length === 0) {
-      setShowBottomNav(false)
-      return
-    }
-
-    const wideScreen = window.matchMedia('(min-width: 48rem)')
-    const update = (rect = nav.getBoundingClientRect()) => {
-      setShowBottomNav(wideScreen.matches && rect.bottom <= 0)
-    }
-    const observer = new IntersectionObserver(([entry]) => update(entry.boundingClientRect), { threshold: 0 })
-    const resizeObserver = new ResizeObserver(() => update())
-    const handleBreakpointChange = () => update()
-
-    observer.observe(nav)
-    resizeObserver.observe(nav)
-    wideScreen.addEventListener('change', handleBreakpointChange)
-    update()
-
-    return () => {
-      observer.disconnect()
-      resizeObserver.disconnect()
-      wideScreen.removeEventListener('change', handleBreakpointChange)
-    }
-  }, [adaptiveQuestion.length, currentIndex])
+  const isSubmitAction = !replyResponse && canSubmit
 
   return (
     <div className={adaptiveQuestion.length > 0 ? styles.practiceActive : undefined}>
-      {adaptiveQuestion.length === 0 && !loading ? (
+      {adaptiveQuestion.length === 0 && !loading && (
         <header className={styles.pageHeader}>
           <h1 className={styles.pageTitle}>智慧練習</h1>
           <p className={styles.pageSubtitle}>制定今天的學習計畫，我們幫你挑出最適合的練習題目。</p>
         </header>
-      ) : (
-        <div className={`${styles.practiceToolbar} ${replyResponse ? styles.practiceToolbarResult : ''}`}>
-          <button
-            onClick={() => (!replyResponse ? setShowLeaveModal(true) : onReset())}
-            disabled={loading}
-            className={styles.backButton}
-          >
-            <svg className="icon-md" width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M16 10H4M4 10L9 5M4 10L9 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            返回
-          </button>
-          {replyResponse && (
-            <>
-              <Button
-                variant="secondary"
-                onClick={onReset}
-                disabled={loading}
-                className={styles.mobileResultFilterButton}
-              >
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                  <path d="M16 10H4M4 10L9 5M4 10L9 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-                重新篩選
-              </Button>
-              <Button
-                onClick={fetchAdaptive}
-                disabled={loading}
-                loading={loading}
-                className={styles.topRepeatButton}
-              >
-                再練一組
-              </Button>
-            </>
-          )}
-        </div>
       )}
 
       {adaptiveQuestion.length === 0 && !loading && <div className={styles.settings}>
@@ -1210,7 +1255,60 @@ export default function AdaptiveClient({
       {adaptiveQuestion.length > 0 && currentQuestion && (
         <div className={styles.practiceQuestion}>
           {/* 導覽列：上一題／跳題／下一題 -- 可自由前後切換，不受作答狀態限制 */}
-          <div ref={questionNavRef} className={styles.questionNav} role="navigation" aria-label="題目導覽">
+          <div className={styles.questionNav} role="navigation" aria-label="作答操作列">
+            {replyResponse ? (
+              <button
+                type="button"
+                onClick={onReset}
+                disabled={loading}
+                className={`${styles.leaveButton} ${styles.resultFilterButton}`}
+              >
+                <span className={styles.resultActionFull}>重新篩選</span>
+                <span className={styles.resultActionShort}>篩選</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowLeaveModal(true)}
+                disabled={loading}
+                className={styles.leaveButton}
+              >
+                <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                  <path d="M15 5L5 15M5 5L15 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
+                <span>離開</span>
+              </button>
+            )}
+
+            {replyResponse ? (
+              <button
+                type="button"
+                onClick={fetchAdaptive}
+                disabled={loading}
+                className={styles.resultRepeatButton}
+              >
+                {loading ? '選題中…' : '再練一組'}
+              </button>
+            ) : (
+              <div className={styles.completionSummary}>
+                <span className={styles.completionLabel}>
+                  完成度 <span className={styles.completionCount}>{completedQuestionCount}/{adaptiveQuestion.length}</span>
+                </span>
+                <div
+                  className={styles.completionProgress}
+                  role="progressbar"
+                  aria-label={`完成度 ${completedQuestionCount}/${adaptiveQuestion.length}`}
+                  aria-valuemin={0}
+                  aria-valuemax={adaptiveQuestion.length}
+                  aria-valuenow={completedQuestionCount}
+                >
+                  <span
+                    className={styles.completionProgressFill}
+                    style={{ width: `${adaptiveQuestion.length > 0 ? completedQuestionCount / adaptiveQuestion.length * 100 : 0}%` }}
+                  />
+                </div>
+              </div>
+            )}
             <button
               onClick={() => {
                 setMobileQuestionPanelOpen(false)
@@ -1222,24 +1320,11 @@ export default function AdaptiveClient({
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M10 3L5 8L10 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
-              上一題
+              <span className={styles.navDirectionLabel}>上一題</span>
             </button>
 
             <div className={styles.navCenter}>
               <div className={styles.desktopQuestionNavCenter}>
-                <div
-                  className={styles.completionProgress}
-                  role="progressbar"
-                  aria-label="作答進度"
-                  aria-valuemin={0}
-                  aria-valuemax={adaptiveQuestion.length}
-                  aria-valuenow={completedQuestionCount}
-                >
-                  <span
-                    className={styles.completionProgressFill}
-                    style={{ width: `${adaptiveQuestion.length > 0 ? completedQuestionCount / adaptiveQuestion.length * 100 : 0}%` }}
-                  />
-                </div>
                 <div
                   ref={questionNumberListRef}
                   className={`${styles.questionNumbers} ${questionNumberEdges.left ? styles.canScrollLeft : ''} ${questionNumberEdges.right ? styles.canScrollRight : ''}`}
@@ -1304,10 +1389,11 @@ export default function AdaptiveClient({
                 className={styles.mobileQuestionTrigger}
                 aria-expanded={mobileQuestionPanelOpen}
                 aria-controls="mobile-question-panel"
+                aria-label={`選擇題目，目前第 ${currentIndex + 1} 題，共 ${adaptiveQuestion.length} 題`}
                 disabled={loading}
                 onClick={() => setMobileQuestionPanelOpen((open) => !open)}
               >
-                <span>第 {currentIndex + 1}／{adaptiveQuestion.length} 題</span>
+                <span>{currentIndex + 1}/{adaptiveQuestion.length}</span>
                 <svg
                   className={mobileQuestionPanelOpen ? styles.mobileQuestionTriggerIconOpen : undefined}
                   width="16"
@@ -1316,7 +1402,7 @@ export default function AdaptiveClient({
                   fill="none"
                   aria-hidden="true"
                 >
-                  <path d="M3 10L8 5L13 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M3 6L8 11L13 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               </button>
             </div>
@@ -1328,7 +1414,7 @@ export default function AdaptiveClient({
               }}
               disabled={loading || (!!replyResponse && isLastQuestion)}
               aria-label={primaryActionLabel}
-              className={`${styles.primaryButton} ${styles.navPrimaryButton}`}
+              className={`${styles.primaryButton} ${styles.navPrimaryButton} ${!loading ? styles.compactDirectionButton : ''}`}
             >
               <span className={styles.primaryActionFull}>
                 {loading && canSubmit ? '送出中…' : primaryActionLabel}
@@ -1338,7 +1424,11 @@ export default function AdaptiveClient({
               </span>
               {!loading && (
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M6 3L11 8L6 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  {isSubmitAction ? (
+                    <path d="M2.5 8L6.5 12L13.5 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  ) : (
+                    <path d="M6 3L11 8L6 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  )}
                 </svg>
               )}
             </button>
@@ -1524,33 +1614,6 @@ export default function AdaptiveClient({
                 ))}
             </div>
           </MathJax>
-          {showBottomNav && <div className={styles.questionBottomNav} role="navigation" aria-label="浮動題目導覽">
-            <button
-              onClick={() => goTo(currentIndex - 1)}
-              disabled={currentIndex === 0 || loading}
-              className={styles.navButton}
-            >
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M10 3L5 8L10 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              上一題
-            </button>
-            <span className={styles.floatingProgress}>
-              第 {currentIndex + 1}／{adaptiveQuestion.length} 題
-            </span>
-            <button
-              onClick={handlePrimaryAction}
-              disabled={loading || (!!replyResponse && isLastQuestion)}
-              className={`${styles.primaryButton} ${styles.navPrimaryButton}`}
-            >
-              {loading && canSubmit ? '送出中…' : primaryActionLabel}
-              {!loading && (
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M6 3L11 8L6 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              )}
-            </button>
-          </div>}
         </div>
       )}
 
@@ -1585,7 +1648,9 @@ export default function AdaptiveClient({
               <circle cx="20" cy="29" r="1.5" fill="currentColor"/>
             </svg>
             <p className="w-full text-center text-base font-normal text-black-700">
-              尚有題目未完成，下次回來時再繼續挑戰。
+              {replyResponse
+                ? '確定要離開作答模式嗎？'
+                : '確定要離開作答模式嗎？目前尚未送出的作答內容將不會儲存。'}
             </p>
             <div className="flex w-full gap-3">
               <Button
@@ -1593,13 +1658,13 @@ export default function AdaptiveClient({
                 onClick={() => setShowLeaveModal(false)}
                 className="flex-1"
               >
-                取消
+                繼續作答
               </Button>
               <Button
                 onClick={() => { setShowLeaveModal(false); onReset() }}
                 className="flex-1"
               >
-                仍要離開
+                確認離開
               </Button>
             </div>
           </div>

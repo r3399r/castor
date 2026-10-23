@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import AuthGuard from '@/components/AuthGuard'
 import Footer from '@/components/Footer'
+import Navbar from '@/components/Navbar'
 import LearningFooterFoliage from '@/components/learning/LearningFooterFoliage'
 import { PageContainer } from '@/components/layout'
 import AdaptiveClient from './AdaptiveClient'
@@ -13,6 +14,11 @@ export default function AdaptivePageClient() {
 
   return (
     <>
+      {!practiceActive && (
+        <div className="standard-site-header">
+          <Navbar />
+        </div>
+      )}
       <div className="layer-content relative">
         <PageContainer className={styles.content}>
           <AuthGuard>
