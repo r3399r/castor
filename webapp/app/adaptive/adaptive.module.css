@@ -1101,7 +1101,8 @@
     flex-direction: column;
   }
   .questionNav {
-    top: 0;
+    top: -2px;
+    isolation: isolate;
     width: 100vw;
     min-height: calc(64px + env(safe-area-inset-top));
     grid-template-columns: max-content max-content minmax(0, 1fr) max-content max-content;
@@ -1114,6 +1115,19 @@
     border-radius: 0;
     background: var(--practice-nav-background);
     box-shadow: 0 8px 24px rgb(23 62 54 / 0.12);
+    transform: translateZ(0);
+    backface-visibility: hidden;
+  }
+  .questionNav::before {
+    position: absolute;
+    z-index: 0;
+    top: -4px;
+    right: 0;
+    left: 0;
+    height: 6px;
+    background: var(--practice-nav-background);
+    content: '';
+    pointer-events: none;
   }
   .leaveButton {
     grid-area: leave;
