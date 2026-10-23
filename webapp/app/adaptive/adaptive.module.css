@@ -1129,6 +1129,10 @@
     content: '';
     pointer-events: none;
   }
+  .questionNavPanelOpen {
+    border-bottom-color: transparent;
+    box-shadow: none;
+  }
   .leaveButton {
     grid-area: leave;
     min-height: 44px;
@@ -1220,7 +1224,7 @@
   .mobileQuestionPanelBackdrop {
     position: fixed;
     z-index: var(--layer-sticky);
-    inset: calc(64px + env(safe-area-inset-top)) 0 0;
+    inset: calc(62px + env(safe-area-inset-top)) 0 0;
     display: block;
     width: 100%;
     border: 0;
@@ -1229,7 +1233,7 @@
   .mobileQuestionPanel {
     position: fixed;
     z-index: calc(var(--layer-sticky) + 1);
-    top: calc(64px + env(safe-area-inset-top));
+    top: calc(62px + env(safe-area-inset-top));
     right: 0;
     left: 0;
     display: block;

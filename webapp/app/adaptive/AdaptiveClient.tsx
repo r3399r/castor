@@ -1255,7 +1255,11 @@ export default function AdaptiveClient({
       {adaptiveQuestion.length > 0 && currentQuestion && (
         <div className={styles.practiceQuestion}>
           {/* 導覽列：上一題／跳題／下一題 -- 可自由前後切換，不受作答狀態限制 */}
-          <div className={styles.questionNav} role="navigation" aria-label="作答操作列">
+          <div
+            className={`${styles.questionNav} ${mobileQuestionPanelOpen ? styles.questionNavPanelOpen : ''}`}
+            role="navigation"
+            aria-label="作答操作列"
+          >
             {replyResponse ? (
               <button
                 type="button"
