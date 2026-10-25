@@ -251,18 +251,36 @@ export type ReplyGroup = {
 
 export type GetReplyResponse = Paginate<ReplyGroup>
 
-export type WrongQuestion = {
+// One wrong sub-question. `id` is the user_wrong_question row, which is
+// what PUT /wrong-question/:id/note and DELETE act on -- the note is per
+// sub-question, since that is the granularity a user writes it at.
+export type WrongQuestionEntry = {
   id: number;
-  parentQuestion: Question | null;
   question: Question;
-  subject: { id: number; name: string };
-  subjectId: number;
   score: number;
   wrongCount: number;
-  lastWrongAt: string | null;
+  lastWrongAt: string;
   note: string | null;
   createdAt: string | null;
   updatedAt: string | null;
+};
+
+// One top-level question and every sub-question of it the user got wrong.
+// The list is paginated by group, not by row: a 題組's children are
+// separate rows, and a row-based page repeated the passage once per wrong
+// child and could split siblings across pages.
+//
+// `id` is the group key -- the parent's question id, or the question's own
+// id when standalone, in which case `parentQuestion` is null and
+// `entries` holds exactly one element.
+export type WrongQuestion = {
+  id: number;
+  parentQuestion: Question | null;
+  subject: { id: number; name: string };
+  subjectId: number;
+  /** The most recent lastWrongAt in the group -- what the list sorts on. */
+  lastWrongAt: string;
+  entries: WrongQuestionEntry[];
 };
 
 export type GetWrongQuestionParams = PaginationParams & {

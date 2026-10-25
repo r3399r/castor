@@ -1,5 +1,5 @@
 import { zValidator } from '@hono/zod-validator';
-import { and, count, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import {
@@ -31,18 +31,32 @@ export const wrongQuestionNoteBodySchema = z.object({
   note: z.string().max(2000).nullable(),
 });
 
-type WrongQuestionDto = {
+// One wrong sub-question. `id` is the user_wrong_question row, which is
+// what PUT /:id/note and DELETE /:id act on -- the note stays per
+// sub-question, since that is the granularity a user writes it at.
+type WrongQuestionEntryDto = {
   id: number;
-  parentQuestion: QuestionDetailDto | null;
   question: QuestionDetailDto;
-  subject: { id: number; name: string };
-  subjectId: number;
   score: number;
   wrongCount: number;
-  lastWrongAt: string | null;
+  lastWrongAt: string;
   note: string | null;
   createdAt: string | null;
   updatedAt: string | null;
+};
+
+// One top-level question and every sub-question of it the user got wrong.
+// `id` is the group key: the parent's question id, or the question's own
+// id when it is standalone (then `entries` has exactly one element and
+// `parentQuestion` is null).
+type WrongQuestionGroupDto = {
+  id: number;
+  parentQuestion: QuestionDetailDto | null;
+  subject: { id: number; name: string };
+  subjectId: number;
+  /** The most recent lastWrongAt in the group -- what the list sorts on. */
+  lastWrongAt: string;
+  entries: WrongQuestionEntryDto[];
 };
 
 export const wrongQuestion = new Hono<UserEnv>()
@@ -88,24 +102,44 @@ export const wrongQuestion = new Hono<UserEnv>()
       userConditions.push(inArray(groupKey, links.map((l) => l.questionId)));
     }
 
-    const [{ total }] = await db
-      .select({ total: count() })
-      .from(userWrongQuestionTable)
-      .where(and(...userConditions));
-
-    // Most recently *wrong* first (not first-ever-marked-wrong) -- there's
-    // no "batch" grouping here like /reply's repliedAt (each row is
-    // already one question, not one submitted batch), so this is a flat,
-    // directly paginated list.
-    const rows = await db
-      .select()
+    // Paginated by group rather than by row. A GROUP question's children
+    // are N separate wrong-question rows, and a flat page repeated the
+    // whole passage once per row -- four wrong sub-questions of one
+    // reading comprehension meant reading the same passage four times.
+    // Worse, the flat ordering by lastWrongAt could split siblings across
+    // a page boundary, so they were not even adjacent. A standalone
+    // question groups under its own id and so comes back as a group of
+    // one.
+    const groupLastWrongAt = sql`max(${userWrongQuestionTable.lastWrongAt})`;
+    const groupRows = await db
+      .select({ groupKey })
       .from(userWrongQuestionTable)
       .where(and(...userConditions))
-      .orderBy(desc(userWrongQuestionTable.lastWrongAt))
+      .groupBy(groupKey)
+      .orderBy(desc(groupLastWrongAt))
       .limit(limit)
       .offset(offset);
 
-    if (rows.length === 0) return c.json({ data: [], paginate: genPagination(total, limit, offset) });
+    // Counts groups, so it agrees with the page above -- count() here
+    // would report rows and overstate the number of pages.
+    const [{ total }] = await db
+      .select({
+        total: sql<number>`count(distinct coalesce(${userWrongQuestionTable.parentId}, ${userWrongQuestionTable.questionId}))`,
+      })
+      .from(userWrongQuestionTable)
+      .where(and(...userConditions));
+
+    if (groupRows.length === 0)
+      return c.json({ data: [], paginate: genPagination(total, limit, offset) });
+
+    // Only used to restore this page's group order after the fetch below,
+    // which comes back ordered by row rather than by group.
+    const pageOrder = new Map(groupRows.map((r, i) => [r.groupKey, i]));
+    const rows = await db
+      .select()
+      .from(userWrongQuestionTable)
+      .where(and(...userConditions, inArray(groupKey, [...pageOrder.keys()])))
+      .orderBy(desc(userWrongQuestionTable.lastWrongAt));
 
     const questionIds = [...new Set(rows.flatMap((r) => [r.questionId, ...(r.parentId ? [r.parentId] : [])]))];
     const subjectIds = [...new Set(rows.map((r) => r.subjectId))];
@@ -116,20 +150,39 @@ export const wrongQuestion = new Hono<UserEnv>()
     const subjectById = new Map(subjects.map((s) => [s.id, s]));
 
     // A row whose question was since deleted has nothing left to show --
-    // buildQuestionDtos simply omits ids it can't find, so this drops it
-    // rather than rendering a broken entry.
-    const data: WrongQuestionDto[] = [];
+    // buildQuestionDtos simply omits ids it can't find, so this drops the
+    // entry rather than rendering a broken one. A group left with no
+    // entries at all is dropped with it.
+    const groupMap = new Map<number, WrongQuestionGroupDto>();
     for (const row of rows) {
+      const key = row.parentId ?? row.questionId;
+      if (!pageOrder.has(key)) continue;
+
       const question = questionDtoById.get(row.questionId);
       if (!question) continue;
-      const parentQuestion = row.parentId ? questionDtoById.get(row.parentId) ?? null : null;
-      const subject = subjectById.get(row.subjectId);
-      data.push({
+
+      if (!groupMap.has(key)) {
+        const subject = subjectById.get(row.subjectId);
+        groupMap.set(key, {
+          id: key,
+          parentQuestion: row.parentId ? questionDtoById.get(row.parentId) ?? null : null,
+          subject: subject ?? { id: row.subjectId, name: '' },
+          subjectId: row.subjectId,
+          // Derived from the entries rather than read back from the
+          // max() above: an aggregate's type depends on how the driver
+          // decodes it, while a column on a row is already a Date.
+          lastWrongAt: row.lastWrongAt.toISOString(),
+          entries: [],
+        });
+      }
+
+      const group = groupMap.get(key)!;
+      if (row.lastWrongAt.toISOString() > group.lastWrongAt)
+        group.lastWrongAt = row.lastWrongAt.toISOString();
+
+      group.entries.push({
         id: row.id,
-        parentQuestion,
         question,
-        subject: subject ?? { id: row.subjectId, name: '' },
-        subjectId: row.subjectId,
         score: row.score,
         wrongCount: row.wrongCount,
         lastWrongAt: row.lastWrongAt.toISOString(),
@@ -138,6 +191,18 @@ export const wrongQuestion = new Hono<UserEnv>()
         updatedAt: row.updatedAt?.toISOString() ?? null,
       });
     }
+
+    const data = [...groupMap.values()]
+      .sort((a, b) => (pageOrder.get(a.id) ?? 0) - (pageOrder.get(b.id) ?? 0))
+      // Within a group, in the order the sub-questions appear in the
+      // paper -- not by when each went wrong, which would shuffle the
+      // passage's own numbering and make the card hard to follow.
+      .map((group) => ({
+        ...group,
+        entries: [...group.entries].sort(
+          (a, b) => (a.question.sortOrder ?? 0) - (b.question.sortOrder ?? 0)
+        ),
+      }));
 
     return c.json({ data, paginate: genPagination(total, limit, offset) });
   })

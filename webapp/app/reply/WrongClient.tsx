@@ -8,7 +8,13 @@ import Chip, { tagColors } from '@/components/Chip'
 import DifficultyStars from '@/components/DifficultyStars'
 import Pagination from '@/components/Pagination'
 import { Button, EmptyState, ErrorState, LoadingState } from '@/components/ui'
-import type { GetWrongQuestionResponse, PutWrongQuestionNoteResponse, WrongQuestion } from '@/types/api'
+import { formatNumber } from '@/lib/number'
+import type {
+  GetWrongQuestionResponse,
+  PutWrongQuestionNoteResponse,
+  WrongQuestion,
+  WrongQuestionEntry,
+} from '@/types/api'
 import type { QueryFilters } from './useSharedFilters'
 import styles from './reply.module.css'
 
@@ -27,6 +33,138 @@ function formatDate(dateStr: string | null): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
 
+/**
+ * One wrong sub-question inside a card.
+ *
+ * Its own component, at module scope, because each one owns a note draft
+ * and a pending state -- declaring it inside WrongCard would give React a
+ * new component type on every render and remount the textarea, losing
+ * whatever was being typed.
+ */
+function WrongEntry({
+  entry,
+  isGroup,
+  position,
+  siblingCount,
+  onSaveNote,
+  onDelete,
+}: {
+  entry: WrongQuestionEntry
+  isGroup: boolean
+  /** 1-based position among the 題組's sub-questions, 0 when unknown. */
+  position: number
+  siblingCount: number
+  onSaveNote: (id: number, note: string | null) => Promise<void>
+  onDelete: (id: number) => Promise<void>
+}) {
+  const question = entry.question
+  const difficulty = question.adjustedDifficulty ?? question.difficulty ?? 0
+
+  const [note, setNote] = useState(entry.note ?? '')
+  const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const noteChanged = note !== (entry.note ?? '')
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      await onSaveNote(entry.id, note.trim() === '' ? null : note)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    setDeleting(true)
+    try {
+      await onDelete(entry.id)
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  return (
+    <div className={isGroup ? 'border-t border-brown-300/40 pt-4' : ''}>
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Chip label={typeLabel[question.type] ?? question.type} />
+          {isGroup && position > 0 && (
+            <span className="text-xs whitespace-nowrap text-black-500">
+              題組第 {position} 題／共 {siblingCount} 題
+            </span>
+          )}
+        </div>
+        <DifficultyStars value={difficulty} tone="forest" />
+      </div>
+
+      {question.content && (
+        <div
+          dangerouslySetInnerHTML={{ __html: question.content }}
+          className="prose max-w-none text-spirit-reading font-medium text-black-800 [&>*:last-child]:mb-0"
+        />
+      )}
+
+      {question.answer && (
+        <div className="mt-2 text-base text-black-700">
+          正確答案：
+          <span className={styles.value}>{question.answer}</span>
+        </div>
+      )}
+
+      <div className={`${styles.statusPanel} ${styles.statusWrong} mt-3`}>
+        <div className="flex flex-col gap-2 text-base text-black-700 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4">
+          <div>
+            最後答錯時間：
+            <span className="font-medium text-black-900">{formatDate(entry.lastWrongAt)}</span>
+          </div>
+          <div className="flex items-center gap-4">
+            <div>
+              得分：
+              <span className={`${styles.value} ${styles.valueWrong}`}>{entry.score}</span>
+            </div>
+            <div>
+              答錯次數：
+              <span className={`${styles.value} ${styles.valueWrong}`}>
+                {formatNumber(entry.wrongCount)}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-3 flex flex-col gap-2">
+        <label className="text-sm font-bold text-black-700">我的註記</label>
+        <textarea
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="寫下這題錯在哪裡、下次要注意什麼…"
+          rows={2}
+          className={styles.noteInput}
+        />
+      </div>
+
+      <div className="mt-3 flex items-center justify-between">
+        <Button onClick={handleSave} disabled={saving || !noteChanged} loading={saving}>
+          {saving ? '儲存中…' : '儲存註記'}
+        </Button>
+        <Button variant="danger" onClick={handleDelete} disabled={deleting} loading={deleting}>
+          {deleting ? '移除中…' : '從錯題本移除'}
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * One top-level question and every sub-question of it the user got wrong.
+ *
+ * A 題組 used to produce one card per wrong child, each repeating the
+ * whole passage -- four wrong sub-questions of one reading comprehension
+ * meant the same passage four times over. Now the passage appears once,
+ * with the wrong sub-questions listed under it in the order they appear
+ * in the paper. A standalone question arrives as a group of one and reads
+ * the same as it always did.
+ */
 function WrongCard({
   item,
   onSaveNote,
@@ -36,105 +174,53 @@ function WrongCard({
   onSaveNote: (id: number, note: string | null) => Promise<void>
   onDelete: (id: number) => Promise<void>
 }) {
-  // For a GROUP question's child, parentQuestion is the 題組 header and
-  // question is the specific child that was answered wrong -- unlike
-  // /reply's history view, there's no need to list every sibling child
-  // here, since this row only ever represents the one question the user
-  // got wrong.
-  const question = item.question
   const isGroup = item.parentQuestion !== null
 
   // exam/concept/tag links only ever live on a question's top-level row,
-  // so for a GROUP child they sit on the parent -- a child has no links
-  // of its own to find. Reading them off the child therefore yielded
-  // empty arrays, which is why these cards showed no exam, concept or tag
-  // at all while the filter panel was filtering on exactly those links
-  // (the server resolves them against the parent via groupKey). You could
-  // filter by 學測 and get back cards with no 學測 chip on them. The
-  // parent was already in the payload; it just was not read.
-  const metaSource = item.parentQuestion ?? question
-  const exams = metaSource.exam ?? []
-  const concepts = metaSource.concept ?? []
-  const tags = metaSource.tag ?? []
+  // so for a 題組 they sit on the parent -- a child has none of its own to
+  // find. These used to be read off the child, which meant group cards
+  // showed no exam, concept or tag at all, while the filter panel filtered
+  // on exactly those links (the server resolves them against the parent).
+  // You could filter by 學測 and get cards with no 學測 chip on them.
+  const metaSource = item.parentQuestion ?? item.entries[0]?.question
+  const exams = metaSource?.exam ?? []
+  const concepts = metaSource?.concept ?? []
+  const tags = metaSource?.tag ?? []
 
-  // Position among its siblings rather than sortOrder + 1: the server
-  // returns children already ordered by sortOrder, and the stored values
-  // are only 0-based by convention -- anything entered by hand could
-  // start at 1 and silently label the first sub-question "第 2 題".
-  // Counting the position cannot be wrong that way, and it also gives the
-  // total, which is what says how much of the 題組 went wrong.
+  // Positions come from the parent's full child list, so an entry can say
+  // "第 2 題／共 5 題" even when only one of the five went wrong. By
+  // position rather than sortOrder + 1: the stored values are only
+  // 0-based by convention, and anything entered by hand could start at 1
+  // and silently label the first sub-question 第 2 題.
   const siblings = item.parentQuestion?.children ?? []
-  const childIndex = siblings.findIndex((c) => c.id === question.id)
-  const groupLabel = !isGroup
-    ? null
-    : childIndex >= 0
-      ? `題組第 ${childIndex + 1} 題／共 ${siblings.length} 題`
-      : '題組'
-  const difficulty = question.adjustedDifficulty ?? question.difficulty ?? 0
+  const positionById = new Map(siblings.map((child, i) => [child.id, i + 1]))
 
-  // Open by default, so a card reads the same as it always has. The
-  // toggle is there for the case this was built for: the passage repeats
-  // on every card for a child that went wrong, so four wrong
-  // sub-questions means the same 400-word passage four times, and
-  // collapsing the ones already read is the way out of that.
   const [passageOpen, setPassageOpen] = useState(true)
-  const [note, setNote] = useState(item.note ?? '')
-  const [saving, setSaving] = useState(false)
-  const [deleting, setDeleting] = useState(false)
-  const noteChanged = note !== (item.note ?? '')
-
-  const handleSave = async () => {
-    setSaving(true)
-    try {
-      await onSaveNote(item.id, note.trim() === '' ? null : note)
-    } catch {
-      alert('儲存註記失敗，請稍後再試。')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const handleDelete = async () => {
-    if (!confirm('確定要從錯題本移除這一題嗎？')) return
-    setDeleting(true)
-    try {
-      await onDelete(item.id)
-    } catch {
-      alert('刪除失敗，請稍後再試。')
-      setDeleting(false)
-    }
-  }
 
   return (
     <article className={styles.recordCard}>
       <div className={styles.cardHeader}>
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className={`${styles.subjectName} flex shrink-0 items-center gap-2`}>
-              <BookOpenText size={20} strokeWidth={2.5} className={`${styles.subjectIcon} shrink-0`} />
-              {item.subject.name}
-            </span>
-            <div className="ml-2 flex flex-wrap gap-2">
-              <Chip label={typeLabel[question.type] ?? question.type} />
-              {groupLabel && (
-                <span className="text-xs text-black-500 whitespace-nowrap">{groupLabel}</span>
-              )}
-              {exams.map((e) => (
-                <Chip key={e.id} label={e.name} color={tagColors.exam} />
-              ))}
-              {concepts.map((c) => (
-                <Chip
-                  key={c.id}
-                  label={c.conceptGroup.name === c.name ? c.name : c.conceptGroup.name + '-' + c.name}
-                  color={tagColors.concept}
-                />
-              ))}
-              {tags.map((t) => (
-                <Chip key={t.id} label={t.name} color={tagColors.tag} />
-              ))}
-            </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className={`${styles.subjectName} flex shrink-0 items-center gap-2`}>
+            <BookOpenText size={20} strokeWidth={2.5} className={`${styles.subjectIcon} shrink-0`} />
+            {item.subject.name}
+          </span>
+          <div className="ml-2 flex flex-wrap gap-2">
+            {isGroup && <Chip label="題組" />}
+            {exams.map((e) => (
+              <Chip key={e.id} label={e.name} color={tagColors.exam} />
+            ))}
+            {concepts.map((c) => (
+              <Chip
+                key={c.id}
+                label={c.conceptGroup.name === c.name ? c.name : c.conceptGroup.name + '-' + c.name}
+                color={tagColors.concept}
+              />
+            ))}
+            {tags.map((t) => (
+              <Chip key={t.id} label={t.name} color={tagColors.tag} />
+            ))}
           </div>
-          <DifficultyStars value={difficulty} tone="forest" />
         </div>
       </div>
 
@@ -157,73 +243,18 @@ function WrongCard({
             )}
           </div>
         )}
-        {question.content && (
-          <div
-            dangerouslySetInnerHTML={{ __html: question.content }}
-            className="prose max-w-none text-spirit-reading font-medium text-black-800 [&>*:last-child]:mb-0"
+
+        {item.entries.map((entry) => (
+          <WrongEntry
+            key={entry.id}
+            entry={entry}
+            isGroup={isGroup}
+            position={positionById.get(entry.question.id) ?? 0}
+            siblingCount={siblings.length}
+            onSaveNote={onSaveNote}
+            onDelete={onDelete}
           />
-        )}
-
-        {question.answer && (
-          <div className="text-base text-black-700">
-            正確答案：
-            <span className={styles.value}>
-              {question.answer}
-            </span>
-          </div>
-        )}
-
-        <div className={`${styles.statusPanel} ${styles.statusWrong}`}>
-          <div className="flex flex-col gap-2 text-base text-black-700 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4">
-            <div>
-              最後答錯時間：
-              <span className="font-medium text-black-900">{formatDate(item.lastWrongAt)}</span>
-            </div>
-            <div className="flex items-center gap-4">
-              <div>
-                得分：
-                <span className={`${styles.value} ${styles.valueWrong}`}>
-                  {item.score}
-                </span>
-              </div>
-              <div>
-                答錯次數：
-                <span className={`${styles.value} ${styles.valueWrong}`}>
-                  {item.wrongCount}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-2">
-          <label className="text-sm font-bold text-black-700">我的註記</label>
-          <textarea
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="寫下這題錯在哪裡、下次要注意什麼…"
-            rows={2}
-            className={styles.noteInput}
-          />
-        </div>
-
-        <div className="flex items-center justify-between">
-          <Button
-            onClick={handleSave}
-            disabled={saving || !noteChanged}
-            loading={saving}
-          >
-            {saving ? '儲存中…' : '儲存註記'}
-          </Button>
-          <Button
-            variant="danger"
-            onClick={handleDelete}
-            disabled={deleting}
-            loading={deleting}
-          >
-            {deleting ? '移除中…' : '從錯題本移除'}
-          </Button>
-        </div>
+        ))}
       </div>
     </article>
   )
@@ -281,17 +312,35 @@ export default function WrongClient({
     const updated = await apiPut<PutWrongQuestionNoteResponse, { note: string | null }>(`wrong-question/${id}/note`, {
       note,
     })
+    // The id is a user_wrong_question row, which now sits on an entry
+    // inside a group rather than on the page item itself -- so the patch
+    // has to reach one level deeper than it used to.
     setList((prev) =>
-      prev ? { ...prev, data: prev.data.map((item) => (item.id === id ? { ...item, note: updated.note } : item)) } : prev
+      prev
+        ? {
+            ...prev,
+            data: prev.data.map((group) => ({
+              ...group,
+              entries: group.entries.map((entry) =>
+                entry.id === id ? { ...entry, note: updated.note } : entry
+              ),
+            })),
+          }
+        : prev
     )
   }
 
   const handleDelete = async (id: number) => {
     await apiDelete(`wrong-question/${id}`)
-    // Refetch rather than splice the item out locally -- deleting the
-    // last row on a page should pull in the next page's item (or show the
-    // empty state), not just leave a shorter page.
-    const nextPage = list && list.data.length === 1 && page > 1 ? page - 1 : page
+    // Refetch rather than splice the entry out locally -- deleting the
+    // last one on a page should pull in the next page's group (or show
+    // the empty state), not just leave a shorter page.
+    //
+    // Counted over entries, not groups: a page now holds groups, and
+    // removing one sub-question of a 題組 that still has others left must
+    // not send the user back a page.
+    const entriesOnPage = list?.data.reduce((n, group) => n + group.entries.length, 0) ?? 0
+    const nextPage = entriesOnPage === 1 && page > 1 ? page - 1 : page
     await fetchPage(nextPage)
   }
 

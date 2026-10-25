@@ -34,18 +34,37 @@ vi.mock('src/lib/facebookEventBridge', () => ({ enableFacebookEventBridge: vi.fn
 
 type QuestionDto = { id: number };
 
-type QuestionDetailDto = { id: number };
+// A deliberately minimal view of the question shape. These local types
+// describe the JSON this endpoint returns and are kept independent of
+// src/routes/question's own DTO, so a change there cannot silently change
+// what these tests assert -- only the fields actually read here are
+// declared.
+type QuestionDetailDto = {
+  id: number;
+  exam: { id: number; name: string }[];
+  tag: { id: number; name: string }[];
+  concept: { id: number; name: string }[];
+  children: { id: number }[];
+};
+
+type WrongQuestionEntryDto = {
+  id: number;
+  question: QuestionDetailDto;
+  score: number;
+  wrongCount: number;
+  lastWrongAt: string;
+  note: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+};
 
 type WrongQuestionDto = {
   id: number;
   parentQuestion: QuestionDetailDto | null;
-  question: QuestionDetailDto;
   subject: { id: number; name: string };
   subjectId: number;
-  score: number;
-  wrongCount: number;
-  lastWrongAt: string | null;
-  note: string | null;
+  lastWrongAt: string;
+  entries: WrongQuestionEntryDto[];
   createdAt: string | null;
   updatedAt: string | null;
 };
@@ -170,6 +189,45 @@ const seedWrongQuestion = async (
   return q;
 };
 
+/**
+ * A GROUP with three children, enabled and ready to be answered.
+ *
+ * Shared by the grouping tests below, which all need more than one child
+ * to say anything -- the behaviour under test only exists once two
+ * sub-questions of the same passage have gone wrong.
+ */
+const seedGroupQuestion = async (
+  subjectId: number,
+  examId: number,
+  conceptId: number,
+  tagIds: number[] = []
+) => {
+  await postQuestions({
+    subjectId,
+    examId,
+    questions: [
+      {
+        type: 'GROUP',
+        content: '<p>passage</p>',
+        difficulty: 5,
+        conceptIds: [conceptId],
+        ...(tagIds.length > 0 ? { tagIds } : {}),
+        childQuestions: [
+          { type: 'SINGLE', sortOrder: 0, content: 'c1', options: 'A|B', answer: 'A', difficulty: 5 },
+          { type: 'SINGLE', sortOrder: 1, content: 'c2', options: 'A|B', answer: 'A', difficulty: 5 },
+          { type: 'SINGLE', sortOrder: 2, content: 'c3', options: 'A|B', answer: 'A', difficulty: 5 },
+        ],
+      },
+    ],
+  });
+
+  return getDb()
+    .select()
+    .from(questionTable)
+    .where(isNotNull(questionTable.parentId))
+    .orderBy(asc(questionTable.sortOrder));
+};
+
 describe('wrongQuestion routes', () => {
   beforeAll(clearTables);
 
@@ -205,9 +263,13 @@ describe('wrongQuestion routes', () => {
       expect(res.status).toBe(200);
       const body = (await res.json()) as { data: WrongQuestionDto[]; paginate: { total: number } };
       expect(body.paginate.total).toBe(1);
-      expect(body.data[0].question.id).toBe(mine.id);
+      // A standalone question is a group of one, keyed by its own id.
+      expect(body.data[0].id).toBe(mine.id);
+      expect(body.data[0].parentQuestion).toBeNull();
       expect(body.data[0].subject.name).toBe('fixture subject');
-      expect(body.data[0]).toMatchObject({ score: 0, wrongCount: 1, note: null });
+      expect(body.data[0].entries).toHaveLength(1);
+      expect(body.data[0].entries[0].question.id).toBe(mine.id);
+      expect(body.data[0].entries[0]).toMatchObject({ score: 0, wrongCount: 1, note: null });
       expect(body.data[0].lastWrongAt).not.toBeNull();
     });
 
@@ -222,11 +284,11 @@ describe('wrongQuestion routes', () => {
       const body = (await res.json()) as { data: WrongQuestionDto[]; paginate: { total: number; totalPages: number } };
       expect(body.paginate).toMatchObject({ total: 2, totalPages: 2 });
       expect(body.data).toHaveLength(1);
-      expect(body.data[0].question.id).toBe(q2.id);
+      expect(body.data[0].entries[0].question.id).toBe(q2.id);
 
       const page2 = await getWrongQuestionList('?limit=1&offset=1');
       const page2Body = (await page2.json()) as { data: WrongQuestionDto[] };
-      expect(page2Body.data[0].question.id).toBe(q1.id);
+      expect(page2Body.data[0].entries[0].question.id).toBe(q1.id);
     });
 
     // The 題組 path, which had no coverage at all. A wrong-question row
@@ -278,23 +340,104 @@ describe('wrongQuestion routes', () => {
       const res = await getWrongQuestionList();
       const body = (await res.json()) as { data: WrongQuestionDto[] };
       expect(body.data).toHaveLength(1);
-      const [entry] = body.data;
+      const [group] = body.data;
 
-      expect(entry.question.id).toBe(children[1].id);
+      // Keyed by the parent, not by the row.
+      expect(group.id).toBe(children[1].parentId);
+      expect(group.entries).toHaveLength(1);
+      expect(group.entries[0].question.id).toBe(children[1].id);
+
       // The child carries none of the classification...
-      expect(entry.question.exam).toEqual([]);
-      expect(entry.question.concept).toEqual([]);
-      expect(entry.question.tag).toEqual([]);
+      expect(group.entries[0].question.exam).toEqual([]);
+      expect(group.entries[0].question.concept).toEqual([]);
+      expect(group.entries[0].question.tag).toEqual([]);
 
       // ...it is all on the parent, which is what the card reads.
-      expect(entry.parentQuestion?.id).toBe(children[1].parentId);
-      expect(entry.parentQuestion?.exam.map((e) => e.name)).toEqual(['fixture exam']);
-      expect(entry.parentQuestion?.concept.map((c) => c.name)).toEqual(['fixture concept']);
-      expect(entry.parentQuestion?.tag.map((t) => t.name)).toEqual(['fixture tag']);
+      expect(group.parentQuestion?.id).toBe(children[1].parentId);
+      expect(group.parentQuestion?.exam.map((e) => e.name)).toEqual(['fixture exam']);
+      expect(group.parentQuestion?.concept.map((c) => c.name)).toEqual(['fixture concept']);
+      expect(group.parentQuestion?.tag.map((t) => t.name)).toEqual(['fixture tag']);
 
       // Siblings in sortOrder, so the card can say 第 2 題／共 3 題 by
       // position rather than trusting sortOrder to be 0-based.
-      expect(entry.parentQuestion?.children.map((c) => c.id)).toEqual(children.map((c) => c.id));
+      expect(group.parentQuestion?.children.map((c) => c.id)).toEqual(children.map((c) => c.id));
+    });
+
+    // The point of grouping: one card per 題組, not one per wrong
+    // sub-question. Before this, four wrong children of one reading
+    // comprehension produced four entries that each repeated the passage.
+    it('merges several wrong children of one group into a single entry', async () => {
+      await seedUser();
+      vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+      const { subjectId, examId, conceptId } = await seedFixture();
+      const children = await seedGroupQuestion(subjectId, examId, conceptId);
+
+      // Answered out of order, so the entry ordering below can only come
+      // from sortOrder and not from the order they went wrong.
+      await postReply([{ questionId: children[2].id, repliedAnswer: 'B' }]);
+      await postReply([{ questionId: children[0].id, repliedAnswer: 'B' }]);
+
+      const res = await getWrongQuestionList();
+      const body = (await res.json()) as {
+        data: WrongQuestionDto[];
+        paginate: { total: number; totalPages: number };
+      };
+
+      expect(body.data).toHaveLength(1);
+      // Groups, not rows: two wrong children are still one page entry.
+      expect(body.paginate).toMatchObject({ total: 1, totalPages: 1 });
+
+      const [group] = body.data;
+      expect(group.id).toBe(children[0].parentId);
+      expect(group.entries.map((e) => e.question.id)).toEqual([children[0].id, children[2].id]);
+      // Each entry keeps its own row id, which is what note/delete use.
+      expect(new Set(group.entries.map((e) => e.id)).size).toBe(2);
+    });
+
+    // Ordering across groups is by the most recent miss in each, so a
+    // 題組 revisited later rises above one left alone.
+    it('orders groups by their most recent wrong answer', async () => {
+      await seedUser();
+      vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+      const { subjectId, examId, conceptId } = await seedFixture();
+      const children = await seedGroupQuestion(subjectId, examId, conceptId);
+      const standalone = await seedWrongQuestion(subjectId, examId, conceptId);
+
+      // The group goes wrong after the standalone question, so it leads.
+      await postReply([{ questionId: children[1].id, repliedAnswer: 'B' }]);
+
+      const res = await getWrongQuestionList();
+      const body = (await res.json()) as {
+        data: WrongQuestionDto[];
+        paginate: { total: number };
+      };
+
+      expect(body.paginate.total).toBe(2);
+      expect(body.data.map((g) => g.id)).toEqual([children[1].parentId, standalone.id]);
+      expect(body.data[0].lastWrongAt >= body.data[1].lastWrongAt).toBe(true);
+    });
+
+    // A group's children must never straddle a page boundary, which is
+    // exactly what a row-based limit used to allow.
+    it('keeps a group whole when the page limit is smaller than its entries', async () => {
+      await seedUser();
+      vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+      const { subjectId, examId, conceptId } = await seedFixture();
+      const children = await seedGroupQuestion(subjectId, examId, conceptId);
+
+      for (const child of children) await postReply([{ questionId: child.id, repliedAnswer: 'B' }]);
+
+      const res = await getWrongQuestionList('?limit=1&offset=0');
+      const body = (await res.json()) as {
+        data: WrongQuestionDto[];
+        paginate: { total: number; totalPages: number };
+      };
+
+      expect(body.paginate).toMatchObject({ total: 1, totalPages: 1 });
+      expect(body.data).toHaveLength(1);
+      // All three on the one page, despite limit=1.
+      expect(body.data[0].entries).toHaveLength(3);
+      expect(body.data[0].entries.map((e) => e.question.id)).toEqual(children.map((c) => c.id));
     });
 
     it('returns an empty page when the user has no wrong questions', async () => {
@@ -336,7 +479,7 @@ describe('wrongQuestion routes', () => {
         const res = await getWrongQuestionList(`?categoryId=${categoryId}`);
         const body = (await res.json()) as { data: WrongQuestionDto[]; paginate: { total: number } };
         expect(body.paginate.total).toBe(1);
-        expect(body.data[0].question.id).toBe(q1.id);
+        expect(body.data[0].entries[0].question.id).toBe(q1.id);
       });
     });
 
@@ -363,7 +506,7 @@ describe('wrongQuestion routes', () => {
         const res = await getWrongQuestionList(`?subjectId=${subjectId}`);
         const body = (await res.json()) as { data: WrongQuestionDto[]; paginate: { total: number } };
         expect(body.paginate.total).toBe(1);
-        expect(body.data[0].question.id).toBe(q1.id);
+        expect(body.data[0].entries[0].question.id).toBe(q1.id);
       });
     });
 
@@ -384,7 +527,7 @@ describe('wrongQuestion routes', () => {
         const res = await getWrongQuestionList(`?examIds=${examId}`);
         const body = (await res.json()) as { data: WrongQuestionDto[]; paginate: { total: number } };
         expect(body.paginate.total).toBe(1);
-        expect(body.data[0].question.id).toBe(q1.id);
+        expect(body.data[0].entries[0].question.id).toBe(q1.id);
       });
     });
 
@@ -404,7 +547,7 @@ describe('wrongQuestion routes', () => {
         const res = await getWrongQuestionList(`?tagIds=${tagId}`);
         const body = (await res.json()) as { data: WrongQuestionDto[]; paginate: { total: number } };
         expect(body.paginate.total).toBe(1);
-        expect(body.data[0].question.id).toBe(q1.id);
+        expect(body.data[0].entries[0].question.id).toBe(q1.id);
       });
     });
   });
@@ -423,7 +566,7 @@ describe('wrongQuestion routes', () => {
       await seedWrongQuestion(subjectId, examId, conceptId);
       const listRes = await getWrongQuestionList();
       const { data } = (await listRes.json()) as { data: WrongQuestionDto[] };
-      const entryId = data[0].id;
+      const entryId = data[0].entries[0].id;
 
       const res = await putWrongQuestionNote(entryId, '記得再複習一次');
       expect(res.status).toBe(200);
@@ -431,7 +574,7 @@ describe('wrongQuestion routes', () => {
 
       const after = await getWrongQuestionList();
       const afterBody = (await after.json()) as { data: WrongQuestionDto[] };
-      expect(afterBody.data[0].note).toBe('記得再複習一次');
+      expect(afterBody.data[0].entries[0].note).toBe('記得再複習一次');
     });
 
     it('clears an existing note when note is null', async () => {
@@ -441,7 +584,7 @@ describe('wrongQuestion routes', () => {
       await seedWrongQuestion(subjectId, examId, conceptId);
       const listRes = await getWrongQuestionList();
       const { data } = (await listRes.json()) as { data: WrongQuestionDto[] };
-      const entryId = data[0].id;
+      const entryId = data[0].entries[0].id;
       await putWrongQuestionNote(entryId, 'first note');
 
       const res = await putWrongQuestionNote(entryId, null);
@@ -485,7 +628,7 @@ describe('wrongQuestion routes', () => {
       await seedWrongQuestion(subjectId, examId, conceptId);
       const listRes = await getWrongQuestionList();
       const { data } = (await listRes.json()) as { data: WrongQuestionDto[] };
-      const entryId = data[0].id;
+      const entryId = data[0].entries[0].id;
 
       const res = await deleteWrongQuestion(entryId);
       expect(res.status).toBe(204);
