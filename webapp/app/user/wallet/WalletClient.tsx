@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Coins } from 'lucide-react'
+import { formatNumber } from '@/lib/number'
 import { apiFetch, LIMIT } from '@/lib/api'
 import Pagination from '@/components/Pagination'
 import { ButtonLink, EmptyState, ErrorState, LoadingState, PageHeader } from '@/components/ui'
@@ -42,9 +43,9 @@ function TransactionRow({ item }: { item: PointTransaction }) {
       <div className="text-right">
         <p className={`text-base font-bold ${positive ? styles.amountPositive : styles.amountNegative}`}>
           {positive ? '+' : ''}
-          {item.amount}
+          {formatNumber(item.amount)}
         </p>
-        <p className={styles.transactionMeta}>餘額 {item.balanceAfter}</p>
+        <p className={styles.transactionMeta}>餘額 {formatNumber(item.balanceAfter)}</p>
       </div>
     </div>
   )

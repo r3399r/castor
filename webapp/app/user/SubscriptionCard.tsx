@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { formatNumber } from '@/lib/number'
 import { CreditCard, RefreshCw } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
 import {
@@ -69,7 +70,7 @@ function SubscriptionDetails({ view }: { view: SubscriptionView }) {
         <PlanLine planCode={view.planCode} />
         <p className={styles.subscriptionMeta}>
           將於 {formatTaiwanDate(view.pendingPlanEffectiveAt)} 變更為{' '}
-          {pendingPlan?.name ?? view.pendingPlanCode}，扣款 NT${view.pendingPlanAmount.toLocaleString('zh-TW')}。
+          {pendingPlan?.name ?? view.pendingPlanCode}，扣款 NT${formatNumber(view.pendingPlanAmount)}。
         </p>
       </>
     )

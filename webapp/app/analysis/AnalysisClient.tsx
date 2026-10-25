@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { formatNumber } from '@/lib/number'
 import {
   CartesianGrid,
   Legend,
@@ -618,7 +619,7 @@ function SpeedCard({
                     )}
                     {' · '}正確率 <span className="tabular-nums">{Math.round(item.accuracy)}%</span>
                     {' · '}
-                    <span className="tabular-nums">{item.sampleCount}</span> 題
+                    <span className="tabular-nums">{formatNumber(item.sampleCount)}</span> 題
                   </span>
                 </div>
 
@@ -799,7 +800,7 @@ export default function AnalysisClient() {
             <div className={styles.summaryGrid}>
               <StatCard
                 label="總刷題數"
-                value={history.totalAttempts}
+                value={formatNumber(history.totalAttempts)}
                 unit="題"
                 iconSrc="/icon-total-questions.svg"
                 tone="blue"

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Coins } from 'lucide-react'
+import { formatNumber } from '@/lib/number'
 import { apiFetch, apiPut } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import { Button, ButtonLink, ErrorState, LoadingState, PageHeader } from '@/components/ui'
@@ -131,7 +132,7 @@ export default function UserClient() {
           <span className={styles.pointsIcon}><Coins size={24} strokeWidth={1.8} /></span>
           <div className={styles.pointsCopy}>
             <p className={styles.pointsTitle}>累積積分</p>
-            <p className={styles.pointsValue}>{me.lifetimePoints}</p>
+            <p className={styles.pointsValue}>{formatNumber(me.lifetimePoints)}</p>
           </div>
         </div>
         <ButtonLink href="/user/wallet" variant="secondary">

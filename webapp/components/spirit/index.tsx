@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from 'react'
 import { Check, Sparkles, Sprout } from 'lucide-react'
 import { Badge, ContentPanel, Progress } from '@/components/ui'
+import { formatNumber } from '@/lib/number'
 import {
   spiritCatalog,
   spiritImage,
@@ -168,7 +169,7 @@ export function SpiritStatusCard({
         <strong>
           {complete
             ? '成長已完成'
-            : `${xp.toLocaleString()} / ${(nextLevelXp ?? 0).toLocaleString()} XP`}
+            : `${formatNumber(xp)} / ${formatNumber(nextLevelXp ?? 0)} XP`}
         </strong>
       </div>
       <Progress

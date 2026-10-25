@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { formatNumber } from '@/lib/number'
 import {
   ArrowRight,
   BookOpen,
@@ -245,7 +246,7 @@ export default function BoxClient() {
           value={pointsToUse}
           disabled={availablePoints === 0}
           aria-label="選擇投入積分點數"
-          aria-valuetext={`${pointsToUse.toLocaleString('zh-TW')} 點`}
+          aria-valuetext={`${formatNumber(pointsToUse)} 點`}
           onChange={(event) => setPointsToUse(Number(event.target.value))}
           style={{
             '--sp-invest-progress': `${
@@ -259,7 +260,7 @@ export default function BoxClient() {
         />
         <div className="sp-invest-range-labels" aria-hidden="true">
           <span>{availablePoints === 0 ? '0' : '1'}</span>
-          <span>最多 {availablePoints.toLocaleString('zh-TW')}</span>
+          <span>最多 {formatNumber(availablePoints)}</span>
         </div>
         <div className="sp-invest-actions">
           <div className="sp-invest-presets" aria-label="快速選擇投入比例">
@@ -367,7 +368,7 @@ export default function BoxClient() {
             <div className="sp-points-copy">
               <p>目前積分</p>
               <strong>
-                {availablePoints.toLocaleString()}
+                {formatNumber(availablePoints)}
                 <span> 點</span>
               </strong>
             </div>
@@ -538,7 +539,7 @@ export default function BoxClient() {
                 </div>
                 <Badge tone="growth">
                   <Coins size={16} aria-hidden="true" />
-                  可使用 {availablePoints} 點
+                  可使用 {formatNumber(availablePoints)} 點
                 </Badge>
               </div>
               {availablePoints === 0 && (
@@ -590,7 +591,7 @@ export default function BoxClient() {
                             <span>兌換所需</span>
                             <strong>
                               <Coins size={16} aria-hidden="true" />
-                              {egg.cost} 點
+                              {formatNumber(egg.cost)} 點
                             </strong>
                           </div>
                           {!isOwned && !canAfford && (
@@ -601,7 +602,7 @@ export default function BoxClient() {
                                 label={`${egg.name}兌換積分`}
                               />
                               <p className="sp-caption">
-                                還差 {pointsNeeded} 點
+                                還差 {formatNumber(pointsNeeded)} 點
                               </p>
                             </>
                           )}
@@ -754,7 +755,7 @@ export default function BoxClient() {
             <div>
               <p className="sp-eyebrow">{eggToExchange.theme}</p>
               <h3>{eggToExchange.name}</h3>
-              <p>將使用 {eggToExchange.cost} 點</p>
+              <p>將使用 {formatNumber(eggToExchange.cost)} 點</p>
             </div>
           </div>
           <TransactionSummary
@@ -842,15 +843,15 @@ function TransactionSummary({
     <dl className="sp-transaction">
       <div>
         <dt>目前積分</dt>
-        <dd>{available} 點</dd>
+        <dd>{formatNumber(available)} 點</dd>
       </div>
       <div>
         <dt>{label}</dt>
-        <dd>− {amount} 點</dd>
+        <dd>− {formatNumber(amount)} 點</dd>
       </div>
       <div>
         <dt>{label === '本次兌換' ? '兌換' : '投入'}後剩餘</dt>
-        <dd>{Math.max(available - amount, 0)} 點</dd>
+        <dd>{formatNumber(Math.max(available - amount, 0))} 點</dd>
       </div>
     </dl>
   )

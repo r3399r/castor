@@ -2,6 +2,7 @@ import type {
   GetSubscriptionHistoryResponse,
   SubscriptionStatus,
 } from '@/types/api'
+import { formatNumber } from '@/lib/number'
 
 export type SubscriptionPlanCode = 'monthly' | 'annual'
 
@@ -37,7 +38,7 @@ export function getSubscriptionPlan(code: string | null | undefined) {
 }
 
 export function formatPlanPrice(plan: SubscriptionPlan) {
-  return `NT$${plan.price.toLocaleString('zh-TW')}／${plan.periodLabel}`
+  return `NT$${formatNumber(plan.price)}／${plan.periodLabel}`
 }
 
 export function formatTaiwanDate(value: string | Date) {

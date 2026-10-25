@@ -4,6 +4,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
 import { Goal, BookOpenText, Brain, Coins, FunnelPlus, NotebookPen } from 'lucide-react'
 import { apiFetch, apiPost } from '@/lib/api'
+import { formatNumber } from '@/lib/number'
 import Chip, { tagColors } from '@/components/Chip'
 import DifficultyStars from '@/components/DifficultyStars'
 import DiscussionLink from '@/components/DiscussionLink'
@@ -1228,7 +1229,7 @@ export default function AdaptiveClient({
 
           <div className={styles.startGroup}>
             {questionCount >= 0 && (
-              <span className={styles.countText}>共有 {questionCount} 題符合條件</span>
+              <span className={styles.countText}>共有 {formatNumber(questionCount)} 題符合條件</span>
             )}
             <button
               onClick={fetchAdaptive}
@@ -1686,13 +1687,13 @@ export default function AdaptiveClient({
               <p className="text-base font-normal text-black-700">此次練習一共獲得</p>
               <div className="mt-1 flex justify-center">
                 <span className={`${styles.questionIndex} relative text-[64px] font-bold leading-tight`}>
-                  {totalScore}
+                  {formatNumber(totalScore)}
                   <span className="absolute bottom-3 left-full ml-1 text-base font-normal text-black-700">分</span>
                 </span>
               </div>
               <div className="mt-1 flex items-center justify-center gap-1 text-sm font-semibold text-amber-700">
                 <Coins size={16} strokeWidth={2.5} />
-                +{totalAwardedPoints} 積分
+                +{formatNumber(totalAwardedPoints)} 積分
               </div>
               <hr className="mt-2 border-spirit-line" />
             </div>

@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { formatNumber } from '@/lib/number'
 import {
   BarChart3,
   BrainCircuit,
@@ -80,7 +81,7 @@ function CurrentSubscriptionSummary({ view }: { view: SubscriptionView }) {
         <strong>目前使用：{currentPlan?.name ?? view.planCode}</strong>
         <span>
           已安排於 {formatTaiwanDate(view.pendingPlanEffectiveAt)} 變更為{' '}
-          {pendingPlan?.name ?? view.pendingPlanCode}，屆時扣款 NT${view.pendingPlanAmount.toLocaleString('zh-TW')}。
+          {pendingPlan?.name ?? view.pendingPlanCode}，屆時扣款 NT${formatNumber(view.pendingPlanAmount)}。
         </span>
       </div>
     )
@@ -211,7 +212,7 @@ export default function SubscriptionPageClient() {
                       </span>
                     </span>
                     <span className={styles.planOptionPrice}>
-                      <strong>NT${plan.price.toLocaleString('zh-TW')}</strong>
+                      <strong>NT${formatNumber(plan.price)}</strong>
                       <span>／{plan.periodLabel}</span>
                     </span>
                     <small>{plan.note}</small>
@@ -283,11 +284,11 @@ export default function SubscriptionPageClient() {
         >
           <p className={styles.dialogCopy}>
             {dialog === 'resume' ? (
-              <>恢復後將於 {formatTaiwanDate(view.entitlementEndsAt)} 以 {selected.name}扣款 NT${selected.price.toLocaleString('zh-TW')}，之後{renewalPeriod}自動續訂。本次不會立即扣款。</>
+              <>恢復後將於 {formatTaiwanDate(view.entitlementEndsAt)} 以 {selected.name}扣款 NT${formatNumber(selected.price)}，之後{renewalPeriod}自動續訂。本次不會立即扣款。</>
             ) : dialog === 'cancel_change' && view.kind === 'scheduled_change' ? (
               <>取消後將維持 {getSubscriptionPlan(view.planCode)?.name ?? view.planCode}，並於 {formatTaiwanDate(view.entitlementEndsAt)} 按原方案自動續訂。</>
             ) : (
-              <>目前方案可使用至 {formatTaiwanDate(view.entitlementEndsAt)}。{selected.name}將於本期結束後生效，屆時扣款 NT${selected.price.toLocaleString('zh-TW')}，之後{renewalPeriod}自動續訂。本次不會立即扣款。{view.kind === 'cancelled' ? '確認後將恢復自動續訂。' : ''}</>
+              <>目前方案可使用至 {formatTaiwanDate(view.entitlementEndsAt)}。{selected.name}將於本期結束後生效，屆時扣款 NT${formatNumber(selected.price)}，之後{renewalPeriod}自動續訂。本次不會立即扣款。{view.kind === 'cancelled' ? '確認後將恢復自動續訂。' : ''}</>
             )}
           </p>
           <div className={styles.managementNotice} role="note">

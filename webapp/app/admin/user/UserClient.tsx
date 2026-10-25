@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { ApiError, apiFetch, apiPut, LIMIT } from '@/lib/api'
+import { formatNumber } from '@/lib/number'
 import Pagination from '@/components/Pagination'
 import { ErrorState, LoadingState, PageHeader, TableFrame } from '@/components/ui'
 import SortableTh, { type SortDirection } from '@/components/SortableTh'
@@ -96,7 +97,7 @@ export default function UserClient() {
       const who = user.email ?? user.id
       setError(
         e instanceof ApiError && e.code === 'INSUFFICIENT_POINTS'
-          ? `${who} 目前只有 ${user.totalPoints} 點，不能扣 ${Math.abs(delta)} 點。`
+          ? `${who} 目前只有 ${formatNumber(user.totalPoints)} 點，不能扣 ${formatNumber(Math.abs(delta))} 點。`
           : `無法調整 ${who} 的點數。`
       )
     } finally {
@@ -242,12 +243,12 @@ export default function UserClient() {
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2 whitespace-nowrap">
                     <span className="tabular-nums font-bold text-black-900">
-                      {user.totalPoints.toLocaleString('zh-TW')}
+                      {formatNumber(user.totalPoints)}
                     </span>
                     {/* Shown because a credit moves it and a debit does
                         not, which is otherwise invisible and surprising. */}
                     <span className="text-[11px] text-black-300 tabular-nums">
-                      累計 {user.lifetimePoints.toLocaleString('zh-TW')}
+                      累計 {formatNumber(user.lifetimePoints)}
                     </span>
                     <button
                       type="button"

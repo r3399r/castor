@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { apiFetch } from '@/lib/api'
+import { formatNumber } from '@/lib/number'
 import { ErrorState, LoadingState, PageHeader } from '@/components/ui'
 import {
   artworkByCode,
@@ -135,7 +136,7 @@ export default function SpeciesClient() {
                   {art === undefined && <Badge tone="warn">尚無圖檔</Badge>}
                 </div>
                 <span className="text-xs text-black-500">
-                  商店名稱 {row.name} · {row.cost} 點 · 排序 {row.sortOrder} ·{' '}
+                  商店名稱 {row.name} · {formatNumber(row.cost)} 點 · 排序 {row.sortOrder} ·{' '}
                   <span className="tabular-nums">
                     {Object.values(row.ownersByLevel).reduce((sum, n) => sum + n, 0)}
                   </span>{' '}
