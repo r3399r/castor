@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from 'react'
 import { MathJax } from 'better-react-mathjax'
-import { BookOpenText } from 'lucide-react'
+import { BookOpenText, ChevronDown, ChevronUp } from 'lucide-react'
 import { apiDelete, apiFetch, apiPut, LIMIT } from '@/lib/api'
 import Chip, { tagColors } from '@/components/Chip'
 import DifficultyStars from '@/components/DifficultyStars'
 import Pagination from '@/components/Pagination'
 import { Button, EmptyState, ErrorState, LoadingState } from '@/components/ui'
 import { formatNumber } from '@/lib/number'
+import { blankNumberFromContent, markBlanksInPassage } from '@/lib/questionBlank'
 import type {
   GetWrongQuestionResponse,
   PutWrongQuestionNoteResponse,
@@ -46,6 +47,7 @@ function WrongEntry({
   isGroup,
   position,
   siblingCount,
+  blankNumber,
   onSaveNote,
   onDelete,
 }: {
@@ -54,6 +56,14 @@ function WrongEntry({
   /** 1-based position among the 題組's sub-questions, 0 when unknown. */
   position: number
   siblingCount: number
+  /**
+   * The blank this sub-question stands for, when its content is only that
+   * number *and* the blank was found and highlighted in the passage above.
+   * null means render the content normally -- including when the content
+   * is a bare number we failed to locate, since the number is then all the
+   * reader has to go on.
+   */
+  blankNumber: number | null
   onSaveNote: (id: number, note: string | null) => Promise<void>
   onDelete: (id: number) => Promise<void>
 }) {
@@ -97,11 +107,18 @@ function WrongEntry({
         <DifficultyStars value={difficulty} tone="forest" />
       </div>
 
-      {question.content && (
-        <div
-          dangerouslySetInnerHTML={{ __html: question.content }}
-          className="prose max-w-none text-spirit-reading font-medium text-black-800 [&>*:last-child]:mb-0"
-        />
+      {blankNumber !== null ? (
+        <div className="text-base text-black-700">
+          本題為文章中標示的第
+          <span className={`${styles.value} mx-1`}>{blankNumber}</span>格
+        </div>
+      ) : (
+        question.content && (
+          <div
+            dangerouslySetInnerHTML={{ __html: question.content }}
+            className="prose max-w-none text-spirit-reading font-medium text-black-800 [&>*:last-child]:mb-0"
+          />
+        )
       )}
 
       {question.answer && (
@@ -195,67 +212,99 @@ function WrongCard({
   const siblings = item.parentQuestion?.children ?? []
   const positionById = new Map(siblings.map((child, i) => [child.id, i + 1]))
 
-  const [passageOpen, setPassageOpen] = useState(true)
+  // The whole card folds away, passage and sub-questions together -- the
+  // list is long enough that scrolling past a finished 題組 is the common
+  // case, and folding only the passage still left every sub-question, its
+  // note box and its two buttons in the way. Open by default, so the page
+  // reads the same as it always did until something is deliberately put
+  // away. Per card and not persisted: a fold is for getting through this
+  // page, not a setting.
+  const [open, setOpen] = useState(true)
+  const bodyId = `wrong-card-${item.id}`
+
+  // 文意選填／篇章結構: each wrong sub-question is only a blank number, so
+  // the blank gets highlighted in the passage and the sub-question says
+  // which one it is instead of printing a lone "31". A number we cannot
+  // find in the passage is left to render as it always did -- see
+  // markBlanksInPassage for why only <u> blanks are matched.
+  const blankNumbers = new Map(
+    item.entries.map((entry) => [entry.id, blankNumberFromContent(entry.question.content)])
+  )
+  const passage = item.parentQuestion?.content ?? null
+  const { html: passageHtml, marked: markedBlanks } = passage
+    ? markBlanksInPassage(
+        passage,
+        [...blankNumbers.values()].filter((n): n is number => n !== null),
+        styles.blankMark
+      )
+    : { html: null, marked: new Set<number>() }
 
   return (
     <article className={styles.recordCard}>
       <div className={styles.cardHeader}>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className={`${styles.subjectName} flex shrink-0 items-center gap-2`}>
-            <BookOpenText size={20} strokeWidth={2.5} className={`${styles.subjectIcon} shrink-0`} />
-            {item.subject.name}
-          </span>
-          <div className="ml-2 flex flex-wrap gap-2">
-            {isGroup && <Chip label="題組" />}
-            {exams.map((e) => (
-              <Chip key={e.id} label={e.name} color={tagColors.exam} />
-            ))}
-            {concepts.map((c) => (
-              <Chip
-                key={c.id}
-                label={c.conceptGroup.name === c.name ? c.name : c.conceptGroup.name + '-' + c.name}
-                color={tagColors.concept}
-              />
-            ))}
-            {tags.map((t) => (
-              <Chip key={t.id} label={t.name} color={tagColors.tag} />
-            ))}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={`${styles.subjectName} flex shrink-0 items-center gap-2`}>
+              <BookOpenText size={20} strokeWidth={2.5} className={`${styles.subjectIcon} shrink-0`} />
+              {item.subject.name}
+            </span>
+            <div className="ml-2 flex flex-wrap gap-2">
+              {isGroup && <Chip label="題組" />}
+              {exams.map((e) => (
+                <Chip key={e.id} label={e.name} color={tagColors.exam} />
+              ))}
+              {concepts.map((c) => (
+                <Chip
+                  key={c.id}
+                  label={c.conceptGroup.name === c.name ? c.name : c.conceptGroup.name + '-' + c.name}
+                  color={tagColors.concept}
+                />
+              ))}
+              {tags.map((t) => (
+                <Chip key={t.id} label={t.name} color={tagColors.tag} />
+              ))}
+            </div>
           </div>
+
+          <button
+            type="button"
+            onClick={() => setOpen((isOpen) => !isOpen)}
+            aria-expanded={open}
+            aria-controls={bodyId}
+            className="flex shrink-0 items-center gap-1 rounded-md border border-brown-300 px-3 py-1.5 text-xs text-black-700 transition hover:bg-beige-200"
+          >
+            {open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            {open ? '收合' : isGroup ? `展開（${item.entries.length} 小題）` : '展開'}
+          </button>
         </div>
       </div>
 
-      <div className={styles.cardBody}>
-        {isGroup && item.parentQuestion?.content && (
-          <div className="flex flex-col gap-2">
-            <button
-              type="button"
-              onClick={() => setPassageOpen((open) => !open)}
-              aria-expanded={passageOpen}
-              className="self-start rounded-md border border-brown-300 px-3 py-1.5 text-xs text-black-700 transition hover:bg-beige-200"
-            >
-              {passageOpen ? '收合題組文章' : '顯示題組文章'}
-            </button>
-            {passageOpen && (
-              <div
-                dangerouslySetInnerHTML={{ __html: item.parentQuestion.content }}
-                className="prose max-w-none text-spirit-reading font-medium text-black-800 [&>*:last-child]:mb-0"
-              />
-            )}
-          </div>
-        )}
+      {open && (
+        <div id={bodyId} className={styles.cardBody}>
+          {isGroup && passageHtml && (
+            <div
+              dangerouslySetInnerHTML={{ __html: passageHtml }}
+              className="prose max-w-none text-spirit-reading font-medium text-black-800 [&>*:last-child]:mb-0"
+            />
+          )}
 
-        {item.entries.map((entry) => (
-          <WrongEntry
-            key={entry.id}
-            entry={entry}
-            isGroup={isGroup}
-            position={positionById.get(entry.question.id) ?? 0}
-            siblingCount={siblings.length}
-            onSaveNote={onSaveNote}
-            onDelete={onDelete}
-          />
-        ))}
-      </div>
+          {item.entries.map((entry) => {
+            const blank = blankNumbers.get(entry.id) ?? null
+            return (
+              <WrongEntry
+                key={entry.id}
+                entry={entry}
+                isGroup={isGroup}
+                position={positionById.get(entry.question.id) ?? 0}
+                siblingCount={siblings.length}
+                blankNumber={blank !== null && markedBlanks.has(blank) ? blank : null}
+                onSaveNote={onSaveNote}
+                onDelete={onDelete}
+              />
+            )
+          })}
+        </div>
+      )}
     </article>
   )
 }

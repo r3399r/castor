@@ -211,6 +211,19 @@
 .valueCorrect { border-color: var(--reply-correct); color: var(--reply-correct-text); }
 .valueWrong { border-color: var(--color-danger); color: var(--color-danger-text); }
 
+/* The blank a wrong 文意選填 sub-question stands for, highlighted inside the
+   passage above it. Danger tone: every blank marked here is one the user
+   got wrong. box-shadow rather than a border so the surrounding text does
+   not shift by a pixel where a blank is marked. */
+.blankMark {
+  border-radius: 4px;
+  padding: 1px 2px;
+  background: var(--color-danger-soft);
+  box-shadow: 0 0 0 1px var(--color-danger);
+  color: var(--color-danger-text);
+  font-weight: 700;
+}
+
 .noteInput {
   width: 100%;
   padding: 10px 12px;

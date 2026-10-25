@@ -29,7 +29,7 @@
 
 改用會自動換行的寫法：
 - 選項排在同一行或各自一行都可以。同一行時用 &nbsp; 分隔即可，例如 11. (A) what is more&nbsp;&nbsp;(B) it turns out&nbsp;&nbsp;(C) in other words&nbsp;&nbsp;(D) all in all
-- 填空處用 <u>&nbsp;&nbsp;11&nbsp;&nbsp;</u> 這種寫法是安全的
+- 填空處用 <u>&nbsp;&nbsp;11&nbsp;&nbsp;</u> 這種寫法是安全的；若是題組文章裡的編號空格，還要加上 data-blank，見「題組格式」
 - 重點是文字能自然換行，不是一行幾個選項
 - 條列用 <ol>／<ul>
 - 段落縮排用 <p style="text-indent:2em">，這在窄螢幕是安全的
@@ -145,6 +145,8 @@ sortOrder 從 0 開始遞增。
 篇章結構、文意選填這類「一篇文章多個編號空格、共用一組選項」的題型，一律是題組：
 
 - 文章（含編號空格與後面的選項清單）放在 GROUP 的 content
+- 文章裡的每一個編號空格一律寫成 <u data-blank="31">&nbsp;&nbsp;31&nbsp;&nbsp;</u>：data-blank 的值、底線裡顯示的編號、對應子題的 content 三者必須是同一個數字。不要改用（31）、__31__、[31]、31. 或其他寫法
+- 這個 data-blank 是給前端用的：使用者答錯某一格時，前端要靠它把那一格標回文章裡。少了它，那個子題在錯題本就只會顯示一個孤零零的編號
 - 每一個編號空格對應一個子題，子題數量必須等於空格數量
 - 子題的 content 寫「N」（N 是該空格的編號）
 - 每個子題的 options 都填同一組共用選項（例如 "A|B|C|D|E"），answer 填該空格的答案
