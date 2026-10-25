@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { asc, eq, isNotNull } from 'drizzle-orm';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { app } from 'src/app';
 import { closeDb, getDb } from 'src/db/client';
@@ -227,6 +227,74 @@ describe('wrongQuestion routes', () => {
       const page2 = await getWrongQuestionList('?limit=1&offset=1');
       const page2Body = (await page2.json()) as { data: WrongQuestionDto[] };
       expect(page2Body.data[0].question.id).toBe(q1.id);
+    });
+
+    // The 題組 path, which had no coverage at all. A wrong-question row
+    // for a GROUP child is the only kind that carries a parentId, and the
+    // card in WrongClient builds its entire header from the parent --
+    // exam/concept/tag links only ever exist on a top-level row, so the
+    // child has none of its own to show. These assertions are what keeps
+    // that true: reading them off the child instead renders a card with
+    // no classification on it, while the filter panel goes on filtering
+    // by exactly those links.
+    it('returns the parent with its links and siblings for a GROUP child', async () => {
+      await seedUser();
+      vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+      const { subjectId, examId, conceptId } = await seedFixture();
+      const db = getDb();
+      const [{ insertId: tagId }] = await db
+        .insert(tagTable)
+        .values({ name: 'fixture tag', subjectId, createdAt: new Date() });
+
+      await postQuestions({
+        subjectId,
+        examId,
+        questions: [
+          {
+            type: 'GROUP',
+            content: '<p>passage</p>',
+            difficulty: 5,
+            conceptIds: [conceptId],
+            tagIds: [tagId],
+            childQuestions: [
+              { type: 'SINGLE', sortOrder: 0, content: 'c1', options: 'A|B', answer: 'A', difficulty: 5 },
+              { type: 'SINGLE', sortOrder: 1, content: 'c2', options: 'A|B', answer: 'A', difficulty: 5 },
+              { type: 'SINGLE', sortOrder: 2, content: 'c3', options: 'A|B', answer: 'A', difficulty: 5 },
+            ],
+          },
+        ],
+      });
+
+      const children = await db
+        .select()
+        .from(questionTable)
+        .where(isNotNull(questionTable.parentId))
+        .orderBy(asc(questionTable.sortOrder));
+      expect(children).toHaveLength(3);
+
+      // The middle one, so an off-by-one in the position label would show.
+      await postReply([{ questionId: children[1].id, repliedAnswer: 'B' }]);
+
+      const res = await getWrongQuestionList();
+      const body = (await res.json()) as { data: WrongQuestionDto[] };
+      expect(body.data).toHaveLength(1);
+      const [entry] = body.data;
+
+      expect(entry.question.id).toBe(children[1].id);
+      // The child carries none of the classification...
+      expect(entry.question.exam).toEqual([]);
+      expect(entry.question.concept).toEqual([]);
+      expect(entry.question.tag).toEqual([]);
+
+      // ...it is all on the parent, which is what the card reads.
+      expect(entry.parentQuestion?.id).toBe(children[1].parentId);
+      expect(entry.parentQuestion?.exam.map((e) => e.name)).toEqual(['fixture exam']);
+      expect(entry.parentQuestion?.concept.map((c) => c.name)).toEqual(['fixture concept']);
+      expect(entry.parentQuestion?.tag.map((t) => t.name)).toEqual(['fixture tag']);
+
+      // Siblings in sortOrder, so the card can say 第 2 題／共 3 題 by
+      // position rather than trusting sortOrder to be 0-based.
+      expect(entry.parentQuestion?.children.map((c) => c.id)).toEqual(children.map((c) => c.id));
     });
 
     it('returns an empty page when the user has no wrong questions', async () => {

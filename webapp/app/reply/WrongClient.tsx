@@ -44,11 +44,40 @@ function WrongCard({
   const question = item.question
   const isGroup = item.parentQuestion !== null
 
-  const exams = question.exam ?? []
-  const concepts = question.concept ?? []
-  const tags = question.tag ?? []
+  // exam/concept/tag links only ever live on a question's top-level row,
+  // so for a GROUP child they sit on the parent -- a child has no links
+  // of its own to find. Reading them off the child therefore yielded
+  // empty arrays, which is why these cards showed no exam, concept or tag
+  // at all while the filter panel was filtering on exactly those links
+  // (the server resolves them against the parent via groupKey). You could
+  // filter by 學測 and get back cards with no 學測 chip on them. The
+  // parent was already in the payload; it just was not read.
+  const metaSource = item.parentQuestion ?? question
+  const exams = metaSource.exam ?? []
+  const concepts = metaSource.concept ?? []
+  const tags = metaSource.tag ?? []
+
+  // Position among its siblings rather than sortOrder + 1: the server
+  // returns children already ordered by sortOrder, and the stored values
+  // are only 0-based by convention -- anything entered by hand could
+  // start at 1 and silently label the first sub-question "第 2 題".
+  // Counting the position cannot be wrong that way, and it also gives the
+  // total, which is what says how much of the 題組 went wrong.
+  const siblings = item.parentQuestion?.children ?? []
+  const childIndex = siblings.findIndex((c) => c.id === question.id)
+  const groupLabel = !isGroup
+    ? null
+    : childIndex >= 0
+      ? `題組第 ${childIndex + 1} 題／共 ${siblings.length} 題`
+      : '題組'
   const difficulty = question.adjustedDifficulty ?? question.difficulty ?? 0
 
+  // Open by default, so a card reads the same as it always has. The
+  // toggle is there for the case this was built for: the passage repeats
+  // on every card for a child that went wrong, so four wrong
+  // sub-questions means the same 400-word passage four times, and
+  // collapsing the ones already read is the way out of that.
+  const [passageOpen, setPassageOpen] = useState(true)
   const [note, setNote] = useState(item.note ?? '')
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -87,6 +116,9 @@ function WrongCard({
             </span>
             <div className="ml-2 flex flex-wrap gap-2">
               <Chip label={typeLabel[question.type] ?? question.type} />
+              {groupLabel && (
+                <span className="text-xs text-black-500 whitespace-nowrap">{groupLabel}</span>
+              )}
               {exams.map((e) => (
                 <Chip key={e.id} label={e.name} color={tagColors.exam} />
               ))}
@@ -108,10 +140,22 @@ function WrongCard({
 
       <div className={styles.cardBody}>
         {isGroup && item.parentQuestion?.content && (
-          <div
-            dangerouslySetInnerHTML={{ __html: item.parentQuestion.content }}
-            className="prose max-w-none text-spirit-reading font-medium text-black-800 [&>*:last-child]:mb-0"
-          />
+          <div className="flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={() => setPassageOpen((open) => !open)}
+              aria-expanded={passageOpen}
+              className="self-start rounded-md border border-brown-300 px-3 py-1.5 text-xs text-black-700 transition hover:bg-beige-200"
+            >
+              {passageOpen ? '收合題組文章' : '顯示題組文章'}
+            </button>
+            {passageOpen && (
+              <div
+                dangerouslySetInnerHTML={{ __html: item.parentQuestion.content }}
+                className="prose max-w-none text-spirit-reading font-medium text-black-800 [&>*:last-child]:mb-0"
+              />
+            )}
+          </div>
         )}
         {question.content && (
           <div
