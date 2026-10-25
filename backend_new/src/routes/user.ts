@@ -1,11 +1,12 @@
 import { zValidator } from '@hono/zod-validator';
-import { asc, count, desc, eq, inArray } from 'drizzle-orm';
+import { asc, count, desc, eq, inArray, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import {
   categoryTable,
   conceptGroupTable,
   conceptTable,
+  pointTransactionTable,
   subjectCategoryTable,
   subjectTable,
   userConceptStatTable,
@@ -21,7 +22,7 @@ import {
 import { verifyIdTokenFull } from 'src/lib/firebaseAdmin';
 import { requireAdmin } from 'src/middleware/adminAuth';
 import { requireUser, UserEnv } from 'src/middleware/requireUser';
-import { NotFoundError, UnauthorizedError } from 'src/model/error';
+import { BadRequestError, NotFoundError, UnauthorizedError } from 'src/model/error';
 
 const USER_SORT_COLUMNS = {
   id: userTable.id,
@@ -41,6 +42,19 @@ export const userListQuerySchema = z.object({
 // all whitespace can't sneak through as "set".
 export const userUpdateMeBodySchema = z.object({
   name: z.string().trim().min(1).max(255),
+});
+
+// Bounded well below INT UNSIGNED's ceiling so a mistyped delta cannot
+// overflow total_points instead of failing. Nonzero because a no-op would
+// still write a ledger row, which is noise in the history this endpoint
+// exists to keep honest.
+export const userPointsBodySchema = z.object({
+  delta: z
+    .number()
+    .int()
+    .min(-1_000_000)
+    .max(1_000_000)
+    .refine((value) => value !== 0, { message: 'delta must not be 0' }),
 });
 
 export const userSubscriptionBodySchema = z.object({
@@ -337,6 +351,74 @@ export const user = new Hono<UserEnv>()
       });
     }
   )
+  /**
+   * Moves a user's point balance by hand. A testing affordance: there is
+   * no way to earn points except by answering questions, which makes any
+   * balance-dependent feature (the store, guardian investment, the
+   * leaderboard) tedious to exercise.
+   *
+   * Writes a real ledger row rather than only touching the balance, so
+   * SUM(point_transaction.amount) still reconciles against
+   * userTable.totalPoints -- the invariant the schema comment relies on.
+   * A silent balance change would make that check useless exactly when
+   * it is needed to explain a wrong number.
+   *
+   * Mirrors production's asymmetry rather than inventing its own: earning
+   * raises totalPoints and lifetimePoints together (reply.ts), spending
+   * lowers only totalPoints (store.ts), because lifetimePoints backs the
+   * leaderboard and never decreases. So a +100 followed by -100 leaves
+   * lifetimePoints 100 higher, which is correct, not a leak.
+   */
+  .put('/:id/points', requireAdmin, zValidator('json', userPointsBodySchema), async (c) => {
+    const db = c.get('db');
+    const id = Number(c.req.param('id'));
+    const { delta } = c.req.valid('json');
+    console.log(`PUT /api/user/${id}/points delta=${delta}`);
+
+    const [found] = await db.select().from(userTable).where(eq(userTable.id, id));
+    if (found === undefined) throw new NotFoundError(`user ${id} not found`);
+
+    // total_points is INT UNSIGNED, so a debit past zero is a database
+    // error rather than a negative balance. Refused with the balance in
+    // the message, which is what the caller needs to pick a valid delta
+    // -- and not clamped to zero, because silently doing something other
+    // than what was asked is worse in a tool used to set up test state.
+    const newTotalPoints = found.totalPoints + delta;
+    if (newTotalPoints < 0)
+      throw new BadRequestError(
+        `delta ${delta} would leave a negative balance (current ${found.totalPoints})`,
+        'INSUFFICIENT_POINTS'
+      );
+
+    const now = new Date();
+    const credit = delta > 0;
+    await db
+      .update(userTable)
+      .set({
+        totalPoints: sql`${userTable.totalPoints} + ${delta}`,
+        ...(credit
+          ? { lifetimePoints: sql`${userTable.lifetimePoints} + ${delta}` }
+          : {}),
+        updatedAt: now,
+      })
+      .where(eq(userTable.id, id));
+
+    // One type for both directions: amount is signed, and the wallet
+    // already renders the sign separately from the label.
+    await db.insert(pointTransactionTable).values({
+      userId: id,
+      type: 'ADMIN_ADJUST',
+      amount: delta,
+      balanceAfter: newTotalPoints,
+      createdAt: now,
+    });
+
+    return c.json({
+      totalPoints: newTotalPoints,
+      lifetimePoints: credit ? found.lifetimePoints + delta : found.lifetimePoints,
+      delta,
+    });
+  })
   // The signed-in user's own profile -- unlike GET /:id below, this needs
   // no admin check since it can only ever read the caller's own row.
   .get('/me', requireUser, async (c) => {

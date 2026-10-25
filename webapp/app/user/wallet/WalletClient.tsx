@@ -16,6 +16,7 @@ const typeLabel: Record<string, string> = {
   EARN_REPLY: '答題獲得',
   SPEND_EGG_REDEEM: '兌換精靈蛋',
   SPEND_GUARDIAN_INVEST: '投入培育',
+  ADMIN_ADJUST: '手動調整',
 }
 
 function formatDate(dateStr: string | null): string {

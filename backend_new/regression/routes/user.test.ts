@@ -15,6 +15,7 @@ import {
   categoryTable,
   conceptGroupTable,
   conceptTable,
+  pointTransactionTable,
   subjectCategoryTable,
   subjectTable,
   userConceptStatTable,
@@ -47,6 +48,7 @@ type UserDto = {
 
 const clearTable = async () => {
   const db = getDb();
+  await db.delete(pointTransactionTable);
   await db.delete(userSubscriptionTable);
   await db.delete(userConceptStatTable);
   await db.delete(userStatHistoryTable);
@@ -599,6 +601,136 @@ describe('user routes', () => {
       expect(rows[0].name).toBe('Other Name');
       const mine = await getDb().select().from(userTable).where(eq(userTable.id, userId));
       expect(mine[0].name).toBe('My New Name');
+    });
+  });
+
+  describe('PUT /:id/points', () => {
+    const putPoints = (id: number | string, body: unknown) =>
+      app.request(`/api/user/${id}/points`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+    const seedWithPoints = async (totalPoints: number, lifetimePoints: number) => {
+      const [{ insertId }] = await getDb().insert(userTable).values({
+        firebaseUid: `points-${Math.random().toString(36).slice(2)}`,
+        totalPoints,
+        lifetimePoints,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      return insertId;
+    };
+
+    const readUser = async (id: number) => {
+      const [row] = await getDb().select().from(userTable).where(eq(userTable.id, id));
+      return row;
+    };
+
+    it('credits both balances and writes a reconcilable ledger row', async () => {
+      const userId = await seedWithPoints(50, 200);
+
+      const res = await putPoints(userId, { delta: 100 });
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ totalPoints: 150, lifetimePoints: 300, delta: 100 });
+
+      const user = await readUser(userId);
+      expect(user.totalPoints).toBe(150);
+      // Earning raises both, same as reply.ts.
+      expect(user.lifetimePoints).toBe(300);
+
+      // The ledger is the point of doing this through an endpoint rather
+      // than with an UPDATE by hand: SUM(amount) has to keep matching the
+      // balance, and balanceAfter has to be the balance as of this row.
+      const ledger = await getDb()
+        .select()
+        .from(pointTransactionTable)
+        .where(eq(pointTransactionTable.userId, userId));
+      expect(ledger).toHaveLength(1);
+      expect(ledger[0].type).toBe('ADMIN_ADJUST');
+      expect(ledger[0].amount).toBe(100);
+      expect(ledger[0].balanceAfter).toBe(150);
+    });
+
+    // lifetimePoints backs the leaderboard and only ever increases, so a
+    // debit must leave it alone -- the same split store.ts relies on.
+    it('debits only the spendable balance', async () => {
+      const userId = await seedWithPoints(500, 900);
+
+      const res = await putPoints(userId, { delta: -200 });
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ totalPoints: 300, lifetimePoints: 900, delta: -200 });
+
+      const user = await readUser(userId);
+      expect(user.totalPoints).toBe(300);
+      expect(user.lifetimePoints).toBe(900);
+
+      const ledger = await getDb()
+        .select()
+        .from(pointTransactionTable)
+        .where(eq(pointTransactionTable.userId, userId));
+      expect(ledger[0].amount).toBe(-200);
+      expect(ledger[0].balanceAfter).toBe(300);
+    });
+
+    // total_points is INT UNSIGNED: without this check the UPDATE itself
+    // fails, which surfaces as a 500 instead of a usable message.
+    it('refuses a debit that would go negative, changing nothing', async () => {
+      const userId = await seedWithPoints(30, 30);
+
+      const res = await putPoints(userId, { delta: -31 });
+
+      expect(res.status).toBe(400);
+      expect(await res.json()).toMatchObject({ code: 'INSUFFICIENT_POINTS' });
+
+      const user = await readUser(userId);
+      expect(user.totalPoints).toBe(30);
+      const ledger = await getDb()
+        .select()
+        .from(pointTransactionTable)
+        .where(eq(pointTransactionTable.userId, userId));
+      expect(ledger).toHaveLength(0);
+    });
+
+    // Zeroing a balance exactly is the common case for setting up a test,
+    // and is the boundary the check above must not reject.
+    it('allows a debit down to exactly zero', async () => {
+      const userId = await seedWithPoints(30, 30);
+
+      const res = await putPoints(userId, { delta: -30 });
+
+      expect(res.status).toBe(200);
+      expect((await readUser(userId)).totalPoints).toBe(0);
+    });
+
+    it('rejects a zero or out-of-range delta', async () => {
+      const userId = await seedWithPoints(10, 10);
+
+      for (const delta of [0, 1_000_001, -1_000_001, 1.5]) {
+        expect((await putPoints(userId, { delta })).status).toBe(400);
+      }
+      expect((await readUser(userId)).totalPoints).toBe(10);
+    });
+
+    it('404s an unknown user', async () => {
+      expect((await putPoints(999999, { delta: 10 })).status).toBe(404);
+    });
+
+    // A balance is worth real things (store redemptions, leaderboard
+    // rank), so this must not be reachable by an ordinary signed-in user.
+    it('rejects a non-admin caller', async () => {
+      const userId = await seedWithPoints(10, 10);
+
+      vi.mocked(verifyIdToken).mockResolvedValue(null);
+      expect((await putPoints(userId, { delta: 10 })).status).toBe(401);
+
+      vi.mocked(verifyIdToken).mockResolvedValue('someone-else@example.com');
+      expect((await putPoints(userId, { delta: 10 })).status).toBe(403);
+
+      expect((await readUser(userId)).totalPoints).toBe(10);
     });
   });
 

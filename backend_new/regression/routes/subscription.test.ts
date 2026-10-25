@@ -281,7 +281,13 @@ describe('subscription', () => {
       expect((await gatedApp.request('/gated/thing')).status).toBe(200);
     });
 
-    it('revokes a subscription, and the gate closes again', async () => {
+    // Revoking turns off auto-renew; it does not end a period already
+    // paid for. So the reply says active: false -- that is the billing
+    // state -- while the gate stays open, because it reads
+    // findEntitledSubscription, which admits `cancelled` until
+    // currentPeriodEnd. Those two answers disagreeing is the design, not
+    // a bug: see findEntitledSubscription's note on status screens.
+    it('reports a revoked subscription as inactive but keeps access to the end of the period', async () => {
       const userId = await seedUser();
       await grant(userId);
       asAdmin();
@@ -290,7 +296,21 @@ describe('subscription', () => {
       expect((await res.json()) as { active: boolean }).toMatchObject({ active: false });
 
       vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
-      expect((await gatedApp.request('/gated/thing')).status).toBe(403);
+      expect((await gatedApp.request('/gated/thing')).status).toBe(200);
+    });
+
+    // The other half of that rule, and the one that keeps it honest: a
+    // cancelled period stops granting access once it runs out. Without
+    // this, "cancelled still counts" would be indistinguishable from
+    // "cancelled grants access forever".
+    it('closes the gate once a revoked period has ended', async () => {
+      const userId = await seedUser();
+      await grant(userId, { status: 'cancelled', endsInDays: -1 });
+      vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
+
+      const res = await gatedApp.request('/gated/thing');
+      expect(res.status).toBe(403);
+      expect(await res.json()).toMatchObject({ code: 'SUBSCRIPTION_REQUIRED' });
     });
 
     // Revoking keeps the row -- it is the history -- rather than deleting.
