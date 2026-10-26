@@ -37,8 +37,9 @@ export const spiritCatalog: Record<SpiritSpecies, SpiritDefinition> = {
   rabbit: {
     name: '兔子精靈',
     category: '疾病醫療、心理與善終',
+    artwork: '/illustrations/guardians/rabbit',
     tone: 'forest',
-    stages: [],
+    stages: ['初生', '萌芽', '探索', '茁壯', '綻放'],
   },
   dolphin: {
     name: '海豚精靈',
@@ -72,6 +73,7 @@ export const spiritCatalog: Record<SpiritSpecies, SpiritDefinition> = {
 export const artworkByCode: Partial<Record<string, SpiritSpecies>> = {
   children: 'cat',
   forest: 'deer',
+  healing: 'rabbit',
   wisdom: 'bird',
 }
 
