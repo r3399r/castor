@@ -35,6 +35,18 @@ services:
       - ../db/table/point_transaction.sql:/docker-entrypoint-initdb.d/22_point_transaction.sql:ro
       - ../db/table/duration_global_stat.sql:/docker-entrypoint-initdb.d/23_duration_global_stat.sql:ro
       - ../db/table/user_subscription.sql:/docker-entrypoint-initdb.d/24_user_subscription.sql:ro
+      # After user (09), because user_guardian's foreign keys need both it
+      # and guardian to exist.
+      - ../db/table/guardian.sql:/docker-entrypoint-initdb.d/25_guardian.sql:ro
+      - ../db/table/user_guardian.sql:/docker-entrypoint-initdb.d/26_user_guardian.sql:ro
+      # Seed data, numbered 9x so it lands after every table above --
+      # docker-entrypoint-initdb.d runs files in name order, and these
+      # insert into tables created there. Without the guardians, /box shows
+      # an empty store on a fresh volume, which reads as a broken page
+      # rather than as missing seed data. Regression tests clear these
+      # tables before their first case, so the rows do not affect them.
+      - ../db/script/v1.0.0/insert_category.sql:/docker-entrypoint-initdb.d/90_insert_category.sql:ro
+      - ../db/script/v1.0.0/insert_guardian.sql:/docker-entrypoint-initdb.d/91_insert_guardian.sql:ro
     healthcheck:
       test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost', '-u', 'root', '-proot']
       interval: 5s

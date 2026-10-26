@@ -31,7 +31,8 @@ npm workspaces monorepo (`webapp`, `backend`, `backend_new`, `packages/*`):
 
 - Schema changes must be made in `db/table/*.sql`, and the matching Drizzle definitions in `backend_new/src/db/schema.ts` must be updated in the same change — the two are hand-kept in sync and regression tests seed from `db/table/`.
 - Do not modify production database structure directly.
-- Data backfills/seeds belong in `db/script/<version>/`, not in application code.
+- Data backfills/seeds belong in `db/script/<version>/`, not in application code. `docker-compose.yml` mounts them after the table DDL (`9x_` prefixes) so a fresh local DB is not empty.
+- A seed containing non-ASCII text must start with `SET NAMES utf8mb4;`. The client that `docker-entrypoint-initdb.d` runs it with takes its charset from the container environment, which is latin1, so every Chinese character is silently double-encoded — 暖陽之蛋 lands as 12 characters, 29 bytes, nothing errors, and the rows read as mojibake forever after. `char_length()` is how you tell that apart from a terminal that simply cannot print CJK.
 - `backend/` (legacy) entities in `src/model/entity/` are not the source of truth; do not add tables there.
 - There is no migration tool. A new table in `db/table/*.sql` reaches a real environment only when someone runs the DDL by hand, and reaches the local test DB only on a fresh volume (`docker-entrypoint-initdb.d` does not re-run) — so also add the file to `backend_new/docker-compose.yml` and tell the user to run it against prod. Say so explicitly when a deploy would otherwise ship code that queries a table that is not there yet.
 
@@ -116,9 +117,11 @@ Reuse these foundations instead of duplicating colors, spacing, radii, surfaces,
 
 **Gift box page (`/box`)**
 
-`/box` is wired to the real API (`GET /guardian`, `GET /store/species`, `POST /store/redeem`, `POST /guardian/:id/invest`); the former `demoData.ts` and its demo-state switcher are gone. Two consequences for anyone working on it:
+`/box` is wired to the real API (`GET /guardian`, `GET /store/species`, `POST /store/redeem`, `POST /guardian/:id/invest`); the former `demoData.ts` and its demo-state switcher are gone. Consequences for anyone working on it:
 
-- The store and collection read the `guardian` table, so an environment with no rows there shows an empty store. Seven rows are expected, and their `code` slugs must match `artworkByCode` in `webapp/lib/guardianArtwork.ts` for artwork to appear. `/admin/species` shows both halves side by side and flags either one missing its counterpart.
+- The store and collection read the `guardian` table, so an environment with no rows there shows an empty store. Seven rows are expected, and their `code` slugs must match `artworkByCode` in `webapp/lib/guardianArtwork.ts` for artwork to appear — the live codes are the first column of the table under **Spirit categories** below.
+- A code that does not match **fails silently**: the component falls back to the locked egg, nothing logs, nothing fails to build, and the only symptom is artwork that never appears. So shipping artwork is not finished when the files and the mapping are in place — the code has to be checked against the database. `/admin/species` is the fastest check and works in any environment: it lists every `guardian` row beside its artwork, and flags either half missing its counterpart. When the artwork is missing in a deployed environment, check that page before suspecting the deploy; the files and the bundle are easy to verify directly (fetch the `.webp`, grep the page chunk) and are rarely the cause.
+- `db/script/v1.0.0/insert_guardian.sql` mirrors the live table as of 2026-10-26, and is the repo's second copy of these codes alongside the table below. It was stale for a while — a renaming left it seeding three codes that no longer existed while four live ones were missing — and nothing detects that, which is how artwork gets wired to a code nobody owns. The table is hand-edited per environment, so when a code changes, update that file and the table below in the same change, and confirm against `/admin/species` rather than against either copy.
 - Level thresholds are large (`LEVEL_XP_THRESHOLDS = [25000, 75000, 225000, 675000]` in `src/routes/guardian.ts`, so `MAX_LEVEL` is 5). Granting points is not a practical way to reach LV2 while testing — set `user_guardian.xp`/`level` directly.
 
 - The hero uses `/images/spirit-garden-hero.webp` with `cover` and `center bottom`, preserving the lower vine, leaves, eggs, and flowers.
@@ -140,17 +143,19 @@ Reuse these foundations instead of duplicating colors, spacing, radii, surfaces,
 
 **Spirit categories**
 
-| Public-interest category | Spirit | Artwork status | Store egg name |
-| --- | --- | --- | --- |
-| 兒少、家庭與婦幼 | 貓 | LV1-LV5 available | 暖陽之蛋 |
-| 身心障礙與神經發展 | 水獺 | Pending | 星光之蛋 |
-| 高齡長照與失智照護 | 狗 | Pending | 長青之蛋 |
-| 疾病醫療、心理與善終 | 兔子 | Pending | 療癒之蛋 |
-| 人權、法治、性別與社區 | 海豚 | Pending | 共鳴之蛋 |
-| 教育翻轉、人文與藝術 | 鳥 | LV1-LV5 available | 智慧之蛋 |
-| 生態環境與動物福利 | 鹿 | LV1-LV5 available | 森林之蛋 |
+`guardian.code` is the join between all three of the database row, the `spiritCatalog` species, and the artwork directory. It is data, not code, so this table is the repo's record of it — keep it true when a row is renamed or added.
 
-Until the other four artwork sets exist, their store and locked collection states use the shared egg asset rather than substitute character artwork. Keep spirit artwork data-driven; do not hard-code the UI to a particular spirit. `spiritCatalog` already defines all seven (names and categories); only the `artwork` field distinguishes the ones with drawings, and `spiritImage()` returns `undefined` for the rest so components fall back on their own.
+| `guardian.code` | Public-interest category | Spirit | Artwork status | Store egg name |
+| --- | --- | --- | --- | --- |
+| `children` | 兒少、家庭與婦幼 | 貓 | LV1-LV5 available | 暖陽之蛋 |
+| `neurodevelopment` | 身心障礙與神經發展 | 水獺 | Pending | 星光之蛋 |
+| `eldercare` | 高齡長照與失智照護 | 狗 | Pending | 長青之蛋 |
+| `healing` | 疾病醫療、心理與善終 | 兔子 | LV1-LV5 available | 療癒之蛋 |
+| `rights` | 人權、法治、性別與社區 | 海豚 | Pending | 共鳴之蛋 |
+| `wisdom` | 教育翻轉、人文與藝術 | 鳥 | LV1-LV5 available | 智慧之蛋 |
+| `forest` | 生態環境與動物福利 | 鹿 | LV1-LV5 available | 森林之蛋 |
+
+Until the other three artwork sets exist, their store and locked collection states use the shared egg asset rather than substitute character artwork. Keep spirit artwork data-driven; do not hard-code the UI to a particular spirit. `spiritCatalog` already defines all seven (names and categories); only the `artwork` field distinguishes the ones with drawings, and `spiritImage()` returns `undefined` for the rest so components fall back on their own.
 
 **Image asset policy**
 
@@ -158,7 +163,7 @@ Until the other four artwork sets exist, their store and locked collection state
 - Original PNG sources for runtime assets live outside the public web root under `webapp/source-assets/png/`, preserving their relative directory structure.
 - Do not reference `webapp/source-assets/` from browser code; it is not publicly served.
 - Only commit original PNGs that correspond to assets actually used by the application. Do not commit unused PNG or generated WebP variants unless requested.
-- Current guardian artwork is under `webapp/public/illustrations/guardians/{bird,cat,deer}/lv1.webp` through `lv5.webp`.
+- Current guardian artwork is under `webapp/public/illustrations/guardians/{bird,cat,deer,rabbit}/lv1.webp` through `lv5.webp`.
 - Shared runtime assets include `/images/locked-egg.webp`, `/images/points-vine-top-left.webp`, `/images/points-vine-bottom-right.webp`, and `/images/spirit-garden-mobile-leaves.webp`.
 
 **Responsive and accessibility requirements**
