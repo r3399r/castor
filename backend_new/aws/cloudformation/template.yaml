@@ -233,7 +233,7 @@ Resources:
     DependsOn: [FacebookFunction]
     Properties:
       Name: !Sub ${Project}-${TargetEnvr}-facebook
-      ScheduleExpression: cron(*/10 * * * ? *)
+      ScheduleExpression: cron(*/3 * * * ? *)
       State: DISABLED
       Targets:
         - Arn: !GetAtt FacebookFunction.Arn
