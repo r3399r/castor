@@ -1514,7 +1514,19 @@ export default function AdaptiveClient({
             </>
           )}
 
-          <MathJax dynamic>
+          {/*
+            Keyed per question so each one gets its own MathJax instance.
+            The component guards against re-entrant typesetting with a ref
+            that is only cleared when the previous typeset promise settles,
+            and a render arriving while that flag is up is skipped entirely.
+            One long-lived instance therefore drops the typeset for whichever
+            question was swapped in during that window, and since nothing
+            re-renders afterwards the formula stays as raw $...$ until the
+            next interaction -- a formula that appears on some questions and
+            not others, depending only on timing. A fresh instance per
+            question starts with the flag down, so the swap cannot be lost.
+          */}
+          <MathJax key={currentQuestion.id} dynamic>
             <div className={styles.questionCard}>
               <div className={styles.questionMeta}>
                 {/* 題號 + 難易度（同一行）*/}
