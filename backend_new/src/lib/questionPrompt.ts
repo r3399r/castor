@@ -44,6 +44,7 @@ export const QUESTION_EXTRACT_INSTRUCTION = `
 改用會自動換行的寫法：
 - 選項排在同一行或各自一行都可以。同一行時用 &nbsp; 分隔即可，例如 11. (A) what is more&nbsp;&nbsp;(B) it turns out&nbsp;&nbsp;(C) in other words&nbsp;&nbsp;(D) all in all
 - 填空處用 <u>&nbsp;&nbsp;11&nbsp;&nbsp;</u> 這種寫法是安全的；若是題組文章裡的編號空格，還要加上 data-blank，見「題組格式」
+- FILL 題的空格依序寫成 ①②③……：一律從 ① 開始，不沿用原卷的題號（原卷標 31、32 也一樣從 ① 起算），個數與順序必須和 answer 的字元一致
 - 重點是文字能自然換行，不是一行幾個選項
 - 條列用 <ol>／<ul>
 - 段落縮排用 <p style="text-indent:2em">，這在窄螢幕是安全的

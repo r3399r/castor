@@ -8,6 +8,7 @@ import { formatNumber } from '@/lib/number'
 import Chip, { tagColors } from '@/components/Chip'
 import DifficultyStars from '@/components/DifficultyStars'
 import DiscussionLink from '@/components/DiscussionLink'
+import MathJaxArea from '@/components/MathJaxArea'
 import { Button, Modal } from '@/components/ui'
 import type {
   GetQuestionAdaptiveResponse,
@@ -16,7 +17,6 @@ import type {
   PostReplyResponse,
   Question,
 } from '@/types/api'
-import { MathJax } from 'better-react-mathjax'
 import styles from './adaptive.module.css'
 
 // High enough to fetch every category in one page -- there's no realistic
@@ -157,49 +157,56 @@ function AnswerInput({
   const options = question.options?.split('|') ?? []
   const submitted = !!correctAnswer
 
-  const getOptClass = (opt: string) => {
+  /**
+   * Whether an option looks picked, and whether it is the right one.
+   *
+   * `answer` means something different per type -- an option label for
+   * SINGLE and TRUE_FALSE, an O/X mask for MULTIPLE, one character per
+   * blank for FILL -- so each branch works out these two booleans and the
+   * styling stays in one place. This used to compare the whole `answer`
+   * string against an option label for every type, which can only ever be
+   * true for SINGLE: tapping a MULTIPLE or FILL option changed the state
+   * but nothing on screen, and submitting marked neither the right answer
+   * nor the wrong pick, so both types looked unanswerable.
+   */
+  const optionClass = ({ selected, correct }: { selected: boolean; correct: boolean }) => {
     const base = styles.answerOption
     if (submitted) {
-      const isCorrect = opt === correctAnswer
-      const isWrongSelected = opt === answer && opt !== correctAnswer
-      if (isCorrect) return `${base} ${styles.answerCorrect}`
-      if (isWrongSelected) return `${base} ${styles.answerWrong}`
+      if (correct) return `${base} ${styles.answerCorrect}`
+      if (selected) return `${base} ${styles.answerWrong}`
       return `${base} ${styles.answerDisabled}`
     }
-    return `${base} ${opt === answer ? styles.answerSelected : ''} ${disabled ? styles.answerDisabled : ''}`
+    return `${base} ${selected ? styles.answerSelected : ''} ${disabled ? styles.answerDisabled : ''}`
   }
 
-  const getTFClass = (val: string) => {
-    const base = styles.answerOption
-    if (submitted) {
-      const isCorrect = val === correctAnswer
-      const isWrongSelected = val === answer && val !== correctAnswer
-      if (isCorrect) return `${base} ${styles.answerCorrect}`
-      if (isWrongSelected) return `${base} ${styles.answerWrong}`
-      return `${base} ${styles.answerDisabled}`
-    }
-    return `${base} ${val === answer ? styles.answerSelected : ''} ${disabled ? styles.answerDisabled : ''}`
-  }
+  const marks = ({ selected, correct }: { selected: boolean; correct: boolean }) => (
+    <>
+      {submitted && correct && <CorrectIcon />}
+      {submitted && selected && !correct && <WrongIcon />}
+    </>
+  )
 
   if (question.type === 'TRUE_FALSE') {
     return (
       <div className={styles.answerGrid}>
-        {['True', 'False'].map((val) => (
-          <label key={val} className={getTFClass(val)}>
-            <input
-              type="radio"
-              name={`q-${question.id}`}
-              value={val}
-              checked={answer === val}
-              onChange={() => !submitted && onAnswer(val)}
-              disabled={disabled}
-              className="sr-only"
-            />
-            {val === 'True' ? '是' : '非'}
-            {submitted && val === correctAnswer && <CorrectIcon />}
-            {submitted && val === answer && val !== correctAnswer && <WrongIcon />}
-          </label>
-        ))}
+        {['True', 'False'].map((val) => {
+          const state = { selected: answer === val, correct: correctAnswer === val }
+          return (
+            <label key={val} className={optionClass(state)}>
+              <input
+                type="radio"
+                name={`q-${question.id}`}
+                value={val}
+                checked={answer === val}
+                onChange={() => !submitted && onAnswer(val)}
+                disabled={disabled}
+                className="sr-only"
+              />
+              {val === 'True' ? '是' : '非'}
+              {marks(state)}
+            </label>
+          )
+        })}
       </div>
     )
   }
@@ -207,78 +214,94 @@ function AnswerInput({
   if (question.type === 'SINGLE') {
     return (
       <div className={styles.answerGrid}>
-        {options.map((opt) => (
-          <label key={opt} className={getOptClass(opt)}>
-            <input
-              type="radio"
-              name={`q-${question.id}`}
-              value={opt}
-              checked={answer === opt}
-              onChange={() => !submitted && onAnswer(opt)}
-              disabled={disabled}
-              className="sr-only"
-            />
-            {opt}
-            {submitted && opt === correctAnswer && <CorrectIcon />}
-            {submitted && opt === answer && opt !== correctAnswer && <WrongIcon />}
-          </label>
-        ))}
+        {options.map((opt) => {
+          const state = { selected: answer === opt, correct: correctAnswer === opt }
+          return (
+            <label key={opt} className={optionClass(state)}>
+              <input
+                type="radio"
+                name={`q-${question.id}`}
+                value={opt}
+                checked={answer === opt}
+                onChange={() => !submitted && onAnswer(opt)}
+                disabled={disabled}
+                className="sr-only"
+              />
+              {opt}
+              {marks(state)}
+            </label>
+          )
+        })}
       </div>
     )
   }
 
   if (question.type === 'MULTIPLE') {
-    const base = answer || 'X'.repeat(options.length)
+    // One character per option: O picked, X not. Same shape as the answer
+    // the server stores, so the mask is edited in place and sent as is.
+    const mask = answer || 'X'.repeat(options.length)
     return (
       <div className={styles.answerGrid}>
-        {options.map((opt, i) => (
-          <label key={opt} className={getOptClass(opt)}>
-            <input
-              type="checkbox"
-              checked={base[i] === 'O'}
-              onChange={(e) => {
-                if (submitted) return
-                const next =
-                  base.substring(0, i) + (e.target.checked ? 'O' : 'X') + base.substring(i + 1)
-                onAnswer(next)
-              }}
-              disabled={disabled}
-              className="sr-only"
-            />
-            {opt}
-            {submitted && opt === correctAnswer && <CorrectIcon />}
-            {submitted && opt === answer && opt !== correctAnswer && <WrongIcon />}
-          </label>
-        ))}
+        {options.map((opt, i) => {
+          const state = { selected: mask[i] === 'O', correct: correctAnswer?.[i] === 'O' }
+          return (
+            <label key={opt} className={optionClass(state)}>
+              <input
+                type="checkbox"
+                checked={mask[i] === 'O'}
+                onChange={(e) => {
+                  if (submitted) return
+                  const next =
+                    mask.substring(0, i) + (e.target.checked ? 'O' : 'X') + mask.substring(i + 1)
+                  onAnswer(next)
+                }}
+                disabled={disabled}
+                className="sr-only"
+              />
+              {opt}
+              {marks(state)}
+            </label>
+          )
+        })}
       </div>
     )
   }
 
   if (question.type === 'FILL') {
+    // The stored answer's length is what says how many blanks there are.
     const blanks = question.answer?.length ?? 0
-    const base = answer || '@'.repeat(blanks)
+    // '@' is not on the keypad, so an untouched blank matches no option.
+    const filled = answer || '@'.repeat(blanks)
     return (
       <div className="flex flex-col gap-4">
         {Array.from({ length: blanks }).map((_, i) => (
           <div key={i} className="flex flex-wrap items-center gap-2">
             <span className="text-sm font-bold text-black-700">{i + 1}.</span>
-            <div className={`${styles.answerGrid} flex-1`}>{options.map((opt) => (
-              <label key={opt} className={getOptClass(opt)}>
-                <input
-                  type="radio"
-                  name={`q-${question.id}-blank-${i}`}
-                  value={opt}
-                  checked={base[i] === opt}
-                  onChange={() => {
-                    const next = base.substring(0, i) + opt + base.substring(i + 1)
-                    onAnswer(next)
-                  }}
-                  disabled={disabled}
-                  className="sr-only"
-                />
-                {opt}
-              </label>
-            ))}</div>
+            <div className={`${styles.answerGrid} flex-1`}>{options.map((opt) => {
+              const state = {
+                selected: filled[i] === opt,
+                correct: correctAnswer?.[i] === opt,
+              }
+              return (
+                <label key={opt} className={optionClass(state)}>
+                  <input
+                    type="radio"
+                    name={`q-${question.id}-blank-${i}`}
+                    value={opt}
+                    checked={filled[i] === opt}
+                    onChange={() => {
+                      if (submitted) return
+                      const next = filled.substring(0, i) + opt + filled.substring(i + 1)
+                      onAnswer(next)
+                    }}
+                    disabled={disabled}
+                    className="sr-only"
+                  />
+                  {opt}
+                  {marks(state)}
+                </label>
+              )
+            })}</div>
           </div>
         ))}
       </div>
@@ -1515,18 +1538,13 @@ export default function AdaptiveClient({
           )}
 
           {/*
-            Keyed per question so each one gets its own MathJax instance.
-            The component guards against re-entrant typesetting with a ref
-            that is only cleared when the previous typeset promise settles,
-            and a render arriving while that flag is up is skipped entirely.
-            One long-lived instance therefore drops the typeset for whichever
-            question was swapped in during that window, and since nothing
-            re-renders afterwards the formula stays as raw $...$ until the
-            next interaction -- a formula that appears on some questions and
-            not others, depending only on timing. A fresh instance per
-            question starts with the flag down, so the swap cannot be lost.
+            MathJaxArea, not the library's <MathJax dynamic>: this page
+            replaces the question in place, and that component skips a
+            render whose typeset would overlap the previous one instead of
+            queueing it, which loses the formula on whichever question was
+            swapped in during that window. See components/MathJaxArea.tsx.
           */}
-          <MathJax key={currentQuestion.id} dynamic>
+          <MathJaxArea>
             <div className={styles.questionCard}>
               <div className={styles.questionMeta}>
                 {/* 題號 + 難易度（同一行）*/}
@@ -1608,6 +1626,18 @@ export default function AdaptiveClient({
                 currentQuestion.children.map((child, i) => (
                   <Fragment key={child.id}>
                     <div className={`${styles.questionBody} border-t border-spirit-line`}>
+                      {/*
+                        The card header can only show the parent's type, which
+                        is 題組 -- it says nothing about the sub-question in
+                        front of you. Without this there is no way to tell a
+                        single-choice sub-question from a multiple-choice one
+                        until you have already answered it wrongly. Wrapped in
+                        its own row because questionBody is a flex column, so
+                        a bare chip would stretch the full width.
+                      */}
+                      <div className="flex flex-wrap gap-2">
+                        <Chip label={typeLabel[child.type] ?? child.type} color={tagColors.type} />
+                      </div>
                       {child.content && (
                         <div
                           dangerouslySetInnerHTML={{ __html: child.content }}
@@ -1630,7 +1660,7 @@ export default function AdaptiveClient({
                   </Fragment>
                 ))}
             </div>
-          </MathJax>
+          </MathJaxArea>
         </div>
       )}
 
