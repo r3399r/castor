@@ -513,13 +513,17 @@ export type PutUserMeRequest = { name: string };
 
 export type PutUserMeResponse = User;
 
-export type GetInfoResponse = {
+// GET /api/info is the database-free health check; these catalog counts
+// are GET /api/info/stats, which the landing page's counter bar reads.
+// questionCount is servable top-level questions only -- the same
+// definition GET /api/question/count uses.
+export type GetInfoStatsResponse = {
   categoryCount: number;
   subjectCount: number;
   examCount: number;
   questionCount: number;
   userCount: number;
-}
+};
 
 export type UserStatHistory = {
   id: number;

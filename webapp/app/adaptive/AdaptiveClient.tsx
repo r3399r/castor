@@ -941,7 +941,7 @@ export default function AdaptiveClient({
                 onClick={() => changeExamCategoryTab('admission')}
                 onKeyDown={(event) => handleExamCategoryTabKeyDown(event, 'admission')}
               >
-                入學考試
+                學校考試
               </button>
               <button
                 type="button"
@@ -989,9 +989,6 @@ export default function AdaptiveClient({
                       {c.name}
                     </button>
                   ))}
-                  <button disabled className={`${styles.option} ${styles.categoryTone}`}>
-                    分科
-                  </button>
                 </div>
               </div>
             )}
