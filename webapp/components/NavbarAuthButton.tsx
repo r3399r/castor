@@ -6,17 +6,16 @@ import { useAuth } from '@/hooks/useAuth'
 export default function NavbarAuthButton() {
   const { user, loading, login } = useAuth()
 
+  // Which control this becomes isn't known yet -- the avatar for a visitor
+  // whose session Firebase is still restoring, the sign-in button for
+  // everyone else -- so it reserves the avatar's footprint and says
+  // nothing. It used to render the sign-in button disabled, which told
+  // already-signed-in visitors to sign in for as long as the check took.
+  // Sized to the avatar rather than the button because that's the case
+  // where a late size change would be visible: the button is wider, and
+  // only its own left edge moves when it appears.
   if (loading) {
-    return (
-      <button
-        type="button"
-        disabled
-        aria-busy="true"
-        className="flex h-control-nav items-center justify-center rounded-md border border-brown-300 px-5 text-sm text-black-900 opacity-70"
-      >
-        Google 登入
-      </button>
-    )
+    return <span aria-hidden="true" className="block h-control-nav w-control-nav shrink-0" />
   }
 
   if (user) {
