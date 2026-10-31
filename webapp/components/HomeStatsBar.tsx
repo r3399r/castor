@@ -7,9 +7,8 @@ import type { GetInfoStatsResponse } from '@/types/api'
 
 // The labels are the fixed part of the bar; only the numbers come from the
 // API. Keeping them here (rather than deriving the rows from the response)
-// means the five cells, and so the responsive 3+2 / 5-column layouts
-// below, exist from the first paint instead of appearing once the fetch
-// lands.
+// means the cells, and so the responsive 3+2 / 5-column layouts below,
+// exist from the first paint instead of appearing once the fetch lands.
 const CELLS: { key: keyof GetInfoStatsResponse; label: string }[] = [
   { key: 'categoryCount', label: '種類別' },
   { key: 'subjectCount', label: '種科目' },
@@ -17,6 +16,13 @@ const CELLS: { key: keyof GetInfoStatsResponse; label: string }[] = [
   { key: 'questionCount', label: '道試題' },
   { key: 'userCount', label: '名使用者' },
 ]
+
+// Below this many registered users the count says more about how new the
+// site is than about what it offers, so that one cell is dropped instead
+// of shown small. All three layouts below take four cells without any
+// change: the tablet bottom row holds one instead of two, and the desktop
+// row four columns instead of five.
+const MIN_USER_COUNT = 100
 
 // Matches SlotNumber's own reel height, so the placeholder reserves the
 // exact space the number will take and the bar doesn't jump.
@@ -55,7 +61,13 @@ export default function HomeStatsBar() {
   // empty cells, or to show numbers that aren't real.
   if (failed) return null
 
-  const stats = CELLS.map(({ key, label }) => ({
+  // The user cell stays out while the count is unknown as well as when it
+  // is too low: four cells that gain a fifth is a better first paint than
+  // five that lose one, and the low case is the one that actually happens
+  // for now.
+  const stats = CELLS.filter(
+    ({ key }) => key !== 'userCount' || (data !== null && data.userCount >= MIN_USER_COUNT),
+  ).map(({ key, label }) => ({
     label,
     value: data === null ? null : data[key],
   }))
