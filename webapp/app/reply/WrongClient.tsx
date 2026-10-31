@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { BookOpenText, ChevronDown, ChevronUp } from 'lucide-react'
 import { apiDelete, apiFetch, apiPut, LIMIT } from '@/lib/api'
+import { readableAnswer } from '@/lib/answerDisplay'
 import Chip, { tagColors } from '@/components/Chip'
 import DifficultyStars from '@/components/DifficultyStars'
 import MathJaxArea from '@/components/MathJaxArea'
@@ -124,7 +125,9 @@ function WrongEntry({
       {question.answer && (
         <div className="mt-2 text-base text-black-700">
           正確答案：
-          <span className={styles.value}>{question.answer}</span>
+          <span className={styles.value}>
+            {readableAnswer(question.type, question.answer, question.options) ?? question.answer}
+          </span>
         </div>
       )}
 

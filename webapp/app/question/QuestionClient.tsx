@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { MathJax } from 'better-react-mathjax'
 import { apiFetch, LIMIT } from '@/lib/api'
+import { readableAnswer } from '@/lib/answerDisplay'
 import MultiSelectField from '@/components/MultiSelectField'
 import SelectField from '@/components/SelectField'
 import Chip, { tagColors } from '@/components/Chip'
@@ -17,6 +18,7 @@ import type {
   GetSubjectConceptGroupResponse,
   GetSubjectExamResponse,
   GetSubjectTagResponse,
+  Question,
   Subject,
   Tag,
 } from '@/types/api'
@@ -27,6 +29,26 @@ const questionTypeLabel: Record<string, string> = {
   TRUE_FALSE: '是非題',
   FILL: '選填題',
   GROUP: '題組',
+}
+
+/**
+ * The 解答 panel's contents.
+ *
+ * A MULTIPLE or FILL answer is stored in the scoring format ("OXOOO",
+ * "901"), so it is read back into option labels and per-blank characters
+ * rather than printed. Anything readableAnswer leaves alone keeps the HTML
+ * rendering this always had, because a SINGLE answer can hold markup or a
+ * formula that still needs to go through MathJax.
+ */
+function Solution({ question }: { question: Question }) {
+  const readable = readableAnswer(question.type, question.answer, question.options)
+  if (readable !== null) return <p className="text-sm font-medium text-black-900">{readable}</p>
+  return (
+    <div
+      dangerouslySetInnerHTML={{ __html: question.answer ?? '' }}
+      className="prose prose-sm max-w-none"
+    />
+  )
 }
 
 
@@ -241,10 +263,7 @@ export default function QuestionClient() {
                       {openSolutionIds.has(item.id) && (
                         <div className="mt-3 rounded-lg border border-green-200 bg-green-50 p-4">
                           <p className="mb-2 font-bold text-green-800">解答</p>
-                          <div
-                            dangerouslySetInnerHTML={{ __html: item.answer }}
-                            className="prose prose-sm max-w-none"
-                          />
+                          <Solution question={item} />
                         </div>
                       )}
                     </div>
@@ -271,10 +290,7 @@ export default function QuestionClient() {
                           {openSolutionIds.has(child.id) && (
                             <div className="mt-3 rounded-lg border border-green-200 bg-green-50 p-4">
                               <p className="mb-2 font-bold text-green-800">解答</p>
-                              <div
-                                dangerouslySetInnerHTML={{ __html: child.answer }}
-                                className="prose prose-sm max-w-none"
-                              />
+                              <Solution question={child} />
                             </div>
                           )}
                         </div>

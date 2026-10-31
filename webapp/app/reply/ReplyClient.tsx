@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { BookOpenText } from 'lucide-react'
 import { apiFetch, LIMIT } from '@/lib/api'
+import { readableAnswer } from '@/lib/answerDisplay'
 import Chip, { tagColors } from '@/components/Chip'
 import DifficultyStars from '@/components/DifficultyStars'
 import DiscussionLink from '@/components/DiscussionLink'
@@ -134,7 +135,13 @@ function ReplyRow({ item }: { item: ReplyGroup }) {
                         <div>
                           作答：
                           <span className={styles.value}>
-                            {child.repliedAnswer ?? '—'}
+                            {readableAnswer(
+                              child.question?.type,
+                              child.repliedAnswer,
+                              child.question?.options
+                            ) ??
+                              child.repliedAnswer ??
+                              '—'}
                           </span>
                         </div>
                         <div>

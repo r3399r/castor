@@ -4,6 +4,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
 import { Goal, BookOpenText, Brain, Coins, FunnelPlus, NotebookPen } from 'lucide-react'
 import { apiFetch, apiPost } from '@/lib/api'
+import { readableAnswer } from '@/lib/answerDisplay'
 import { formatNumber } from '@/lib/number'
 import Chip, { tagColors } from '@/components/Chip'
 import DifficultyStars from '@/components/DifficultyStars'
@@ -76,8 +77,18 @@ const typeLabel: Record<string, string> = {
 
 
 
-function ResultBox({ result }: { result: { correctAnswer: string; score: number; fbPostId?: string | null } }) {
+function ResultBox({
+  result,
+  question,
+}: {
+  result: { correctAnswer: string; score: number; fbPostId?: string | null }
+  // Only for reading the answer back: the reply response carries the
+  // correct answer but not the type or options it has to be read against.
+  question: Question
+}) {
   const correct = result.score > 0
+  const correctAnswerText =
+    readableAnswer(question.type, result.correctAnswer, question.options) ?? result.correctAnswer
   const fbUrl = result.fbPostId
     ? `https://m.facebook.com/${result.fbPostId.split('_')[0]}/posts/${result.fbPostId.split('_')[1]}`
     : null
@@ -112,7 +123,7 @@ function ResultBox({ result }: { result: { correctAnswer: string; score: number;
           </div>
           <div className="flex flex-wrap items-center gap-4 sm:contents">
             <div className="text-base text-black-700">
-              正確答案：<span className={styles.resultValue}>{result.correctAnswer}</span>
+              正確答案：<span className={styles.resultValue}>{correctAnswerText}</span>
             </div>
             <div className="text-base text-black-500">得分：<span className={styles.resultValue}>{result.score}</span></div>
           </div>
@@ -1619,7 +1630,7 @@ export default function AdaptiveClient({
               </div>
 
               {currentQuestion.type !== 'GROUP' && replyResponse?.[currentOffset] && (
-                <ResultBox result={replyResponse[currentOffset]} />
+                <ResultBox result={replyResponse[currentOffset]} question={currentQuestion} />
               )}
 
               {currentQuestion.type === 'GROUP' &&
@@ -1655,7 +1666,7 @@ export default function AdaptiveClient({
                       />
                     </div>
                     {replyResponse?.[currentOffset + i] && (
-                      <ResultBox result={replyResponse[currentOffset + i]} />
+                      <ResultBox result={replyResponse[currentOffset + i]} question={child} />
                     )}
                   </Fragment>
                 ))}
