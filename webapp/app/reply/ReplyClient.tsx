@@ -1,12 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { MathJax } from 'better-react-mathjax'
 import { BookOpenText } from 'lucide-react'
 import { apiFetch, LIMIT } from '@/lib/api'
 import Chip, { tagColors } from '@/components/Chip'
 import DifficultyStars from '@/components/DifficultyStars'
 import DiscussionLink from '@/components/DiscussionLink'
+import MathJaxArea from '@/components/MathJaxArea'
 import Pagination from '@/components/Pagination'
 import { ButtonLink, EmptyState, ErrorState, LoadingState } from '@/components/ui'
 import type { GetReplyResponse, ReplyGroup } from '@/types/api'
@@ -257,13 +257,17 @@ export default function ReplyClient({
         </EmptyState>
       ) : (
         <>
-          <MathJax dynamic>
-            <div className={styles.cardList}>
-              {replyList.data.map((item) => (
-                <ReplyRow key={`${item.repliedAt}|${item.children[0]?.parentId ?? item.children[0]?.questionId}`} item={item} />
-              ))}
-            </div>
-          </MathJax>
+          {/*
+            One area around the list is right here, unlike the 錯題本 tab:
+            every row is stateless, so the only thing that changes what is
+            on screen is this component's own state (page, filters), which
+            re-renders the area with it.
+          */}
+          <MathJaxArea className={styles.cardList}>
+            {replyList.data.map((item) => (
+              <ReplyRow key={`${item.repliedAt}|${item.children[0]?.parentId ?? item.children[0]?.questionId}`} item={item} />
+            ))}
+          </MathJaxArea>
 
           <Pagination
             page={page}

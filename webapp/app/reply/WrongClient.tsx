@@ -1,11 +1,11 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { MathJax } from 'better-react-mathjax'
 import { BookOpenText, ChevronDown, ChevronUp } from 'lucide-react'
 import { apiDelete, apiFetch, apiPut, LIMIT } from '@/lib/api'
 import Chip, { tagColors } from '@/components/Chip'
 import DifficultyStars from '@/components/DifficultyStars'
+import MathJaxArea from '@/components/MathJaxArea'
 import Pagination from '@/components/Pagination'
 import { Button, EmptyState, ErrorState, LoadingState } from '@/components/ui'
 import { formatNumber } from '@/lib/number'
@@ -279,8 +279,14 @@ function WrongCard({
         </div>
       </div>
 
+      {/*
+        The area sits inside the card, not around the list: `open` lives
+        here, so expanding a card re-renders this component and nothing
+        above it. A wrapper around the whole list never re-renders on a
+        fold and leaves the re-expanded body as raw $...$ forever.
+      */}
       {open && (
-        <div id={bodyId} className={styles.cardBody}>
+        <MathJaxArea id={bodyId} className={styles.cardBody}>
           {isGroup && passageHtml && (
             <div
               dangerouslySetInnerHTML={{ __html: passageHtml }}
@@ -303,7 +309,7 @@ function WrongCard({
               />
             )
           })}
-        </div>
+        </MathJaxArea>
       )}
     </article>
   )
@@ -422,13 +428,11 @@ export default function WrongClient({
         </EmptyState>
       ) : (
         <>
-          <MathJax dynamic>
-            <div className={styles.cardList}>
-              {list.data.map((item) => (
-                <WrongCard key={item.id} item={item} onSaveNote={handleSaveNote} onDelete={handleDelete} />
-              ))}
-            </div>
-          </MathJax>
+          <div className={styles.cardList}>
+            {list.data.map((item) => (
+              <WrongCard key={item.id} item={item} onSaveNote={handleSaveNote} onDelete={handleDelete} />
+            ))}
+          </div>
 
           <Pagination
             page={page}

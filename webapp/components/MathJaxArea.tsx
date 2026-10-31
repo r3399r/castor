@@ -24,6 +24,16 @@ import { useContext, useLayoutEffect, useRef, type ReactNode } from 'react'
  * one shared document (it assigns document.options.elements, resets it and
  * renders), so two areas typesetting at once is the thing to avoid -- every
  * area on the page goes through this one chain instead.
+ *
+ * Where to put it: around content that re-renders *with* this component,
+ * not above a child that owns the state. Typesetting runs from this
+ * component's own effect, so if a descendant mounts new content from its
+ * own state -- a card expanding, a section revealing -- and this component
+ * does not re-render, nothing typesets it. Measured the same way: ten
+ * collapsible cards, collapsed and expanded again, with the wrapper above
+ * the cards left 0 of 10 typeset whether it was <MathJax dynamic>, one
+ * <MathJax> per card, or this component; moving this component inside the
+ * card, around the part that collapses, left 10 of 10.
  */
 
 type MathJaxTypesetter = {
@@ -34,9 +44,13 @@ type MathJaxTypesetter = {
 let queue: Promise<unknown> = Promise.resolve()
 
 export default function MathJaxArea({
+  id,
   className,
   children,
 }: {
+  // So an area can be the element something else already points at, such
+  // as a collapse button's aria-controls, instead of adding a wrapper.
+  id?: string
   className?: string
   children: ReactNode
 }) {
@@ -62,7 +76,7 @@ export default function MathJaxArea({
   })
 
   return (
-    <div className={className} ref={ref}>
+    <div id={id} className={className} ref={ref}>
       {children}
     </div>
   )
