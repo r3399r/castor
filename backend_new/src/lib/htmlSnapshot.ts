@@ -43,6 +43,18 @@ const wrapHtml = (content: string) => `<!DOCTYPE html>
        characters they have no glyph for fall through to Noto Serif TC.
        The app's own question rendering does NOT share this stack. */
     body { margin: 20px 24px; font-family: 'Times New Roman', 'Tinos', 'Noto Serif TC', serif; font-size: 16px; line-height: 1.6; background: #fff; color: #1a1a1a; }
+    /* A character MathJax has no glyph of its own for -- a FILL
+       question's ①②③, or any CJK inside \text{} -- comes out as
+       <mjx-utext> carrying the inline stack "MJXZERO, serif". That
+       generic serif is the problem: it ignores the webfonts above and
+       resolves, on the Lambda image with no system fonts, to nothing at
+       all, so the character renders as blank with no error anywhere. A
+       desktop browser hides this by quietly borrowing a system font.
+       Repeating the body stack sends it to Noto Serif TC, which does
+       have those glyphs. MJXZERO stays first because MathJax sizes the
+       box with it, and !important is required because what it overrides
+       is an inline style. */
+    mjx-utext { font-family: MJXZERO, 'Times New Roman', 'Tinos', 'Noto Serif TC', serif !important; }
     img { max-width: 100%; }
     /* Separates a GROUP's sub-questions, which otherwise read as one
        run-on paragraph (see facebookPoster.ts). */
