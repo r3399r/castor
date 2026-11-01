@@ -136,7 +136,7 @@ export function DonationDemoBox() {
     update(defaultDonationDemoState)
     setCelebrating(false)
   }
-  const goToSupport = () => router.push('/box/donation?demo=donation&step=choose')
+  const goToSupport = () => router.push('/box/donation/?demo=donation&step=choose')
 
   if (!ready) return <div className="sp-box"><p className="sp-description">載入示範資料…</p></div>
 
@@ -213,7 +213,7 @@ export function DonationDemoBox() {
                 <Badge tone="complete">{state.stage === 'pending' ? '等待平台撥款（示範）' : '平台已完成撥款（示範）'}</Badge>
                 <h3>已選擇支持{organization?.name ?? '示範公益組織'}</h3>
                 <p>精靈會繼續保留在收藏中，本次養成成果無法再次提交。</p>
-                <Button variant="secondary" onClick={() => router.push('/box/donation?demo=donation&step=record')}>查看支持紀錄</Button>
+                <Button variant="secondary" onClick={() => router.push('/box/donation/?demo=donation&step=record')}>查看支持紀錄</Button>
               </div>
             )}
           </ContentPanel>
@@ -271,7 +271,7 @@ export function DonationFlowClient() {
       return
     }
     if (!ready || step === requestedStep) return
-    router.replace(`/box/donation?demo=donation&step=${step}`)
+    router.replace(`/box/donation/?demo=donation&step=${step}`)
   }, [demoMode, ready, requestedStep, router, step])
 
   if (!ready || !demoMode) return <main className="donation-flow"><p>載入示範資料…</p></main>
@@ -281,7 +281,7 @@ export function DonationFlowClient() {
     setSubmitting(true)
     const next = { ...state, stage: 'pending' as const, organizationId: draft.id, selectedAt: new Date().toISOString() }
     update(next)
-    router.replace('/box/donation?demo=donation&step=complete')
+    router.replace('/box/donation/?demo=donation&step=complete')
   }
 
   return (
@@ -291,11 +291,11 @@ export function DonationFlowClient() {
           <ContentPanel className="donation-centered-state">
             <h1>尚未取得支持選擇機會</h1>
             <p>請先在 demo 控制區模擬精靈達到 LV5 滿級。</p>
-            <ButtonLink href="/box?demo=donation">返回精靈養成</ButtonLink>
+            <ButtonLink href="/box/?demo=donation">返回精靈養成</ButtonLink>
           </ContentPanel>
         ) : step === 'choose' ? (
           <>
-            <ButtonLink href="/box?demo=donation" variant="quiet" className="donation-back"><ChevronLeft size={17} aria-hidden="true" />返回精靈養成</ButtonLink>
+            <ButtonLink href="/box/?demo=donation" variant="quiet" className="donation-back"><ChevronLeft size={17} aria-hidden="true" />返回精靈養成</ButtonLink>
             <header className="donation-flow-heading"><h1>選擇公益支持對象</h1><p>本次由平台捐出 NT${DEMO_DONATION_AMOUNT}（示範金額），你不需要付款。</p></header>
             <SpiritSummary
               state={state}
@@ -347,7 +347,7 @@ export function DonationFlowClient() {
             </div>
             <div className="donation-action-bar">
               <p aria-live="polite">{draft ? `已選擇：${draft.name}` : '請先選擇一個示範公益組織'}</p>
-              <Button disabled={!draft} onClick={() => router.push('/box/donation?demo=donation&step=confirm')}>下一步</Button>
+              <Button disabled={!draft} onClick={() => router.push('/box/donation/?demo=donation&step=confirm')}>下一步</Button>
             </div>
           </>
         ) : step === 'confirm' && draft ? (
@@ -374,7 +374,7 @@ export function DonationFlowClient() {
               <p>平台完成撥款後將另行通知。</p>
               <p className="donation-final-warning">確認後將無法更換本次支持對象。</p>
               <div className="donation-confirm-actions">
-                <Button variant="secondary" disabled={submitting} onClick={() => router.push('/box/donation?demo=donation&step=choose')}>返回修改</Button>
+                <Button variant="secondary" disabled={submitting} onClick={() => router.push('/box/donation/?demo=donation&step=choose')}>返回修改</Button>
                 <Button loading={submitting} onClick={confirm}>確認支持這個組織</Button>
               </div>
             </ContentPanel>
@@ -385,11 +385,11 @@ export function DonationFlowClient() {
             <h1>已收到你的支持選擇</h1>
             <p>你已選擇支持{confirmed?.name ?? draft?.name}。正式版將由平台依撥款時程處理。</p>
             <Badge tone="growth">等待平台撥款（示範）</Badge>
-            <ButtonLink href="/box?demo=donation">返回精靈養成</ButtonLink>
+            <ButtonLink href="/box/?demo=donation">返回精靈養成</ButtonLink>
           </ContentPanel>
         ) : (
           <>
-            <ButtonLink href="/box?demo=donation" variant="quiet" className="donation-back"><ChevronLeft size={17} aria-hidden="true" />返回精靈養成</ButtonLink>
+            <ButtonLink href="/box/?demo=donation" variant="quiet" className="donation-back"><ChevronLeft size={17} aria-hidden="true" />返回精靈養成</ButtonLink>
             <header className="donation-flow-heading"><h1>公益支持紀錄</h1></header>
             <ContentPanel className="donation-record-card">
               <div className="donation-confirm-spirit">
@@ -422,7 +422,7 @@ export function DonationFlowClient() {
                   </dd>
                 </div>
               </dl>
-              <ButtonLink href="/box?demo=donation">返回精靈養成</ButtonLink>
+              <ButtonLink href="/box/?demo=donation">返回精靈養成</ButtonLink>
             </ContentPanel>
           </>
         )}
