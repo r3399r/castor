@@ -120,7 +120,6 @@ function SpiritSummary({
 }
 
 export function DonationDemoBox() {
-  const router = useRouter()
   const { state, update, ready } = useDonationDemo()
   const [celebrating, setCelebrating] = useState(false)
   const organization = findDemoOrganization(state.organizationId)
@@ -136,7 +135,9 @@ export function DonationDemoBox() {
     update(defaultDonationDemoState)
     setCelebrating(false)
   }
-  const goToSupport = () => router.push('/box/donation/?demo=donation&step=choose')
+  const openDonationStep = (step: 'choose' | 'record') => {
+    window.location.assign(`/box/donation/?demo=donation&step=${step}`)
+  }
 
   if (!ready) return <div className="sp-box"><p className="sp-description">載入示範資料…</p></div>
 
@@ -206,14 +207,14 @@ export function DonationDemoBox() {
                 <Badge tone="complete"><Check size={13} aria-hidden="true" /> LV5 滿級</Badge>
                 <h3>滿級達成！讓這份陪伴延續下去</h3>
                 <p>你已完成這隻精靈的養成，可以選擇一個公益組織，由平台提供捐款支持。</p>
-                <Button onClick={goToSupport}>選擇支持對象</Button>
+                <Button onClick={() => openDonationStep('choose')}>選擇支持對象</Button>
               </div>
             ) : (
               <div className="donation-unlocked-message">
                 <Badge tone="complete">{state.stage === 'pending' ? '等待平台撥款（示範）' : '平台已完成撥款（示範）'}</Badge>
                 <h3>已選擇支持{organization?.name ?? '示範公益組織'}</h3>
                 <p>精靈會繼續保留在收藏中，本次養成成果無法再次提交。</p>
-                <Button variant="secondary" onClick={() => router.push('/box/donation/?demo=donation&step=record')}>查看支持紀錄</Button>
+                <Button variant="secondary" onClick={() => openDonationStep('record')}>查看支持紀錄</Button>
               </div>
             )}
           </ContentPanel>
@@ -231,7 +232,7 @@ export function DonationDemoBox() {
           </p>
           <div className="sp-dialog-actions">
             <Button variant="secondary" onClick={() => setCelebrating(false)}>稍後再選</Button>
-            <Button onClick={goToSupport}>選擇支持對象</Button>
+            <Button onClick={() => openDonationStep('choose')}>選擇支持對象</Button>
           </div>
         </Modal>
       )}
