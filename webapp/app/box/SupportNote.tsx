@@ -6,7 +6,9 @@ export default function SupportNote() {
     <ContentPanel className="sp-support">
       <div className="sp-support-summary">
         <div className="sp-support-copy">
-          <p className="sp-support-eyebrow">Learning for good</p>
+          {/* The brand line verbatim -- this section is where the name's
+              second half is actually explained. */}
+          <p className="sp-support-eyebrow">Learn for Good</p>
           <h2>讓學習成果，成為一份真實的支持</h2>
           <p>
             每完成一隻精靈的最高階段，平台就會提撥資金，支持與精靈主題相關的公益機構。

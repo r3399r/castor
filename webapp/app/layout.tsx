@@ -18,9 +18,13 @@ const fredoka = Fredoka({
 })
 
 export const metadata: Metadata = {
-  title: 'PMP - 考試題庫與練習平台',
+  // The English is in the title as well as the Chinese because "學益" is a
+  // homophone of "學藝" -- people who hear the name will search for the
+  // wrong spelling, and "Learn for Good" is the half of the brand that is
+  // unambiguous.
+  title: '學益 Learn for Good - 考試題庫與練習平台',
   description:
-    '涵蓋高中／大學／公職／證照考試，透過智慧出題與個人化練習，幫助你精準掌握重點，穩定提升解題能力與每一次考試表現。',
+    '涵蓋高中／大學／公職／證照考試，以智慧出題與個人化練習，幫你精準掌握重點、穩定提升成績。練習累積的積分還能培育精靈，完成培育後由平台提撥款項支持公益——學習有所得，也讓世界有所益。',
 }
 
 export const viewport: Viewport = {

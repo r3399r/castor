@@ -6,14 +6,20 @@ export default function HomeHero() {
       <div className="mx-auto grid w-full max-w-site items-center gap-10 px-page-gutter lg:grid-cols-2 lg:px-12">
         <div className="space-y-8">
           <div className="max-w-2xl space-y-4">
-            <p className="text-sm font-bold tracking-[0.12em] text-spirit-leaf uppercase">
-              PMP - Practice Makes Perfect
+            {/*
+              No `uppercase` here: the brand is written "Learn for Good"
+              everywhere else, and the utility was repainting it as
+              "LEARN FOR GOOD". The letterspacing still gives the eyebrow
+              its treatment without re-casing a name.
+            */}
+            <p className="text-sm font-bold tracking-[0.12em] text-spirit-leaf">
+              學益 - Learn for Good
             </p>
             <h1 className="text-spirit-display-sm font-bold text-spirit-canopy sm:text-5xl lg:text-6xl">
               個人化智慧題庫
             </h1>
             <p className="max-w-xl text-base leading-7 text-spirit-muted sm:text-lg">
-              涵蓋高中／大學／公職／證照考試，透過智慧出題與個人化練習，幫助你精準掌握重點，穩定提升解題能力與每一次考試表現。
+              涵蓋高中／大學／公職／證照考試，以智慧出題與個人化練習，幫你精準掌握重點、穩定提升成績。練習累積的積分可以培育精靈，當牠成長到最後一階，平台就會提撥款項支持牠代表的公益主題——你的努力，不只屬於自己。
             </p>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">

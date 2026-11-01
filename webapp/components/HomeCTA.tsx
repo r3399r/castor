@@ -7,7 +7,7 @@ export default function HomeCTA() {
             準備好開始了嗎？
           </h2>
           <p className="mb-10 text-base leading-7 text-spirit-on-dark/85">
-            現在就加入，從第一題開始累積你的學習優勢。
+            現在就加入，從第一題開始累積你的學習優勢，也累積一份公益。
           </p>
           <div>
             <a

@@ -53,7 +53,15 @@ export default function HomeStatsBar() {
 
   useEffect(() => {
     apiFetch<GetInfoStatsResponse>('info/stats')
-      .then(setData)
+      .then((res) => {
+        // A 2xx is no guarantee of the shape. A 204 reaches here as
+        // undefined, and anything else answering this path reaches it as
+        // the wrong object; either way the counts would then be rendered
+        // as undefined and the exception would take down the whole page,
+        // not just this bar. Treated as a failed fetch instead.
+        if (CELLS.every(({ key }) => typeof res?.[key] === 'number')) setData(res)
+        else setFailed(true)
+      })
       .catch(() => setFailed(true))
   }, [])
 

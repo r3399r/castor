@@ -7,7 +7,7 @@ export default function Navbar() {
       <nav className="site-header__nav">
         <div className="site-header__content flex items-center justify-between">
           <Link href="/" className="site-header__logo font-helvetica text-lg font-bold tracking-[0.02em]">
-            PMP - Practice Makes Perfect
+            學益 - Learn for Good
           </Link>
           <NavbarMenu />
         </div>

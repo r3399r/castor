@@ -13,7 +13,9 @@ class CastorApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Castor',
+      // Shown in the Android task switcher, so it is the brand name, not
+      // the repo's codename (which the class name below still carries).
+      title: '學益',
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(),
       home: const RootShell(),
