@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { formatNumber } from '@/lib/number'
 import {
   ArrowRight,
@@ -34,6 +35,7 @@ import {
 import { artworkByCode, spiritCatalog, type SpiritSpecies } from '@/lib/guardianArtwork'
 import { apiFetch, apiPost } from '@/lib/api'
 import SupportNote from './SupportNote'
+import { DonationDemoBox } from './DonationDemo'
 
 type GuardianDto = {
   id: number
@@ -91,6 +93,11 @@ function ArtworkPlaceholder() {
   )
 }
 export default function BoxClient() {
+  const searchParams = useSearchParams()
+  return searchParams.get('demo') === 'donation' ? <DonationDemoBox /> : <RealBoxClient />
+}
+
+function RealBoxClient() {
   const [activeTab, setActiveTab] = useState<
     'growing' | 'store' | 'collection'
   >('growing')

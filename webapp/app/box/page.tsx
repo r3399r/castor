@@ -1,5 +1,6 @@
 import AuthGuard from "@/components/AuthGuard";
 import Navbar from "@/components/Navbar";
+import { Suspense } from "react";
 import BoxClient from "./BoxClient";
 
 export default function BoxPage() {
@@ -10,7 +11,9 @@ export default function BoxPage() {
       </div>
       <div className="sp-box-access">
         <AuthGuard>
-          <BoxClient />
+          <Suspense fallback={<div className="sp-box"><p className="sp-description">載入中…</p></div>}>
+            <BoxClient />
+          </Suspense>
         </AuthGuard>
       </div>
     </div>
