@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState, type CSSProperties } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Check, ChevronDown, ChevronLeft, ExternalLink, HeartHandshake, RotateCcw, Sparkles } from 'lucide-react'
+import { Check, ChevronDown, ChevronLeft, ExternalLink, HeartHandshake, RotateCcw } from 'lucide-react'
 import { Badge, Button, ButtonLink, Card, ContentPanel, Modal } from '@/components/ui'
 import { SpiritArtwork, SpiritScene } from '@/components/spirit'
 import { spiritCatalog, type SpiritSpecies } from '@/lib/guardianArtwork'
@@ -40,15 +40,6 @@ function useDonationDemo(enabled = true) {
     })
   }, [])
   return { state, update, ready }
-}
-
-function DemoNotice() {
-  return (
-    <p className="donation-demo-notice" role="note">
-      <Sparkles size={16} aria-hidden="true" />
-      示範流程，本次操作不會產生實際撥款。
-    </p>
-  )
 }
 
 const confettiPieces = Array.from({ length: 30 }, (_, index) => ({
@@ -144,7 +135,6 @@ export function DonationDemoBox() {
   return (
     <div className="sp-box donation-demo-box">
       <div className="donation-demo-shell">
-        <DemoNotice />
         <ContentPanel className="donation-demo-controls" aria-label="公益支持 demo 控制區">
           <div>
             <p className="sp-eyebrow">DEMO CONTROLS</p>
@@ -186,15 +176,17 @@ export function DonationDemoBox() {
           </div>
         </ContentPanel>
 
-        <div className="donation-demo-growing">
-          {state.vip ? (
-            <div className="donation-vip-scene" aria-label="VIP 精靈圖片尚未提供">
-              <span>{maxed ? 'LV5 滿級' : 'LV4'}</span>
-            </div>
-          ) : (
-            <SpiritScene species={state.spirit} level={maxed ? 5 : 4} priority caption={maxed ? 'LV5 滿級' : 'LV4'} />
-          )}
-          <ContentPanel className="donation-max-card">
+        <div className="sp-growing-layout donation-demo-growing">
+          <div className="sp-companion-art">
+            {state.vip ? (
+              <figure className="sp-scene donation-vip-scene" aria-label="VIP 精靈圖片尚未提供">
+                <figcaption>{maxed ? 'LV5 滿級' : 'LV4'}</figcaption>
+              </figure>
+            ) : (
+              <SpiritScene species={state.spirit} level={maxed ? 5 : 4} priority caption={maxed ? 'LV5 滿級' : 'LV4'} />
+            )}
+          </div>
+          <ContentPanel className="sp-status donation-max-card">
             <p className="sp-eyebrow">{state.vip ? '可跨公益分類' : spiritCatalog[state.spirit].category}</p>
             <h2>{state.vip ? 'VIP 星冠精靈' : spiritCatalog[state.spirit].name}</h2>
             {!maxed ? (
@@ -213,7 +205,6 @@ export function DonationDemoBox() {
               <div className="donation-unlocked-message">
                 <Badge tone="complete">{state.stage === 'pending' ? '等待平台撥款（示範）' : '平台已完成撥款（示範）'}</Badge>
                 <h3>已選擇支持{organization?.name ?? '示範公益組織'}</h3>
-                <p>精靈會繼續保留在收藏中，本次養成成果無法再次提交。</p>
                 <Button variant="secondary" onClick={() => openDonationStep('record')}>查看支持紀錄</Button>
               </div>
             )}
@@ -297,7 +288,7 @@ export function DonationFlowClient() {
         ) : step === 'choose' ? (
           <>
             <ButtonLink href="/box/?demo=donation" variant="quiet" className="donation-back"><ChevronLeft size={17} aria-hidden="true" />返回精靈養成</ButtonLink>
-            <header className="donation-flow-heading"><h1>選擇公益支持對象</h1><p>本次由平台捐出 NT${DEMO_DONATION_AMOUNT}（示範金額），你不需要付款。</p></header>
+            <header className="donation-flow-heading"><h1>選擇支持的公益組織</h1><p>本次由平台捐出 NT${DEMO_DONATION_AMOUNT}（示範金額），你不需要付款。</p></header>
             <SpiritSummary
               state={state}
               categorySelector
