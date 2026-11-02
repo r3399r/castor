@@ -418,15 +418,49 @@ export type GetUserStatsResponse = StatsSubject[];
 // Mirrors GET /subscription/me, so a client can handle the two
 // interchangeably. expiresAt is an ISO string over the wire, like every
 // other date in this file.
+// `active` means auto-renew is on. A cancelled subscription reports
+// false here while its paid period is still running -- the remaining
+// entitlement lives in GET /subscription/history, which is where the
+// client derives "cancelled but still usable" from.
+//
+// There are no pending-plan fields: ECPay cannot amend a recurring
+// agreement, so a plan change is a new agreement charged immediately,
+// never a change scheduled for the end of the period.
 export type SubscriptionStatus = {
   active: boolean;
   plan: string | null;
   expiresAt: string | null;
   autoRenew?: boolean | null;
-  pendingPlan?: string | null;
-  pendingPlanEffectiveAt?: string | null;
-  pendingPlanAmount?: number | null;
 };
+
+// GET /api/info/plans. Public and unauthenticated, because the pricing
+// page is read before signing in. `amount` is the authoritative price in
+// NTD -- the webapp must render this rather than a constant of its own,
+// or it can show one number and charge another.
+export type SubscriptionPlanInfo = {
+  code: string;
+  amount: number;
+  periodType: 'D' | 'M' | 'Y';
+  frequency: number;
+};
+
+export type GetInfoPlansResponse = SubscriptionPlanInfo[];
+
+export type PostPaymentCheckoutRequest = { plan: string };
+
+// POST /api/payment/checkout. Not a payment: it is a signed form the
+// browser has to POST to `action` so the cardholder lands on the
+// provider's own page. Nothing is charged until the provider's webhook
+// says so, and the user may simply close the tab.
+export type PostPaymentCheckoutResponse = {
+  action: string;
+  params: Record<string, string>;
+};
+
+// POST /api/subscription/cancel. Same shape as GET /api/subscription/me,
+// and it reports active:false as soon as auto-renew is off -- the period
+// already paid for keeps granting access and shows up in /history.
+export type PostSubscriptionCancelResponse = SubscriptionStatus;
 
 export type SubscriptionHistoryItem = {
   id: number;

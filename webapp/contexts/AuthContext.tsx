@@ -1,9 +1,9 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useState } from 'react'
 import { signInWithPopup, signOut, type User } from 'firebase/auth'
 import { auth, provider } from '@/lib/firebase'
-import { apiPost } from '@/lib/api'
+import { apiFetch, apiPost } from '@/lib/api'
 import type { PostUserSyncResponse, SubscriptionStatus } from '@/types/api'
 
 type AuthContextType = {
@@ -19,6 +19,15 @@ type AuthContextType = {
    * still in flight.
    */
   subscription: SubscriptionStatus | null
+  /**
+   * Re-reads entitlement without signing in again.
+   *
+   * Sync runs once per sign-in, so without this the value above stays
+   * whatever it was when the session started -- and the moment it is
+   * most wrong is right after someone pays, when every gated block
+   * would still show them its locked state.
+   */
+  refreshSubscription: () => Promise<void>
   login: () => Promise<void>
   logout: () => Promise<void>
 }
@@ -69,6 +78,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => unsubscribe()
   }, [])
 
+  // Reads /subscription/me rather than re-running sync: sync also
+  // upserts the user row, and this only needs to know what they are
+  // entitled to. Returns rather than throws on failure, because the
+  // caller's job (telling the user their payment went through) is not
+  // the same as this one.
+  const refreshSubscription = useCallback(async () => {
+    if (!auth.currentUser) return
+    try {
+      setSubscription(await apiFetch<SubscriptionStatus>('subscription/me'))
+    } catch (e) {
+      console.error('Failed to refresh subscription:', e)
+    }
+  }, [])
+
   const login = async () => {
     if (isInAppBrowser()) {
       alert('為了安全性，Google 登入不支援 App 內建瀏覽器。請改用系統瀏覽器後再試一次，如 Chrome 或 Safari')
@@ -90,7 +113,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, subscription, login, logout }}>
+    <AuthContext.Provider
+      value={{ user, loading, subscription, refreshSubscription, login, logout }}
+    >
       {children}
     </AuthContext.Provider>
   )

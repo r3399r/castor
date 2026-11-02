@@ -1,12 +1,14 @@
 import {
   AnyMySqlColumn,
   boolean,
+  char,
   date,
   datetime,
   double,
   int,
   mysqlTable,
   primaryKey,
+  smallint,
   text,
   tinyint,
   varchar,
@@ -476,4 +478,51 @@ export const userSubscriptionTable = mysqlTable('user_subscription', {
   providerRef: varchar('provider_ref', { length: 255 }),
   createdAt: datetime('created_at', { mode: 'date', fsp: 3 }),
   updatedAt: datetime('updated_at', { mode: 'date', fsp: 3 }),
+});
+
+// One row per recurring-payment agreement with the provider. Separate
+// from userSubscriptionTable on purpose: that one is entitlement and
+// must stay readable with the provider unreachable, this one is ECPay's
+// state. activeUserId is database-generated (the user id while status is
+// 'active', NULL otherwise) so a plain UNIQUE index can enforce "at most
+// one live agreement per user" -- see db/table/payment_order.sql for why
+// that failure is worth a generated column.
+export const paymentOrderTable = mysqlTable('payment_order', {
+  id: int('id', { unsigned: true }).autoincrement().primaryKey(),
+  userId: int('user_id', { unsigned: true })
+    .notNull()
+    .references(() => userTable.id),
+  plan: varchar('plan', { length: 32 }).notNull(),
+  provider: varchar('provider', { length: 32 }).notNull().default('ecpay'),
+  merchantTradeNo: varchar('merchant_trade_no', { length: 20 }).notNull(),
+  status: varchar('status', { length: 16 }).notNull(),
+  periodType: char('period_type', { length: 1 }).notNull(),
+  frequency: smallint('frequency', { unsigned: true }).notNull(),
+  execTimes: smallint('exec_times', { unsigned: true }).notNull(),
+  periodAmount: int('period_amount', { unsigned: true }).notNull(),
+  ecpayTradeNo: varchar('ecpay_trade_no', { length: 32 }),
+  createdAt: datetime('created_at', { mode: 'date', fsp: 3 }),
+  updatedAt: datetime('updated_at', { mode: 'date', fsp: 3 }),
+  cancelledAt: datetime('cancelled_at', { mode: 'date', fsp: 3 }),
+});
+
+// One row per authorisation notification, successes and failures alike.
+// gwsr is ECPay's per-authorisation number and carries a UNIQUE index:
+// it is what stops a retried webhook from granting a second period. It
+// is nullable because a declined authorisation has no usable number, and
+// UNIQUE ignores NULLs.
+export const paymentChargeTable = mysqlTable('payment_charge', {
+  id: int('id', { unsigned: true }).autoincrement().primaryKey(),
+  paymentOrderId: int('payment_order_id', { unsigned: true })
+    .notNull()
+    .references(() => paymentOrderTable.id),
+  gwsr: varchar('gwsr', { length: 32 }),
+  rtnCode: int('rtn_code').notNull(),
+  rtnMsg: varchar('rtn_msg', { length: 255 }),
+  amount: int('amount', { unsigned: true }).notNull(),
+  authCode: varchar('auth_code', { length: 10 }),
+  processDate: datetime('process_date', { mode: 'date', fsp: 3 }),
+  totalSuccessTimes: int('total_success_times', { unsigned: true }),
+  simulatePaid: boolean('simulate_paid').notNull().default(false),
+  createdAt: datetime('created_at', { mode: 'date', fsp: 3 }),
 });
