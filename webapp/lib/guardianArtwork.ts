@@ -25,8 +25,9 @@ export const spiritCatalog: Record<SpiritSpecies, SpiritDefinition> = {
   otter: {
     name: '水獺精靈',
     category: '身心障礙與神經發展',
+    artwork: '/illustrations/guardians/otter',
     tone: 'sky',
-    stages: [],
+    stages: ['初生', '萌芽', '探索', '茁壯', '綻放'],
   },
   dog: {
     name: '狗精靈',
@@ -74,6 +75,7 @@ export const artworkByCode: Partial<Record<string, SpiritSpecies>> = {
   children: 'cat',
   forest: 'deer',
   healing: 'rabbit',
+  neurodevelopment: 'otter',
   wisdom: 'bird',
 }
 

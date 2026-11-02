@@ -148,14 +148,14 @@ Reuse these foundations instead of duplicating colors, spacing, radii, surfaces,
 | `guardian.code` | Public-interest category | Spirit | Artwork status | Store egg name |
 | --- | --- | --- | --- | --- |
 | `children` | 兒少、家庭與婦幼 | 貓 | LV1-LV5 available | 暖陽之蛋 |
-| `neurodevelopment` | 身心障礙與神經發展 | 水獺 | Pending | 星光之蛋 |
+| `neurodevelopment` | 身心障礙與神經發展 | 水獺 | LV1-LV5 available | 星光之蛋 |
 | `eldercare` | 高齡長照與失智照護 | 狗 | Pending | 長青之蛋 |
 | `healing` | 疾病醫療、心理與善終 | 兔子 | LV1-LV5 available | 療癒之蛋 |
 | `rights` | 人權、法治、性別與社區 | 海豚 | Pending | 共鳴之蛋 |
 | `wisdom` | 教育翻轉、人文與藝術 | 鳥 | LV1-LV5 available | 智慧之蛋 |
 | `forest` | 生態環境與動物福利 | 鹿 | LV1-LV5 available | 森林之蛋 |
 
-Until the other three artwork sets exist, their store and locked collection states use the shared egg asset rather than substitute character artwork. Keep spirit artwork data-driven; do not hard-code the UI to a particular spirit. `spiritCatalog` already defines all seven (names and categories); only the `artwork` field distinguishes the ones with drawings, and `spiritImage()` returns `undefined` for the rest so components fall back on their own.
+Until the remaining two artwork sets exist, their store and locked collection states use the shared egg asset rather than substitute character artwork. Keep spirit artwork data-driven; do not hard-code the UI to a particular spirit. `spiritCatalog` already defines all seven (names and categories); only the `artwork` field distinguishes the ones with drawings, and `spiritImage()` returns `undefined` for the rest so components fall back on their own.
 
 **Image asset policy**
 
@@ -163,7 +163,7 @@ Until the other three artwork sets exist, their store and locked collection stat
 - Original PNG sources for runtime assets live outside the public web root under `webapp/source-assets/png/`, preserving their relative directory structure.
 - Do not reference `webapp/source-assets/` from browser code; it is not publicly served.
 - Only commit original PNGs that correspond to assets actually used by the application. Do not commit unused PNG or generated WebP variants unless requested.
-- Current guardian artwork is under `webapp/public/illustrations/guardians/{bird,cat,deer,rabbit}/lv1.webp` through `lv5.webp`.
+- Current guardian artwork is under `webapp/public/illustrations/guardians/{bird,cat,deer,otter,rabbit}/lv1.webp` through `lv5.webp`.
 - Shared runtime assets include `/images/locked-egg.webp`, `/images/points-vine-top-left.webp`, `/images/points-vine-bottom-right.webp`, and `/images/spirit-garden-mobile-leaves.webp`.
 
 **Responsive and accessibility requirements**
