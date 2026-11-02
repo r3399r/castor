@@ -1,5 +1,10 @@
 import { and, desc, eq, gt, inArray } from 'drizzle-orm';
 import { userSubscriptionTable } from 'src/db/schema';
+import {
+  RENEWAL_GRACE_MS,
+  SubscriptionPlan,
+  nominalPeriodEnd,
+} from 'src/lib/subscriptionPlan';
 import { TransactionEnv } from 'src/middleware/transaction';
 
 type Db = TransactionEnv['Variables']['db'];
@@ -219,4 +224,99 @@ export const setSubscription = async (
   });
 
   return { plan, currentPeriodEnd };
+};
+
+/**
+ * Records one paid period, as a payment provider's webhook sees it.
+ *
+ * Distinct from setSubscription, which answers "make sure this user has
+ * access" and does nothing when they already do. This one always appends
+ * a period, because it is called once per successful charge and the user
+ * has paid for every one of them. Calling it twice for the same charge
+ * would hand out two periods, so the *caller* owes idempotency -- the
+ * webhook gets it from payment_charge's UNIQUE(gwsr), not from here.
+ *
+ * Three cases, and the awkward one is the middle:
+ *
+ * - nothing live: the period starts now.
+ * - still entitled (an early renewal, or a cancelled period that has not
+ *   run out): the new period queues behind the furthest-out entitlement
+ *   rather than overwriting it, so renewing or switching plan mid-period
+ *   never costs the user days they already paid for. This is also what
+ *   makes a plan change work at all -- ECPay cannot amend an agreement,
+ *   so changing plan means a new agreement charging immediately, and the
+ *   fairness has to come from here.
+ * - a row still marked 'active' whose period has elapsed: it has to be
+ *   closed before the insert or it collides on unique_active_subscription.
+ */
+export const renewSubscriptionPeriod = async (
+  db: Db,
+  userId: number,
+  plan: SubscriptionPlan,
+  provider: string,
+  providerRef: string
+): Promise<{ currentPeriodStart: Date; currentPeriodEnd: Date }> => {
+  const now = new Date();
+
+  // At most one, enforced by the generated activeUserId column.
+  const [live] = await db
+    .select({ id: userSubscriptionTable.id })
+    .from(userSubscriptionTable)
+    .where(
+      and(
+        eq(userSubscriptionTable.userId, userId),
+        eq(userSubscriptionTable.status, SUBSCRIPTION_STATUS_ACTIVE)
+      )
+    )
+    .limit(1);
+
+  // The furthest-out end, not the newest row: picking by recency could
+  // shorten someone whose longer period was recorded first.
+  const [entitled] = await db
+    .select({ currentPeriodEnd: userSubscriptionTable.currentPeriodEnd })
+    .from(userSubscriptionTable)
+    .where(
+      and(
+        eq(userSubscriptionTable.userId, userId),
+        inArray(userSubscriptionTable.status, [
+          SUBSCRIPTION_STATUS_ACTIVE,
+          SUBSCRIPTION_STATUS_CANCELLED,
+        ]),
+        gt(userSubscriptionTable.currentPeriodEnd, now)
+      )
+    )
+    .orderBy(desc(userSubscriptionTable.currentPeriodEnd))
+    .limit(1);
+
+  // Subtracting the grace recovers the moment the previous period was
+  // actually paid up to. Chaining onto the stored end instead would add
+  // the grace again every cycle until it was worth more than a month.
+  const currentPeriodStart =
+    entitled === undefined
+      ? now
+      : new Date(Math.max(now.getTime(), entitled.currentPeriodEnd.getTime() - RENEWAL_GRACE_MS));
+
+  if (live !== undefined)
+    await db
+      .update(userSubscriptionTable)
+      .set({ status: 'expired', updatedAt: now })
+      .where(eq(userSubscriptionTable.id, live.id));
+
+  const currentPeriodEnd = new Date(
+    nominalPeriodEnd(plan, currentPeriodStart).getTime() + RENEWAL_GRACE_MS
+  );
+
+  await db.insert(userSubscriptionTable).values({
+    userId,
+    plan: plan.code,
+    status: SUBSCRIPTION_STATUS_ACTIVE,
+    currentPeriodStart,
+    currentPeriodEnd,
+    provider,
+    providerRef,
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  return { currentPeriodStart, currentPeriodEnd };
 };

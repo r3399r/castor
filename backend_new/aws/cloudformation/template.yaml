@@ -130,6 +130,33 @@ Resources:
           # -- same tier, separate capacity pool, and not a preview that
           # could be retired underneath us.
           GEMINI_FALLBACK_MODEL: gemini-3.5-flash
+          # ECPay recurring billing. The three credentials are a matched
+          # set with ECPAY_MODE below -- stage and production have
+          # different merchant ids and keys -- so they are changed
+          # together or not at all.
+          ECPAY_MERCHANT_ID: !Sub '{{resolve:ssm:${Project}-ecpay-merchant-id}}'
+          ECPAY_HASH_KEY: !Sub '{{resolve:ssm:${Project}-ecpay-hash-key}}'
+          ECPAY_HASH_IV: !Sub '{{resolve:ssm:${Project}-ecpay-hash-iv}}'
+          # Which ECPay to talk to: 'stage' or 'production'. An SSM
+          # parameter and not !If [IsProd, ...] on purpose. dev.yml
+          # deploys to the prod *stack* deliberately (see AGENTS.md), so
+          # tying this to the stack name would make an ordinary dev
+          # deploy start charging real cards. Going live stays a separate,
+          # deliberate act with its own audit trail; src/lib/ecpay.ts
+          # defaults to stage for anything that is not exactly
+          # 'production'.
+          ECPAY_MODE: !Sub '{{resolve:ssm:${Project}-ecpay-mode}}'
+          # Origin ECPay calls back on, and the one the browser is sent
+          # back to. Derived from the same parameters as the CloudFront
+          # alias below rather than configured separately, so it cannot
+          # drift from the domain that actually serves the site -- a
+          # wrong value here means payments succeed at ECPay and are
+          # never recorded. ECPay rejects an IP address, so this has to
+          # stay a domain name.
+          PUBLIC_BASE_URL: !If
+            - IsProd
+            - !Sub 'https://${SubDomain}.${Domain}'
+            - !Sub 'https://${SubDomain}-${TargetEnvr}.${Domain}'
       Events:
         AnyRoute:
           Type: Api

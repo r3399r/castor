@@ -39,6 +39,10 @@ services:
       # and guardian to exist.
       - ../db/table/guardian.sql:/docker-entrypoint-initdb.d/25_guardian.sql:ro
       - ../db/table/user_guardian.sql:/docker-entrypoint-initdb.d/26_user_guardian.sql:ro
+      # payment_charge's foreign key needs payment_order, which in turn
+      # needs user (09), so the two stay in this order.
+      - ../db/table/payment_order.sql:/docker-entrypoint-initdb.d/27_payment_order.sql:ro
+      - ../db/table/payment_charge.sql:/docker-entrypoint-initdb.d/28_payment_charge.sql:ro
       # Seed data, numbered 9x so it lands after every table above --
       # docker-entrypoint-initdb.d runs files in name order, and these
       # insert into tables created there. Without the guardians, /box shows

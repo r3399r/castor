@@ -14,6 +14,7 @@ import { filterDimension } from 'src/routes/filterDimension';
 import { filterOption } from 'src/routes/filterOption';
 import { guardian } from 'src/routes/guardian';
 import { info } from 'src/routes/info';
+import { payment } from 'src/routes/payment';
 import { question } from 'src/routes/question';
 import { reply } from 'src/routes/reply';
 import { species } from 'src/routes/species';
@@ -23,6 +24,7 @@ import { subscription } from 'src/routes/subscription';
 import { tag } from 'src/routes/tag';
 import { user } from 'src/routes/user';
 import { wallet } from 'src/routes/wallet';
+import { webhook } from 'src/routes/webhook';
 import { wrongQuestion } from 'src/routes/wrongQuestion';
 
 export const app = new Hono()
@@ -62,6 +64,20 @@ export const app = new Hono()
   .use('/api/subscription/*', transaction)
   .use('/api/subscription/*', requireUser)
   .route('/api/subscription', subscription)
+  // Starting or replacing a paid agreement: a signed-in person asking to
+  // be charged.
+  .use('/api/payment/*', transaction)
+  .use('/api/payment/*', requireUser)
+  .route('/api/payment', payment)
+  // Payment-provider callbacks, and the one group in this app with no
+  // authentication middleware at all -- the caller is ECPay's server,
+  // which has no Firebase token. Authenticity is checked inside the
+  // routes, from the CheckMacValue signature. It has its own prefix so
+  // that "unauthenticated" is a property of the prefix instead of an
+  // exception carved out of /api/payment, where the next route added
+  // would inherit it by accident.
+  .use('/api/webhook/*', transaction)
+  .route('/api/webhook', webhook)
   // Subscriber-only. requireSubscription reads the user row requireUser
   // resolves, so the order of these three matters.
   .use('/api/analysis/*', transaction)

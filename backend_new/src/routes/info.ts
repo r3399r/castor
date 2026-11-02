@@ -7,6 +7,7 @@ import {
   subjectTable,
   userTable,
 } from 'src/db/schema';
+import { SUBSCRIPTION_PLANS } from 'src/lib/subscriptionPlan';
 import { TransactionEnv } from 'src/middleware/transaction';
 
 export const info = new Hono<TransactionEnv>()
@@ -15,6 +16,27 @@ export const info = new Hono<TransactionEnv>()
   // middleware is therefore bound to /api/info/stats alone in app.ts, not
   // to /api/info/*, which would also catch this path.
   .get('/', (c) => c.json({ status: 'ok', time: new Date().toISOString() }))
+  // The authoritative prices, and the reason the webapp holds no price
+  // constants of its own: the amount shown on the pricing page has to be
+  // the amount that gets signed into the ECPay order, and a visitor sees
+  // that page before signing in -- so this lives here, in the public
+  // group, rather than under /api/subscription where requireUser would
+  // hide it from exactly the people deciding whether to pay.
+  //
+  // No database access, so it stays outside the transaction middleware
+  // bound to /api/info/stats.
+  .get('/plans', (c) => {
+    console.log('GET /api/info/plans');
+
+    return c.json(
+      SUBSCRIPTION_PLANS.map(({ code, amount, periodType, frequency }) => ({
+        code,
+        amount,
+        periodType,
+        frequency,
+      }))
+    );
+  })
   // Public and unauthenticated -- it only feeds the landing page's counter
   // bar, so it reports catalog sizes and nothing per-user.
   .get('/stats', async (c) => {
