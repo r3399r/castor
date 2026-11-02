@@ -29,11 +29,15 @@
   color: var(--color-spirit-on-dark);
   line-height: var(--leading-normal);
 }
-.site-header__logo::before {
-  color: var(--color-spirit-gold);
-  content: "✦";
-  font-size: 0.55rem;
-  line-height: var(--leading-none);
+.site-header__mark {
+  width: 36px;
+  height: 36px;
+  /* The mark's deep green is 1.00:1 against --color-spirit-canopy, so it
+     needs its own light ground here; on the cream disc it can then keep the
+     colours it was drawn in, rather than being knocked out. */
+  --brand-mark-bg: var(--color-spirit-cream);
+  --brand-mark-ring: var(--color-spirit-gold);
+  flex: 0 0 auto;
 }
 .site-header__nav-link,
 .site-header__menu-toggle,
@@ -214,6 +218,10 @@
     max-width: calc(100% - 112px);
     font-size: 0.875rem;
     line-height: var(--leading-display-relaxed);
+  }
+  .site-header__mark {
+    width: 29px;
+    height: 29px;
   }
   .site-header__desktop-actions,
   .site-header__mobile-actions {
