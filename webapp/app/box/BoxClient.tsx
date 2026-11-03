@@ -34,6 +34,7 @@ import {
 } from '@/components/spirit'
 import { artworkByCode, spiritCatalog, type SpiritSpecies } from '@/lib/guardianArtwork'
 import { apiFetch, apiPost } from '@/lib/api'
+import { useAuth } from '@/contexts/AuthContext'
 import SupportNote from './SupportNote'
 import { DonationDemoBox, FormalDonationEntry } from './DonationDemo'
 
@@ -98,6 +99,7 @@ export default function BoxClient() {
 }
 
 function RealBoxClient() {
+  const { subscription } = useAuth()
   const [activeTab, setActiveTab] = useState<
     'growing' | 'store' | 'collection'
   >('growing')
@@ -148,6 +150,9 @@ function RealBoxClient() {
   const level = guardian?.level ?? 1
   const complete = level >= MAX_LEVEL
   const shownLevel = previewLevel ?? level
+  const hasMemberExperienceBonus = subscription?.active === true
+  const memberBonusXp = Number((pointsToUse * 0.1).toFixed(1))
+  const totalExperienceXp = Number((pointsToUse + memberBonusXp).toFixed(1))
 
   // Started species first, so the collection opens on what the user has
   // actually been growing.
@@ -209,6 +214,18 @@ function RealBoxClient() {
       <p className="sp-description">
         選擇要投入的積分，增加這隻精靈的成長經驗。
       </p>
+      {hasMemberExperienceBonus && (
+        <div className="sp-member-bonus">
+          <Badge tone="growth">訂閱會員</Badge>
+          <div>
+            <strong>培育經驗額外 +10%</strong>
+            <span>
+              會員加成試算：投入 {formatNumber(pointsToUse)} 點，預計獲得{' '}
+              {formatNumber(totalExperienceXp)} XP（含 +{formatNumber(memberBonusXp)} XP）
+            </span>
+          </div>
+        </div>
+      )}
       {availablePoints === 0 && (
         <p className="sp-inline-notice">
           目前沒有可分配的積分。完成更多練習後，就能繼續培育這隻精靈。
@@ -791,6 +808,9 @@ function RealBoxClient() {
             amount={pointsToUse}
             label="本次投入"
           />
+          {hasMemberExperienceBonus && (
+            <MemberExperienceBonus amount={pointsToUse} />
+          )}
           {actionError && <p className="sp-inline-notice">{actionError}</p>}
           <div className="sp-dialog-actions">
             <Button
@@ -853,5 +873,29 @@ function TransactionSummary({
         <dd>{formatNumber(Math.max(available - amount, 0))} 點</dd>
       </div>
     </dl>
+  )
+}
+
+function MemberExperienceBonus({ amount }: { amount: number }) {
+  const bonus = Number((amount * 0.1).toFixed(1))
+  const total = Number((amount + bonus).toFixed(1))
+  return (
+    <div className="sp-member-bonus sp-member-bonus--dialog">
+      <Badge tone="growth">訂閱會員 +10%</Badge>
+      <dl>
+        <div>
+          <dt>原始培育經驗</dt>
+          <dd>{formatNumber(amount)} XP</dd>
+        </div>
+        <div>
+          <dt>會員額外經驗</dt>
+          <dd>+ {formatNumber(bonus)} XP</dd>
+        </div>
+        <div>
+          <dt>預計獲得經驗</dt>
+          <dd>{formatNumber(total)} XP</dd>
+        </div>
+      </dl>
+    </div>
   )
 }
