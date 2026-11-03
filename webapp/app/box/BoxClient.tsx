@@ -35,7 +35,7 @@ import {
 import { artworkByCode, spiritCatalog, type SpiritSpecies } from '@/lib/guardianArtwork'
 import { apiFetch, apiPost } from '@/lib/api'
 import SupportNote from './SupportNote'
-import { DonationDemoBox } from './DonationDemo'
+import { DonationDemoBox, FormalDonationEntry } from './DonationDemo'
 
 type GuardianDto = {
   id: number
@@ -431,15 +431,7 @@ function RealBoxClient() {
                         nextLevelXp={complete ? null : guardian.nextLevelXp}
                       >
                         {complete ? (
-                          <RewardBanner title="精靈已完成培育">
-                            LV1～LV5 的成長足跡，已收入你的圖鑑。
-                            <Button
-                              variant="secondary"
-                              onClick={() => setActiveTab('collection')}
-                            >
-                              查看我的圖鑑
-                            </Button>
-                          </RewardBanner>
+                          <FormalDonationEntry guardianId={guardian.id} species={artwork} />
                         ) : (
                           investControls
                         )}

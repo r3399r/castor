@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Check, ChevronDown, ChevronLeft, ExternalLink, HeartHandshake, RotateCcw } from 'lucide-react'
 import { Badge, Button, ButtonLink, Card, ContentPanel, Modal } from '@/components/ui'
@@ -11,10 +11,12 @@ import {
   DONATION_DEMO_STORAGE_KEY,
   defaultDonationDemoState,
   demoOrganizationCategories,
+  eligibleDonationState,
   findDemoOrganization,
+  formalDonationStorageKey,
   organizationsFor,
-  readDonationDemoState,
-  writeDonationDemoState,
+  readDonationState,
+  writeDonationState,
   type DonationDemoState,
 } from '@/lib/donationDemo'
 
@@ -25,20 +27,24 @@ const demoSpiritOptions: { value: SpiritSpecies; label: string }[] = [
   { value: 'deer', label: '森林鹿靈' },
 ]
 
-function useDonationDemo(enabled = true) {
-  const [state, setState] = useState(defaultDonationDemoState)
+function useDonationState(
+  enabled: boolean,
+  storageKey: string,
+  fallback: DonationDemoState,
+) {
+  const [state, setState] = useState(fallback)
   const [ready, setReady] = useState(false)
   useEffect(() => {
-    if (enabled) setState(readDonationDemoState())
+    if (enabled) setState(readDonationState(storageKey, fallback))
     setReady(true)
-  }, [enabled])
+  }, [enabled, fallback, storageKey])
   const update = useCallback((next: DonationDemoState | ((value: DonationDemoState) => DonationDemoState)) => {
     setState((current) => {
       const value = typeof next === 'function' ? next(current) : next
-      writeDonationDemoState(value)
+      writeDonationState(storageKey, value)
       return value
     })
-  }, [])
+  }, [storageKey])
   return { state, update, ready }
 }
 
@@ -68,6 +74,65 @@ function CelebrationConfetti() {
         />
       ))}
     </div>
+  )
+}
+
+export function FormalDonationEntry({
+  guardianId,
+  species,
+}: {
+  guardianId: number
+  species: SpiritSpecies
+}) {
+  const storageKey = formalDonationStorageKey(guardianId)
+  const fallback = useMemo(() => eligibleDonationState(species), [species])
+  const { state, update, ready } = useDonationState(true, storageKey, fallback)
+  const [celebrating, setCelebrating] = useState(false)
+  const organization = findDemoOrganization(state.organizationId)
+
+  useEffect(() => {
+    if (!ready || state.stage !== 'eligible' || state.celebrationSeen) return
+    update((current) => ({ ...current, celebrationSeen: true }))
+    setCelebrating(true)
+  }, [ready, state.celebrationSeen, state.stage, update])
+
+  const openStep = (step: 'choose' | 'record') => {
+    window.location.assign(`/box/donation/?guardianId=${guardianId}&step=${step}`)
+  }
+
+  if (!ready) return <p className="sp-description">載入公益支持狀態…</p>
+
+  return (
+    <>
+      {state.stage === 'eligible' ? (
+        <div className="donation-unlocked-message">
+          <Badge tone="complete"><Check size={13} aria-hidden="true" /> LV5 滿級</Badge>
+          <h3>滿級達成！讓這份陪伴延續下去</h3>
+          <p>你已完成這隻精靈的養成，可以選擇一個公益組織，由平台提供捐款支持。</p>
+          <Button onClick={() => openStep('choose')}>選擇支持對象</Button>
+        </div>
+      ) : (
+        <div className="donation-unlocked-message">
+          <Badge tone="complete">{state.stage === 'pending' ? '等待平台撥款（前端示範）' : '平台已完成撥款（前端示範）'}</Badge>
+          <h3>已選擇支持{organization?.name ?? '示範公益組織'}</h3>
+          <Button variant="secondary" onClick={() => openStep('record')}>查看支持紀錄</Button>
+        </div>
+      )}
+      {celebrating && (
+        <Modal title="滿級達成！" className="donation-celebration" onClose={() => setCelebrating(false)}>
+          <CelebrationConfetti />
+          <div className="donation-celebration-art"><SpiritArtwork species={species} level={5} priority /></div>
+          <p className="donation-celebration-copy">
+            恭喜你完成一隻精靈的養成！現在可以選擇一個相關公益組織作為捐款對象，
+            <strong>這份支持由平台提供。</strong>
+          </p>
+          <div className="sp-dialog-actions">
+            <Button variant="secondary" onClick={() => setCelebrating(false)}>稍後再選</Button>
+            <Button onClick={() => openStep('choose')}>選擇支持對象</Button>
+          </div>
+        </Modal>
+      )}
+    </>
   )
 }
 
@@ -111,7 +176,7 @@ function SpiritSummary({
 }
 
 export function DonationDemoBox() {
-  const { state, update, ready } = useDonationDemo()
+  const { state, update, ready } = useDonationState(true, DONATION_DEMO_STORAGE_KEY, defaultDonationDemoState)
   const [celebrating, setCelebrating] = useState(false)
   const organization = findDemoOrganization(state.organizationId)
   const maxed = state.stage !== 'not-maxed'
@@ -240,8 +305,15 @@ export function DonationFlowClient() {
   const router = useRouter()
   const params = useSearchParams()
   const demoMode = params.get('demo') === 'donation'
+  const guardianIdValue = Number(params.get('guardianId'))
+  const guardianId = Number.isInteger(guardianIdValue) && guardianIdValue > 0 ? guardianIdValue : null
+  const formalMode = guardianId !== null
+  const enabled = demoMode || formalMode
+  const storageKey = demoMode
+    ? DONATION_DEMO_STORAGE_KEY
+    : formalDonationStorageKey(guardianId ?? 0)
   const requestedStep = params.get('step') ?? 'choose'
-  const { state, update, ready } = useDonationDemo(demoMode)
+  const { state, update, ready } = useDonationState(enabled, storageKey, defaultDonationDemoState)
   const [expanded, setExpanded] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const organizations = organizationsFor(state)
@@ -257,23 +329,28 @@ export function DonationFlowClient() {
   else if (step === 'confirm' && !draft) step = 'choose'
   else if (!['choose', 'confirm', 'complete', 'record'].includes(step)) step = 'choose'
 
+  const boxHref = demoMode ? '/box/?demo=donation' : '/box/'
+  const flowHref = useCallback((nextStep: string) => demoMode
+    ? `/box/donation/?demo=donation&step=${nextStep}`
+    : `/box/donation/?guardianId=${guardianId}&step=${nextStep}`, [demoMode, guardianId])
+
   useEffect(() => {
-    if (!demoMode) {
-      router.replace('/box')
+    if (!enabled) {
+      router.replace('/box/')
       return
     }
     if (!ready || step === requestedStep) return
-    router.replace(`/box/donation/?demo=donation&step=${step}`)
-  }, [demoMode, ready, requestedStep, router, step])
+    router.replace(flowHref(step))
+  }, [enabled, flowHref, ready, requestedStep, router, step])
 
-  if (!ready || !demoMode) return <main className="donation-flow"><p>載入示範資料…</p></main>
+  if (!ready || !enabled) return <main className="donation-flow"><p>載入公益支持資料…</p></main>
 
   const confirm = () => {
     if (!draft || submitting || state.stage !== 'eligible') return
     setSubmitting(true)
     const next = { ...state, stage: 'pending' as const, organizationId: draft.id, selectedAt: new Date().toISOString() }
     update(next)
-    router.replace('/box/donation/?demo=donation&step=complete')
+    router.replace(flowHref('complete'))
   }
 
   return (
@@ -282,12 +359,12 @@ export function DonationFlowClient() {
         {step === 'locked' ? (
           <ContentPanel className="donation-centered-state">
             <h1>尚未取得支持選擇機會</h1>
-            <p>請先在 demo 控制區模擬精靈達到 LV5 滿級。</p>
-            <ButtonLink href="/box/?demo=donation">返回精靈養成</ButtonLink>
+            <p>{demoMode ? '請先在 demo 控制區模擬精靈達到 LV5 滿級。' : '這隻精靈目前沒有可用的公益支持資格。'}</p>
+            <ButtonLink href={boxHref}>返回精靈養成</ButtonLink>
           </ContentPanel>
         ) : step === 'choose' ? (
           <>
-            <ButtonLink href="/box/?demo=donation" variant="quiet" className="donation-back"><ChevronLeft size={17} aria-hidden="true" />返回精靈養成</ButtonLink>
+            <ButtonLink href={boxHref} variant="quiet" className="donation-back"><ChevronLeft size={17} aria-hidden="true" />返回精靈養成</ButtonLink>
             <header className="donation-flow-heading"><h1>選擇支持的公益組織</h1><p>本次由平台捐出 NT${DEMO_DONATION_AMOUNT}（示範金額），你不需要付款。</p></header>
             <SpiritSummary
               state={state}
@@ -339,7 +416,7 @@ export function DonationFlowClient() {
             </div>
             <div className="donation-action-bar">
               <p aria-live="polite">{draft ? `已選擇：${draft.name}` : '請先選擇一個示範公益組織'}</p>
-              <Button disabled={!draft} onClick={() => router.push('/box/donation/?demo=donation&step=confirm')}>下一步</Button>
+              <Button disabled={!draft} onClick={() => router.push(flowHref('confirm'))}>下一步</Button>
             </div>
           </>
         ) : step === 'confirm' && draft ? (
@@ -366,7 +443,7 @@ export function DonationFlowClient() {
               <p>平台完成撥款後將另行通知。</p>
               <p className="donation-final-warning">確認後將無法更換本次支持對象。</p>
               <div className="donation-confirm-actions">
-                <Button variant="secondary" disabled={submitting} onClick={() => router.push('/box/donation/?demo=donation&step=choose')}>返回修改</Button>
+                <Button variant="secondary" disabled={submitting} onClick={() => router.push(flowHref('choose'))}>返回修改</Button>
                 <Button loading={submitting} onClick={confirm}>確認支持這個組織</Button>
               </div>
             </ContentPanel>
@@ -377,11 +454,11 @@ export function DonationFlowClient() {
             <h1>已收到你的支持選擇</h1>
             <p>你已選擇支持{confirmed?.name ?? draft?.name}。正式版將由平台依撥款時程處理。</p>
             <Badge tone="growth">等待平台撥款（示範）</Badge>
-            <ButtonLink href="/box/?demo=donation">返回精靈養成</ButtonLink>
+            <ButtonLink href={boxHref}>返回精靈養成</ButtonLink>
           </ContentPanel>
         ) : (
           <>
-            <ButtonLink href="/box/?demo=donation" variant="quiet" className="donation-back"><ChevronLeft size={17} aria-hidden="true" />返回精靈養成</ButtonLink>
+            <ButtonLink href={boxHref} variant="quiet" className="donation-back"><ChevronLeft size={17} aria-hidden="true" />返回精靈養成</ButtonLink>
             <header className="donation-flow-heading"><h1>公益支持紀錄</h1></header>
             <ContentPanel className="donation-record-card">
               <div className="donation-confirm-spirit">
@@ -414,7 +491,7 @@ export function DonationFlowClient() {
                   </dd>
                 </div>
               </dl>
-              <ButtonLink href="/box/?demo=donation">返回精靈養成</ButtonLink>
+              <ButtonLink href={boxHref}>返回精靈養成</ButtonLink>
             </ContentPanel>
           </>
         )}

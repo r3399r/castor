@@ -132,6 +132,7 @@ Reuse these foundations instead of duplicating colors, spacing, radii, surfaces,
 - The growth summary shows LV1-LV5. Future stages use the shared locked egg and must not load unreleased character artwork.
 - The collection and store always display all seven public-interest categories. Redeemed or in-progress categories sort first; locked categories remain visible afterward.
 - The public-support panel explains that completing LV5 triggers a platform contribution and highlights `NT$10`; do not implement or change contribution logic as part of UI work.
+- The LV5 organization-selection UI is currently frontend-only: each `user_guardian.id` is stored under a versioned `castor:donation-ui:*` localStorage key and uses fictional organizations. It is not an authoritative one-time entitlement or payout record; do not remove the demo labels or treat it as payment state until a backend model exists.
 
 **Learning analysis page (`/analysis`)**
 

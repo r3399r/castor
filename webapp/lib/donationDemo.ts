@@ -1,6 +1,7 @@
 import { spiritCatalog, type SpiritSpecies } from '@/lib/guardianArtwork'
 
 export const DONATION_DEMO_STORAGE_KEY = 'castor:donation-demo:v2'
+export const DONATION_FORMAL_STORAGE_PREFIX = 'castor:donation-ui:v1'
 export const DEMO_DONATION_AMOUNT = 100
 
 export type DonationDemoStage =
@@ -44,6 +45,18 @@ export const defaultDonationDemoState: DonationDemoState = {
   disbursedAt: null,
 }
 
+export function eligibleDonationState(spirit: SpiritSpecies): DonationDemoState {
+  return {
+    ...defaultDonationDemoState,
+    stage: 'eligible',
+    spirit,
+  }
+}
+
+export function formalDonationStorageKey(guardianId: number) {
+  return `${DONATION_FORMAL_STORAGE_PREFIX}:${guardianId}`
+}
+
 const categoryNames = Object.values(spiritCatalog).map((item) => item.category)
 
 export const demoOrganizations: DemoOrganization[] = categoryNames.flatMap(
@@ -71,25 +84,28 @@ export function organizationsFor(state: DonationDemoState) {
 
 export const demoOrganizationCategories = categoryNames
 
-export function readDonationDemoState(): DonationDemoState {
-  if (typeof window === 'undefined') return defaultDonationDemoState
+export function readDonationState(
+  storageKey: string,
+  fallback: DonationDemoState = defaultDonationDemoState,
+): DonationDemoState {
+  if (typeof window === 'undefined') return fallback
   try {
-    const raw = window.localStorage.getItem(DONATION_DEMO_STORAGE_KEY)
-    if (!raw) return defaultDonationDemoState
+    const raw = window.localStorage.getItem(storageKey)
+    if (!raw) return fallback
     const value = JSON.parse(raw) as Partial<DonationDemoState>
-    if (value.version !== 2) return defaultDonationDemoState
+    if (value.version !== 2) return fallback
     const validStages: DonationDemoStage[] = ['not-maxed', 'eligible', 'pending', 'disbursed']
-    if (!validStages.includes(value.stage as DonationDemoStage)) return defaultDonationDemoState
-    if (!(value.spirit && value.spirit in spiritCatalog)) return defaultDonationDemoState
-    return { ...defaultDonationDemoState, ...value } as DonationDemoState
+    if (!validStages.includes(value.stage as DonationDemoStage)) return fallback
+    if (!(value.spirit && value.spirit in spiritCatalog)) return fallback
+    return { ...fallback, ...value } as DonationDemoState
   } catch {
-    return defaultDonationDemoState
+    return fallback
   }
 }
 
-export function writeDonationDemoState(state: DonationDemoState) {
+export function writeDonationState(storageKey: string, state: DonationDemoState) {
   try {
-    window.localStorage.setItem(DONATION_DEMO_STORAGE_KEY, JSON.stringify(state))
+    window.localStorage.setItem(storageKey, JSON.stringify(state))
   } catch {
     // The demo remains usable for this tab when storage is blocked or full.
   }
