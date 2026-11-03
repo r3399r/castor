@@ -677,6 +677,27 @@
   margin-top: 6px;
   font-size: var(--text-spirit-caption);
 }
+.sp-member-bonus {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--color-spirit-leaf) 26%, var(--color-spirit-line));
+  border-radius: var(--radius-spirit-control);
+  color: var(--color-spirit-forest);
+  background: color-mix(in srgb, var(--color-spirit-mist) 82%, var(--color-spirit-paper));
+}
+.sp-member-bonus > .sp-badge { flex: none; }
+.sp-member-bonus > div { display: grid; gap: 3px; }
+.sp-member-bonus strong { font-size: var(--text-spirit-small); }
+.sp-member-bonus span { color: var(--color-spirit-muted); font-size: var(--text-spirit-caption); line-height: var(--leading-relaxed); }
+.sp-member-bonus--dialog { display: block; margin: -4px 0 20px; }
+.sp-member-bonus--dialog > .sp-badge { margin-bottom: 10px; }
+.sp-member-bonus--dialog dl { display: grid; gap: 7px; margin: 0; }
+.sp-member-bonus--dialog dl > div { display: flex; justify-content: space-between; gap: 16px; font-size: var(--text-spirit-small); }
+.sp-member-bonus--dialog dd { margin: 0; font-weight: 700; }
+.sp-member-bonus--dialog dl > div:last-child { padding-top: 7px; border-top: 1px solid color-mix(in srgb, var(--color-spirit-leaf) 20%, transparent); }
 .sp-invest-selector {
   margin-top: 16px;
 }
