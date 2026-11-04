@@ -48,6 +48,25 @@ const clean = (value: string | undefined): string | undefined => {
 };
 
 /**
+ * The first of several spellings ECPay might use for one value.
+ *
+ * Their own documentation for the recurring notification disagrees with
+ * itself: the field list names ProcessDate and AuthCode, while the
+ * schema on the same page names process_date and auth_code. Reading
+ * both costs nothing and removes the question; reading one and guessing
+ * wrong loses the authorisation date and code on every renewal, with
+ * nothing failing to show it -- the columns are nullable and nothing
+ * branches on them, so it would only surface when reconciling.
+ */
+const pick = (payload: Payload, ...names: string[]): string | undefined => {
+  for (const name of names) {
+    const value = clean(payload[name]);
+    if (value !== undefined) return value;
+  }
+  return undefined;
+};
+
+/**
  * The value that makes processing a notification idempotent.
  *
  * ECPay retries anything it did not get `1|OK` for, so without this a
@@ -69,7 +88,7 @@ const dedupeKey = (payload: Payload): string | undefined => {
 
 // The recurring notification calls it Amount, the first one TradeAmt.
 const amountOf = (payload: Payload): number =>
-  Number(clean(payload.Amount) ?? clean(payload.TradeAmt) ?? 0);
+  Number(pick(payload, 'Amount', 'amount', 'TradeAmt') ?? 0);
 
 /**
  * Records one authorisation and, when it paid, extends the subscription.
@@ -127,8 +146,10 @@ const recordNotification = async (db: Db, payload: Payload, source: string): Pro
     rtnCode,
     rtnMsg: payload.RtnMsg?.slice(0, 255) ?? null,
     amount: amountOf(payload),
-    authCode: clean(payload.auth_code)?.slice(0, 10) ?? null,
-    processDate: parseEcpayDate(payload.process_date ?? payload.PaymentDate),
+    authCode: pick(payload, 'auth_code', 'AuthCode')?.slice(0, 10) ?? null,
+    processDate: parseEcpayDate(
+      pick(payload, 'process_date', 'ProcessDate', 'PaymentDate')
+    ),
     totalSuccessTimes: clean(payload.TotalSuccessTimes)
       ? Number(payload.TotalSuccessTimes)
       : null,

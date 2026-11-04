@@ -110,17 +110,35 @@ export const genCheckMacValue = (params: Record<string, string>): string => {
 };
 
 /**
+ * Constant-time string comparison, for comparing a MAC and nothing else.
+ *
+ * `timingSafeEqual` throws on a length mismatch, so the lengths are
+ * checked first. That leaks the length, which here is the fixed width of
+ * a SHA256 hex digest and therefore not a secret.
+ */
+const timingSafeEquals = (a: string, b: string): boolean => {
+  const left = Buffer.from(a, 'utf8');
+  const right = Buffer.from(b, 'utf8');
+  if (left.length !== right.length) return false;
+  return crypto.timingSafeEqual(left, right);
+};
+
+/**
  * Whether a notification really came from ECPay.
  *
  * This is the only authentication a webhook route has -- it carries no
- * token and cannot, since ECPay's servers are the caller. A plain
- * comparison is enough: forging the value requires the HashKey, and
- * there is nothing to learn from how long the comparison took.
+ * token and cannot, since ECPay's servers are the caller. So the
+ * comparison itself has to be constant-time: `===` stops at the first
+ * byte that differs, and an attacker who can send notifications and
+ * measure the reply has an oracle for guessing the expected digest one
+ * byte at a time, without ever knowing the HashKey. Exploiting that
+ * across the internet is hard, but the cost of removing it is four
+ * lines, and ECPay's own integration guidance requires it.
  */
 export const verifyCheckMacValue = (payload: Record<string, string>): boolean => {
   const { CheckMacValue, ...rest } = payload;
   if (CheckMacValue === undefined) return false;
-  return genCheckMacValue(rest) === CheckMacValue.toUpperCase();
+  return timingSafeEquals(genCheckMacValue(rest), CheckMacValue.toUpperCase());
 };
 
 // ECPay timestamps are Taipei wall-clock with no offset in the string,

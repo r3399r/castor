@@ -2,25 +2,25 @@
 -- charge and not per subscription period.
 --
 -- The split from user_subscription is deliberate and follows what that
--- table's comment already anticipated: user_subscription answers "may
+-- comment on that table already anticipated: user_subscription answers "may
 -- this user have paid features, and until when", which must stay
 -- readable with the provider unreachable. This table answers "what did
 -- we agree with ECPay, and is it still charging", which is provider
 -- state we do not own. Entitlement must not depend on a row here, so
 -- nothing in the access check reads this table.
 --
--- ECPay's 信用卡定期定額 is the product behind it: the cardholder
+-- The ECPay 信用卡定期定額 product is behind it: the cardholder
 -- authorises once, and ECPay then charges on its own schedule
 -- (period_type/frequency/exec_times) until the executions run out, the
 -- card expires, six consecutive charges fail, or we cancel. Those are
--- ECPay's terms, not ours -- see the status column.
+-- the ECPay terms, not ours -- see the status column.
 CREATE TABLE IF NOT EXISTS castor.payment_order (
     id INT UNSIGNED AUTO_INCREMENT,
     user_id INT UNSIGNED NOT NULL,
-    plan VARCHAR(32) NOT NULL, -- monthly, annual; matches user_subscription.plan
+    plan VARCHAR(32) NOT NULL, -- monthly or annual, matching user_subscription.plan
     provider VARCHAR(32) NOT NULL DEFAULT 'ecpay',
 
-    -- ECPay's MerchantTradeNo: ours to generate, max 20 characters,
+    -- The ECPay MerchantTradeNo: ours to generate, max 20 characters,
     -- alphanumeric only, and the one identifier that appears in every
     -- notification ECPay sends for this agreement. It is therefore also
     -- what user_subscription.provider_ref points at. UNIQUE because
@@ -28,9 +28,9 @@ CREATE TABLE IF NOT EXISTS castor.payment_order (
     -- than at their gateway.
     merchant_trade_no VARCHAR(20) NOT NULL,
 
-    -- created   -- form handed to the browser; nothing has been paid and
+    -- created   -- form handed to the browser, nothing has been paid and
     --              possibly never will be (the user can close the tab)
-    -- active    -- first authorisation succeeded; ECPay is scheduling
+    -- active    -- first authorisation succeeded, ECPay is scheduling
     -- cancelled -- we called CreditCardPeriodAction/Cancel. One-way:
     --              ECPay cannot re-enable an order, only a new one can
     --              be created, which is why resuming a subscription is a
@@ -46,7 +46,7 @@ CREATE TABLE IF NOT EXISTS castor.payment_order (
     exec_times SMALLINT UNSIGNED NOT NULL, -- total charges ECPay will attempt
     period_amount INT UNSIGNED NOT NULL, -- NTD per charge, integer only
 
-    -- ECPay's own trade number for the first authorisation. Only useful
+    -- The ECPay trade number for the first authorisation. Only useful
     -- for looking an order up in their back office, so it is nullable
     -- and nothing branches on it.
     ecpay_trade_no VARCHAR(32) NULL,

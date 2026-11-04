@@ -103,6 +103,26 @@ describe('verifyCheckMacValue', () => {
   it('rejects a payload carrying no CheckMacValue at all', () => {
     expect(verifyCheckMacValue({ MerchantTradeNo: 'CS1' })).toBe(false);
   });
+
+  it('accepts the digest in lower case, which is how some payloads arrive', () => {
+    const payload = { MerchantTradeNo: 'CS1', RtnCode: '1' };
+    const CheckMacValue = genCheckMacValue(payload).toLowerCase();
+    expect(verifyCheckMacValue({ ...payload, CheckMacValue })).toBe(true);
+  });
+
+  // The comparison is constant-time, and Node's timingSafeEqual throws
+  // when the two buffers differ in length. Returning false has to happen
+  // before that: a throw here is a 500, and ECPay answers a 500 by
+  // re-sending the same notification up to four times.
+  it.each([
+    ['shorter than a digest', 'ABCD'],
+    ['longer than a digest', `${'A'.repeat(64)}EXTRA`],
+    ['empty', ''],
+  ])('rejects a CheckMacValue that is %s, without throwing', (_label, CheckMacValue) => {
+    const payload = { MerchantTradeNo: 'CS1', RtnCode: '1' };
+    expect(() => verifyCheckMacValue({ ...payload, CheckMacValue })).not.toThrow();
+    expect(verifyCheckMacValue({ ...payload, CheckMacValue })).toBe(false);
+  });
 });
 
 describe('AES payload encryption', () => {

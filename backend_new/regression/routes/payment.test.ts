@@ -282,6 +282,30 @@ describe('payment', () => {
       expect(await getDb().select().from(paymentChargeTable)).toEqual([]);
     });
 
+    // The signature check is constant-time, and the primitive behind it
+    // throws when the two values differ in length. The case above cannot
+    // catch that, because a 64-character forgery is the same length as a
+    // real digest. A throw would surface as a 500, and ECPay answers a
+    // 500 by re-sending the notification up to four times.
+    it('rejects a truncated signature with 400 rather than failing', async () => {
+      const userId = await seedUser();
+      await seedOrder(userId);
+
+      const truncated = new URLSearchParams({
+        MerchantID: '3002607',
+        MerchantTradeNo: 'CSTEST1',
+        RtnCode: '1',
+        TradeAmt: '199',
+        TradeNo: 'EC0001',
+        CheckMacValue: 'F',
+      }).toString();
+
+      const res = await postWebhook('/api/webhook/ecpay/notify', truncated);
+      expect(res.status).toBe(400);
+      expect(await subscriptionsOf(userId)).toEqual([]);
+      expect(await getDb().select().from(paymentChargeTable)).toEqual([]);
+    });
+
     it('marks a declined first authorisation failed and grants nothing', async () => {
       const userId = await seedUser();
       await seedOrder(userId);
@@ -349,6 +373,37 @@ describe('payment', () => {
         auth_code: '777777',
         TotalSuccessTimes: '2',
       });
+
+    // ECPay's own page for this notification contradicts itself: the
+    // field list names ProcessDate and AuthCode, the schema beside it
+    // names process_date and auth_code. Reading only one spelling loses
+    // the authorisation date and code on every renewal, and loses them
+    // quietly -- both columns are nullable and nothing branches on them,
+    // so the first sign of it would be a reconciliation that cannot be
+    // done.
+    it('records the authorisation details under either spelling', async () => {
+      const userId = await seedUser();
+      await seedOrder(userId, { status: 'active' });
+
+      const pascalCase = notification({
+        MerchantID: '3002607',
+        MerchantTradeNo: 'CSTEST1',
+        RtnCode: '1',
+        RtnMsg: '成功',
+        Amount: '199',
+        gwsr: '77777777',
+        ProcessDate: '2024/04/12 15:30:23',
+        AuthCode: '654321',
+        TotalSuccessTimes: '2',
+      });
+
+      const res = await postWebhook('/api/webhook/ecpay/period', pascalCase);
+      expect(res.status).toBe(200);
+
+      const [charge] = await getDb().select().from(paymentChargeTable);
+      expect(charge.authCode).toBe('654321');
+      expect(charge.processDate).not.toBeNull();
+    });
 
     it('queues the renewed period behind the one already paid for', async () => {
       const userId = await seedUser();
