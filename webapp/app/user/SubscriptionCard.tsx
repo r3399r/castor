@@ -1,9 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { formatNumber } from '@/lib/number'
 import { CreditCard, RefreshCw } from 'lucide-react'
-import { apiFetch } from '@/lib/api'
+import { apiFetch, apiPost } from '@/lib/api'
+import { usePlanAmounts, type PlanAmounts } from '@/hooks/usePlanAmounts'
 import {
   deriveSubscriptionView,
   formatPlanPrice,
@@ -24,18 +24,22 @@ import type {
 } from '@/types/api'
 import styles from './user.module.css'
 
-type ManagementDialog = 'cancel'
-
-function PlanLine({ planCode }: { planCode: string }) {
+function PlanLine({ planCode, amounts }: { planCode: string; amounts: PlanAmounts | null }) {
   const plan = getSubscriptionPlan(planCode)
   return (
     <p className={styles.subscriptionPlan}>
-      {plan ? `${plan.name} · ${formatPlanPrice(plan)}` : `目前方案 · ${planCode}`}
+      {plan ? `${plan.name} · ${formatPlanPrice(plan, amounts?.[plan.code])}` : `目前方案 · ${planCode}`}
     </p>
   )
 }
 
-function SubscriptionDetails({ view }: { view: SubscriptionView }) {
+function SubscriptionDetails({
+  view,
+  amounts,
+}: {
+  view: SubscriptionView
+  amounts: PlanAmounts | null
+}) {
   if (view.kind === 'free') {
     return (
       <>
@@ -49,28 +53,13 @@ function SubscriptionDetails({ view }: { view: SubscriptionView }) {
 
   if (view.kind === 'active') {
     const plan = getSubscriptionPlan(view.planCode)
-    const renewalPeriod = plan?.code === 'annual' ? '每年' : '每月'
     return (
       <>
         <Badge tone="complete" className={styles.subscriptionBadge}>訂閱中</Badge>
-        <PlanLine planCode={view.planCode} />
+        <PlanLine planCode={view.planCode} amounts={amounts} />
         <p className={styles.subscriptionMeta}>
-          本方案將{renewalPeriod}自動續訂，下一次扣款日為{' '}
+          本方案將{plan?.renewalLabel ?? '每月'}自動續訂，下一次扣款日約為{' '}
           {formatTaiwanDate(view.entitlementEndsAt)}。
-        </p>
-      </>
-    )
-  }
-
-  if (view.kind === 'scheduled_change') {
-    const pendingPlan = getSubscriptionPlan(view.pendingPlanCode)
-    return (
-      <>
-        <Badge tone="complete" className={styles.subscriptionBadge}>訂閱中</Badge>
-        <PlanLine planCode={view.planCode} />
-        <p className={styles.subscriptionMeta}>
-          將於 {formatTaiwanDate(view.pendingPlanEffectiveAt)} 變更為{' '}
-          {pendingPlan?.name ?? view.pendingPlanCode}，扣款 NT${formatNumber(view.pendingPlanAmount)}。
         </p>
       </>
     )
@@ -82,7 +71,7 @@ function SubscriptionDetails({ view }: { view: SubscriptionView }) {
         <Badge tone="neutral" className={`${styles.subscriptionBadge} ${styles.cancelledBadge}`}>
           已取消續訂
         </Badge>
-        <PlanLine planCode={view.planCode} />
+        <PlanLine planCode={view.planCode} amounts={amounts} />
         <p className={styles.subscriptionMeta}>
           訂閱權益可使用至：{formatTaiwanDate(view.entitlementEndsAt)}。到期後恢復免費會員，不再自動扣款。
         </p>
@@ -96,9 +85,9 @@ function SubscriptionDetails({ view }: { view: SubscriptionView }) {
         <Badge tone="neutral" className={`${styles.subscriptionBadge} ${styles.paymentBadge}`}>
           付款需要處理
         </Badge>
-        <PlanLine planCode={view.planCode} />
+        <PlanLine planCode={view.planCode} amounts={amounts} />
         <p className={styles.subscriptionDescription}>
-          續訂付款未完成。目前沒有可用的付款管理入口，訂閱權益依後端狀態為準。
+          續訂付款未完成。可至訂閱頁重新建立訂閱，訂閱權益依後端狀態為準。
         </p>
       </>
     )
@@ -116,7 +105,10 @@ export default function SubscriptionCard() {
   const [view, setView] = useState<SubscriptionView | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [dialog, setDialog] = useState<ManagementDialog | null>(null)
+  const [confirming, setConfirming] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
+  const [cancelError, setCancelError] = useState<string | null>(null)
+  const { amounts } = usePlanAmounts()
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -138,7 +130,36 @@ export default function SubscriptionCard() {
     load()
   }, [load])
 
-  const active = view?.kind === 'active' || view?.kind === 'scheduled_change'
+  /**
+   * Turns auto-renew off. Access is not revoked -- the period already
+   * paid for runs to its end -- but it cannot be undone at the provider,
+   * so resubscribing later is a fresh agreement charged on the spot.
+   *
+   * The cancel and the refresh are deliberately separate try blocks: a
+   * failed refresh after a successful cancel must not be reported as a
+   * failed cancel, or the user retries something that already happened.
+   */
+  const cancel = useCallback(async () => {
+    setCancelling(true)
+    setCancelError(null)
+    try {
+      await apiPost('subscription/cancel', {})
+    } catch {
+      setCancelling(false)
+      setCancelError('取消失敗，請稍後再試。若狀況持續，請與我們聯絡。')
+      return
+    }
+    setConfirming(false)
+    try {
+      await load()
+    } catch {
+      setError('已取消續訂，但畫面上的狀態可能不是最新的，請重新載入。')
+    } finally {
+      setCancelling(false)
+    }
+  }, [load])
+
+  const active = view?.kind === 'active'
   const cancelled = view?.kind === 'cancelled'
   const free = view?.kind === 'free' || view?.kind === 'expired'
   const paymentFailed = view?.kind === 'payment_failed'
@@ -165,7 +186,7 @@ export default function SubscriptionCard() {
               </Button>
             </ErrorState>
           ) : view ? (
-            <SubscriptionDetails view={view} />
+            <SubscriptionDetails view={view} amounts={amounts} />
           ) : null}
         </div>
       </div>
@@ -175,50 +196,46 @@ export default function SubscriptionCard() {
           {free && <ButtonLink href="/subscription">查看訂閱方案</ButtonLink>}
           {active && (
             <>
-              <ButtonLink href="/subscription">
-                {view.kind === 'scheduled_change' ? '查看／變更方案' : '變更訂閱方案'}
-              </ButtonLink>
+              <ButtonLink href="/subscription">變更訂閱方案</ButtonLink>
               <Button
                 variant="secondary"
                 className={styles.cancelSubscriptionButton}
-                onClick={() => setDialog('cancel')}
+                onClick={() => setConfirming(true)}
               >
                 取消續訂
               </Button>
             </>
           )}
           {cancelled && (
-            <ButtonLink href="/subscription">查看訂閱方案</ButtonLink>
+            <ButtonLink href="/subscription">重新訂閱</ButtonLink>
           )}
           {paymentFailed && (
-            <>
-              <Button disabled>更新付款方式（尚未開放）</Button>
-              <ButtonLink href="/subscription" variant="secondary">查看方案</ButtonLink>
-            </>
+            <ButtonLink href="/subscription">重新建立訂閱</ButtonLink>
           )}
         </div>
       )}
 
-      {dialog && view && (view.kind === 'active' || view.kind === 'scheduled_change') && (
-        <Modal
-          title="取消續訂？"
-          onClose={() => setDialog(null)}
-        >
+      {confirming && view?.kind === 'active' && (
+        <Modal title="取消續訂？" onClose={() => (cancelling ? undefined : setConfirming(false))}>
           <p className={styles.dialogCopy}>
-            取消後將不再自動扣款，並預計可使用訂閱功能至{' '}
+            取消後不會再自動扣款，訂閱功能仍可使用至{' '}
             {formatTaiwanDate(view.entitlementEndsAt)}。
-            {view.kind === 'scheduled_change' ? '已安排的方案變更也會一併取消。' : ''}
-            目前線上取消功能尚未開放，無法在此變更訂閱狀態。
           </p>
+          {/*
+            Not a scare notice but a fact about the provider: ECPay
+            cannot re-enable a cancelled agreement, so "undo" means
+            buying again, and that charges immediately.
+          */}
           <div className={styles.managementNotice} role="note">
-            訂閱管理 API 尚未串接，這個視窗目前僅供確認流程與文案。
+            取消後無法直接恢復。若之後想繼續訂閱，需要重新刷卡建立新的訂閱，並於當下扣款；不過新的訂閱期間會接在上述日期之後，已付的天數不會損失。
           </div>
+          {cancelError && <p role="alert">{cancelError}</p>}
           <div className="sp-dialog-actions">
-            <Button variant="secondary" onClick={() => setDialog(null)}>
+            <Button variant="secondary" onClick={() => setConfirming(false)} disabled={cancelling}>
               維持訂閱
             </Button>
-            <Button variant="danger" disabled>
-              確認取消續訂
+            <Button variant="danger" onClick={cancel} disabled={cancelling}>
+              {cancelling ? '處理中…' : '確認取消續訂'}
             </Button>
           </div>
         </Modal>

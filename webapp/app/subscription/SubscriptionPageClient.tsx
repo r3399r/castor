@@ -13,9 +13,12 @@ import {
   Zap,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
-import { apiFetch } from '@/lib/api'
+import { usePlanAmounts } from '@/hooks/usePlanAmounts'
+import { ApiError, apiFetch, apiPost } from '@/lib/api'
+import { submitCheckout } from '@/lib/checkout'
 import {
   deriveSubscriptionView,
+  formatPlanPrice,
   formatTaiwanDate,
   getSubscriptionPlan,
   subscriptionPlans,
@@ -23,7 +26,11 @@ import {
   type SubscriptionView,
 } from '@/lib/subscription'
 import { Badge, Button, Card, ContentPanel, Modal } from '@/components/ui'
-import type { GetSubscriptionHistoryResponse, SubscriptionStatus } from '@/types/api'
+import type {
+  GetSubscriptionHistoryResponse,
+  PostPaymentCheckoutResponse,
+  SubscriptionStatus,
+} from '@/types/api'
 import styles from './subscription.module.css'
 
 const benefitSummary = [
@@ -54,9 +61,12 @@ const analysisFeatures = [
 ]
 
 const faqs = [
-  ['訂閱後何時可以使用進階分析？', '付款功能尚未開放，實際啟用時間將於正式上線前確認。'],
+  ['訂閱後何時可以使用進階分析？', '刷卡完成、收到綠界的付款結果後就會開通，通常是幾秒內。若畫面尚未更新，重新整理即可。'],
+  ['可以用什麼方式付款？', '目前只支援信用卡。自動續訂是透過綠界的信用卡定期定額，刷一次卡之後由綠界按週期扣款，不支援銀聯卡。'],
   ['原本的學習紀錄會保留嗎？', '會，訂閱不會影響既有的練習紀錄與學習資料。'],
-  ['如何管理訂閱？', '取消自動續訂可至個人資料頁處理；恢復續訂與變更計費週期則在本頁操作。相關功能目前尚未開放。'],
+  ['如何取消訂閱？', '到個人資料頁點「取消續訂」即可。取消後不再扣款，但已付費的這一期仍可使用到期末。'],
+  ['取消後想再訂閱呢？', '可以，但會是一份全新的訂閱，需要重新刷卡且當下就會扣款。新的訂閱期間會接在原本已付費的期間之後開始，不會浪費你已付的天數。'],
+  ['中途換方案會怎麼計費？', '會立即停止原本的自動續訂、重新刷卡，新方案當下就扣款；新的訂閱期間一樣接在目前期間結束後才開始。'],
   ['10% XP 加成如何計算？', '例如投入 100 積分，訂閱期間精靈可獲得 110 XP。'],
   ['公益類別可以更改嗎？', '限定精靈完成培養後的公益選擇規則仍待確認。'],
 ]
@@ -72,17 +82,13 @@ function CurrentSubscriptionSummary({ view }: { view: SubscriptionView }) {
       </div>
     )
   }
-  if (view.kind === 'scheduled_change') {
-    const currentPlan = getSubscriptionPlan(view.planCode)
-    const pendingPlan = getSubscriptionPlan(view.pendingPlanCode)
+  if (view.kind === 'cancelled') {
+    const plan = getSubscriptionPlan(view.planCode)
     return (
       <div className={styles.currentSummary}>
-        <Badge tone="complete">訂閱中</Badge>
-        <strong>目前使用：{currentPlan?.name ?? view.planCode}</strong>
-        <span>
-          已安排於 {formatTaiwanDate(view.pendingPlanEffectiveAt)} 變更為{' '}
-          {pendingPlan?.name ?? view.pendingPlanCode}，屆時扣款 NT${formatNumber(view.pendingPlanAmount)}。
-        </span>
+        <Badge tone="neutral">已取消續訂</Badge>
+        <strong>目前使用：{plan?.name ?? view.planCode}</strong>
+        <span>可使用至 {formatTaiwanDate(view.entitlementEndsAt)}，不會再自動扣款。</span>
       </div>
     )
   }
@@ -103,7 +109,12 @@ export default function SubscriptionPageClient() {
   const [view, setView] = useState<SubscriptionView | null>(null)
   const [statusLoading, setStatusLoading] = useState(false)
   const [statusError, setStatusError] = useState<string | null>(null)
-  const [dialog, setDialog] = useState<'resume' | 'change' | 'cancel_change' | null>(null)
+  // Only one confirmation exists now, and it guards the one irreversible
+  // step: starting a new agreement stops the current one for good.
+  const [confirming, setConfirming] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const { amounts, failed: amountsFailed } = usePlanAmounts()
 
   const loadStatus = useCallback(async () => {
     if (!user) {
@@ -120,9 +131,7 @@ export default function SubscriptionPageClient() {
       ])
       const nextView = deriveSubscriptionView(current, history)
       setView(nextView)
-      if (nextView.kind === 'scheduled_change' && getSubscriptionPlan(nextView.pendingPlanCode))
-        setSelectedPlan(nextView.pendingPlanCode as SubscriptionPlanCode)
-      else if ('planCode' in nextView && getSubscriptionPlan(nextView.planCode))
+      if ('planCode' in nextView && getSubscriptionPlan(nextView.planCode))
         setSelectedPlan(nextView.planCode as SubscriptionPlanCode)
     } catch {
       setView(null)
@@ -140,30 +149,59 @@ export default function SubscriptionPageClient() {
     () => subscriptionPlans.find((plan) => plan.code === selectedPlan) ?? subscriptionPlans[0],
     [selectedPlan],
   )
-  const managedSubscription =
-    view?.kind === 'active' || view?.kind === 'cancelled' || view?.kind === 'scheduled_change'
+  const managedSubscription = view?.kind === 'active' || view?.kind === 'cancelled'
   const statePending = authLoading || statusLoading
   const canChoosePlan = !statePending && !statusError && view?.kind !== 'payment_failed'
-  const renewalPeriod = selected.code === 'annual' ? '每年' : '每月'
   const currentPlanCode = managedSubscription ? view.planCode : null
   const selectedIsCurrent = selectedPlan === currentPlanCode
-  const pendingPlanCode = view?.kind === 'scheduled_change' ? view.pendingPlanCode : null
-  const selectedIsPending = selectedPlan === pendingPlanCode
-  const actionLabel = view?.kind === 'scheduled_change'
-    ? selectedIsPending
-      ? '已安排變更'
-      : selectedIsCurrent
-        ? '取消方案變更'
-        : `變更為${selected.name}`
+  const selectedAmount = amounts?.[selected.code] ?? null
+
+  // Starting a subscription replaces whatever agreement exists, so the
+  // only state with nothing to offer is "already on this exact plan with
+  // auto-renew on". A cancelled subscriber choosing their own plan again
+  // is resubscribing, which is a new agreement and therefore allowed.
+  const alreadyOnThisPlan = view?.kind === 'active' && selectedIsCurrent
+  const actionLabel = alreadyOnThisPlan
+    ? '目前使用此方案'
     : view?.kind === 'active'
-    ? selectedIsCurrent
-      ? '目前使用此方案'
-      : `變更為${selected.name}`
-    : view?.kind === 'cancelled'
-      ? selectedIsCurrent
-        ? '恢復自動續訂'
-        : `變更為${selected.name}`
-      : '開始訂閱（尚未開放）'
+      ? `改用${selected.name}`
+      : view?.kind === 'cancelled'
+        ? selectedIsCurrent
+          ? '重新訂閱'
+          : `改用${selected.name}`
+        : '開始訂閱'
+
+  // A purchase is never offered at a price the server has not confirmed:
+  // the amount shown has to be the amount that gets charged.
+  const canSubscribe =
+    !!user && !statePending && !statusError && !alreadyOnThisPlan &&
+    view?.kind !== 'payment_failed' && selectedAmount !== null && !submitting
+
+  /**
+   * Hands the browser to ECPay. Replacing an existing agreement is
+   * confirmed first, because stopping it is irreversible -- ECPay cannot
+   * re-enable one, and abandoning the payment page afterwards leaves the
+   * user with no auto-renew at all.
+   */
+  const startCheckout = useCallback(async () => {
+    setSubmitting(true)
+    setActionError(null)
+    try {
+      const checkout = await apiPost<PostPaymentCheckoutResponse>('payment/checkout', {
+        plan: selected.code,
+      })
+      // Leaves the page, so nothing after this runs on success.
+      submitCheckout(checkout)
+    } catch (e) {
+      setSubmitting(false)
+      setConfirming(false)
+      setActionError(
+        e instanceof ApiError && e.code === 'ALREADY_SUBSCRIBED'
+          ? '你已經在使用這個方案了。'
+          : '無法前往付款頁面，請稍後再試。',
+      )
+    }
+  }, [selected.code])
 
   return (
     <>
@@ -190,7 +228,7 @@ export default function SubscriptionPageClient() {
           <div className={styles.planOptions}>
             {subscriptionPlans.map((plan) => {
               const current = managedSubscription && plan.code === currentPlanCode
-              const pending = view?.kind === 'scheduled_change' && plan.code === view.pendingPlanCode
+              const amount = amounts?.[plan.code]
               return (
                 <label key={plan.code} className={`${styles.planOption} ${current ? styles.currentPlan : ''}`}>
                   <input
@@ -207,13 +245,24 @@ export default function SubscriptionPageClient() {
                       <strong>{plan.name}</strong>
                       <span className={styles.planBadges}>
                         {current && <Badge tone="growth">目前方案</Badge>}
-                        {pending && <Badge tone="neutral" className={styles.pendingBadge}>已安排變更</Badge>}
                         {plan.recommended && <Badge tone="complete">推薦</Badge>}
                       </span>
                     </span>
+                    {/*
+                      The price comes from the API, never from a constant
+                      here: this number has to be the one the server signs
+                      into the ECPay order. Until it arrives the plan is
+                      shown without a price rather than with a guess.
+                    */}
                     <span className={styles.planOptionPrice}>
-                      <strong>NT${formatNumber(plan.price)}</strong>
-                      <span>／{plan.periodLabel}</span>
+                      {typeof amount === 'number' ? (
+                        <>
+                          <strong>NT${formatNumber(amount)}</strong>
+                          <span>／{plan.periodLabel}</span>
+                        </>
+                      ) : (
+                        <span>{amountsFailed ? '價格暫時無法顯示' : '讀取價格…'}</span>
+                      )}
                     </span>
                     <small>{plan.note}</small>
                   </span>
@@ -228,7 +277,7 @@ export default function SubscriptionPageClient() {
             <>
               <p role="status">正在載入訂閱狀態…</p>
               <Button className={styles.subscribeButton} size="lg" disabled>
-                開始訂閱（尚未開放）
+                開始訂閱
               </Button>
             </>
             ) : statusError ? (
@@ -242,68 +291,79 @@ export default function SubscriptionPageClient() {
             <p>付款狀態需要處理，目前無法開始或變更方案。</p>
             ) : (
             <>
-              {view?.kind === 'cancelled' ? (
-                <p>選擇方案後將恢復自動續訂；原訂閱權益預計可使用至 {formatTaiwanDate(view.entitlementEndsAt)}。</p>
+              {!user ? (
+                <p>請先登入，才能開始訂閱。</p>
+              ) : view?.kind === 'cancelled' ? (
+                <p>
+                  原訂閱權益可使用至 {formatTaiwanDate(view.entitlementEndsAt)}。
+                  重新訂閱會立即扣款，新的訂閱期間接在該日之後開始。
+                </p>
+              ) : view?.kind === 'active' ? (
+                <p>
+                  {alreadyOnThisPlan
+                    ? `${selected.name}將${selected.renewalLabel}自動續訂；可至個人資料頁取消續訂。`
+                    : '改用其他方案會立即停止目前的自動續訂並重新刷卡，已付費的天數不會損失。'}
+                </p>
               ) : (
-                <p>{selected.name}將{renewalPeriod}自動續訂；訂閱後可至個人資料頁取消續訂。</p>
+                <p>{selected.name}將{selected.renewalLabel}自動續訂；訂閱後可至個人資料頁取消續訂。</p>
               )}
+              {amountsFailed && <p role="alert">暫時無法取得方案價格，請重新整理後再試。</p>}
+              {actionError && <p role="alert">{actionError}</p>}
               <Button
                 className={styles.subscribeButton}
                 size="lg"
-                disabled={
-                  !managedSubscription ||
-                  (view?.kind === 'active' && selectedIsCurrent) ||
-                  (view?.kind === 'scheduled_change' && selectedIsPending)
-                }
+                disabled={!canSubscribe}
                 onClick={() => {
-                  if (view?.kind === 'cancelled' && selectedIsCurrent) setDialog('resume')
-                  else if (view?.kind === 'scheduled_change' && selectedIsCurrent) setDialog('cancel_change')
-                  else if (managedSubscription) setDialog('change')
+                  // Replacing a live agreement is irreversible, so it is
+                  // confirmed; a first subscription is not, because
+                  // ECPay's own payment page is the next step either way.
+                  if (managedSubscription) setConfirming(true)
+                  else startCheckout()
                 }}
               >
-                {actionLabel}
+                {submitting ? '前往付款…' : actionLabel}
               </Button>
-              {view?.kind === 'scheduled_change' && (
-                <Button variant="secondary" onClick={() => setDialog('cancel_change')}>
-                  取消方案變更
-                </Button>
-              )}
             </>
             )}
         </div>
       </ContentPanel>
 
-      {dialog && managedSubscription && (
+      {/*
+        Everything this dialog says has to match what ECPay actually
+        does. It cannot amend an agreement and cannot un-cancel one, so
+        there is no "takes effect at the end of the period" and no "you
+        will not be charged now" -- both were true of the provider this
+        screen was first drafted against, and neither is true here.
+      */}
+      {confirming && managedSubscription && (
         <Modal
-          title={dialog === 'resume'
-            ? '恢復自動續訂？'
-            : dialog === 'cancel_change'
-              ? '取消方案變更？'
-              : `變更為${selected.name}？`}
-          onClose={() => setDialog(null)}
+          title={view.kind === 'cancelled' && selectedIsCurrent ? '重新訂閱？' : `改用${selected.name}？`}
+          onClose={() => setConfirming(false)}
         >
           <p className={styles.dialogCopy}>
-            {dialog === 'resume' ? (
-              <>恢復後將於 {formatTaiwanDate(view.entitlementEndsAt)} 以 {selected.name}扣款 NT${formatNumber(selected.price)}，之後{renewalPeriod}自動續訂。本次不會立即扣款。</>
-            ) : dialog === 'cancel_change' && view.kind === 'scheduled_change' ? (
-              <>取消後將維持 {getSubscriptionPlan(view.planCode)?.name ?? view.planCode}，並於 {formatTaiwanDate(view.entitlementEndsAt)} 按原方案自動續訂。</>
-            ) : (
-              <>目前方案可使用至 {formatTaiwanDate(view.entitlementEndsAt)}。{selected.name}將於本期結束後生效，屆時扣款 NT${formatNumber(selected.price)}，之後{renewalPeriod}自動續訂。本次不會立即扣款。{view.kind === 'cancelled' ? '確認後將恢復自動續訂。' : ''}</>
+            {view.kind === 'active' && (
+              <>目前方案可使用至 {formatTaiwanDate(view.entitlementEndsAt)}，這些天數不會損失。</>
             )}
+            {view.kind === 'cancelled' && (
+              <>原訂閱權益可使用至 {formatTaiwanDate(view.entitlementEndsAt)}，這些天數不會損失。</>
+            )}
+            {' '}
+            確認後會前往綠界重新刷卡，
+            {selectedAmount !== null && <>本次就會扣款 NT${formatNumber(selectedAmount)}，</>}
+            新的訂閱期間接在上述日期之後開始，之後{selected.renewalLabel}自動續訂。
           </p>
-          <div className={styles.managementNotice} role="note">
-            訂閱付款與方案管理 API 尚未串接，目前不能送出這項變更。
-          </div>
+          {view.kind === 'active' && (
+            <div className={styles.managementNotice} role="note">
+              目前的自動續訂會在此時停止，且無法復原。若沒有完成這次刷卡，到期後就不會再自動續訂。
+            </div>
+          )}
+          {actionError && <p role="alert">{actionError}</p>}
           <div className="sp-dialog-actions">
-            <Button variant="secondary" onClick={() => setDialog(null)}>
-              {dialog === 'resume'
-                ? '暫不恢復'
-                : dialog === 'cancel_change'
-                  ? '保留變更'
-                  : '暫不變更'}
+            <Button variant="secondary" onClick={() => setConfirming(false)} disabled={submitting}>
+              暫不變更
             </Button>
-            <Button disabled>
-              {dialog === 'resume' ? '確認恢復' : dialog === 'cancel_change' ? '確認取消變更' : '確認變更'}
+            <Button onClick={startCheckout} disabled={submitting || selectedAmount === null}>
+              {submitting ? '前往付款…' : '前往付款'}
             </Button>
           </div>
         </Modal>
