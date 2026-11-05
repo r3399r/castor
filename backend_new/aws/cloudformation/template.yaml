@@ -440,22 +440,92 @@ Resources:
         DefaultCacheBehavior:
           AllowedMethods: [ "GET", "HEAD", "OPTIONS", "PUT", "PATCH", "POST", "DELETE"]
           TargetOriginId: S3-hosted-website-ID
+          # Nothing in this distribution compressed anything before, so
+          # every visitor downloaded index.html at 75KB rather than 14KB
+          # and the homepage's JS at 695KB rather than 221KB. CloudFront
+          # only compresses when the viewer sends Accept-Encoding and the
+          # content type is compressible, so this is safe to set here.
+          Compress: true
           ForwardedValues:
             QueryString: 'false'
             Cookies:
               Forward: none
           ViewerProtocolPolicy: redirect-to-https
+          # Deliberately uncached. This behavior serves index.html and the
+          # rest of the export, whose paths do not change between
+          # releases, and deploy.sh runs no CloudFront invalidation -- any
+          # TTL here would keep serving the previous release's HTML for
+          # that long. The files that ARE safe to cache are the hashed
+          # ones under /_next/static/*, which have their own behavior.
           DefaultTTL: 0
           MinTTL: 0
           MaxTTL: 0
+        # Ordered deliberately: CloudFront uses the FIRST pattern in this
+        # list that matches, not the most specific one, so /api/info/*
+        # has to precede /api/*.
         CacheBehaviors:
+        - PathPattern: /_next/static/*
+          # Static assets: no reason to accept a body or a mutation here.
+          AllowedMethods: [ "GET", "HEAD" ]
+          Compress: true
+          TargetOriginId: S3-hosted-website-ID
+          ForwardedValues:
+            QueryString: 'false'
+            Cookies:
+              Forward: none
+          ViewerProtocolPolicy: redirect-to-https
+          # Next.js puts a content hash in every filename under here, so a
+          # changed file is a different URL and a cached entry can never
+          # go stale -- this is the one place in the site where a long TTL
+          # costs nothing. The origin sends max-age=31536000, immutable
+          # (see deploy.sh); these bounds exist to let CloudFront honour
+          # it instead of capping it at MaxTTL: 0 as before.
+          MinTTL: 0
+          DefaultTTL: 86400
+          MaxTTL: 31536000
+        - PathPattern: /api/info/*
+          AllowedMethods: [ "GET", "HEAD", "OPTIONS" ]
+          Compress: true
+          ForwardedValues:
+            # No Authorization here, unlike /api/* below, so that a TTL
+            # can be turned on without handing one viewer's response to
+            # another. Note this drops the header on the way to the
+            # origin as well, not just out of the cache key: NOTHING
+            # mounted under /api/info may read it. Every route there is
+            # public today (health check, plan prices, catalogue counts,
+            # popular list) and an authenticated one would belong
+            # somewhere else anyway. requestLogger also stops seeing
+            # x-api-version on these paths, which is a log field only.
+            QueryString: true
+          TargetOriginId: !Sub ${Project}-${TargetEnvr}-ApiEndpoint-ID
+          ViewerProtocolPolicy: redirect-to-https
+          # Catalogue counts, plan prices and the popular list: public,
+          # per-nobody, and slow-moving. Caching them makes the number of
+          # Lambda invocations a function of the TTL instead of a function
+          # of traffic -- one per entry, per edge location, per five
+          # minutes, however many people load the landing page.
+          #
+          # This does NOT affect how quickly a new release shows up: the
+          # HTML, and everything else the export produces, is served by
+          # the default behavior at TTL 0 with a no-cache header. What
+          # goes stale here is the data inside the page -- a question
+          # added, or a plan price changed, takes up to five minutes to
+          # appear. Keep this short for that reason.
+          MinTTL: 0
+          DefaultTTL: 300
+          MaxTTL: 300
         - PathPattern: /api/*
           AllowedMethods: [ "GET", "HEAD", "OPTIONS", "PUT", "PATCH", "POST", "DELETE"]
+          Compress: true
           ForwardedValues:
             Headers: [ "Authorization", "Accept" ]
             QueryString: true
           TargetOriginId: !Sub ${Project}-${TargetEnvr}-ApiEndpoint-ID
           ViewerProtocolPolicy: redirect-to-https
+          # Stays uncached, and must: these paths answer per user and have
+          # to be current. Authorization is in the cache key above only so
+          # that a TTL introduced here later cannot hand one user's
+          # response to another.
           DefaultTTL: 0
           MinTTL: 0
           MaxTTL: 0

@@ -31,6 +31,33 @@ cd ../webapp
 # re-synced to S3 from a stale export.
 rm -rf .next out
 npm run build
-aws s3 sync ./out s3://$project-$env-y --delete --cache-control "no-cache"
-aws s3 sync ./out/_next/static s3://$project-$env-y/_next/static --cache-control "public, max-age=31536000, immutable"
+# Everything outside _next/static: unhashed names, so it has to stay
+# uncacheable. --delete prunes pages removed since the last release.
+aws s3 sync ./out s3://$project-$env-y --delete --exclude "_next/static/*" --cache-control "no-cache"
+
+# The hashed assets, in two passes, because one cannot do both jobs:
+#
+#   sync  prunes assets dropped from this release, but SKIPS any file
+#         whose contents already match the object in the bucket -- it
+#         never revisits a skipped object to update its metadata.
+#   cp    always writes, so it is what actually puts the header on.
+#
+# That skip is why the immutable header below has never reached a single
+# asset: the old script uploaded everything with no-cache first, and the
+# line meant to mark it immutable skipped all of it. Reordering alone
+# would not fix it either -- an asset already in the bucket from an
+# earlier release keeps its no-cache header until something overwrites
+# the object, and an unchanged chunk keeps the same content hash, so its
+# name never changes and sync never touches it again.
+#
+# The cp pass re-uploads the whole prefix every deploy (2.4MB, 69 files),
+# which is cheaper than reasoning about which objects still carry a stale
+# header.
+aws s3 sync ./out/_next/static s3://$project-$env-y/_next/static --delete --cache-control "public, max-age=31536000, immutable"
+aws s3 cp ./out/_next/static s3://$project-$env-y/_next/static --recursive --cache-control "public, max-age=31536000, immutable"
+# No CloudFront invalidation, and none needed: everything outside
+# _next/static is served with no-cache and sits behind a TTL-0 behavior,
+# while everything inside it has a content hash in its name, so a new
+# release is a new URL. Adding a TTL to the default behavior would change
+# that and an invalidation would have to come with it.
 echo ====================================================================================
