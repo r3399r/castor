@@ -1,72 +1,159 @@
-const categories = [
-  {
-    title: '高等考試',
-    color: 'bg-spirit-paper',
-    items: ['114年考古題', '113年模擬試卷', '110年重點整理', '常考題型', '限時練習'],
-  },
-  {
-    title: '高中數學',
-    color: 'bg-category-gold-soft',
-    items: ['114年考古題', '113年歷屆試題', '公式速記', '圖形選擇題', '證明題練習'],
-  },
-  {
-    title: '高中英文',
-    color: 'bg-category-leaf-soft',
-    items: ['114年會考題', '113年指考題', '閱讀測驗', '文法填空', '聽力模擬'],
-  },
-]
+'use client'
+
+import { useEffect, useState } from 'react'
+import { apiFetch } from '@/lib/api'
+import type { GetInfoPopularResponse } from '@/types/api'
+
+// Indexed by card position, so the three cards keep the colours they had
+// while this section was hardcoded.
+const CARD_COLORS = ['bg-spirit-paper', 'bg-category-gold-soft', 'bg-category-leaf-soft']
+
+// What GET /api/info/popular returns at most. Held here as well so the
+// placeholder can reserve the exact space the real cards will take.
+const ROWS_PER_CARD = 5
+
+/**
+ * A 2xx is no guarantee of the shape, and this section renders the names
+ * it is given. A 204 arrives as undefined and anything else answering
+ * this path arrives as the wrong object; either would throw while
+ * rendering and take the whole landing page down with it, so it is
+ * treated as a failed fetch instead.
+ */
+function isPopular(res: unknown): res is GetInfoPopularResponse {
+  return (
+    Array.isArray(res) &&
+    res.every(
+      (s) =>
+        typeof s?.name === 'string' &&
+        Array.isArray(s.exams) &&
+        s.exams.every((e: unknown) => typeof (e as { name?: unknown })?.name === 'string')
+    )
+  )
+}
+
+function Card({ color, children }: { color: string; children: React.ReactNode }) {
+  return (
+    <article
+      className={`${color} flex flex-col rounded-spirit-card border-2 border-spirit-leaf shadow-spirit-card transition-all duration-300 hover:-translate-y-2 hover:shadow-spirit-float`}
+    >
+      {/*
+        flex-1 on the inner panel, because the number of exams now differs
+        between cards: the grid already stretches the three articles to a
+        common height, and without this the bordered panel inside a short
+        card stopped partway down it.
+      */}
+      <div className="m-3 flex-1 rounded-spirit-control border border-spirit-line p-4">
+        {children}
+      </div>
+    </article>
+  )
+}
+
+function Row({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="border-b border-spirit-line px-1 py-2 last:border-b-0">{children}</div>
+  )
+}
+
+/**
+ * A grey bar standing in for a line of text that has not arrived.
+ *
+ * It holds invisible text rather than setting its own height, so it
+ * inherits the exact line box of whatever it is placed in -- a bar sized
+ * in pixels came out a few short per line, and the card grid visibly grew
+ * as the fetch landed.
+ */
+function Bar({ width }: { width: string }) {
+  return (
+    <span className="relative block text-transparent" aria-hidden="true">
+      載入中
+      <span
+        className={`absolute inset-y-0 left-0 my-auto block h-5 rounded-full bg-spirit-mist ${width}`}
+      />
+    </span>
+  )
+}
+
+// Mirrors a real card line for line -- a title, the rule under it and five
+// rows -- so the grid does not grow when the fetch lands.
+function PlaceholderCards() {
+  return (
+    <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3" role="status" aria-label="載入熱門科目">
+      {CARD_COLORS.map((color) => (
+        <Card key={color} color={color}>
+          <h3 className="text-spirit-character font-bold">
+            <Bar width="w-24" />
+          </h3>
+          <hr className="my-4 border-spirit-line" />
+          <div>
+            {Array.from({ length: ROWS_PER_CARD }, (_, i) => (
+              <Row key={i}>
+                <span className="block text-base">
+                  <Bar width="w-32" />
+                </span>
+              </Row>
+            ))}
+          </div>
+        </Card>
+      ))}
+    </div>
+  )
+}
 
 export default function HomeCategories() {
+  const [data, setData] = useState<GetInfoPopularResponse | null>(null)
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    apiFetch<unknown>('info/popular')
+      .then((res) => (isPopular(res) ? setData(res) : setFailed(true)))
+      .catch(() => setFailed(true))
+  }, [])
+
+  // Nothing real to show. Dropping the section beats a row of empty cards,
+  // and beats the invented subject names that used to stand here: an empty
+  // response means the catalog has no servable questions yet, which is a
+  // true thing about the site and not an error to paper over.
+  if (failed || data?.length === 0) return null
+
   return (
     <section className="py-section-md xl:py-section-xl">
       <div className="mx-auto w-full max-w-site space-y-8 px-page-gutter xl:px-12">
-      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div className="space-y-3">
           <p className="text-sm font-bold tracking-[0.12em] text-spirit-leaf uppercase">熱門分類</p>
           <h2 className="text-spirit-display-sm font-bold text-spirit-canopy">熱門考試 / 科目</h2>
         </div>
-        <a
-          href="/question"
-          className="relative self-end inline-flex items-center gap-2 px-1 py-2 text-sm font-bold text-spirit-muted transition-colors after:absolute after:bottom-0 after:left-0 after:h-px after:w-0 after:bg-spirit-teal after:transition-[width] after:duration-300 hover:text-spirit-teal hover:after:w-full"
-        >
-          <span>看全部科目</span>
-          <span aria-hidden="true">→</span>
-        </a>
-      </div>
 
-      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-        {categories.map((category) => (
-          <article key={category.title} className={`${category.color} rounded-spirit-card border-2 border-spirit-leaf shadow-spirit-card transition-all duration-300 hover:-translate-y-2 hover:shadow-spirit-float`}>
-            <div className="m-3 rounded-spirit-control border border-spirit-line p-4">
-              <h3 className="text-spirit-character font-bold text-spirit-canopy">{category.title}</h3>
-              <hr className="my-4 border-spirit-line" />
-              <div>
-                {category.items.map((item) => (
-                  <div
-                    key={item}
-                    className="flex items-center justify-between border-b border-spirit-line px-1 py-2"
-                  >
-                    <span className="text-base text-spirit-ink">{item}</span>
-                    <div className="flex items-center gap-3">
-                      <button className="rounded-spirit-small border border-spirit-line bg-spirit-paper/55 px-3 py-1.5 text-sm text-spirit-forest transition-colors hover:bg-spirit-mist active:bg-spirit-line">題庫</button>
-                      <button className="rounded-spirit-small border border-spirit-line bg-spirit-paper/55 px-3 py-1.5 text-sm text-spirit-forest transition-colors hover:bg-spirit-mist active:bg-spirit-line">練習</button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-6 flex justify-end">
-                <a
-                  href="/question"
-                  className="inline-flex items-center gap-2 px-1 py-2 text-sm font-bold text-spirit-muted transition-colors hover:text-spirit-teal"
-                >
-                  更多
-                  <span aria-hidden="true">→</span>
-                </a>
-              </div>
-            </div>
-          </article>
-        ))}
-      </div>
+        {data === null ? (
+          <PlaceholderCards />
+        ) : (
+          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+            {data.map((subject, i) => (
+              <Card key={subject.id} color={CARD_COLORS[i % CARD_COLORS.length]}>
+                <h3 className="text-spirit-character font-bold text-spirit-canopy">
+                  {subject.name}
+                </h3>
+                <hr className="my-4 border-spirit-line" />
+                <div>
+                  {subject.exams.length === 0 ? (
+                    // A popular subject whose questions are filed under no
+                    // exam. Saying so is better than an empty card, and
+                    // better than dropping a subject people are answering.
+                    <Row>
+                      <span className="text-base text-spirit-muted">尚未分類試卷</span>
+                    </Row>
+                  ) : (
+                    subject.exams.map((exam) => (
+                      <Row key={exam.id}>
+                        <span className="text-base text-spirit-ink">{exam.name}</span>
+                      </Row>
+                    ))
+                  )}
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
     </section>
   )

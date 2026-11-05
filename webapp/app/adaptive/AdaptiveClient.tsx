@@ -89,9 +89,6 @@ function ResultBox({
   const correct = result.score > 0
   const correctAnswerText =
     readableAnswer(question.type, result.correctAnswer, question.options) ?? result.correctAnswer
-  const fbUrl = result.fbPostId
-    ? `https://m.facebook.com/${result.fbPostId.split('_')[0]}/posts/${result.fbPostId.split('_')[1]}`
-    : null
   return (
     <div className="px-5 pb-5">
       <div
@@ -127,9 +124,7 @@ function ResultBox({
             </div>
             <div className="text-base text-black-500">得分：<span className={styles.resultValue}>{result.score}</span></div>
           </div>
-          {fbUrl && (
-            <DiscussionLink href={fbUrl} />
-          )}
+          <DiscussionLink fbPostId={result.fbPostId} />
         </div>
       </div>
     </div>

@@ -29,13 +29,6 @@ function formatDate(dateStr: string | null): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
 
-function getFbUrl(fbPostId: string | null): string | null {
-  if (!fbPostId) return null
-  const [pageId, postId] = fbPostId.split('_')
-  if (!pageId || !postId) return null
-  return `https://m.facebook.com/${pageId}/posts/${postId}`
-}
-
 function ReplyRow({ item }: { item: ReplyGroup }) {
   // For a group, parentQuestion is the 題組 header.
   // For a standalone question, parentQuestion is null and children has one entry.
@@ -46,7 +39,7 @@ function ReplyRow({ item }: { item: ReplyGroup }) {
   const concepts = question.concept ?? []
   const tags = question.tag ?? []
   const difficulty = question.adjustedDifficulty ?? question.difficulty ?? 0
-  const fbUrl = getFbUrl(question.fbPostId)
+  const fbPostId = question.fbPostId
   const isGroup = item.parentQuestion !== null
 
   const MetaChips = () => (
@@ -156,7 +149,7 @@ function ReplyRow({ item }: { item: ReplyGroup }) {
                     </div>
 
                     {!isGroup && (
-                      <DiscussionLink href={fbUrl} />
+                      <DiscussionLink fbPostId={fbPostId} />
                     )}
                   </div>
                 </div>
@@ -165,9 +158,9 @@ function ReplyRow({ item }: { item: ReplyGroup }) {
           })}
         </div>
 
-        {/* 討論區 link for group (shown once at bottom), disabled rather than hidden when there's no fbUrl */}
+        {/* Once at the bottom for a group, rather than per sub-question. */}
         {isGroup && (
-          <DiscussionLink href={fbUrl} className="self-end" />
+          <DiscussionLink fbPostId={fbPostId} className="self-end" />
         )}
       </div>
     </article>
