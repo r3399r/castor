@@ -115,6 +115,11 @@ function RealBoxClient() {
   const [pointsToUse, setPointsToUse] = useState(1)
   const [eggToExchange, setEggToExchange] = useState<SpeciesDto | null>(null)
   const [showInvestDialog, setShowInvestDialog] = useState(false)
+  const [levelUpCelebration, setLevelUpCelebration] = useState<{
+    name: string
+    level: number
+    species?: SpiritSpecies
+  } | null>(null)
   const [collectionPreview, setCollectionPreview] = useState<{
     name: string
     theme: string
@@ -149,10 +154,22 @@ function RealBoxClient() {
   const availablePoints = totalPoints
   const level = guardian?.level ?? 1
   const complete = level >= MAX_LEVEL
+  const pointsUntilNextLevel =
+    guardian === undefined || guardian.nextLevelXp === null
+      ? 0
+      : Math.max(guardian.nextLevelXp - guardian.xp, 0)
+  const maxInvestablePoints = Math.min(availablePoints, pointsUntilNextLevel)
   const shownLevel = previewLevel ?? level
   const hasMemberExperienceBonus = subscription?.active === true
   const memberBonusXp = Number((pointsToUse * 0.1).toFixed(1))
   const totalExperienceXp = Number((pointsToUse + memberBonusXp).toFixed(1))
+
+  useEffect(() => {
+    setPointsToUse((value) => {
+      if (maxInvestablePoints === 0) return 0
+      return Math.min(Math.max(value, 1), maxInvestablePoints)
+    })
+  }, [maxInvestablePoints])
 
   // Started species first, so the collection opens on what the user has
   // actually been growing.
@@ -192,6 +209,8 @@ function RealBoxClient() {
 
   const confirmInvest = async () => {
     if (guardian === undefined) return
+    const reachesNextLevel =
+      guardian.nextLevelXp !== null && pointsToUse >= pointsUntilNextLevel
     setBusy(true)
     setActionError(null)
     try {
@@ -203,6 +222,13 @@ function RealBoxClient() {
     }
     setShowInvestDialog(false)
     setBusy(false)
+    if (reachesNextLevel) {
+      setLevelUpCelebration({
+        name: artwork ? spiritCatalog[artwork].name : guardian.name,
+        level: Math.min(guardian.level + 1, MAX_LEVEL),
+        species: artwork,
+      })
+    }
     refreshAfterAction()
   }
   const investControls = (
@@ -231,6 +257,12 @@ function RealBoxClient() {
           目前沒有可分配的積分。完成更多練習後，就能繼續培育這隻精靈。
         </p>
       )}
+      {availablePoints > 0 && maxInvestablePoints > 0 && (
+        <p className="sp-stage-limit" role="status">
+          本階段還需 <strong>{formatNumber(pointsUntilNextLevel)} 點</strong>
+          即可升級；升級後可繼續投入剩餘積分。
+        </p>
+      )}
       <div className="sp-invest-selector">
         <div className="sp-invest-value-row">
           <span>本次投入</span>
@@ -239,23 +271,23 @@ function RealBoxClient() {
             <input
               type="number"
               inputMode="numeric"
-              min={availablePoints === 0 ? 0 : 1}
-              max={availablePoints}
+              min={maxInvestablePoints === 0 ? 0 : 1}
+              max={maxInvestablePoints}
               value={pointsToUse}
-              disabled={availablePoints === 0}
+              disabled={maxInvestablePoints === 0}
               onFocus={(event) => event.currentTarget.select()}
               onChange={(event) => {
                 const nextValue = Number(event.target.value)
                 if (Number.isFinite(nextValue))
                   setPointsToUse(
                     Math.min(
-                      availablePoints,
+                      maxInvestablePoints,
                       Math.max(0, Math.trunc(nextValue)),
                     ),
                   )
               }}
               onBlur={() => {
-                if (availablePoints > 0 && pointsToUse < 1) setPointsToUse(1)
+                if (maxInvestablePoints > 0 && pointsToUse < 1) setPointsToUse(1)
               }}
             />
             <span>點</span>
@@ -264,46 +296,46 @@ function RealBoxClient() {
         <input
           className="sp-invest-range"
           type="range"
-          min={availablePoints === 0 ? 0 : 1}
-          max={Math.max(availablePoints, 1)}
+          min={maxInvestablePoints === 0 ? 0 : 1}
+          max={Math.max(maxInvestablePoints, 1)}
           step={1}
           value={pointsToUse}
-          disabled={availablePoints === 0}
+          disabled={maxInvestablePoints === 0}
           aria-label="選擇投入積分點數"
           aria-valuetext={`${formatNumber(pointsToUse)} 點`}
           onChange={(event) => setPointsToUse(Number(event.target.value))}
           style={{
             '--sp-invest-progress': `${
-              availablePoints === 1
+              maxInvestablePoints === 1
                 ? 100
-                : availablePoints > 1
-                ? ((pointsToUse - 1) / (availablePoints - 1)) * 100
+                : maxInvestablePoints > 1
+                ? ((pointsToUse - 1) / (maxInvestablePoints - 1)) * 100
                 : 0
             }%`,
           } as React.CSSProperties}
         />
         <div className="sp-invest-range-labels" aria-hidden="true">
-          <span>{availablePoints === 0 ? '0' : '1'}</span>
-          <span>最多 {formatNumber(availablePoints)}</span>
+          <span>{maxInvestablePoints === 0 ? '0' : '1'}</span>
+          <span>本階段最多 {formatNumber(maxInvestablePoints)}</span>
         </div>
         <div className="sp-invest-actions">
           <div className="sp-invest-presets" aria-label="快速選擇投入比例">
             {[
               { label: '25%', ratio: 0.25 },
               { label: '50%', ratio: 0.5 },
-              { label: '全部投入', ratio: 1 },
+              { label: '投入階段上限', ratio: 1 },
             ].map(({ label, ratio }) => {
               const value =
-                availablePoints === 0
+                maxInvestablePoints === 0
                   ? 0
-                  : Math.max(1, Math.round(availablePoints * ratio))
+                  : Math.max(1, Math.round(maxInvestablePoints * ratio))
               return (
                 <Button
                   key={label}
                   variant="secondary"
                   size="sm"
                   className="sp-invest-preset"
-                  disabled={availablePoints === 0}
+                  disabled={maxInvestablePoints === 0}
                   aria-pressed={pointsToUse === value}
                   onClick={() => setPointsToUse(value)}
                 >
@@ -315,7 +347,7 @@ function RealBoxClient() {
           <Button
             className="sp-invest-confirm"
             onClick={() => setShowInvestDialog(true)}
-            disabled={availablePoints === 0 || pointsToUse < 1}
+            disabled={maxInvestablePoints === 0 || pointsToUse < 1}
           >
             <Sparkles size={16} aria-hidden="true" />
             確認投入
@@ -843,6 +875,41 @@ function RealBoxClient() {
             ) : (
               <ArtworkPlaceholder />
             )}
+          </div>
+        </Modal>
+      )}
+      {levelUpCelebration && (
+        <Modal
+          title="精靈升級！"
+          className="sp-level-up-modal"
+          onClose={() => setLevelUpCelebration(null)}
+        >
+          <div className="sp-level-up-effect" aria-hidden="true">
+            {Array.from({ length: 12 }, (_, index) => (
+              <span
+                key={index}
+                style={{ '--sp-mote-delay': `${index * 45}ms` } as React.CSSProperties}
+              />
+            ))}
+          </div>
+          <div className="sp-level-up-art">
+            {levelUpCelebration.species ? (
+              <SpiritArtwork
+                species={levelUpCelebration.species}
+                level={levelUpCelebration.level}
+                priority
+              />
+            ) : (
+              <ArtworkPlaceholder />
+            )}
+          </div>
+          <div className="sp-level-up-copy">
+            <Badge tone="growth">LV{levelUpCelebration.level} 解鎖</Badge>
+            <h3>{levelUpCelebration.name}升級了！</h3>
+            <p>新的成長階段已解鎖，可以繼續投入積分培育精靈。</p>
+          </div>
+          <div className="sp-dialog-actions">
+            <Button onClick={() => setLevelUpCelebration(null)}>繼續培育</Button>
           </div>
         </Modal>
       )}

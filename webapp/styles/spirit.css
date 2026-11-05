@@ -698,6 +698,17 @@
 .sp-member-bonus--dialog dl > div { display: flex; justify-content: space-between; gap: 16px; font-size: var(--text-spirit-small); }
 .sp-member-bonus--dialog dd { margin: 0; font-weight: 700; }
 .sp-member-bonus--dialog dl > div:last-child { padding-top: 7px; border-top: 1px solid color-mix(in srgb, var(--color-spirit-leaf) 20%, transparent); }
+.sp-stage-limit {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--color-spirit-leaf) 18%, var(--color-spirit-line));
+  border-radius: var(--radius-spirit-control);
+  background: color-mix(in srgb, var(--color-spirit-mist) 58%, var(--color-spirit-paper));
+  color: var(--color-spirit-muted);
+  font-size: var(--text-spirit-caption);
+  line-height: var(--leading-relaxed);
+}
+.sp-stage-limit strong { color: var(--color-spirit-forest); }
 .sp-invest-selector {
   margin-top: 16px;
 }
@@ -1656,6 +1667,97 @@
 .sp-dialog-art {
   max-width: 480px;
   margin: 20px auto;
+}
+.sp-level-up-modal {
+  isolation: isolate;
+  width: min(540px, calc(100% - 32px));
+  overflow: hidden;
+  text-align: center;
+}
+.sp-level-up-modal > :not(.sp-level-up-effect) {
+  position: relative;
+  z-index: 1;
+}
+.sp-level-up-art {
+  position: relative;
+  width: min(310px, 80%);
+  margin: 0 auto 20px;
+}
+.sp-level-up-art::before {
+  position: absolute;
+  z-index: -1;
+  inset: 12%;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--color-spirit-gold) 32%, transparent);
+  filter: blur(22px);
+  content: '';
+  animation: spirit-level-glow 1.1s ease-out both;
+}
+.sp-level-up-art .sp-artwork,
+.sp-level-up-art .sp-artwork-placeholder {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  animation: spirit-level-arrive 650ms cubic-bezier(.2, .8, .25, 1) both;
+}
+.sp-level-up-copy {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+}
+.sp-level-up-copy h3 { font-size: var(--text-spirit-subtitle); }
+.sp-level-up-copy p {
+  margin: 0;
+  color: var(--color-spirit-muted);
+  font-size: var(--text-spirit-caption);
+  line-height: var(--leading-relaxed);
+}
+.sp-level-up-effect {
+  position: absolute;
+  z-index: 0;
+  inset: 60px 0 110px;
+  overflow: hidden;
+  pointer-events: none;
+}
+.sp-level-up-effect span {
+  --sp-mote-x: 0px;
+  position: absolute;
+  bottom: 12%;
+  left: 50%;
+  width: 8px;
+  height: 14px;
+  border-radius: 80% 20% 70% 30%;
+  background: var(--color-spirit-leaf);
+  opacity: 0;
+  animation: spirit-level-mote 1.35s ease-out var(--sp-mote-delay) both;
+}
+.sp-level-up-effect span:nth-child(3n) { background: var(--color-spirit-gold); }
+.sp-level-up-effect span:nth-child(4n) { width: 6px; height: 6px; border-radius: 50%; background: var(--color-spirit-teal); }
+.sp-level-up-effect span:nth-child(1) { --sp-mote-x: -190px; }
+.sp-level-up-effect span:nth-child(2) { --sp-mote-x: -150px; }
+.sp-level-up-effect span:nth-child(3) { --sp-mote-x: -112px; }
+.sp-level-up-effect span:nth-child(4) { --sp-mote-x: -78px; }
+.sp-level-up-effect span:nth-child(5) { --sp-mote-x: -42px; }
+.sp-level-up-effect span:nth-child(6) { --sp-mote-x: -14px; }
+.sp-level-up-effect span:nth-child(7) { --sp-mote-x: 18px; }
+.sp-level-up-effect span:nth-child(8) { --sp-mote-x: 48px; }
+.sp-level-up-effect span:nth-child(9) { --sp-mote-x: 82px; }
+.sp-level-up-effect span:nth-child(10) { --sp-mote-x: 116px; }
+.sp-level-up-effect span:nth-child(11) { --sp-mote-x: 152px; }
+.sp-level-up-effect span:nth-child(12) { --sp-mote-x: 190px; }
+@keyframes spirit-level-arrive {
+  from { opacity: 0; transform: scale(.94); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes spirit-level-glow {
+  from { opacity: 0; transform: scale(.65); }
+  55% { opacity: 1; }
+  to { opacity: .55; transform: scale(1.2); }
+}
+@keyframes spirit-level-mote {
+  0% { opacity: 0; transform: translate(0, 40px) rotate(0deg); }
+  20% { opacity: .9; }
+  100% { opacity: 0; transform: translate(var(--sp-mote-x), -250px) rotate(160deg); }
 }
 @keyframes spirit-drift {
   from {
