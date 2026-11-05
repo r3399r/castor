@@ -354,6 +354,12 @@ export type QuestionDetailDto = {
   uuid: string;
   subjectId: number;
   parentId: number | null;
+  // The Facebook post this question was published as, which is what the
+  // 討論區 link is built from. Only ever set on a top-level question:
+  // facebookPoster renders a group and its children into one image and
+  // writes the id back to the parent, so a child's own column stays null
+  // and callers must read the parent's.
+  fbPostId: string | null;
   isGroup: boolean;
   type: string;
   sortOrder: number | null;
@@ -451,6 +457,7 @@ export const buildQuestionDtos = async (db: Db, ids: number[]) => {
       uuid: row.uuid,
       subjectId: row.subjectId,
       parentId: row.parentId,
+      fbPostId: row.fbPostId,
       isGroup: row.isGroup,
       type: row.type,
       sortOrder: row.sortOrder,

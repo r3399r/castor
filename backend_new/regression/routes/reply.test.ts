@@ -66,6 +66,7 @@ type PostReplyResponse = {
 type QuestionDetailDto = {
   id: number;
   content: string | null;
+  fbPostId: string | null;
   exam: { id: number; name: string }[];
   tag: { id: number; name: string }[];
   concept: { id: number; name: string; conceptGroup: { id: number; name: string } }[];
@@ -992,6 +993,56 @@ describe('reply routes', () => {
       expect(body.data).toHaveLength(1);
       expect(body.data[0].parentQuestion?.id).toBe(group.id);
       expect(body.data[0].children.map((c) => c.questionId).sort()).toEqual([child1.id, child2.id].sort());
+    });
+
+    // The 討論區 link on the history page is built from this field alone,
+    // so a response that omits it renders a permanently disabled button
+    // that no amount of correct data can light up -- and nothing fails,
+    // because the frontend's own type says the field is there. Asserting
+    // the shape is the only thing that catches it.
+    it('returns fbPostId for a standalone question', async () => {
+      await seedUser();
+      vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+      const { subjectId, examId, conceptId } = await seedFixture();
+      const q = await createQuestion(subjectId, examId, { answer: 'A', conceptIds: [conceptId] });
+      await getDb()
+        .update(questionTable)
+        .set({ fbPostId: '1122334455_9988776655' })
+        .where(eq(questionTable.id, q.id));
+
+      await postReply([{ questionId: q.id, repliedAnswer: 'A' }]);
+
+      const res = await getReplyList();
+      const body = (await res.json()) as { data: ReplyGroupDto[] };
+      expect(body.data[0].children[0].question.fbPostId).toBe('1122334455_9988776655');
+    });
+
+    // facebookPoster renders a group and its children into a single image
+    // and writes the id back to the parent row, so the children keep a
+    // null of their own. The history page reads the parent for a group,
+    // which only works if the parent's value survives the response.
+    it("returns the parent's fbPostId for a GROUP question, children staying null", async () => {
+      await seedUser();
+      vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+      const { subjectId, examId, conceptId } = await seedFixture();
+      const [group, child1, child2] = await createGroupQuestion(subjectId, examId, [conceptId], [
+        { answer: 'A', options: 'A|B' },
+        { answer: 'A', options: 'A|B' },
+      ]);
+      await getDb()
+        .update(questionTable)
+        .set({ fbPostId: '1122334455_5566778899' })
+        .where(eq(questionTable.id, group.id));
+
+      await postReply([
+        { questionId: child1.id, repliedAnswer: 'A' },
+        { questionId: child2.id, repliedAnswer: 'A' },
+      ]);
+
+      const res = await getReplyList();
+      const body = (await res.json()) as { data: ReplyGroupDto[] };
+      expect(body.data[0].parentQuestion?.fbPostId).toBe('1122334455_5566778899');
+      expect(body.data[0].children[0].question.fbPostId).toBeNull();
     });
 
     it('paginates across separately-submitted batches, newest first', async () => {
