@@ -6,17 +6,9 @@ export default function HomeCTA() {
           <h2 className="mb-4 text-spirit-display-sm font-bold leading-tight text-spirit-on-dark">
             準備好開始了嗎？
           </h2>
-          <p className="mb-10 text-base leading-7 text-spirit-on-dark/85">
+          <p className="text-base leading-7 text-spirit-on-dark/85">
             現在就加入，從第一題開始累積你的學習優勢，也累積一份公益。
           </p>
-          <div>
-            <a
-              href="/question"
-              className="inline-flex items-center justify-center rounded-md bg-spirit-gold px-8 py-3 text-base font-medium text-spirit-deep transition hover:bg-spirit-gold-hover"
-            >
-              立刻開始
-            </a>
-          </div>
         </div>
       </div>
     </section>

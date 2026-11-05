@@ -6,6 +6,7 @@ import { apiDelete, apiFetch, apiPut, LIMIT } from '@/lib/api'
 import { readableAnswer } from '@/lib/answerDisplay'
 import Chip, { tagColors } from '@/components/Chip'
 import DifficultyStars from '@/components/DifficultyStars'
+import DiscussionLink from '@/components/DiscussionLink'
 import MathJaxArea from '@/components/MathJaxArea'
 import Pagination from '@/components/Pagination'
 import { Button, EmptyState, ErrorState, LoadingState } from '@/components/ui'
@@ -312,6 +313,8 @@ function WrongCard({
               />
             )
           })}
+
+          <DiscussionLink fbPostId={metaSource?.fbPostId} className="self-end" />
         </MathJaxArea>
       )}
     </article>

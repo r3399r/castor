@@ -1,10 +1,32 @@
+/**
+ * Link to the Facebook post a question was published as.
+ *
+ * Takes the raw fbPostId rather than a finished href so the URL shape
+ * lives in exactly one place: it was previously rebuilt by hand at every
+ * call site, and a question whose id is not in Facebook's
+ * `{pageId}_{postId}` form would have produced a link to
+ * `.../undefined` at some of them and nothing at others.
+ *
+ * fbPostId is only ever set on a top-level question -- a 題組 and its
+ * children are posted as one image and the id is written back to the
+ * parent -- so callers pass the parent's value for a group.
+ */
+function toUrl(fbPostId: string | null | undefined): string | null {
+  if (!fbPostId) return null
+  const [pageId, postId] = fbPostId.split('_')
+  if (!pageId || !postId) return null
+  return `https://m.facebook.com/${pageId}/posts/${postId}`
+}
+
 export default function DiscussionLink({
-  href,
+  fbPostId,
   className = '',
 }: {
-  href?: string | null
+  fbPostId?: string | null
   className?: string
 }) {
+  const href = toUrl(fbPostId)
+
   const content = (
     <>
       討論區
@@ -14,6 +36,9 @@ export default function DiscussionLink({
     </>
   )
 
+  // Shown disabled rather than hidden: the question simply has not been
+  // posted yet, and a button that appears and disappears between cards
+  // reads as a glitch rather than as a state.
   if (!href) {
     return (
       <span className={`discussion-link ${className}`} aria-disabled="true">

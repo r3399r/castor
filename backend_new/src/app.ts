@@ -29,9 +29,10 @@ import { wrongQuestion } from 'src/routes/wrongQuestion';
 
 export const app = new Hono()
   .use('*', requestLogger)
-  // Bound to the one path that reads the database, not /api/info/*, so the
+  // Bound to the two paths that read the database, not /api/info/*, so the
   // health check at /api/info stays answerable with the database down.
   .use('/api/info/stats', transaction)
+  .use('/api/info/popular', transaction)
   .route('/api/info', info)
   .use('/api/category/*', adminAuth)
   .use('/api/category/*', transaction)

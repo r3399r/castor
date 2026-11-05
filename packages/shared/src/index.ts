@@ -559,6 +559,39 @@ export type GetInfoStatsResponse = {
   userCount: number;
 };
 
+// GET /api/info/popular -- the landing page's 熱門考試 / 科目 section.
+//
+// attemptCount is how many times the questions were practised, not how
+// many answers they drew: a 題組 answered once counts once, however many
+// sub-questions it holds. Spelled correctly here even though the column it
+// is aggregated from (question.attemp_count) and the Question type both
+// carry the original typo -- this is a new aggregate rather than that
+// column passed through, and nothing is gained by propagating the
+// misspelling into a second public shape.
+//
+// questionCount counts servable top-level questions, so a 題組 counts once
+// however many sub-questions it holds -- the same definition
+// GetInfoStatsResponse.questionCount uses.
+export type PopularExam = {
+  id: number;
+  name: string;
+  attemptCount: number;
+  questionCount: number;
+};
+
+export type PopularSubject = {
+  id: number;
+  name: string;
+  attemptCount: number;
+  questionCount: number;
+  // Ranked like the subjects themselves, and empty when the subject's
+  // questions are not filed under any exam -- which is a real state, not
+  // an error, so the section has to render a subject that has none.
+  exams: PopularExam[];
+};
+
+export type GetInfoPopularResponse = PopularSubject[];
+
 export type UserStatHistory = {
   id: number;
   userId: number;
