@@ -640,6 +640,140 @@ describe('question routes', () => {
       expect(body.data.find((q) => q.id === unfiled.id)!.categories).toEqual([]);
     });
 
+    describe('filters', () => {
+      /**
+       * Two subjects in different categories, two exams/concepts/tags
+       * inside the first subject, and three questions -- enough that every
+       * dimension has something it must exclude, so a filter that silently
+       * does nothing fails instead of passing by coincidence.
+       */
+      const seedFilterFixture = async () => {
+        const db = getDb();
+        const name = (value: string) => ({ name: value, createdAt: new Date() });
+        const [{ insertId: science }] = await db.insert(categoryTable).values(name('自然'));
+        const [{ insertId: humanities }] = await db.insert(categoryTable).values(name('社會'));
+        const [{ insertId: subjectA }] = await db.insert(subjectTable).values(name('數學'));
+        const [{ insertId: subjectB }] = await db.insert(subjectTable).values(name('歷史'));
+        await db.insert(subjectCategoryTable).values([
+          { subjectId: subjectA, categoryId: science },
+          { subjectId: subjectB, categoryId: humanities },
+        ]);
+
+        const [{ insertId: exam1 }] = await db.insert(examTable).values(name('114 學測'));
+        const [{ insertId: exam2 }] = await db.insert(examTable).values(name('113 分科'));
+        const [{ insertId: examB }] = await db.insert(examTable).values(name('歷史卷'));
+        await db.insert(examSubjectTable).values([
+          { examId: exam1, subjectId: subjectA },
+          { examId: exam2, subjectId: subjectA },
+          { examId: examB, subjectId: subjectB },
+        ]);
+
+        const [{ insertId: tag1 }] = await db
+          .insert(tagTable)
+          .values({ ...name('常考'), subjectId: subjectA });
+        const [{ insertId: tag2 }] = await db
+          .insert(tagTable)
+          .values({ ...name('冷門'), subjectId: subjectA });
+        const [{ insertId: groupA }] = await db
+          .insert(conceptGroupTable)
+          .values({ ...name('函數'), subjectId: subjectA });
+        const [{ insertId: concept1 }] = await db
+          .insert(conceptTable)
+          .values({ ...name('二次函數'), conceptGroupId: groupA });
+        const [{ insertId: concept2 }] = await db
+          .insert(conceptTable)
+          .values({ ...name('指數函數'), conceptGroupId: groupA });
+        const [{ insertId: groupB }] = await db
+          .insert(conceptGroupTable)
+          .values({ ...name('近代史'), subjectId: subjectB });
+        const [{ insertId: conceptB }] = await db
+          .insert(conceptTable)
+          .values({ ...name('條約'), conceptGroupId: groupB });
+
+        const a1 = await createQuestion(subjectA, exam1, {
+          conceptIds: [concept1],
+          tagIds: [tag1],
+        });
+        const a2 = await createQuestion(subjectA, exam2, {
+          conceptIds: [concept2],
+          tagIds: [tag2],
+        });
+        const b = await createQuestion(subjectB, examB, { conceptIds: [conceptB] });
+
+        return {
+          science,
+          humanities,
+          subjectA,
+          subjectB,
+          exam1,
+          exam2,
+          tag1,
+          tag2,
+          concept1,
+          concept2,
+          a1: a1.id,
+          a2: a2.id,
+          b: b.id,
+        };
+      };
+
+      const listedIds = async (query: string) => {
+        const res = await getQuestionList(query);
+        expect(res.status).toBe(200);
+        const body = (await res.json()) as {
+          data: { id: number }[];
+          paginate: { total: number };
+        };
+        // The filtered total is asserted alongside the rows on every case:
+        // a count query that ignored the filter would still return the
+        // right page of rows while making the pager offer empty pages.
+        expect(body.paginate.total).toBe(body.data.length);
+        return body.data.map((q) => q.id).sort((x, y) => x - y);
+      };
+
+      it('filters by the subject category', async () => {
+        const f = await seedFilterFixture();
+        expect(await listedIds(`?categoryId=${f.science}`)).toEqual([f.a1, f.a2]);
+        expect(await listedIds(`?categoryId=${f.humanities}`)).toEqual([f.b]);
+      });
+
+      it('filters by subject', async () => {
+        const f = await seedFilterFixture();
+        expect(await listedIds(`?subjectId=${f.subjectA}`)).toEqual([f.a1, f.a2]);
+        expect(await listedIds(`?subjectId=${f.subjectB}`)).toEqual([f.b]);
+      });
+
+      it('filters by exam, concept and tag', async () => {
+        const f = await seedFilterFixture();
+        expect(await listedIds(`?examId=${f.exam1}`)).toEqual([f.a1]);
+        expect(await listedIds(`?conceptId=${f.concept2}`)).toEqual([f.a2]);
+        expect(await listedIds(`?tagId=${f.tag1}`)).toEqual([f.a1]);
+      });
+
+      it('combines dimensions with AND', async () => {
+        const f = await seedFilterFixture();
+        expect(await listedIds(`?categoryId=${f.science}&tagId=${f.tag2}`)).toEqual([f.a2]);
+        // Both halves match a question, but not the same one.
+        expect(await listedIds(`?examId=${f.exam1}&tagId=${f.tag2}`)).toEqual([]);
+      });
+
+      it('counts a 題組 once per filter, not once per link', async () => {
+        const db = getDb();
+        const f = await seedFilterFixture();
+        // Two tags on one question: an EXISTS filter yields one row, a
+        // join would yield two and double the total.
+        await db
+          .insert(questionTagTable)
+          .values({ questionId: f.a1, tagId: f.tag2 });
+        expect(await listedIds(`?tagId=${f.tag2}`)).toEqual([f.a1, f.a2].sort((x, y) => x - y));
+      });
+
+      it('rejects a non-numeric filter with 400', async () => {
+        const res = await getQuestionList('?subjectId=abc');
+        expect(res.status).toBe(400);
+      });
+    });
+
     it('sorts by difficulty ascending and descending', async () => {
       const { subjectId, examId, conceptId } = await seedFixture();
       const low = await createQuestion(subjectId, examId, { difficulty: 2, conceptIds: [conceptId] });

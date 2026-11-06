@@ -1,5 +1,5 @@
 import { zValidator } from '@hono/zod-validator';
-import { and, asc, count, desc, eq, gt, inArray, isNull, lte, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, exists, gt, inArray, isNull, lte, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
@@ -299,11 +299,24 @@ const QUESTION_SORT_COLUMNS = {
   difficulty: questionTable.difficulty,
 };
 
+// The admin list's filters are one id per dimension, not the comma-joined
+// lists /count and /adaptive take: those exist so a practice session can
+// draw from several exams at once, whereas this page is someone looking
+// for a particular question. Dimensions combine with AND, so picking an
+// exam and a concept narrows to questions carrying both.
+//
+// categoryId filters by the *subject's* category, since a question has no
+// category of its own; the other three are links on the question itself.
 export const questionListQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(MAX_LIMIT).optional().default(DEFAULT_LIMIT),
   offset: z.coerce.number().int().min(0).optional().default(0),
   sort: z.enum(['id', 'subject', 'type', 'difficulty']).optional().default('id'),
   order: z.enum(['asc', 'desc']).optional().default('desc'),
+  categoryId: z.coerce.number().int().positive().optional(),
+  subjectId: z.coerce.number().int().positive().optional(),
+  examId: z.coerce.number().int().positive().optional(),
+  conceptId: z.coerce.number().int().positive().optional(),
+  tagId: z.coerce.number().int().positive().optional(),
 });
 
 // imageCount matters because the prompt says something different for a
@@ -638,9 +651,12 @@ const createOneQuestion = async (
 
 export const question = new Hono<UserEnv>()
   .get('/', zValidator('query', questionListQuerySchema), async (c) => {
-    const { limit, offset, sort, order } = c.req.valid('query');
+    const { limit, offset, sort, order, categoryId, subjectId, examId, conceptId, tagId } =
+      c.req.valid('query');
     console.log(
-      `GET /api/question limit=${limit} offset=${offset} sort=${sort} order=${order}`
+      `GET /api/question limit=${limit} offset=${offset} sort=${sort} order=${order}` +
+        ` categoryId=${categoryId ?? ''} subjectId=${subjectId ?? ''} examId=${examId ?? ''}` +
+        ` conceptId=${conceptId ?? ''} tagId=${tagId ?? ''}`
     );
     const db = c.get('db');
 
@@ -648,10 +664,77 @@ export const question = new Hono<UserEnv>()
     // independent meaning without their parent, so they're never listed
     // as their own rows here (childCount below is how the admin sees
     // there's more to a GROUP question than what's shown).
+    const conditions = [isNull(questionTable.parentId)];
+
+    // EXISTS rather than a join, so a question linked to several rows of a
+    // link table still produces exactly one row and the pagination count
+    // stays honest. Unlike /count, which materialises matching question
+    // ids in JS, this stays a single statement -- the list is paginated and
+    // pulling every matching id back just to send 10 of them would get
+    // worse as the catalogue grows.
+    if (categoryId !== undefined)
+      conditions.push(
+        exists(
+          db
+            .select({ one: sql`1` })
+            .from(subjectCategoryTable)
+            .where(
+              and(
+                eq(subjectCategoryTable.subjectId, questionTable.subjectId),
+                eq(subjectCategoryTable.categoryId, categoryId)
+              )
+            )
+        )
+      );
+    if (subjectId !== undefined) conditions.push(eq(questionTable.subjectId, subjectId));
+    if (examId !== undefined)
+      conditions.push(
+        exists(
+          db
+            .select({ one: sql`1` })
+            .from(questionExamTable)
+            .where(
+              and(
+                eq(questionExamTable.questionId, questionTable.id),
+                eq(questionExamTable.examId, examId)
+              )
+            )
+        )
+      );
+    if (conceptId !== undefined)
+      conditions.push(
+        exists(
+          db
+            .select({ one: sql`1` })
+            .from(questionConceptTable)
+            .where(
+              and(
+                eq(questionConceptTable.questionId, questionTable.id),
+                eq(questionConceptTable.conceptId, conceptId)
+              )
+            )
+        )
+      );
+    if (tagId !== undefined)
+      conditions.push(
+        exists(
+          db
+            .select({ one: sql`1` })
+            .from(questionTagTable)
+            .where(
+              and(
+                eq(questionTagTable.questionId, questionTable.id),
+                eq(questionTagTable.tagId, tagId)
+              )
+            )
+        )
+      );
+    const where = and(...conditions);
+
     const [{ total }] = await db
       .select({ total: count() })
       .from(questionTable)
-      .where(isNull(questionTable.parentId));
+      .where(where);
     const sortColumn = QUESTION_SORT_COLUMNS[sort];
     const data = await db
       .select({
@@ -671,7 +754,7 @@ export const question = new Hono<UserEnv>()
       })
       .from(questionTable)
       .innerJoin(subjectTable, eq(subjectTable.id, questionTable.subjectId))
-      .where(isNull(questionTable.parentId))
+      .where(where)
       .orderBy(order === 'desc' ? desc(sortColumn) : asc(sortColumn))
       .limit(limit)
       .offset(offset);
