@@ -424,6 +424,12 @@ export const guardianTable = mysqlTable('guardian', {
   name: varchar('name', { length: 100 }).notNull(),
   theme: varchar('theme', { length: 100 }).notNull(),
   cost: int('cost', { unsigned: true }).notNull(),
+  // When true, this spirit's LV5 donation may be directed at any of the
+  // public-interest categories instead of only its own -- the planned VIP
+  // spirit. A flag rather than a check on `code`, so the rule is data.
+  // Such a guardian is not itself a category and must never end up in
+  // donation.guardianId.
+  unrestrictedCategory: boolean('unrestricted_category').notNull().default(false),
   sortOrder: tinyint('sort_order', { unsigned: true }).notNull().default(0),
   isActive: boolean('is_active').notNull().default(true),
   createdAt: datetime('created_at', { mode: 'date', fsp: 3 }),
@@ -525,4 +531,129 @@ export const paymentChargeTable = mysqlTable('payment_charge', {
   totalSuccessTimes: int('total_success_times', { unsigned: true }),
   simulatePaid: boolean('simulate_paid').notNull().default(false),
   createdAt: datetime('created_at', { mode: 'date', fsp: 3 }),
+});
+
+// A foundation or association the platform contributes to on a user's
+// behalf once they grow a spirit to max level. Curated by hand through
+// the admin UI; never deleted, because a past donation still has to
+// render its recipient's name on the public record. isActive = false
+// removes it from the chooser and nothing else.
+export const charityOrganizationTable = mysqlTable('charity_organization', {
+  id: int('id', { unsigned: true }).autoincrement().primaryKey(),
+  name: varchar('name', { length: 100 }).notNull(),
+  // The Taiwanese unified business number -- the identifier that goes on
+  // the transfer. Nullable (small associations are not always findable)
+  // but unique when present, so one foundation cannot be entered twice
+  // under two spellings.
+  taxId: varchar('tax_id', { length: 8 }),
+  introduction: text('introduction').notNull(),
+  websiteUrl: varchar('website_url', { length: 500 }),
+  logoUrl: varchar('logo_url', { length: 500 }),
+  sortOrder: smallint('sort_order', { unsigned: true }).notNull().default(0),
+  isActive: boolean('is_active').notNull().default(true),
+  createdAt: datetime('created_at', { mode: 'date', fsp: 3 }),
+  updatedAt: datetime('updated_at', { mode: 'date', fsp: 3 }),
+});
+
+// Which public-interest categories an organisation is offered under. The
+// category is the guardian (guardian.theme holds the seven names), so
+// there is no separate category table. Many-to-many because a large
+// foundation plausibly belongs under two eggs at once.
+export const charityOrganizationGuardianTable = mysqlTable(
+  'charity_organization_guardian',
+  {
+    organizationId: int('organization_id', { unsigned: true })
+      .notNull()
+      .references(() => charityOrganizationTable.id),
+    guardianId: int('guardian_id', { unsigned: true })
+      .notNull()
+      .references(() => guardianTable.id),
+  },
+  (table) => [primaryKey({ columns: [table.organizationId, table.guardianId] })]
+);
+
+// One actual transfer of money to one organisation. Payouts are batched
+// because a NT$1,000 wire costs more in fees than it carries; a
+// one-at-a-time payout is just a batch holding one donation.
+export const donationBatchTable = mysqlTable('donation_batch', {
+  id: int('id', { unsigned: true }).autoincrement().primaryKey(),
+  organizationId: int('organization_id', { unsigned: true })
+    .notNull()
+    .references(() => charityOrganizationTable.id),
+  // What actually left the bank account. The member count and their
+  // subtotal are deliberately NOT stored -- they are aggregated from
+  // donation.batchId on read, since a batch's membership is frozen once
+  // created. transferredAmount minus that subtotal is the platform's
+  // top-up, which is how the public page labels it; a negative
+  // difference means less was sent than promised and must not publish.
+  transferredAmount: int('transferred_amount', { unsigned: true }).notNull(),
+  // The date the money moved, not the date this row was typed in.
+  transferredAt: datetime('transferred_at', { mode: 'date', fsp: 3 }).notNull(),
+  reference: varchar('reference', { length: 100 }),
+  note: text('note'),
+  published: boolean('published').notNull().default(false),
+  createdAt: datetime('created_at', { mode: 'date', fsp: 3 }),
+  updatedAt: datetime('updated_at', { mode: 'date', fsp: 3 }),
+});
+
+// Proof a batch was paid: transfer slip, the receipt the organisation
+// issued, a thank-you letter. Its own table because one payout routinely
+// produces several documents, arriving at different times.
+export const donationBatchEvidenceTable = mysqlTable('donation_batch_evidence', {
+  id: int('id', { unsigned: true }).autoincrement().primaryKey(),
+  batchId: int('batch_id', { unsigned: true })
+    .notNull()
+    .references(() => donationBatchTable.id),
+  // TRANSFER_RECEIPT, ORG_RECEIPT, THANK_YOU_LETTER -- a varchar rather
+  // than an enum, matching pointTransaction.type: a new kind of proof
+  // should not need a schema change.
+  kind: varchar('kind', { length: 50 }).notNull(),
+  url: varchar('url', { length: 500 }).notNull(),
+  // Kept alongside the URL rather than parsed back out of it:
+  // deleteFromS3 takes a key, and deriving one from a URL breaks
+  // silently the moment the bucket or region changes.
+  s3Key: varchar('s3_key', { length: 500 }).notNull(),
+  caption: varchar('caption', { length: 255 }),
+  sortOrder: smallint('sort_order', { unsigned: true }).notNull().default(0),
+  createdAt: datetime('created_at', { mode: 'date', fsp: 3 }),
+});
+
+// One user's contribution, earned by growing one spirit to max level and
+// directed at one organisation. The user pays nothing; the platform
+// does. The row is created when the user confirms a choice, not when the
+// spirit maxes -- so a maxed spirit whose owner has not chosen yet has
+// no row here, and the public page counts what is promised from
+// userGuardian at max level instead of from SUM(amount) over this table.
+export const donationTable = mysqlTable('donation', {
+  id: int('id', { unsigned: true }).autoincrement().primaryKey(),
+  userId: int('user_id', { unsigned: true })
+    .notNull()
+    .references(() => userTable.id),
+  // The entitlement: one maxed spirit buys one choice. Its UNIQUE index
+  // is the load-bearing constraint of the whole feature -- without it a
+  // replayed confirmation becomes a second promise of real money.
+  userGuardianId: int('user_guardian_id', { unsigned: true })
+    .notNull()
+    .references(() => userGuardianTable.id),
+  // The category the user actually chose. Usually the guardian the
+  // spirit already is, which is why it looks redundant, but a guardian
+  // flagged unrestrictedCategory may pick any of the seven, so it cannot
+  // be recovered by joining through userGuardian.
+  guardianId: int('guardian_id', { unsigned: true })
+    .notNull()
+    .references(() => guardianTable.id),
+  organizationId: int('organization_id', { unsigned: true })
+    .notNull()
+    .references(() => charityOrganizationTable.id),
+  // Frozen at confirmation, never read from a constant at display time:
+  // the amount is still provisional and a later change must not rewrite
+  // what past records say was promised.
+  amount: int('amount', { unsigned: true }).notNull(),
+  // NULL means awaiting payout, set means paid. No separate status
+  // column (that would be two sources for one fact) and no disbursedAt
+  // either, since that date belongs to donationBatch.transferredAt.
+  batchId: int('batch_id', { unsigned: true }).references(() => donationBatchTable.id),
+  confirmedAt: datetime('confirmed_at', { mode: 'date', fsp: 3 }).notNull(),
+  createdAt: datetime('created_at', { mode: 'date', fsp: 3 }),
+  updatedAt: datetime('updated_at', { mode: 'date', fsp: 3 }),
 });

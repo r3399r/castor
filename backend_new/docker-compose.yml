@@ -43,6 +43,14 @@ services:
       # needs user (09), so the two stay in this order.
       - ../db/table/payment_order.sql:/docker-entrypoint-initdb.d/27_payment_order.sql:ro
       - ../db/table/payment_charge.sql:/docker-entrypoint-initdb.d/28_payment_charge.sql:ro
+      # The donation feature. charity_organization_guardian needs guardian
+      # (25), donation needs user (09), user_guardian (26) and the batch
+      # table, so this whole block has to stay after those and in order.
+      - ../db/table/charity_organization.sql:/docker-entrypoint-initdb.d/29_charity_organization.sql:ro
+      - ../db/table/charity_organization_guardian.sql:/docker-entrypoint-initdb.d/30_charity_organization_guardian.sql:ro
+      - ../db/table/donation_batch.sql:/docker-entrypoint-initdb.d/31_donation_batch.sql:ro
+      - ../db/table/donation_batch_evidence.sql:/docker-entrypoint-initdb.d/32_donation_batch_evidence.sql:ro
+      - ../db/table/donation.sql:/docker-entrypoint-initdb.d/33_donation.sql:ro
       # Seed data, numbered 9x so it lands after every table above --
       # docker-entrypoint-initdb.d runs files in name order, and these
       # insert into tables created there. Without the guardians, /box shows
