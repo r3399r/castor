@@ -4,6 +4,7 @@ import { Hono } from 'hono';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import {
+  categoryTable,
   conceptGroupTable,
   conceptTable,
   examSubjectTable,
@@ -14,6 +15,7 @@ import {
   questionTable,
   questionTagTable,
   replyTable,
+  subjectCategoryTable,
   subjectTable,
   tagTable,
   userConceptStatTable,
@@ -674,7 +676,39 @@ export const question = new Hono<UserEnv>()
       .limit(limit)
       .offset(offset);
 
-    return c.json({ data, paginate: genPagination(total, limit, offset) });
+    // The subject's categories, read for this page's subjects rather than
+    // joined into the query above: subject-to-category is many-to-many, so
+    // a join would either multiply the rows or force a GROUP BY onto a
+    // query whose pagination, sorting and COUNT are already settled. A
+    // subject usually sits in one category, but the column is an array
+    // because nothing stops it from sitting in several.
+    const subjectIds = [...new Set(data.map((row) => row.subjectId))];
+    const categoryLinks =
+      subjectIds.length === 0
+        ? []
+        : await db
+            .select({
+              subjectId: subjectCategoryTable.subjectId,
+              name: categoryTable.name,
+            })
+            .from(subjectCategoryTable)
+            .innerJoin(categoryTable, eq(categoryTable.id, subjectCategoryTable.categoryId))
+            .where(inArray(subjectCategoryTable.subjectId, subjectIds))
+            .orderBy(asc(categoryTable.name));
+    const categoriesBySubject = new Map<number, string[]>();
+    for (const link of categoryLinks) {
+      const list = categoriesBySubject.get(link.subjectId) ?? [];
+      list.push(link.name);
+      categoriesBySubject.set(link.subjectId, list);
+    }
+
+    return c.json({
+      data: data.map((row) => ({
+        ...row,
+        categories: categoriesBySubject.get(row.subjectId) ?? [],
+      })),
+      paginate: genPagination(total, limit, offset),
+    });
   })
   .get('/count', zValidator('query', questionCountQuerySchema), async (c) => {
     const { subjectId, examIds, conceptIds, tagIds } = c.req.valid('query');
@@ -994,11 +1028,36 @@ export const question = new Hono<UserEnv>()
       .from(questionConceptTable)
       .where(eq(questionConceptTable.questionId, id));
 
+    // A 題組's sub-questions, so the admin preview can show what a user
+    // is actually given rather than just the parent's stem. Empty for a
+    // standalone question. Children carry no exam/tag/concept links of
+    // their own -- those live on the parent -- so only their own fields
+    // are returned.
+    const children = await db
+      .select({
+        id: questionTable.id,
+        type: questionTable.type,
+        sortOrder: questionTable.sortOrder,
+        content: questionTable.content,
+        options: questionTable.options,
+        answer: questionTable.answer,
+        // Both: adjustedDifficulty is what every reader shows, and what
+        // adaptive selection matches against, while difficulty is the
+        // prior it was seeded from and is still weighted into the
+        // recomputation on each reply (see reply.ts).
+        difficulty: questionTable.difficulty,
+        adjustedDifficulty: questionTable.adjustedDifficulty,
+      })
+      .from(questionTable)
+      .where(eq(questionTable.parentId, id))
+      .orderBy(asc(questionTable.sortOrder), asc(questionTable.id));
+
     return c.json({
       ...found,
       examId: examLink?.examId ?? null,
       tagIds: tagLinks.map((l) => l.tagId),
       conceptIds: conceptLinks.map((l) => l.conceptId),
+      children,
     });
   })
   .post('/', zValidator('json', questionBodySchema), async (c) => {

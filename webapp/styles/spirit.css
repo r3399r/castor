@@ -1664,6 +1664,12 @@
 .sp-modal--art {
   width: min(620px, calc(100% - 32px));
 }
+/* For a modal whose body is rendered question content rather than a
+   sentence of copy: a 題組 with several sub-questions needs the width to
+   stay readable, and MathJax display equations overflow a 480px dialog. */
+.sp-modal--wide {
+  width: min(820px, calc(100% - 32px));
+}
 .sp-dialog-art {
   max-width: 480px;
   margin: 20px auto;

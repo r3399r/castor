@@ -12,6 +12,7 @@ import {
 import { app } from 'src/app';
 import { closeDb, getDb } from 'src/db/client';
 import {
+  categoryTable,
   conceptGroupTable,
   conceptTable,
   examSubjectTable,
@@ -22,6 +23,7 @@ import {
   questionTable,
   questionTagTable,
   replyTable,
+  subjectCategoryTable,
   subjectTable,
   tagTable,
   userConceptStatTable,
@@ -209,7 +211,9 @@ const clearTables = async () => {
   await db.delete(tagTable);
   await db.delete(examSubjectTable);
   await db.delete(examTable);
+  await db.delete(subjectCategoryTable);
   await db.delete(subjectTable);
+  await db.delete(categoryTable);
   await db.delete(userTable);
 };
 
@@ -594,6 +598,48 @@ describe('question routes', () => {
       expect(singleRow.childCount).toBe(0);
     });
 
+    it("reports the subject's categories, and an empty list when it has none", async () => {
+      const db = getDb();
+      const { subjectId, examId, conceptId } = await seedFixture();
+      // Listed out of alphabetical order on purpose: the response is
+      // sorted by name, not by link or insertion order.
+      const [{ insertId: humanities }] = await db
+        .insert(categoryTable)
+        .values({ name: '社會', createdAt: new Date() });
+      const [{ insertId: science }] = await db
+        .insert(categoryTable)
+        .values({ name: '自然', createdAt: new Date() });
+      await db
+        .insert(subjectCategoryTable)
+        .values([
+          { subjectId, categoryId: science },
+          { subjectId, categoryId: humanities },
+        ]);
+
+      const [{ insertId: orphanSubjectId }] = await db
+        .insert(subjectTable)
+        .values({ name: 'uncategorised subject', createdAt: new Date() });
+      await db.insert(examSubjectTable).values({ examId, subjectId: orphanSubjectId });
+      const [{ insertId: orphanGroupId }] = await db
+        .insert(conceptGroupTable)
+        .values({ name: 'g', subjectId: orphanSubjectId, createdAt: new Date() });
+      const [{ insertId: orphanConceptId }] = await db
+        .insert(conceptTable)
+        .values({ name: 'c', conceptGroupId: orphanGroupId, createdAt: new Date() });
+
+      const filed = await createQuestion(subjectId, examId, { conceptIds: [conceptId] });
+      const unfiled = await createQuestion(orphanSubjectId, examId, {
+        conceptIds: [orphanConceptId],
+      });
+
+      const body = (await (await getQuestionList()).json()) as {
+        data: { id: number; categories: string[] }[];
+      };
+      expect(body.data.find((q) => q.id === filed.id)!.categories).toEqual(['社會', '自然']);
+      // A subject in no category is a real state, not an error.
+      expect(body.data.find((q) => q.id === unfiled.id)!.categories).toEqual([]);
+    });
+
     it('sorts by difficulty ascending and descending', async () => {
       const { subjectId, examId, conceptId } = await seedFixture();
       const low = await createQuestion(subjectId, examId, { difficulty: 2, conceptIds: [conceptId] });
@@ -918,6 +964,52 @@ describe('question routes', () => {
         tagIds: [tagId],
         conceptIds: [conceptId],
       });
+    });
+
+    it("returns a 題組's sub-questions in order, and none for a standalone", async () => {
+      const { subjectId, examId, conceptId } = await seedFixture();
+
+      const standalone = await createQuestion(subjectId, examId, { conceptIds: [conceptId] });
+      const standaloneBody = (await (await getQuestion(standalone.id)).json()) as {
+        children: unknown[];
+      };
+      expect(standaloneBody.children).toEqual([]);
+
+      const groupRes = await postQuestions({
+        subjectId,
+        examId,
+        questions: [
+          {
+            type: 'GROUP',
+            difficulty: 5,
+            conceptIds: [conceptId],
+            // Submitted out of order, to pin that the response is sorted
+            // by sortOrder rather than by insertion.
+            childQuestions: [
+              { type: 'SINGLE', sortOrder: 1, content: 'second', options: 'A|B', answer: 'B', difficulty: 4 },
+              { type: 'SINGLE', sortOrder: 0, content: 'first', options: 'A|B', answer: 'A', difficulty: 3 },
+            ],
+          },
+        ],
+      });
+      const [[group]] = (await groupRes.json()) as QuestionDto[][];
+
+      const body = (await (await getQuestion(group.id)).json()) as {
+        children: {
+          content: string;
+          answer: string;
+          difficulty: number;
+          adjustedDifficulty: number;
+          sortOrder: number;
+        }[];
+      };
+      expect(body.children.map((c) => c.content)).toEqual(['first', 'second']);
+      expect(body.children.map((c) => c.answer)).toEqual(['A', 'B']);
+      // Each sub-question keeps its own difficulty, not the parent's, and
+      // carries the adjusted value every reader actually displays --
+      // seeded from difficulty, so equal to it until the first reply.
+      expect(body.children.map((c) => c.difficulty)).toEqual([3, 4]);
+      expect(body.children.map((c) => c.adjustedDifficulty)).toEqual([3, 4]);
     });
 
     it('404s for an unknown question id', async () => {
