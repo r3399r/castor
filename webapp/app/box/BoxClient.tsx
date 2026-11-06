@@ -534,7 +534,7 @@ function RealBoxClient() {
                     action={
                       <>
                         <a
-                          href="/question"
+                          href="/adaptive"
                           className="sp-button sp-button--primary"
                         >
                           前往練習
@@ -593,7 +593,7 @@ function RealBoxClient() {
               {availablePoints === 0 && (
                 <RewardBanner title="目前還沒有可使用的積分">
                   商品仍可先瀏覽。完成練習累積積分後，就能回來兌換喜歡的蛋。
-                  <a href="/question" className="sp-text-link">
+                  <a href="/adaptive" className="sp-text-link">
                     前往練習 →
                   </a>
                 </RewardBanner>

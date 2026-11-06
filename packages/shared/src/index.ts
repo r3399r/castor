@@ -162,39 +162,17 @@ export type FilterOption = {
   name: string;
 };
 
-export type GetCategoryResponse = Category[]
-
-export type GetCategorySubjectResponse = {
-  subjects: Omit<Subject, 'category' | 'filterOptions'>[],
-  filterDimensions: (FilterDimension & {
-    options: {
-      id: number;
-      parentId: number | null;
-      name: string;
-      subjectIds: number[];
-    }[]
-  })[]
-}
-
 export type PostCategoryRequest = {
   name: string;
 };
 
 export type PostCategoryResponse = Category;
 
-export type GetSubjectResponse = Subject[];
-
 export type PostSubjectResponse = Subject;
 
 export type PostSubjectRequest = {
   name: string;
 };
-
-export type GetSubjectExamResponse = Exam[]
-
-export type GetSubjectConceptGroupResponse = ConceptGroup[]
-
-export type GetSubjectTagResponse = Tag[]
 
 export type PostExamResponse = Exam;
 
@@ -344,15 +322,6 @@ export type PostGuardianInvestRequest = { points: number };
 
 export type PostGuardianInvestResponse = { guardian: Guardian; totalPoints: number };
 
-export type PostPreviewRequest = { text: string; imageUrl: string }
-
-export type PostPreviewResponse = {
-  content: string
-  solution: string
-  difficulty: number
-  conceptIds: number[]
-}
-
 export type PostQuestionRequest = {
   subjectId: number;
   type: 'GROUP' | 'SINGLE' | 'MULTIPLE' | 'TRUE_FALSE' | 'FILL';
@@ -392,8 +361,6 @@ export type GetQuestionAdaptiveParams = {
 };
 
 export type GetQuestionAdaptiveResponse = Question[];
-
-export type GetQuestionResponse = Paginate<Question>;
 
 export type GetQuestionIdResponse = Question;
 
