@@ -1034,6 +1034,96 @@ describe('question routes', () => {
       expect(body.map((q) => q.id)).toEqual([wanted.id]);
     });
 
+    // A short paper inside a long subject: the exam holds 3 of the
+    // subject's 20 questions, and the user asks for 5.
+    it('serves every question a small exam holds, not just the per-concept LIMIT', async () => {
+      await seedUser();
+      vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+      const { subjectId, examId, conceptId } = await seedFixture();
+      const db = getDb();
+      const [{ insertId: smallExamId }] = await db
+        .insert(examTable)
+        .values({ name: 'small exam', createdAt: new Date() });
+      await db.insert(examSubjectTable).values({ examId: smallExamId, subjectId });
+
+      const wanted: number[] = [];
+      for (let i = 0; i < 3; i++)
+        wanted.push((await createQuestion(subjectId, smallExamId, { conceptIds: [conceptId] })).id);
+      for (let i = 0; i < 17; i++) await createQuestion(subjectId, examId, { conceptIds: [conceptId] });
+
+      const res = await getAdaptive(`?subjectId=${subjectId}&examIds=${smallExamId}&count=5`);
+      const body = (await res.json()) as AdaptiveDto[];
+      expect(body.map((q) => q.id).sort()).toEqual([...wanted].sort());
+    });
+
+    // The same, but the exam's questions all sit in a concept that owns a
+    // tiny fraction of the subject. weightedTake used to be derived from
+    // that whole-subject fraction (3/203 -> a LIMIT of 1), so two of the
+    // three questions on the chosen paper were unreachable. It is derived
+    // from the filtered pool now.
+    it('does not let a concept with a small share of the subject starve a filtered pool', async () => {
+      await seedUser();
+      vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+      const { subjectId, examId, conceptId } = await seedFixture();
+      const db = getDb();
+      const [{ insertId: smallExamId }] = await db
+        .insert(examTable)
+        .values({ name: 'small exam', createdAt: new Date() });
+      await db.insert(examSubjectTable).values({ examId: smallExamId, subjectId });
+      const [group] = await db.select().from(conceptGroupTable);
+      const [{ insertId: bigConceptId }] = await db
+        .insert(conceptTable)
+        .values({ name: 'bulk concept', conceptGroupId: group.id, createdAt: new Date() });
+
+      const wanted: number[] = [];
+      for (let i = 0; i < 3; i++)
+        wanted.push((await createQuestion(subjectId, smallExamId, { conceptIds: [conceptId] })).id);
+      // A sibling concept large enough to make the first one's whole-subject
+      // share round weightedTake down to 1.
+      for (let i = 0; i < 60; i++) await createQuestion(subjectId, examId, { conceptIds: [bigConceptId] });
+
+      const res = await getAdaptive(`?subjectId=${subjectId}&examIds=${smallExamId}&count=5`);
+      const body = (await res.json()) as AdaptiveDto[];
+      expect(body.map((q) => q.id).sort()).toEqual([...wanted].sort());
+    });
+
+    // An abandoned session leaves pending replies behind. They are served
+    // first so a practice set stays stable, but only where they belong:
+    // handing a 試卷 B leftover to a request filtered to 試卷 A both breaks
+    // the filter and costs the user one of their 試卷 A questions, since
+    // the leftover counts against `count`.
+    it('does not serve a pending question from outside the requested exam', async () => {
+      const userId = await seedUser();
+      vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+      const { subjectId, examId, conceptId } = await seedFixture();
+      const db = getDb();
+      const [{ insertId: otherExamId }] = await db
+        .insert(examTable)
+        .values({ name: 'other exam', createdAt: new Date() });
+      await db.insert(examSubjectTable).values({ examId: otherExamId, subjectId });
+
+      const wanted: number[] = [];
+      for (let i = 0; i < 3; i++)
+        wanted.push((await createQuestion(subjectId, examId, { conceptIds: [conceptId] })).id);
+      const strayQuestion = await createQuestion(subjectId, otherExamId, { conceptIds: [conceptId] });
+      await db.insert(pendingReplyTable).values({
+        questionId: strayQuestion.id,
+        userId,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      const res = await getAdaptive(`?subjectId=${subjectId}&examIds=${examId}&count=5`);
+      const body = (await res.json()) as AdaptiveDto[];
+      expect(body.map((q) => q.id)).not.toContain(strayQuestion.id);
+      expect(body.map((q) => q.id).sort()).toEqual([...wanted].sort());
+
+      // The leftover is still pending, so it comes back when the user
+      // practices the exam it actually belongs to.
+      const other = await getAdaptive(`?subjectId=${subjectId}&examIds=${otherExamId}&count=5`);
+      expect(((await other.json()) as AdaptiveDto[]).map((q) => q.id)).toContain(strayQuestion.id);
+    });
+
     it('prefers a fresh question over one replied to in the last 7 days when both are candidates', async () => {
       const userId = await seedUser();
       vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');

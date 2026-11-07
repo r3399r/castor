@@ -932,6 +932,29 @@ export const question = new Hono<UserEnv>()
 
     const totalQuestions = [...conceptWeights.values()].reduce((a, b) => a + b, 0);
 
+    // The exam/tag filters, resolved to question-id sets once. Needed in
+    // two places below -- the pending-reply match and the per-concept
+    // candidate pools -- which is why they are built up here rather than
+    // next to the first of those.
+    let examQuestionIds: Set<number> | null = null;
+    const examIdList = parseIdList(examIds);
+    if (examIdList.length > 0) {
+      const rows = await db
+        .select({ questionId: questionExamTable.questionId })
+        .from(questionExamTable)
+        .where(inArray(questionExamTable.examId, examIdList));
+      examQuestionIds = new Set(rows.map((r) => r.questionId));
+    }
+    let tagQuestionIds: Set<number> | null = null;
+    const tagIdList = parseIdList(tagIds);
+    if (tagIdList.length > 0) {
+      const rows = await db
+        .select({ questionId: questionTagTable.questionId })
+        .from(questionTagTable)
+        .where(inArray(questionTagTable.tagId, tagIdList));
+      tagQuestionIds = new Set(rows.map((r) => r.questionId));
+    }
+
     // Pending replies: questions already served to this user for this
     // subject that they haven't answered yet -- re-serving them fresh
     // would let a slow client end up with the "same" practice set
@@ -961,6 +984,17 @@ export const question = new Hono<UserEnv>()
         conceptsByQuestion.set(link.questionId, list);
       }
       for (const pending of pendingReplies) {
+        // A pending question still has to satisfy the filters this request
+        // asked for. Without this, a session abandoned halfway through one
+        // exam hands its leftovers to the next session even when that one
+        // picked a different exam -- the user filters to 試卷 A and is
+        // served a 試卷 B question, and because it counts against `count`
+        // they get one fewer 試卷 A question too. The leftover stays
+        // pending (it is still in pendingQuestionIds, so it is also kept
+        // out of the candidate pool) and is picked up again the next time
+        // the user practices somewhere it does belong.
+        if (examQuestionIds && !examQuestionIds.has(pending.questionId)) continue;
+        if (tagQuestionIds && !tagQuestionIds.has(pending.questionId)) continue;
         const questionConcepts = conceptsByQuestion.get(pending.questionId) ?? [];
         if (questionConcepts.some((cid) => conceptWeights.has(cid)))
           matchedPendingIds.push(pending.questionId);
@@ -992,30 +1026,10 @@ export const question = new Hono<UserEnv>()
 
       const baseCandidateTake = conceptWeights.size * (5 + Math.ceil(recentQuestionIds.size / 2));
 
-      // Precomputed once rather than per concept (the legacy version
-      // re-ran an equivalent lookup inside its per-concept loop even
-      // though neither depends on which concept is being scored).
-      let examQuestionIds: Set<number> | null = null;
-      const examIdList = parseIdList(examIds);
-      if (examIdList.length > 0) {
-        const rows = await db
-          .select({ questionId: questionExamTable.questionId })
-          .from(questionExamTable)
-          .where(inArray(questionExamTable.examId, examIdList));
-        examQuestionIds = new Set(rows.map((r) => r.questionId));
-      }
-      let tagQuestionIds: Set<number> | null = null;
-      const tagIdList = parseIdList(tagIds);
-      if (tagIdList.length > 0) {
-        const rows = await db
-          .select({ questionId: questionTagTable.questionId })
-          .from(questionTagTable)
-          .where(inArray(questionTagTable.tagId, tagIdList));
-        tagQuestionIds = new Set(rows.map((r) => r.questionId));
-      }
-
-      // Also batched once across every candidate concept instead of one
-      // query per concept.
+      // Batched once across every candidate concept instead of one query
+      // per concept (the legacy version re-ran an equivalent lookup inside
+      // its per-concept loop even though neither depends on which concept
+      // is being scored).
       const conceptIdsList = [...conceptWeights.keys()];
       const masteryRows = await db
         .select({ conceptId: userConceptStatTable.conceptId, mastery: userConceptStatTable.mastery })
@@ -1038,27 +1052,49 @@ export const question = new Hono<UserEnv>()
       const candidateIds = new Set<number>();
       const recentCandidateIds = new Set<number>();
 
+      // Each concept's pool *after* the exam/tag filters, plus their sum.
+      //
+      // Built before the loop because weightedTake needs the filtered
+      // sizes, not conceptWeights'. conceptWeights holds each concept's
+      // question count across the whole subject, which ignores the filters
+      // entirely: with 試卷 A holding 3 questions, all in a concept that
+      // owns 3 of the subject's 203, the share came out at 3/203 and
+      // weightedTake at ceil(10 * 0.0148) = 1, so the LIMIT below pulled
+      // one of the three. The user picked a paper with three questions on
+      // it, asked for five, and got one.
+      //
+      // Sharing out the *filtered* pool instead gives that concept 3/3 and
+      // a take of 10, so all three are candidates. Unfiltered requests are
+      // unaffected: with no filters the filtered pool is the whole pool, so
+      // every share is what it was.
+      const allowedIdsByConcept = new Map<number, number[]>();
+      let filteredTotal = 0;
+      for (const conceptId of conceptWeights.keys()) {
+        let allowedIds = questionIdsByConcept.get(conceptId) ?? [];
+        if (examQuestionIds) allowedIds = allowedIds.filter((id) => examQuestionIds!.has(id));
+        if (tagQuestionIds) allowedIds = allowedIds.filter((id) => tagQuestionIds!.has(id));
+        if (allowedIds.length === 0) continue;
+        allowedIdsByConcept.set(conceptId, allowedIds);
+        filteredTotal += allowedIds.length;
+      }
+
       // The two per-direction queries below (adjustedDifficulty <=
       // mastery vs > mastery) still run once per concept -- take (LIMIT)
       // and the candidate id set both vary per concept, so unlike the
       // lookups above there's no way to batch these into one query
       // without a per-partition LIMIT, which MySQL doesn't support.
-      for (const [conceptId, numberOfQuestions] of conceptWeights) {
-        let allowedIds = questionIdsByConcept.get(conceptId) ?? [];
-        if (examQuestionIds) allowedIds = allowedIds.filter((id) => examQuestionIds!.has(id));
-        if (tagQuestionIds) allowedIds = allowedIds.filter((id) => tagQuestionIds!.has(id));
-        if (allowedIds.length === 0) continue;
-
+      for (const [conceptId, allowedIds] of allowedIdsByConcept) {
         const mastery = masteryByConcept.get(conceptId) ?? 0;
-        // This concept's share of the total candidate pool, scaled by
-        // baseCandidateTake. The legacy version's equivalent line was
+        // This concept's share of the filtered candidate pool, scaled by
+        // baseCandidateTake. (The legacy version's equivalent line was
         // `baseCandidateTake * (conceptIds.get(conceptId) ?? 1 /
-        // totalQuestions)` -- since .get(conceptId) is always defined
-        // for a key drawn from the same map, the `?? 1 / totalQuestions`
-        // branch could never actually run, so it multiplied by the
-        // concept's raw, un-normalized question count instead of its
-        // fraction of the total. Normalizing here fixes that.
-        const weightedTake = Math.max(1, Math.ceil(baseCandidateTake * (numberOfQuestions / totalQuestions)));
+        // totalQuestions)` -- since .get(conceptId) is always defined for
+        // a key drawn from the same map, the `?? 1 / totalQuestions`
+        // branch could never run, so it multiplied by the concept's raw,
+        // un-normalized question count instead of its fraction.)
+        // filteredTotal is non-zero whenever this loop runs at all, since
+        // only concepts with a non-empty pool are in the map.
+        const weightedTake = Math.max(1, Math.ceil(baseCandidateTake * (allowedIds.length / filteredTotal)));
 
         const baseConditions = [
           isNull(questionTable.parentId),
