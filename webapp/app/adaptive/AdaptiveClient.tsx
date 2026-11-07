@@ -5,6 +5,7 @@ import type { KeyboardEvent } from 'react'
 import { Goal, BookOpenText, Brain, Coins, FunnelPlus, NotebookPen } from 'lucide-react'
 import { apiFetch, apiPost } from '@/lib/api'
 import { readableAnswer } from '@/lib/answerDisplay'
+import { blankNumbersFromPassage } from '@/lib/questionBlank'
 import { formatNumber } from '@/lib/number'
 import Chip, { tagColors } from '@/components/Chip'
 import DifficultyStars from '@/components/DifficultyStars'
@@ -72,6 +73,7 @@ const typeLabel: Record<string, string> = {
   MULTIPLE: '多選題',
   TRUE_FALSE: '是非題',
   FILL: '選填題',
+  CLOZE: '文意選填',
   GROUP: '題組',
 }
 
@@ -273,16 +275,31 @@ function AnswerInput({
     )
   }
 
-  if (question.type === 'FILL') {
+  if (question.type === 'FILL' || question.type === 'CLOZE') {
     // The stored answer's length is what says how many blanks there are.
     const blanks = question.answer?.length ?? 0
-    // '@' is not on the keypad, so an untouched blank matches no option.
+    // '@' is on neither option set, so an untouched blank matches nothing.
     const filled = answer || '@'.repeat(blanks)
+    // FILL's blanks are the digits of one number, written ①②③ in the
+    // question, so rows 1..n line up with it already -- which is why the
+    // prompt makes FILL restart at ① instead of keeping the paper's 31.
+    // A CLOZE keeps the paper's numbers, and the rows are labelled from
+    // the passage so that the row and the article agree. Those numbers
+    // need not start at 1 or be contiguous; they are labels on positional
+    // rows.
+    //
+    // All or nothing: a label list of a different length than the answer
+    // would attach label i to the wrong row, so it is dropped entirely in
+    // favour of 1..n rather than used in part. The server rejects a CLOZE
+    // whose data-blank count doesn't match its answer, so this only trips
+    // on a question stored before that check existed.
+    const passageLabels = question.type === 'CLOZE' ? blankNumbersFromPassage(question.content) : []
+    const rowLabels = passageLabels.length === blanks ? passageLabels : []
     return (
       <div className="flex flex-col gap-4">
         {Array.from({ length: blanks }).map((_, i) => (
           <div key={i} className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-bold text-black-700">{i + 1}.</span>
+            <span className="text-sm font-bold text-black-700">{rowLabels[i] ?? i + 1}.</span>
             <div className={`${styles.answerGrid} flex-1`}>{options.map((opt) => {
               const state = {
                 selected: filled[i] === opt,

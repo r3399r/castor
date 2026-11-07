@@ -78,7 +78,7 @@ export type Question = {
   // is effectively always true on anything the practice UI sees -- it
   // matters on the admin list, which shows both.
   enabled: boolean;
-  type: 'GROUP' | 'SINGLE' | 'MULTIPLE' | 'TRUE_FALSE' | 'FILL';
+  type: 'GROUP' | 'SINGLE' | 'MULTIPLE' | 'TRUE_FALSE' | 'FILL' | 'CLOZE';
   sortOrder: number | null;
   content: string | null;
   options: string | null;
@@ -324,7 +324,7 @@ export type PostGuardianInvestResponse = { guardian: Guardian; totalPoints: numb
 
 export type PostQuestionRequest = {
   subjectId: number;
-  type: 'GROUP' | 'SINGLE' | 'MULTIPLE' | 'TRUE_FALSE' | 'FILL';
+  type: 'GROUP' | 'SINGLE' | 'MULTIPLE' | 'TRUE_FALSE' | 'FILL' | 'CLOZE';
   content?: string;
   options?: string;
   answer?: string;

@@ -4,8 +4,9 @@ import type { Question } from '@/types/api'
  * Turns a stored answer into something a user can read.
  *
  * The `answer` column is written for scoring, not for reading: MULTIPLE is
- * an O/X mask over the options ("OXOOO"), FILL is one character per blank
- * ("901"), TRUE_FALSE is the literal "True"/"False". Printing those raw --
+ * an O/X mask over the options ("OXOOO"), FILL and CLOZE are one character
+ * per blank ("901", "CGAEIBDFHJ"), TRUE_FALSE is the literal
+ * "True"/"False". Printing those raw --
  * which is what the 答題紀錄 and the result box after submitting did --
  * shows the user the database format instead of their own answer.
  *
@@ -39,10 +40,11 @@ export const readableAnswer = (
     return picked.length > 0 ? picked.join('、') : '未選任何選項'
   }
 
-  if (type === 'FILL') {
-    // One character per blank, in blank order. A character that is not on
-    // the keypad means that blank was left alone -- the answer input fills
-    // untouched blanks with a placeholder rather than shortening the
+  if (type === 'FILL' || type === 'CLOZE') {
+    // One character per blank, in blank order -- the same storage shape
+    // for both, which is why they share this branch. A character that is
+    // not an option means that blank was left alone: the answer input
+    // fills untouched blanks with a placeholder rather than shortening the
     // string, because its length is what decides how many blanks there are.
     return [...answer]
       .map((char) => (labels.length === 0 || labels.includes(char) ? char : '－'))

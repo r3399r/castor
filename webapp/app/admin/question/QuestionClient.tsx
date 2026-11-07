@@ -163,7 +163,7 @@ function FilterSelect({
   )
 }
 
-const QUESTION_TYPES = ['GROUP', 'SINGLE', 'MULTIPLE', 'TRUE_FALSE', 'FILL']
+const QUESTION_TYPES = ['GROUP', 'SINGLE', 'MULTIPLE', 'TRUE_FALSE', 'FILL', 'CLOZE']
 
 // The filter dropdowns want every category and subject in one go, not a
 // page of them -- both lists are small enough that paging them would only

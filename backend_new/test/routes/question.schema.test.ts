@@ -90,6 +90,41 @@ describe('questionBodySchema', () => {
     expect(result.success).toBe(false);
   });
 
+  // CLOZE is deliberately top-level-only: a passage of numbered blanks is
+  // a whole question, scored and rewarded as N blanks at once, so it never
+  // sits under a GROUP. The asymmetry between questionItemSchema and
+  // childQuestionSchema looks like an oversight and is easy to "tidy up".
+  it('accepts a top-level CLOZE but rejects CLOZE as a child question', () => {
+    expect(
+      questionBodySchema.safeParse({
+        ...validBody,
+        questions: [{ ...validQuestion, type: 'CLOZE', options: 'A|B|C', answer: 'CAB' }],
+      }).success
+    ).toBe(true);
+
+    expect(
+      questionBodySchema.safeParse({
+        ...validBody,
+        questions: [
+          {
+            ...validQuestion,
+            type: 'GROUP',
+            childQuestions: [
+              {
+                type: 'CLOZE',
+                sortOrder: 0,
+                content: 'child',
+                options: 'A|B',
+                answer: 'A',
+                difficulty: 3,
+              },
+            ],
+          },
+        ],
+      }).success
+    ).toBe(false);
+  });
+
   it('rejects an empty conceptIds', () => {
     const result = questionBodySchema.safeParse({
       ...validBody,

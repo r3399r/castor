@@ -1396,6 +1396,162 @@ describe('question routes', () => {
       expect(await res.json()).toMatchObject({ code: 'QUESTION_IMAGE_PLACEHOLDER' });
     });
 
+    // A CLOZE passage's blank count has to match answer.length, because
+    // the frontend lays out one answer row per character of answer and
+    // labels those rows from the passage's own data-blank numbers. A
+    // mismatch is silent everywhere downstream -- the rows just stop
+    // lining up with the article and every blank past the gap is scored
+    // against the wrong position -- so it is rejected at the door.
+    describe('CLOZE blank count', () => {
+      const clozePassage = (blanks: number) =>
+        Array.from(
+          { length: blanks },
+          (_, i) => `<u data-blank="${31 + i}">&nbsp;&nbsp;${31 + i}&nbsp;&nbsp;</u>`
+        ).join(' ');
+
+      const postCloze = async (
+        subjectId: number,
+        examId: number,
+        conceptId: number,
+        content: string,
+        answer: string
+      ) =>
+        postQuestions({
+          subjectId,
+          examId,
+          questions: [
+            {
+              type: 'CLOZE',
+              content,
+              options: 'A|B|C|D|E',
+              answer,
+              difficulty: 5,
+              conceptIds: [conceptId],
+            },
+          ],
+        });
+
+      it('accepts a CLOZE whose data-blank count equals answer.length', async () => {
+        const { subjectId, examId, conceptId } = await seedFixture();
+
+        const res = await postCloze(subjectId, examId, conceptId, clozePassage(5), 'CADBE');
+        expect(res.status).toBe(201);
+
+        const rows = await getDb().select().from(questionTable);
+        expect(rows).toHaveLength(1);
+        expect(rows[0].type).toBe('CLOZE');
+        // Top-level, not a GROUP child: a passage is a whole question.
+        expect(rows[0].parentId).toBeNull();
+        expect(rows[0].isGroup).toBe(false);
+      });
+
+      // Only the count is checked, never the values. The blank numbers are
+      // the original paper's, so a passage lifted from 第二部分 starts at
+      // 31, and a paper can repeat a number across sections or skip one.
+      // The answer string is positional, so those numbers are labels --
+      // this pins that down against a later "numbers must ascend from 1"
+      // check, which FILL does need (its rows are hard-numbered 1..n) but
+      // which would reject perfectly good CLOZE passages.
+      it('accepts blank numbers that do not start at 1, ascend, or run contiguously', async () => {
+        const { subjectId, examId, conceptId } = await seedFixture();
+        const scattered = [40, 31, 7, 99]
+          .map((n) => `<u data-blank="${n}">&nbsp;&nbsp;${n}&nbsp;&nbsp;</u>`)
+          .join(' ');
+
+        const res = await postCloze(subjectId, examId, conceptId, scattered, 'CADB');
+        expect(res.status).toBe(201);
+      });
+
+      it('rejects a CLOZE with more blanks than answer characters', async () => {
+        const { subjectId, examId, conceptId } = await seedFixture();
+
+        const res = await postCloze(subjectId, examId, conceptId, clozePassage(5), 'CADB');
+        expect(res.status).toBe(400);
+        expect(await res.json()).toMatchObject({ code: 'QUESTION_CLOZE_BLANK_MISMATCH' });
+
+        // Nothing was written -- the whole batch rolls back.
+        expect(await getDb().select().from(questionTable)).toHaveLength(0);
+      });
+
+      it('rejects a CLOZE with fewer blanks than answer characters', async () => {
+        const { subjectId, examId, conceptId } = await seedFixture();
+
+        const res = await postCloze(subjectId, examId, conceptId, clozePassage(3), 'CADBE');
+        expect(res.status).toBe(400);
+        expect(await res.json()).toMatchObject({ code: 'QUESTION_CLOZE_BLANK_MISMATCH' });
+      });
+
+      // The likeliest extraction failure: the model writes the blanks as
+      // plain (31) or __31__ and drops data-blank entirely. Counting zero
+      // against a zero-length answer would otherwise pass this check.
+      it('rejects a CLOZE whose passage has no data-blank marker at all', async () => {
+        const { subjectId, examId, conceptId } = await seedFixture();
+
+        const res = await postCloze(
+          subjectId,
+          examId,
+          conceptId,
+          '<p>The answer is <u>&nbsp;&nbsp;31&nbsp;&nbsp;</u> here.</p>',
+          'C'
+        );
+        expect(res.status).toBe(400);
+        expect(await res.json()).toMatchObject({ code: 'QUESTION_CLOZE_NO_BLANK' });
+      });
+
+      it('leaves non-CLOZE types alone, blanks or not', async () => {
+        const { subjectId, examId, conceptId } = await seedFixture();
+
+        const res = await postQuestions({
+          subjectId,
+          examId,
+          questions: [
+            {
+              type: 'SINGLE',
+              content: '<p>no data-blank anywhere</p>',
+              options: 'A|B',
+              answer: 'A',
+              difficulty: 5,
+              conceptIds: [conceptId],
+            },
+          ],
+        });
+        expect(res.status).toBe(201);
+      });
+
+      // PUT is the admin's edit path, so a mismatch can be introduced
+      // after creation just as easily as during it.
+      it('rejects a PUT that leaves the blank count and answer out of step', async () => {
+        const { subjectId, examId, conceptId } = await seedFixture();
+        const created = await createQuestion(subjectId, examId, { conceptIds: [conceptId] });
+
+        const res = await putQuestion(created.id, {
+          type: 'CLOZE',
+          content: clozePassage(5),
+          options: 'A|B|C|D|E',
+          answer: 'CAD',
+          difficulty: 5,
+          examId,
+        });
+        expect(res.status).toBe(400);
+        expect(await res.json()).toMatchObject({ code: 'QUESTION_CLOZE_BLANK_MISMATCH' });
+      });
+
+      it('accepts a PUT that converts a question to a well-formed CLOZE', async () => {
+        const { subjectId, examId, conceptId } = await seedFixture();
+        const created = await createQuestion(subjectId, examId, { conceptIds: [conceptId] });
+
+        const res = await putQuestion(created.id, {
+          type: 'CLOZE',
+          content: clozePassage(5),
+          options: 'A|B|C|D|E',
+          answer: 'CADBE',
+          difficulty: 5,
+          examId,
+        });
+        expect(res.status).toBe(200);
+      });
+    });
+
     it('rejects an empty conceptIds with 400', async () => {
       const { subjectId, examId, conceptId } = await seedFixture();
       const created = await createQuestion(subjectId, examId, { conceptIds: [conceptId] });

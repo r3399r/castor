@@ -308,6 +308,159 @@ describe('reply routes', () => {
       expect(((await full.json()) as PostReplyResponse)[0].score).toBe(10);
     });
 
+    describe('CLOZE', () => {
+      // POST /question rejects a CLOZE whose data-blank count doesn't
+      // match answer.length, so fixture passages carry real markers.
+      const clozePassage = (blanks: number) =>
+        Array.from(
+          { length: blanks },
+          (_, i) => `<u data-blank="${31 + i}">&nbsp;&nbsp;${31 + i}&nbsp;&nbsp;</u>`
+        ).join(' ');
+
+      const createCloze = (subjectId: number, examId: number, conceptId: number, answer: string) =>
+        createQuestion(subjectId, examId, {
+          type: 'CLOZE',
+          content: clozePassage(answer.length),
+          options: 'A|B|C|D|E',
+          answer,
+          difficulty: 5,
+          conceptIds: [conceptId],
+        });
+
+      it('scores CLOZE proportionally, with no penalty for a wrong blank', async () => {
+        await seedUser();
+        vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+        const { subjectId, examId, conceptId } = await seedFixture();
+        const q = await createCloze(subjectId, examId, conceptId, 'ABCDEABCDE');
+
+        // 7 of 10 blanks right -> 7/10 * 10 = 7. Note what this is NOT:
+        // calcMultipleScore's 2x penalty would make the same answer
+        // (10 - 2*3)/10 * 10 = 4. CLOZE deliberately doesn't penalise,
+        // because each blank is a single-choice row with no "tick
+        // everything" strategy to deter.
+        const res = await postReply([{ questionId: q.id, repliedAnswer: 'ABCDEABXXX' }]);
+        expect(((await res.json()) as PostReplyResponse)[0].score).toBe(7);
+      });
+
+      it('scores an all-correct CLOZE as 10 and an all-wrong one as 0', async () => {
+        await seedUser();
+        vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+        const { subjectId, examId, conceptId } = await seedFixture();
+        const q = await createCloze(subjectId, examId, conceptId, 'ABCDE');
+
+        const full = await postReply([{ questionId: q.id, repliedAnswer: 'ABCDE' }]);
+        expect(((await full.json()) as PostReplyResponse)[0].score).toBe(10);
+
+        const none = await postReply([{ questionId: q.id, repliedAnswer: 'BCDEA' }]);
+        expect(((await none.json()) as PostReplyResponse)[0].score).toBe(0);
+      });
+
+      // The load-bearing one. A CLOZE is a single question row where the
+      // GROUP form used to be N children, so without the per-blank reward
+      // unit a ten-blank passage would pay out the same ~100 points as
+      // one multiple-choice question -- roughly a tenth of what the same
+      // work earned before. Raising `difficulty` cannot recover that:
+      // calcBasePoints tops out at 2x POINTS_BASE.
+      it('awards one correct CLOZE the same points as its blank count in separate questions', async () => {
+        await seedUser();
+        vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+        const { subjectId, examId, conceptId } = await seedFixture();
+        const q = await createCloze(subjectId, examId, conceptId, 'ABCDEABCDE');
+
+        // Cold start (mastery == difficulty) -> basePoints = 100, which is
+        // exactly what one correct SINGLE earns above. 10 blanks -> 1000.
+        const res = await postReply([{ questionId: q.id, repliedAnswer: 'ABCDEABCDE' }]);
+        expect(((await res.json()) as PostReplyResponse)[0].awardedPoints).toBe(1000);
+      });
+
+      it('scales a partially-correct CLOZE by score as well as by blank count', async () => {
+        await seedUser();
+        vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+        const { subjectId, examId, conceptId } = await seedFixture();
+        const q = await createCloze(subjectId, examId, conceptId, 'ABCDEABCDE');
+
+        // score 7 -> basePoints 100 * 0.7 = 70, times 10 blanks = 700.
+        const res = await postReply([{ questionId: q.id, repliedAnswer: 'ABCDEABXXX' }]);
+        expect(((await res.json()) as PostReplyResponse)[0].awardedPoints).toBe(700);
+      });
+
+      // The other half of the reward fix. question.durationMedianMs is a
+      // whole-passage figure while subject.durationMedianMs is per single
+      // question, so the raw ratio for a ten-blank passage lands near 10
+      // and gets flattened by WITHIN_SUBJECT_CLAMP's 2.0 ceiling.
+      // Dividing by the blank count puts both sides in per-blank units.
+      it('compares a CLOZE per blank against the subject median, not per passage', async () => {
+        await seedUser();
+        vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+        const { subjectId, examId, conceptId } = await seedFixture();
+        const q = await createCloze(subjectId, examId, conceptId, 'ABCDEABCDE');
+        const db = getDb();
+        await db.insert(durationGlobalStatTable).values({ medianMs: 20000 });
+        await db.update(subjectTable).set({ durationMedianMs: 60000 }).where(eq(subjectTable.id, subjectId));
+        // Ten blanks at a typical 60s each = 600s for the whole passage.
+        await db.update(questionTable).set({ durationMedianMs: 600000 }).where(eq(questionTable.id, q.id));
+
+        // withinSubjectRatio = (600000/10) / 60000 = 1.0 (the passage is
+        // exactly typical per blank). subjectMultiplier = 60000/20000 = 3.
+        // 100 * 1.0 * 3 * 10 blanks = 3000.
+        //
+        // Comparing per passage instead would give clamp(10, 0.5, 2) = 2.0
+        // and so 6000 -- a question that happens to be long would be paid
+        // double on top of already being paid per blank.
+        const res = await postReply([{ questionId: q.id, repliedAnswer: 'ABCDEABCDE' }]);
+        expect(((await res.json()) as PostReplyResponse)[0].awardedPoints).toBe(3000);
+      });
+
+      it('still pays the full blank-count award before duration_median_ms exists', async () => {
+        await seedUser();
+        vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+        const { subjectId, examId, conceptId } = await seedFixture();
+        const q = await createCloze(subjectId, examId, conceptId, 'ABCDEABCDE');
+        // question.durationMedianMs left NULL, as it is for the first
+        // MIN_QUESTION_SAMPLES replies -- the within-subject layer falls
+        // back to a neutral 1.0, so the earliest answerers are not paid a
+        // tenth of what later ones get.
+
+        const res = await postReply([{ questionId: q.id, repliedAnswer: 'ABCDEABCDE' }]);
+        expect(((await res.json()) as PostReplyResponse)[0].awardedPoints).toBe(1000);
+      });
+
+      it('writes one reply row per CLOZE, not one per blank', async () => {
+        await seedUser();
+        vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+        const { subjectId, examId, conceptId } = await seedFixture();
+        const q = await createCloze(subjectId, examId, conceptId, 'ABCDEABCDE');
+
+        await postReply([{ questionId: q.id, repliedAnswer: 'ABCDEABXXX' }]);
+
+        const db = getDb();
+        const replies = await db.select().from(replyTable).where(eq(replyTable.questionId, q.id));
+        expect(replies).toHaveLength(1);
+        expect(replies[0]).toMatchObject({ parentId: null, score: 7, awardedPoints: 700 });
+      });
+
+      // Other types must be untouched by countRewardUnits: a 10-character
+      // FILL answer is one answer split across ten digit slots, not ten
+      // independent questions, so it stays worth one question's points.
+      it('does not multiply FILL points by its answer length', async () => {
+        await seedUser();
+        vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+        const { subjectId, examId, conceptId } = await seedFixture();
+        const q = await createQuestion(subjectId, examId, {
+          type: 'FILL',
+          options: '1|2|3|4|5|6|7|8|9|0',
+          answer: '1234567890',
+          difficulty: 5,
+          conceptIds: [conceptId],
+        });
+
+        const res = await postReply([{ questionId: q.id, repliedAnswer: '1234567890' }]);
+        const body = (await res.json()) as PostReplyResponse;
+        expect(body[0].score).toBe(10);
+        expect(body[0].awardedPoints).toBe(100);
+      });
+    });
+
     it('updates question attempCount/scoringTotal/adjustedDifficulty and inserts a reply row', async () => {
       await seedUser();
       vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');

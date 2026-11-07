@@ -57,6 +57,45 @@ const assertNoImagePlaceholder = (content: string | undefined, where: string): v
     );
 };
 
+/**
+ * A CLOZE question's blank count lives in two places that have to agree:
+ * the number of data-blank markers in the passage, and the length of
+ * `answer` (one character per blank, in the order the blanks appear).
+ *
+ * Checked here because a mismatch raises no error anywhere downstream.
+ * The passage would show ten blanks while the answer area lays out nine
+ * rows, and every blank past the missing one would be scored against the
+ * wrong position -- a question that is quietly mis-scored forever, which
+ * is worse than a 400 the admin sees while the preview page is still
+ * open. Same reasoning as assertNoImagePlaceholder above.
+ *
+ * Only the count is checked, not which numbers were used: those are the
+ * original paper's (31, 32, ...) and carry no meaning here beyond being
+ * the labels the frontend prints beside each row.
+ */
+const DATA_BLANK = /\bdata-blank\s*=\s*["']?\d{1,3}["']?/gi;
+
+const assertClozeBlanksMatchAnswer = (
+  type: string,
+  content: string | undefined,
+  answer: string | undefined,
+  where: string
+): void => {
+  if (type !== 'CLOZE') return;
+  const blanks = content?.match(DATA_BLANK)?.length ?? 0;
+  if (blanks === 0)
+    throw new BadRequestError(
+      `${where} is a CLOZE question but its content has no data-blank marker`,
+      'QUESTION_CLOZE_NO_BLANK'
+    );
+  const answerLength = answer?.length ?? 0;
+  if (blanks !== answerLength)
+    throw new BadRequestError(
+      `${where} has ${blanks} data-blank marker(s) but an answer of length ${answerLength}`,
+      'QUESTION_CLOZE_BLANK_MISMATCH'
+    );
+};
+
 type Db = TransactionEnv['Variables']['db'];
 
 const childQuestionSchema = z.object({
@@ -72,7 +111,7 @@ const childQuestionSchema = z.object({
 // persisted -- there's no column for it on the question table, matching
 // the legacy createQuestion's behavior of silently dropping it too.
 const questionItemSchema = z.object({
-  type: z.enum(['GROUP', 'SINGLE', 'MULTIPLE', 'TRUE_FALSE', 'FILL']),
+  type: z.enum(['GROUP', 'SINGLE', 'MULTIPLE', 'TRUE_FALSE', 'FILL', 'CLOZE']),
   content: z.string().optional(),
   options: z.string().optional(),
   answer: z.string().optional(),
@@ -100,7 +139,7 @@ export const questionBodySchema = z.object({
 // those links. Tag/concept links get their own relation endpoints below,
 // same split as subject's PUT /:id vs PUT /:id/category.
 export const questionUpdateBodySchema = z.object({
-  type: z.enum(['GROUP', 'SINGLE', 'MULTIPLE', 'TRUE_FALSE', 'FILL']),
+  type: z.enum(['GROUP', 'SINGLE', 'MULTIPLE', 'TRUE_FALSE', 'FILL', 'CLOZE']),
   content: z.string().optional(),
   options: z.string().optional(),
   answer: z.string().optional(),
@@ -205,7 +244,7 @@ const aiChildQuestionSchema = z.object({
 });
 
 const aiQuestionSchema = z.object({
-  type: z.enum(['GROUP', 'SINGLE', 'MULTIPLE', 'TRUE_FALSE', 'FILL']),
+  type: z.enum(['GROUP', 'SINGLE', 'MULTIPLE', 'TRUE_FALSE', 'FILL', 'CLOZE']),
   content: z.string().min(1),
   options: z.string().nullish(),
   answer: z.string().nullish(),
@@ -230,7 +269,7 @@ export const questionImageAiSchema = z.array(aiQuestionSchema);
 // accepts. Nullable fields are modelled as simply "not required" here --
 // that subset has no clean nullable, and the zod schema's .nullish()
 // tolerates an explicit null anyway if one slips through.
-const QUESTION_TYPE_ENUM = ['GROUP', 'SINGLE', 'MULTIPLE', 'TRUE_FALSE', 'FILL'];
+const QUESTION_TYPE_ENUM = ['GROUP', 'SINGLE', 'MULTIPLE', 'TRUE_FALSE', 'FILL', 'CLOZE'];
 const CHILD_QUESTION_TYPE_ENUM = ['SINGLE', 'MULTIPLE', 'TRUE_FALSE', 'FILL'];
 
 export const questionImageResponseJsonSchema = {
@@ -1161,6 +1200,7 @@ export const question = new Hono<UserEnv>()
 
     data.questions.forEach((item, i) => {
       assertNoImagePlaceholder(item.content, `questions[${i}].content`);
+      assertClozeBlanksMatchAnswer(item.type, item.content, item.answer, `questions[${i}]`);
       item.childQuestions?.forEach((child, j) =>
         assertNoImagePlaceholder(child.content, `questions[${i}].childQuestions[${j}].content`)
       );
@@ -1317,6 +1357,7 @@ export const question = new Hono<UserEnv>()
     if (found === undefined) throw new NotFoundError(`question ${id} not found`);
 
     assertNoImagePlaceholder(data.content, 'content');
+    assertClozeBlanksMatchAnswer(data.type, data.content, data.answer, `question ${id}`);
 
     await validateExamForSubject(db, found.subjectId, data.examId);
 

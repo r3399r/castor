@@ -62,6 +62,49 @@ const calcFillScore = (replied: string, correct: string) => {
   return 10;
 };
 
+// CLOZE: one passage, N independent blanks sharing one option list.
+// Straight proportional credit with no penalty for a wrong blank --
+// unlike calcMultipleScore, whose 2x penalty is there to kill the "tick
+// every option" strategy. Each CLOZE blank is a single-choice row with
+// exactly one option selected, so there is no such strategy to deter,
+// and penalising would make a 7-of-10 passage worth less than its seven
+// correct blanks honestly are.
+const calcClozeScore = (replied: string, correct: string) => {
+  if (correct.length === 0) return 0;
+  let correctCount = 0;
+  for (let i = 0; i < correct.length; i++) if (replied.at(i) === correct.at(i)) correctCount++;
+  return (correctCount / correct.length) * 10;
+};
+
+// A CLOZE question is one `question` row but N blanks to the user, so
+// both halves of the reward have to be told the count. Returns 1 for
+// every other type, which leaves their arithmetic untouched.
+//
+//  - calcTimeWeight compares this question's median duration against the
+//    *subject* median, which is a per-single-question figure. A ten-blank
+//    passage takes roughly ten times as long, so the raw ratio lands near
+//    10 and gets flattened by WITHIN_SUBJECT_CLAMP's 2.0 top end.
+//    Dividing by the blank count converts it to per-blank duration, the
+//    same unit as the subject median -- the clamp then sits back in the
+//    behavioral range it was chosen for, so widening that clamp (which
+//    would change every existing question's weight) isn't needed.
+//  - Multiplying the final award by the blank count makes one passage
+//    worth the N replies it replaced, which is what these questions paid
+//    out while they were still built as a GROUP of N children.
+//
+// Together the two are throughput-neutral, the property calcTimeWeight's
+// own comment relies on. It also holds from the very first reply: a new
+// question's durationMedianMs is NULL until MIN_QUESTION_SAMPLES replies
+// exist, which falls back to a neutral 1.0 -- times the blank count, that
+// is still the full N-question award, so the first few answerers aren't
+// paid a tenth of what later ones get.
+//
+// isTooFastForPoints is deliberately left alone: durationP5Ms and the
+// reply's own durationMs are both whole-question figures, already in the
+// same unit as each other.
+const countRewardUnits = (type: string, answer: string | null): number =>
+  type === 'CLOZE' ? Math.max(1, answer?.length ?? 1) : 1;
+
 const calcScore = (type: string, replied: string, correct: string) => {
   switch (type) {
     case 'TRUE_FALSE':
@@ -71,6 +114,8 @@ const calcScore = (type: string, replied: string, correct: string) => {
       return calcMultipleScore(replied, correct);
     case 'FILL':
       return calcFillScore(replied, correct);
+    case 'CLOZE':
+      return calcClozeScore(replied, correct);
     default:
       return 0;
   }
@@ -107,6 +152,12 @@ const calcBasePoints = (questionMastery: number, adjustedDifficulty: number, sco
 // within-subject differentiation the question-level layer exists for.
 //   withinSubjectRatio: this question vs typical for its own subject.
 //   subjectMultiplier: this subject vs the platform-wide typical.
+// questionMedianMs is a *per-reward-unit* duration, not necessarily the
+// stored column: a CLOZE's median covers a whole passage of blanks, which
+// is not the unit the subject median is in, so the caller divides it down
+// first -- see countRewardUnits. Removing that division looks like a
+// simplification and silently re-flattens those questions against the
+// clamp below.
 // Any missing/insufficient-sample input (NULL from questionStat.ts, or no
 // duration_global_stat row yet) falls back to neutral (1.0) for that
 // layer -- untrusted data should never distort the reward, only trusted
@@ -466,15 +517,18 @@ export const reply = new Hono<UserEnv>()
       // question looked beforehand, not after this outcome already
       // adjusted it.
       const questionMastery = calcQuestionMastery(conceptIds, question.adjustedDifficulty);
+      const rewardUnits = countRewardUnits(question.type, question.answer ?? null);
       const timeWeight = calcTimeWeight(
-        question.durationMedianMs,
+        question.durationMedianMs === null ? null : question.durationMedianMs / rewardUnits,
         subjectMedianById.get(question.subjectId) ?? null,
         globalMedianMs
       );
       const tooFast = isTooFastForPoints(question.durationP5Ms, item.durationMs);
       const awardedPoints = tooFast
         ? 0
-        : Math.round(calcBasePoints(questionMastery, question.adjustedDifficulty, score) * timeWeight);
+        : Math.round(
+            calcBasePoints(questionMastery, question.adjustedDifficulty, score) * timeWeight * rewardUnits
+          );
       userPointsBatch += awardedPoints;
 
       // Mutated in-memory and persisted once after the loop below (rather
