@@ -975,11 +975,6 @@ export default function AdaptiveClient({
                     {c.name}
                   </button>
                 ))}
-                {['分科'].map((name) => (
-                  <button key={name} disabled className={`${styles.option} ${styles.categoryTone}`}>
-                    {name}
-                  </button>
-                ))}
               </div>
             </div>
             <div className={`${styles.card} ${styles.examCard}`}>
