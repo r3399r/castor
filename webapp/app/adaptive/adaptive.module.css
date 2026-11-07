@@ -788,7 +788,20 @@
   color: #ffe8e5;
 }
 
+/* Partial credit -- a MULTIPLE or CLOZE answer that was right in part.
+   Spirit gold so it reads as "not finished with this one" rather than as
+   either a pass or a fail; it still goes to 錯題本 like a wrong answer.
+   These dots sit on a dark surface, so the fill is a muted translucent
+   gold with light text, matching its two siblings above rather than the
+   light-background pairing the tokens are built for. */
+.questionNumberPartial {
+  --question-number-border: var(--color-warning);
+  --question-number-background: rgb(166 134 58 / 0.32);
+  color: #f8eecd;
+}
+
 .questionNumberCorrect.questionNumberCurrent,
+.questionNumberPartial.questionNumberCurrent,
 .questionNumberWrong.questionNumberCurrent {
   --question-number-background: var(--result-gold);
   color: var(--result-deep-green);
@@ -982,6 +995,15 @@
   color: var(--color-success-text);
 }
 
+.scorePartial {
+  background: var(--color-warning-soft);
+  color: var(--color-warning-text);
+}
+
+.scorePartial > p {
+  color: var(--color-warning-text);
+}
+
 .scoreWrong {
   background: var(--color-danger-soft);
   color: var(--color-danger-text);
@@ -1005,6 +1027,12 @@
   border-color: var(--result-correct);
   background: var(--result-correct-bg);
   color: var(--result-correct-text);
+}
+
+.resultPartial {
+  border-color: var(--color-warning);
+  background: var(--color-warning-soft);
+  color: var(--color-warning-text);
 }
 
 .resultWrong {
@@ -1034,6 +1062,10 @@
 
 .resultCorrect .resultIcon {
   background: var(--result-correct);
+}
+
+.resultPartial .resultIcon {
+  background: var(--color-warning);
 }
 
 .resultWrong .resultIcon {

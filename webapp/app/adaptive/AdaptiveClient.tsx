@@ -6,6 +6,7 @@ import { Goal, BookOpenText, Brain, Coins, FunnelPlus, NotebookPen } from 'lucid
 import { apiFetch, apiPost } from '@/lib/api'
 import { readableAnswer } from '@/lib/answerDisplay'
 import { blankNumbersFromPassage } from '@/lib/questionBlank'
+import { combinedOutcome, scoreOutcome, type ScoreOutcome } from '@/lib/scoreOutcome'
 import { formatNumber } from '@/lib/number'
 import Chip, { tagColors } from '@/components/Chip'
 import DifficultyStars from '@/components/DifficultyStars'
@@ -48,8 +49,8 @@ type FilterDimensionWithOptions = {
 type QuestionProgressState = {
   answered: boolean
   graded: boolean
-  result: 'correct' | 'wrong' | null
-  label: '未作答' | '已作答' | '答對' | '答錯'
+  result: ScoreOutcome | null
+  label: '未作答' | '已作答' | '答對' | '部分答對' | '答錯'
 }
 type AdaptivePracticeDraft = {
   selectedCategoryId: string
@@ -68,12 +69,45 @@ type AdaptivePracticeDraft = {
   pageTimeMs: [number, number][]
 }
 
+// The progress bar and the question grid paint the same three-state
+// result, so the mapping lives here instead of inline in both -- a third
+// state added in one place only would have been easy to miss.
+const questionNumberTone = (progress: QuestionProgressState): string => {
+  if (progress.graded)
+    return progress.result === 'wrong'
+      ? styles.questionNumberWrong
+      : progress.result === 'partial'
+        ? styles.questionNumberPartial
+        : styles.questionNumberCorrect
+  return progress.answered ? styles.questionNumberAnswered : ''
+}
+
+function QuestionResultGlyph({ result }: { result: ScoreOutcome | null }) {
+  return (
+    <svg className={styles.questionResultIcon} viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      {result === 'wrong' ? (
+        <path d="M4 4L12 12M12 4L4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      ) : result === 'partial' ? (
+        <path d="M4 8H12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      ) : (
+        <path
+          d="M3 8L6.5 11.5L13 4.5"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      )}
+    </svg>
+  )
+}
+
 const typeLabel: Record<string, string> = {
   SINGLE: '單選題',
   MULTIPLE: '多選題',
   TRUE_FALSE: '是非題',
   FILL: '選填題',
-  CLOZE: '文意選填',
+  CLOZE: '填空題',
   GROUP: '題組',
 }
 
@@ -88,37 +122,36 @@ function ResultBox({
   // correct answer but not the type or options it has to be read against.
   question: Question
 }) {
-  const correct = result.score > 0
+  // Not a boolean: a partially-credited answer (MULTIPLE, CLOZE) is
+  // neither. See lib/scoreOutcome for why the cut is at full marks.
+  const outcome = scoreOutcome(result.score)
+  const noticeTone =
+    outcome === 'correct'
+      ? styles.resultCorrect
+      : outcome === 'partial'
+        ? styles.resultPartial
+        : styles.resultWrong
   const correctAnswerText =
     readableAnswer(question.type, result.correctAnswer, question.options) ?? result.correctAnswer
   return (
     <div className="px-5 pb-5">
-      <div
-        className={`${styles.resultNotice} ${correct ? styles.resultCorrect : styles.resultWrong}`}
-      >
+      <div className={`${styles.resultNotice} ${noticeTone}`}>
         <div className="flex flex-col gap-y-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4 sm:gap-y-1">
           <div
             className={styles.resultHeading}
           >
-            {correct ? (
-              <>
-                <span className={styles.resultIcon}>
-                  <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
-                    <path d="M2 6L5 9L10 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </span>
-                答對了！
-              </>
-            ) : (
-              <>
-                <span className={styles.resultIcon}>
-                  <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
-                    <path d="M3 3L9 9M9 3L3 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                  </svg>
-                </span>
-                答錯了
-              </>
-            )}
+            <span className={styles.resultIcon}>
+              <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+                {outcome === 'correct' ? (
+                  <path d="M2 6L5 9L10 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                ) : outcome === 'partial' ? (
+                  <path d="M3 6H9" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                ) : (
+                  <path d="M3 3L9 9M9 3L3 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                )}
+              </svg>
+            </span>
+            {outcome === 'correct' ? '答對了！' : outcome === 'partial' ? '部分答對' : '答錯了'}
           </div>
           <div className="flex flex-wrap items-center gap-4 sm:contents">
             <div className="text-base text-black-700">
@@ -295,10 +328,19 @@ function AnswerInput({
     // on a question stored before that check existed.
     const passageLabels = question.type === 'CLOZE' ? blankNumbersFromPassage(question.content) : []
     const rowLabels = passageLabels.length === blanks ? passageLabels : []
+    // A rule between rows rather than just a gap: a CLOZE has up to ten of
+    // these stacked up, each one a full row of option buttons, and with
+    // only whitespace between them it is hard to see where one blank's
+    // choices end and the next blank's begin. The first row has no rule
+    // above it and the last none below, so the block keeps its own
+    // padding from the container.
     return (
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col">
         {Array.from({ length: blanks }).map((_, i) => (
-          <div key={i} className="flex flex-wrap items-center gap-2">
+          <div
+            key={i}
+            className="flex flex-wrap items-center gap-2 border-t border-spirit-line py-3 first:border-t-0 first:pt-0 last:pb-0"
+          >
             <span className="text-sm font-bold text-black-700">{rowLabels[i] ?? i + 1}.</span>
             <div className={`${styles.answerGrid} flex-1`}>{options.map((opt) => {
               const state = {
@@ -528,15 +570,22 @@ export default function AdaptiveClient({
         ? question.children.map((_, childIndex) => replyResponse?.[offset + childIndex])
         : [replyResponse?.[offset]]
       const graded = !!replyResponse && results.every(Boolean)
-      const result = graded
-        ? results.some((response) => (response?.score ?? 0) <= 0) ? 'wrong' : 'correct'
-        : null
+      const result = graded ? combinedOutcome(results.map((response) => response?.score ?? 0)) : null
 
       return {
         answered,
         graded,
         result,
-        label: result === 'wrong' ? '答錯' : result === 'correct' ? '答對' : answered ? '已作答' : '未作答',
+        label:
+          result === 'correct'
+            ? '答對'
+            : result === 'partial'
+              ? '部分答對'
+              : result === 'wrong'
+                ? '答錯'
+                : answered
+                  ? '已作答'
+                  : '未作答',
       }
     }),
   [adaptiveQuestion, repliedAnswer, replyResponse, responseOffsets])
@@ -547,8 +596,22 @@ export default function AdaptiveClient({
   )
 
   const totalScore = useMemo(() => replyResponse?.reduce((sum, r) => sum + r.score, 0) ?? 0, [replyResponse])
-  const correctCount = useMemo(() => replyResponse?.filter((r) => r.score > 0).length ?? 0, [replyResponse])
-  const wrongCount = useMemo(() => replyResponse?.filter((r) => r.score <= 0).length ?? 0, [replyResponse])
+  // 正確 counts full marks only, so the tally agrees with what lands in
+  // 錯題本 (anything under 10). Partial answers get their own figure
+  // instead of being folded into either side -- previously a 5/10
+  // MULTIPLE was counted as 正確 while the backend filed it for review.
+  const correctCount = useMemo(
+    () => replyResponse?.filter((r) => scoreOutcome(r.score) === 'correct').length ?? 0,
+    [replyResponse],
+  )
+  const partialCount = useMemo(
+    () => replyResponse?.filter((r) => scoreOutcome(r.score) === 'partial').length ?? 0,
+    [replyResponse],
+  )
+  const wrongCount = useMemo(
+    () => replyResponse?.filter((r) => scoreOutcome(r.score) === 'wrong').length ?? 0,
+    [replyResponse],
+  )
   const totalAwardedPoints = useMemo(
     () => replyResponse?.reduce((sum, r) => sum + r.awardedPoints, 0) ?? 0,
     [replyResponse],
@@ -1388,40 +1451,10 @@ export default function AdaptiveClient({
                       disabled={loading}
                       aria-current={i === currentIndex ? 'step' : undefined}
                       aria-label={`第 ${i + 1} 題，${progress.label}${i === currentIndex ? '，目前題目' : ''}`}
-                      className={`${styles.questionNumber} ${
-                        progress.graded
-                          ? progress.result === 'wrong'
-                            ? styles.questionNumberWrong
-                            : styles.questionNumberCorrect
-                          : progress.answered
-                            ? styles.questionNumberAnswered
-                            : ''
-                      } ${i === currentIndex ? styles.questionNumberCurrent : ''}`}
+                      className={`${styles.questionNumber} ${questionNumberTone(progress)} ${i === currentIndex ? styles.questionNumberCurrent : ''}`}
                     >
                       {progress.graded ? (
-                        <svg
-                          className={styles.questionResultIcon}
-                          viewBox="0 0 16 16"
-                          fill="none"
-                          aria-hidden="true"
-                        >
-                          {progress.result === 'wrong' ? (
-                            <path
-                              d="M4 4L12 12M12 4L4 12"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                            />
-                          ) : (
-                            <path
-                              d="M3 8L6.5 11.5L13 4.5"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            />
-                          )}
-                        </svg>
+                        <QuestionResultGlyph result={progress.result} />
                       ) : (
                         i + 1
                       )}
@@ -1512,40 +1545,10 @@ export default function AdaptiveClient({
                         disabled={loading}
                         aria-current={index === currentIndex ? 'step' : undefined}
                         aria-label={`第 ${index + 1} 題，${progress.label}${index === currentIndex ? '，目前題目' : ''}`}
-                        className={`${styles.questionNumber} ${
-                          progress.graded
-                            ? progress.result === 'wrong'
-                              ? styles.questionNumberWrong
-                              : styles.questionNumberCorrect
-                            : progress.answered
-                              ? styles.questionNumberAnswered
-                              : ''
-                        } ${index === currentIndex ? styles.questionNumberCurrent : ''}`}
+                        className={`${styles.questionNumber} ${questionNumberTone(progress)} ${index === currentIndex ? styles.questionNumberCurrent : ''}`}
                       >
                         {progress.graded ? (
-                          <svg
-                            className={styles.questionResultIcon}
-                            viewBox="0 0 16 16"
-                            fill="none"
-                            aria-hidden="true"
-                          >
-                            {progress.result === 'wrong' ? (
-                              <path
-                                d="M4 4L12 12M12 4L4 12"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                              />
-                            ) : (
-                              <path
-                                d="M3 8L6.5 11.5L13 4.5"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              />
-                            )}
-                          </svg>
+                          <QuestionResultGlyph result={progress.result} />
                         ) : (
                           index + 1
                         )}
@@ -1764,6 +1767,14 @@ export default function AdaptiveClient({
                 <p className="text-2xl font-bold">{correctCount}</p>
                 <p className="mt-1 text-sm font-semibold">正確</p>
               </div>
+              {/* Only when there is one, so a set with no partial-credit
+                  question keeps the two-tile layout it always had. */}
+              {partialCount > 0 && (
+                <div className={`${styles.scorePartial} flex-1 rounded-lg px-4 py-3 text-center`}>
+                  <p className="text-2xl font-bold">{partialCount}</p>
+                  <p className="mt-1 text-sm font-semibold">部分</p>
+                </div>
+              )}
               <div className={`${styles.scoreWrong} flex-1 rounded-lg px-4 py-3 text-center`}>
                 <p className="text-2xl font-bold">{wrongCount}</p>
                 <p className="mt-1 text-sm font-semibold">錯誤</p>
