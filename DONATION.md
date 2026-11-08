@@ -21,7 +21,7 @@
 | 使用者前端（`/box/donation`） | ✅ 完成，改打真實 API |
 | 公開徵信頁（`/impact`） | ✅ 完成，不需登入 |
 
-已驗證：五支 SQL 實際灌進本機 dev DB、五條 FK 建立成功、`ALTER` 實際跑過、drizzle 欄位名對得上真實資料庫、後端全套測試 193 unit ＋ 714 regression 全過（45 檔 907 個）、webapp `next build` 通過。
+已驗證：五支 SQL 實際灌進本機 dev DB、五條 FK 建立成功、drizzle 欄位名對得上真實資料庫、後端全套測試 193 unit ＋ 714 regression 全過（45 檔 907 個）、webapp `next build` 通過。
 
 **前端四個畫面都沒有實際點過。** 後端有測試、前端有型別檢查與 build，但瀏覽器裡的互動（檔案上傳、確認框、分頁、VIP 的類別切換）未經人工驗證——除 `/impact` 外都需要真實 Firebase 登入才能跑起來。
 
@@ -250,8 +250,9 @@ promisedAmount   = confirmedAmount + pendingAmount
 
 《公益勸募條例》管的是向公眾募集財物，這裡是平台拿自己的錢捐、使用者一毛沒付，判斷不構成勸募。要處理的就是上面那句同意。
 
-**③ `db/script/v1.1.0/` 這個資料夾名稱是我取的**
-既有只有 `v1.0.0`，backend package 是 `0.1.0`、webapp 是 `1.0.0`，看不出慣例。有規則的話改名。
+**③ ~~`db/script/v1.1.0/` 這個資料夾名稱~~** ✅ 已解決
+2026-11-09 搬進 `db/script/v1.0.0/`，`v1.1.0` 資料夾移除。那支 `ALTER` 腳本一併刪掉——
+它只對「在捐款功能之前就存在的資料庫」有意義，而那個資料庫只有一個（正式庫），已經跑過了。
 
 **④ 金額 NT$1,000 還是暫定的**
 前端已經不再寫死任何金額：`SupportNote` 和選擇流程都從 API 讀，紀錄頁一律印凍結值。所以調整 `DONATION_AMOUNT` 不需要改前端。總積分與訂閱價的連動見 `POINTS.md`。
@@ -263,7 +264,7 @@ promisedAmount   = confirmedAmount + pendingAmount
 
 ## 正式資料庫怎麼上
 
-本機 dev DB（docker）已經套用過了。**正式庫一個字都還沒碰。**
+**正式庫已於 2026-11-08 套用**（使用者自行執行），本機 dev DB 也已套用。這一節留給下一個環境。
 
 從 repo 根目錄依序跑：
 
@@ -273,18 +274,23 @@ mysql ... < db/table/charity_organization.sql
 mysql ... < db/table/charity_organization_category.sql
 mysql ... < db/table/donation_batch.sql
 mysql ... < db/table/donation_batch_evidence.sql
-mysql ... < db/script/v1.1.0/donation.sql
-mysql ... < db/script/v1.1.0/insert_charity_category.sql
+mysql ... < db/script/v1.0.0/insert_charity_category.sql
 mysql ... < db/table/donation.sql
 ```
 
-**順序有意義**：`charity_category` 要最先（`guardian` 的新外鍵指向它），`donation.sql` 要最後（它的外鍵也指向 `charity_category`）。
+**順序有意義**：`charity_category` 要最先（`guardian` 的外鍵指向它），`donation.sql` 要最後（它的外鍵也指向 `charity_category`）。
 
 六支 table 檔是 `CREATE TABLE IF NOT EXISTS`，可以重複執行。
-`donation.sql`（script 那支）**不可以**重複執行——MySQL 沒有 `ADD COLUMN IF NOT EXISTS`，跑第二次會在 `Duplicate column name` 停住。那是刻意的：它會停下來，而不是靜悄悄改了什麼。
-`insert_charity_category.sql` 的 INSERT 也不可重跑（`uk_code` 會擋），但它的 UPDATE 本身是 idempotent 的。
+`insert_charity_category.sql` 的 INSERT 不可重跑（`uk_code` 會擋），但它的 UPDATE 本身是 idempotent 的。
 
-> **若某個環境已經跑過舊版的 `v1.1.0/donation.sql`**（加了 `unrestricted_category`），先 `ALTER TABLE castor.guardian DROP COLUMN unrestricted_category;`。正式庫沒跑過。
+> **原本還有一支 `ALTER TABLE guardian ADD COLUMN category_id` 的升級腳本，已經刪掉。**
+> 它只對捐款功能之前就存在的資料庫有意義，而那個資料庫（正式庫）已經跑過了。
+> `category_id` 和它的外鍵現在由 `db/table/guardian.sql` 自己帶，新環境不需要任何 ALTER。
+> 外鍵名稱 `fk_guardian_category` 在那支檔案裡明寫著，**不要拿掉**——正式庫就是這個名字。
+
+> **不要用 GUI client 跑這些檔案。** `CREATE TABLE` 括號內有空行，而 DBeaver 若開了
+> 「Blank line is statement delimiter」會把一個語句切成好幾段（症狀是 `1064` 錯誤指在
+> `created_at` 那一行）。另外有幾支檔案的註解裡帶分號，也是切分地雷。用 `mysql` CLI。
 
 新環境不需要跑這些，`backend_new/docker-compose.yml` 已經掛好了：`charity_category` 是 `24a`（排在 `guardian` 的 25 之前），其餘 29–33，類別 seed 是 92（要在 guardian seed 91 之後，它靠 code 連回去）。
 
@@ -300,8 +306,7 @@ mysql ... < db/table/donation.sql
 | `db/table/donation_batch.sql` | 新增 |
 | `db/table/donation_batch_evidence.sql` | 新增 |
 | `db/table/donation.sql` | 新增 |
-| `db/script/v1.1.0/donation.sql` | 新增，既有資料庫的 `ALTER` |
-| `db/script/v1.1.0/insert_charity_category.sql` | 新增，七個類別的 seed ＋ 依 code 連回 guardian |
+| `db/script/v1.0.0/insert_charity_category.sql` | 新增，七個類別的 seed ＋ 依 code 連回 guardian |
 | `db/table/guardian.sql` | 加 `category_id`（取代原本的 `unrestricted_category`） |
 | `backend_new/src/db/schema.ts` | 加六張表 ＋ `guardian.categoryId` |
 | `backend_new/src/lib/guardianLevel.ts` | 新增。`LEVEL_XP_THRESHOLDS` / `MAX_LEVEL` 從 `routes/guardian.ts` 搬出來共用——捐款要判斷滿級，而 `MAX_LEVEL` 絕不能有兩份 |

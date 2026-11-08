@@ -67,7 +67,7 @@ services:
       - ../db/script/v1.0.0/insert_guardian.sql:/docker-entrypoint-initdb.d/91_insert_guardian.sql:ro
       # Last, because its UPDATE links each guardian to its category by
       # matching code -- it needs the guardian rows from 91 to exist.
-      - ../db/script/v1.1.0/insert_charity_category.sql:/docker-entrypoint-initdb.d/92_insert_charity_category.sql:ro
+      - ../db/script/v1.0.0/insert_charity_category.sql:/docker-entrypoint-initdb.d/92_insert_charity_category.sql:ro
     healthcheck:
       test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost', '-u', 'root', '-proot']
       interval: 5s

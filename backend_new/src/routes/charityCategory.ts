@@ -9,7 +9,7 @@ import { TransactionEnv } from 'src/middleware/transaction';
 /**
  * The seven public-interest categories, read-only.
  *
- * Read-only because the rows are seeded (db/script/v1.1.0/
+ * Read-only because the rows are seeded (db/script/v1.0.0/
  * insert_charity_category.sql) and tied to the spirit species by `code`:
  * creating an eighth through an API would produce a category no egg leads
  * to, and renaming one would silently rewrite what past public records

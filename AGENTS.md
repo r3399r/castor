@@ -14,6 +14,20 @@ npm workspaces monorepo (`webapp`, `backend`, `backend_new`, `packages/*`):
 - `packages/shared` (`@castor/shared`) — TS shared between `backend_new` and `webapp`.
 - `deploy.sh` — deploys `backend_new` (CloudFormation) and syncs the webapp SSG output to S3, from CI. Sections get commented out from time to time to deploy only one side — read it before assuming what a deploy does.
 
+## Documents at the repo root
+
+Read the relevant one **before** starting, not after. Each exists because the
+thing it describes has at least one failure mode that produces no error.
+
+| File | Answers | Read it when |
+| --- | --- | --- |
+| `AGENTS.md` | this file — rules, conventions, and the known-gaps table at the bottom | always, first |
+| `GUARDIAN.md` | how to add a spirit egg (category-bound or VIP), and how to add a public-interest category | adding, removing or renaming an egg or a category |
+| `DONATION.md` | the LV5 donation feature: decisions, data model, every endpoint and page, what is still missing | anything touching donations, payouts or the public transparency page |
+| `POINTS.md` | the scoring formula, what a point is worth, and how the per-spirit total, the subscription price and the donation amount are locked together | changing scoring, XP thresholds, egg price, question sampling, or any of those three prices |
+| `QUESTION.md` | the Gemini prompt for transcribing a question screenshot | editing that prompt (and `src/lib/questionPrompt.ts` in the same change) |
+| `README.md` | local Docker setup only | setting up a machine |
+
 ## Rules
 
 ### General
@@ -136,6 +150,7 @@ Reuse these foundations instead of duplicating colors, spacing, radii, surfaces,
 
 `/box` is wired to the real API (`GET /guardian`, `GET /store/species`, `POST /store/redeem`, `POST /guardian/:id/invest`); the former `demoData.ts` and its demo-state switcher are gone. Consequences for anyone working on it:
 
+- **Adding, removing or renaming an egg: read `GUARDIAN.md` first.** An egg's identity lives in eight places (one database row, three hardcoded spots in `webapp/lib/guardianArtwork.ts`, five artwork files, the seed script, the table below), and only two of them fail loudly. That file has the step-by-step for a category-bound egg, a VIP egg and a new category, plus what each omission looks like.
 - The store and collection read the `guardian` table, so an environment with no rows there shows an empty store. Seven rows are expected, and their `code` slugs must match `artworkByCode` in `webapp/lib/guardianArtwork.ts` for artwork to appear — the live codes are the first column of the table under **Spirit categories** below.
 - A code that does not match **fails silently**: the component falls back to the locked egg, nothing logs, nothing fails to build, and the only symptom is artwork that never appears. So shipping artwork is not finished when the files and the mapping are in place — the code has to be checked against the database. `/admin/species` is the fastest check and works in any environment: it lists every `guardian` row beside its artwork, and flags either half missing its counterpart. When the artwork is missing in a deployed environment, check that page before suspecting the deploy; the files and the bundle are easy to verify directly (fetch the `.webp`, grep the page chunk) and are rarely the cause.
 - `db/script/v1.0.0/insert_guardian.sql` mirrors the live table as of 2026-10-26, and is the repo's second copy of these codes alongside the table below. It was stale for a while — a renaming left it seeding three codes that no longer existed while four live ones were missing — and nothing detects that, which is how artwork gets wired to a code nobody owns. The table is hand-edited per environment, so when a code changes, update that file and the table below in the same change, and confirm against `/admin/species` rather than against either copy.
@@ -163,7 +178,7 @@ Reuse these foundations instead of duplicating colors, spacing, radii, surfaces,
 
 `guardian.code` is the join between all three of the database row, the `spiritCatalog` species, and the artwork directory. It is data, not code, so this table is the repo's record of it — keep it true when a row is renamed or added.
 
-The *donation category* is no longer this row. It used to be: `guardian.theme` held the seven category names, and the donation feature pointed at `guardian` directly. Categories now live in `charity_category`, and `guardian.category_id` says which one an egg supports (NULL for an egg tied to none, which is how the planned VIP spirit may support any of them). `guardian.theme` stays as the egg's own displayed label — it reads the same as its category's name today, and will diverge once one category holds several eggs. The seven `charity_category.code` values match the seven `guardian.code` values below, which is what `db/script/v1.1.0/insert_charity_category.sql` joins on.
+The *donation category* is no longer this row. It used to be: `guardian.theme` held the seven category names, and the donation feature pointed at `guardian` directly. Categories now live in `charity_category`, and `guardian.category_id` says which one an egg supports (NULL for an egg tied to none, which is how the planned VIP spirit may support any of them). `guardian.theme` stays as the egg's own displayed label — it reads the same as its category's name today, and will diverge once one category holds several eggs. The seven `charity_category.code` values match the seven `guardian.code` values below, which is what `db/script/v1.0.0/insert_charity_category.sql` joins on.
 
 | `guardian.code` | Public-interest category | Spirit | Artwork status | Store egg name |
 | --- | --- | --- | --- | --- |
@@ -240,6 +255,7 @@ already.
 | New guardian artwork lands under `webapp/public/illustrations/guardians/` | Add the `code → species` entry to `artworkByCode` in `webapp/lib/guardianArtwork.ts`. Artwork is otherwise shipped but never displayed — this happened when the cat set landed. `/admin/species` is the quickest way to see which rows and catalog entries are still unpaired. |
 | A new **field** is added to `GET /analysis/overview` | New *routes* under `/api/analysis/*` inherit the paywall from the path prefix; a new *field* does not inherit anything. Confirm the data is meant to be paid before returning it. |
 | A range tab on `/analysis` or `/box` is widened | Widen the matching request parameter too (`progressDays` is derived from `DATE_RANGES`). The server trims to what was asked for, so a wider tab would silently show nothing extra. |
+| An egg is added, removed or renamed | Read `GUARDIAN.md`. The trap that has no loud failure: `db/script/v1.0.0/insert_charity_category.sql` backfills `guardian.category_id` by joining `charity_category.code = guardian.code`, so a **second** egg in an existing category (whose code necessarily differs) is never matched and keeps `category_id` NULL — which *means* "may support any category", i.e. a silent extra VIP whose owner can direct real money anywhere. Set `category_id` explicitly in the INSERT, and check `/admin/species` for the amber badge afterwards. |
 | `QUESTION.md` or `src/lib/questionPrompt.ts` is edited | Both must change together, and the `.ts` copy is a template literal: every backslash needs doubling again (`$\\frac` in the doc is `$\\\\frac` in source), and every backtick needs escaping. A single backslash is a valid JSON escape, so a wrong count corrupts formulas silently rather than failing; a raw backtick ends the literal and at least fails loudly. Verify by printing the runtime string and diffing it against the doc, rather than by reading the source. |
 | The serif stack for the Facebook post image changes | Two places must agree: the `body` rule in `backend_new/src/lib/htmlSnapshot.ts`, where webfonts are **mandatory** (Lambda Chromium ships no system fonts at all, so Tinos stands in for Times and LXGW WenKai TC for 楷體), and the 字體 section of the prompt, which names the stacks the AI may emit as inline styles. A font named in the prompt but absent from the snapshot template is silently ignored. Note this is the posted image only — the app itself has **no** serif default for question HTML, so the same markup looks different in the two places. |
 | Something outside the Facebook poster needs S3 | Import `src/lib/s3.ts`, never `src/lib/htmlSnapshot.ts`. That module imports `puppeteer-core` and `@sparticuz/chromium`, so importing anything from it drags a headless browser into the importing lambda’s bundle — nothing fails, the bundle just grows by tens of MB. `deleteS3File` is still re-exported from `htmlSnapshot.ts` under its old name so `facebookPoster` and its mocks keep working. Verify with `grep -c sparticuz dist/api/index.js` after `npm run build` (expected: 0). |
