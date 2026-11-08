@@ -123,6 +123,10 @@
 .donation-org-link:hover { text-decoration: underline; }
 .donation-action-bar { position: fixed; z-index: var(--layer-sticky); right: 0; bottom: 0; left: 0; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 14px max(16px, calc((100vw - var(--container-site)) / 2)); padding-bottom: max(14px, env(safe-area-inset-bottom)); border-top: var(--spirit-border); background: color-mix(in srgb, var(--color-spirit-paper) 94%, transparent); box-shadow: 0 -8px 24px rgb(23 63 58 / .08); backdrop-filter: blur(12px); }
 .donation-action-bar p { margin: 0; color: var(--color-spirit-ink-soft); font-weight: 600; }
+/* The bar holds two buttons now ("let the platform decide" beside "next"),
+   so they need their own row; the bar itself space-betweens the message
+   against this group. */
+.donation-action-bar-buttons { display: flex; flex: none; gap: 10px; }
 .donation-confirm-card,
 .donation-record-card,
 .donation-centered-state { max-width: 760px; margin: 0 auto; padding: clamp(24px, 5vw, 48px); }
@@ -178,8 +182,11 @@
   .donation-demo-fields, .donation-demo-control-actions { align-items: stretch; flex-direction: column; }
   .donation-demo-fields select { width: 100%; }
   .donation-max-card { padding: 24px 20px; }
-  .donation-org-grid { grid-template-columns: 1fr; padding-bottom: 150px; }
+  /* Clears the fixed action bar, which is taller here because the two
+     buttons stack. */
+  .donation-org-grid { grid-template-columns: 1fr; padding-bottom: 210px; }
   .donation-action-bar { align-items: stretch; flex-direction: column; gap: 10px; }
+  .donation-action-bar-buttons { flex-direction: column; }
   .donation-action-bar .sp-button { width: 100%; }
   .donation-spirit-summary { align-items: flex-start; gap: 16px; padding: 4px 0 18px; }
   .donation-spirit-thumb { width: 96px; height: 96px; }

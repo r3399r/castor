@@ -93,6 +93,57 @@ const seedCategory = async (overrides: Partial<typeof charityCategoryTable.$infe
   return insertId;
 };
 
+const getSuggest = (query = '') =>
+  app.request(`/api/charity-organization/suggest${query}`);
+
+/**
+ * One confirmed donation to an organisation, so the suggestion has
+ * something to rank by. Each one needs its own user and spirit --
+ * donation's UNIQUE is on user_guardian_id, so a second donation cannot
+ * reuse the first one's spirit.
+ */
+const seedDonationTo = async (organizationId: number, categoryId: number, amount = 1000) => {
+  const db = getDb();
+  seq += 1;
+  const [{ insertId: userId }] = await db.insert(userTable).values({
+    firebaseUid: `donor-${seq}`,
+    email: `donor-${seq}@example.com`,
+    name: `donor ${seq}`,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
+  const [{ insertId: speciesId }] = await db.insert(guardianTable).values({
+    code: `sp-${seq}`,
+    name: `species ${seq}`,
+    theme: 'theme',
+    cost: 10,
+    categoryId,
+    // Flat 0: guardian.sort_order is TINYINT UNSIGNED and this file's
+    // counter runs past 255.
+    sortOrder: 0,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
+  const [{ insertId: userGuardianId }] = await db.insert(userGuardianTable).values({
+    userId,
+    guardianId: speciesId,
+    level: 5,
+    xp: 0,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
+  await db.insert(donationTable).values({
+    userId,
+    userGuardianId,
+    categoryId,
+    organizationId,
+    amount,
+    confirmedAt: new Date(),
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
+};
+
 const validBody = (categoryIds: number[], overrides: Record<string, unknown> = {}) => ({
   name: '財團法人測試基金會',
   introduction: '做測試用的基金會簡介。',
@@ -494,6 +545,156 @@ describe('charity organization routes', () => {
       const list = await getList();
       expect(list.status).toBe(200);
       expect(((await list.json()) as ListDto).paginate.total).toBe(1);
+    });
+  });
+
+  describe('GET /suggest', () => {
+    const create = async (categoryIds: number[], overrides: Record<string, unknown> = {}) => {
+      const res = await postOrganization(validBody(categoryIds, overrides));
+      return ((await res.json()) as OrganizationDto).id;
+    };
+
+    it('suggests the organization with the least support so far', async () => {
+      const cat = await seedCategory();
+      const popular = await create([cat], { name: '甲基金會', sortOrder: 1 });
+      const quiet = await create([cat], { name: '乙基金會', sortOrder: 2 });
+      await seedDonationTo(popular, cat);
+
+      const res = await getSuggest(`?categoryId=${cat}`);
+      expect(res.status).toBe(200);
+      // The *later*-sorted one wins, which is the whole point: without the
+      // ranking the first row would simply keep collecting donations.
+      expect((await res.json()) as OrganizationDto).toMatchObject({ id: quiet, name: '乙基金會' });
+    });
+
+    it('ranks by amount, not by number of donations', async () => {
+      // Amounts are uniform today, but donation.amount is frozen per row
+      // precisely because that can change. "Least supported" is a
+      // statement about money.
+      const cat = await seedCategory();
+      const twoSmall = await create([cat], { name: '甲基金會', sortOrder: 1 });
+      const oneBig = await create([cat], { name: '乙基金會', sortOrder: 2 });
+      await seedDonationTo(twoSmall, cat, 100);
+      await seedDonationTo(twoSmall, cat, 100);
+      await seedDonationTo(oneBig, cat, 1000);
+
+      const body = (await (await getSuggest(`?categoryId=${cat}`)).json()) as OrganizationDto;
+      expect(body.id).toBe(twoSmall);
+    });
+
+    it('includes an organization nobody has chosen yet', async () => {
+      // It has no donation rows at all, so an inner join would drop it --
+      // ranking it last by excluding it instead of first by counting zero.
+      const cat = await seedCategory();
+      const chosen = await create([cat], { name: '甲基金會', sortOrder: 1 });
+      const untouched = await create([cat], { name: '乙基金會', sortOrder: 2 });
+      await seedDonationTo(chosen, cat);
+
+      const body = (await (await getSuggest(`?categoryId=${cat}`)).json()) as OrganizationDto;
+      expect(body.id).toBe(untouched);
+    });
+
+    it('breaks a tie by sortOrder, so the answer is the same every time', async () => {
+      // Two organisations, nothing donated to either, so only the
+      // tiebreakers decide. The loop pins what is actually observable:
+      // three calls, one answer.
+      //
+      // It does not reliably pin the tiebreakers themselves. MySQL's order
+      // for rows with equal sort keys is unspecified, and measurably
+      // varies between runs -- deleting `asc(sortOrder), asc(id)` failed
+      // this test on one mutation run and passed on the next. The
+      // tiebreakers stay because determinism is their whole job, and no
+      // single assertion can demonstrate determinism.
+      const cat = await seedCategory();
+      const second = await create([cat], { name: '乙基金會', sortOrder: 5 });
+      const first = await create([cat], { name: '甲基金會', sortOrder: 1 });
+
+      for (let i = 0; i < 3; i++) {
+        const body = (await (await getSuggest(`?categoryId=${cat}`)).json()) as OrganizationDto;
+        expect(body.id).toBe(first);
+      }
+      expect(second).not.toBe(first);
+    });
+
+    it('never suggests an inactive organization', async () => {
+      // POST /api/donation refuses one, so suggesting it is a dead end.
+      const cat = await seedCategory();
+      const retired = await create([cat], { name: '甲基金會', sortOrder: 1, isActive: false });
+      const active = await create([cat], { name: '乙基金會', sortOrder: 2 });
+
+      const body = (await (await getSuggest(`?categoryId=${cat}`)).json()) as OrganizationDto;
+      expect(body.id).toBe(active);
+      expect(body.id).not.toBe(retired);
+    });
+
+    it('only considers organizations filed under the requested category', async () => {
+      // `elsewhere` is given the winning sortOrder on purpose: both have no
+      // donations, so with the category filter removed it is the one that
+      // comes back. Without that arrangement the test passes either way
+      // and pins nothing.
+      const wanted = await seedCategory();
+      const other = await seedCategory();
+      const elsewhere = await create([other], { name: '甲基金會', sortOrder: 1 });
+      const inCategory = await create([wanted], { name: '乙基金會', sortOrder: 2 });
+
+      const body = (await (await getSuggest(`?categoryId=${wanted}`)).json()) as OrganizationDto;
+      expect(body.id).toBe(inCategory);
+      expect(body.id).not.toBe(elsewhere);
+    });
+
+    it("counts an organization's whole history, not just this category's", async () => {
+      // An organisation can be filed under several categories. The money it
+      // received is the money it received, whichever category routed it.
+      const wanted = await seedCategory();
+      const other = await seedCategory();
+      const busyElsewhere = await create([wanted, other], { name: '甲基金會', sortOrder: 1 });
+      const quiet = await create([wanted], { name: '乙基金會', sortOrder: 2 });
+      await seedDonationTo(busyElsewhere, other);
+
+      const body = (await (await getSuggest(`?categoryId=${wanted}`)).json()) as OrganizationDto;
+      expect(body.id).toBe(quiet);
+    });
+
+    it('answers 404 when the category has no active organization', async () => {
+      const cat = await seedCategory();
+      const res = await getSuggest(`?categoryId=${cat}`);
+      expect(res.status).toBe(404);
+      expect(((await res.json()) as { code?: string }).code).toBe('NO_ORGANIZATION_AVAILABLE');
+    });
+
+    it('tells a non-existent category apart from one with nothing in it', async () => {
+      // Both are 404, so the status alone proves nothing: without the
+      // explicit category check this request falls through to the
+      // no-organisation branch and answers the same way. The *code* is
+      // what separates a bad link from a category that is simply not
+      // stocked yet.
+      const res = await getSuggest('?categoryId=999999');
+      expect(res.status).toBe(404);
+      expect(((await res.json()) as { code?: string }).code).toBe('NOT_FOUND');
+    });
+
+    it('rejects a request with no categoryId', async () => {
+      expect((await getSuggest()).status).toBe(400);
+    });
+
+    it('is matched before /:id, not as an id named "suggest"', async () => {
+      // Hono matches routes in declaration order. With /suggest declared
+      // after /:id this request reaches the id handler as Number('suggest')
+      // = NaN, which answers 404 -- so a passing 200 here is what proves
+      // the ordering.
+      const cat = await seedCategory();
+      await create([cat]);
+
+      const res = await getSuggest(`?categoryId=${cat}`);
+      expect(res.status).toBe(200);
+    });
+
+    it('needs no identity, like the other reads here', async () => {
+      const cat = await seedCategory();
+      await create([cat]);
+      vi.mocked(verifyIdToken).mockResolvedValue(null);
+
+      expect((await getSuggest(`?categoryId=${cat}`)).status).toBe(200);
     });
   });
 });

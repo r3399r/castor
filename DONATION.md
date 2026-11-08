@@ -16,6 +16,7 @@
 | `/api/donation` | ✅ 完成，23 個 regression test |
 | `/api/info/donation` | ✅ 完成，19 個 regression test |
 | `/api/charity-category` | ✅ 完成，6 個 regression test |
+| `/api/charity-organization/suggest` | ✅ 完成，12 個 regression test |
 | `/api/donation-batch` | ✅ 完成，51 個 regression test |
 | admin 介面（前端） | ✅ 完成，兩頁 |
 | 使用者前端（`/box/donation`） | ✅ 完成，改打真實 API |
@@ -182,6 +183,21 @@ promisedAmount   = confirmedAmount + pendingAmount
    - 一般精靈只能捐自己的類別（`categoryId` 省略即可，填錯回 `DONATION_CATEGORY_INVALID`）；`guardian.category_id IS NULL` 的（VIP）必須明寫 `categoryId`
    - 組織必須 `isActive` 且確實掛在所選類別下（公開頁是按類別分組的）
    - `batch` 用 **left join**：剛確認完的捐款沒有批次，那是最常見的狀態
+   - **「幫我決定」**（`GET /api/charity-organization/suggest?categoryId=`，2026-11-09 加）：
+     選擇是整個 LV5 功能的情感報酬，但對沒有意見的使用者來說它是一道牆——關掉頁面就等於
+     那筆捐款永遠不會發生（`donation` 沒有列，`pendingCount` 一直掛著）。給一條出路比
+     逼每個人做決定有價值
+     - 挑**累積支持最少**的組織，不是隨機。理由有兩個：結果在公開頁上講得出來，而且分配會平均，
+       不會因為排序在前就一直被選中
+     - 按**金額總和**排序而不是筆數：`donation.amount` 是逐列凍結的，正因為它會變；
+       「支持最少」是一句關於錢的話。金額一致時兩者排序相同
+     - **left join** `donation`：沒人選過的組織完全沒有 donation 列，inner join 會把它
+       排除掉——那等於讓它永遠排最後，而不是以 0 排最前
+     - 只看 `isActive` 的組織（停用的會被 `POST /api/donation` 拒絕）
+     - 統計的是該組織的**全部歷史**，不分類別：它收到多少就是多少
+     - **刻意做成「建議」而不是在 `POST /api/donation` 裡偷偷挑。** 紀錄和公開頁都會寫出
+       組織名稱，所以使用者必須先看到是誰才確認，而且仍然可以改選
+     - `/suggest` 必須宣告在 `/:id` **之前**（Hono 依序比對，否則會被當成 `Number('suggest')` = NaN），有測試釘住
 4. ~~**`/api/info/donation`**~~ ✅ — 公開徵信頁的資料。掛在 `/api/info/*` 底下可直接吃到既有的 5 分鐘 CloudFront TTL，且那條 behavior 本來就不轉送 `Authorization`，公開端點完全相符
    - 寫在 `routes/info.ts` 裡，不另開路由檔；`app.ts` 要單獨掛 `transaction`（那個 group 是逐路徑掛的，`/api/info` 本身是健康檢查，資料庫掛了也要回 200）
    - 只列 `published = 1` 的批次。**summary 的 `transferredAmount` 用同一個條件**，所以把看得到的批次加起來就等於那個總額

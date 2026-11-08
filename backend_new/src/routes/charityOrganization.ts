@@ -1,5 +1,5 @@
 import { zValidator } from '@hono/zod-validator';
-import { and, asc, count, desc, eq, inArray } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import {
@@ -61,6 +61,10 @@ const SORT_COLUMNS = {
   name: charityOrganizationTable.name,
   sortOrder: charityOrganizationTable.sortOrder,
 };
+
+export const charityOrganizationSuggestQuerySchema = z.object({
+  categoryId: z.coerce.number().int().positive(),
+});
 
 export const charityOrganizationListQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(MAX_LIMIT).optional().default(DEFAULT_LIMIT),
@@ -230,6 +234,94 @@ export const charityOrganization = new Hono<TransactionEnv>()
     const data = rows.map((row) => buildDto(row, categories.get(row.id) ?? []));
 
     return c.json({ data, paginate: genPagination(total, limit, offset) });
+  })
+  /**
+   * One organisation for a user who has no preference of their own.
+   *
+   * Exists because the choice is the whole emotional payoff of the LV5
+   * donation, which makes it a wall for anyone who does not have an
+   * opinion: they close the page, no `donation` row is ever written, and
+   * the promise stays an unconfirmed number in /api/info/donation's
+   * pendingCount. A way out of that screen is worth more than insisting
+   * everyone decides.
+   *
+   * It suggests the **least-supported** organisation rather than a random
+   * one, for two reasons: the result can be explained on the public page
+   * ("this went to the organisation with the least support so far"), and
+   * it spreads donations evenly instead of letting whichever row sorts
+   * first collect most of them.
+   *
+   * Deliberately a suggestion, not a hidden choice inside
+   * POST /api/donation: the record and the public page both name the
+   * organisation, so the user has to see who it is before confirming.
+   * They can still pick someone else afterwards.
+   *
+   * Declared before `/:id` on purpose -- Hono matches in order, so with
+   * the two swapped this path would hit the id handler as Number('suggest')
+   * = NaN. There is a test pinning that.
+   */
+  .get('/suggest', zValidator('query', charityOrganizationSuggestQuerySchema), async (c) => {
+    const db = c.get('db');
+    const { categoryId } = c.req.valid('query');
+    console.log(`GET /api/charity-organization/suggest categoryId=${categoryId}`);
+
+    const [category] = await db
+      .select({ id: charityCategoryTable.id })
+      .from(charityCategoryTable)
+      .where(eq(charityCategoryTable.id, categoryId));
+    if (category === undefined) throw new NotFoundError(`charity category ${categoryId} not found`);
+
+    // Summed amount, not a count of rows: amounts are uniform today but
+    // donation.amount is frozen per row precisely because that can change,
+    // and "least supported" is a statement about money. With uniform
+    // amounts this orders identically to a count.
+    //
+    // Left join so an organisation nobody has chosen yet takes part at
+    // all -- it has no donation rows, and an inner join would rank it
+    // last by excluding it instead of first by counting zero.
+    //
+    // The total is the organisation's own, across every category it is
+    // filed under: the money it received is the money it received,
+    // regardless of which category routed it there.
+    // One expression, used by both the projection and the ordering. Two
+    // copies drift apart the moment one of them is edited -- and the
+    // selected value is read by nothing, so editing only it changes
+    // nothing while looking like it has.
+    const supported = sql<number>`cast(coalesce(sum(${donationTable.amount}), 0) as signed)`;
+    const [suggestion] = await db
+      .select({ id: charityOrganizationTable.id, supported })
+      .from(charityOrganizationTable)
+      .innerJoin(
+        charityOrganizationCategoryTable,
+        and(
+          eq(charityOrganizationCategoryTable.organizationId, charityOrganizationTable.id),
+          eq(charityOrganizationCategoryTable.categoryId, categoryId)
+        )
+      )
+      .leftJoin(donationTable, eq(donationTable.organizationId, charityOrganizationTable.id))
+      // Only organisations still accepting donations: POST /api/donation
+      // refuses an inactive one, so suggesting it would be a dead end.
+      .where(eq(charityOrganizationTable.isActive, true))
+      .groupBy(charityOrganizationTable.id)
+      // sortOrder then id as tiebreakers, so an untouched category (every
+      // total zero) returns the same answer to everyone who asks rather
+      // than whatever MySQL happens to return first.
+      .orderBy(
+        asc(supported),
+        asc(charityOrganizationTable.sortOrder),
+        asc(charityOrganizationTable.id)
+      )
+      .limit(1);
+    if (suggestion === undefined)
+      throw new NotFoundError(
+        `no active organization is filed under charity category ${categoryId}`,
+        'NO_ORGANIZATION_AVAILABLE'
+      );
+
+    const found = await findOrganization(db, suggestion.id);
+    const categories = await categoriesByOrganization(db, [suggestion.id]);
+
+    return c.json(buildDto(found, categories.get(suggestion.id) ?? []));
   })
   .get('/:id', async (c) => {
     const db = c.get('db');

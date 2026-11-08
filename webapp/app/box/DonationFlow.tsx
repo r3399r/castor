@@ -15,6 +15,7 @@ import type {
   GetCharityCategoriesResponse,
   GetDonationResponse,
   GetGuardianResponse,
+  GetSuggestedOrganizationResponse,
   Guardian,
   Paginate,
 } from '@/types/api'
@@ -336,6 +337,11 @@ export function DonationFlowClient() {
   const [expanded, setExpanded] = useState<number | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  // Set when the platform picked instead of the user, so the action bar
+  // can say so. Cleared the moment they touch a card themselves -- a
+  // suggestion they have since overridden must stop claiming credit.
+  const [suggested, setSuggested] = useState(false)
+  const [suggesting, setSuggesting] = useState(false)
 
   useEffect(() => {
     if (guardianId === null) {
@@ -383,6 +389,7 @@ export function DonationFlowClient() {
         if (!cancelled) {
           setOrganizations(res.data)
           setDraftId(null)
+          setSuggested(false)
         }
       } catch {
         if (!cancelled) setLoadError('無法載入公益組織列表。')
@@ -432,6 +439,43 @@ export function DonationFlowClient() {
     } finally {
       setSubmitting(false)
     }
+  }
+
+  /**
+   * Picks on the user's behalf, for someone with no preference of their
+   * own.
+   *
+   * Asks the backend rather than choosing locally: the rule is
+   * "least-supported so far", which needs the donation totals the client
+   * does not have — and keeping the rule in one place is what lets the
+   * public page explain it.
+   *
+   * This only fills the selection in. The confirm screen still names the
+   * organisation and the user still presses the button, because the
+   * donation record and the public page both carry that name.
+   */
+  const chooseForMe = async () => {
+    if (chosenCategoryId === null || suggesting) return
+    setSuggesting(true)
+    setSubmitError(null)
+    try {
+      const picked = await apiFetch<GetSuggestedOrganizationResponse>(
+        'charity-organization/suggest',
+        { categoryId: chosenCategoryId }
+      )
+      setDraftId(picked.id)
+      setSuggested(true)
+    } catch {
+      setSubmitError('暫時無法為你挑選，請直接從上面選一個。')
+    } finally {
+      setSuggesting(false)
+    }
+  }
+
+  const pick = (id: number) => {
+    setDraftId(id)
+    // A suggestion the user has overridden must stop claiming credit.
+    setSuggested(false)
   }
 
   if (!allReady)
@@ -527,11 +571,11 @@ export function DonationFlowClient() {
                         role="radio"
                         aria-checked={selected}
                         tabIndex={0}
-                        onClick={() => setDraftId(item.id)}
+                        onClick={() => pick(item.id)}
                         onKeyDown={(event) => {
                           if (event.key === ' ' || event.key === 'Enter') {
                             event.preventDefault()
-                            setDraftId(item.id)
+                            pick(item.id)
                           }
                         }}
                       >
@@ -575,12 +619,32 @@ export function DonationFlowClient() {
                 </div>
                 <div className="donation-action-bar">
                   <p aria-live="polite">
-                    {draft ? `已選擇：${draft.name}` : '請先選擇一個公益組織'}
+                    {draft === undefined
+                      ? '請選擇一個公益組織，或讓平台幫你決定'
+                      : suggested
+                        ? `平台為你選了：${draft.name}（目前累積支持最少的單位）`
+                        : `已選擇：${draft.name}`}
                   </p>
-                  <Button disabled={!draft} onClick={() => router.push(flowHref('confirm'))}>
-                    下一步
-                  </Button>
+                  <div className="donation-action-bar-buttons">
+                    {/* Offered even once something is selected: the user may
+                        have picked at random just to get past the screen,
+                        and this is the honest version of that. */}
+                    <Button
+                      variant="secondary"
+                      loading={suggesting}
+                      onClick={chooseForMe}
+                    >
+                      {suggesting ? '挑選中…' : '沒有特別想法，幫我決定'}
+                    </Button>
+                    <Button disabled={!draft} onClick={() => router.push(flowHref('confirm'))}>
+                      下一步
+                    </Button>
+                  </div>
                 </div>
+                {/* The suggestion can fail, and its error belongs next to
+                    the button that caused it rather than on the confirm
+                    screen the user has not reached yet. */}
+                {submitError && <p className="donation-final-warning">{submitError}</p>}
               </>
             )}
           </>

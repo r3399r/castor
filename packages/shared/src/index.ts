@@ -893,3 +893,22 @@ export type CharityCategoryRow = CharityCategory & {
 };
 
 export type GetCharityCategoriesResponse = Paginate<CharityCategoryRow>;
+
+/**
+ * GET /api/charity-organization/suggest?categoryId=N
+ *
+ * One organisation for a user with no preference, so that "I don't know
+ * who to pick" is not a dead end on the screen that is the whole point of
+ * the LV5 donation. It returns the least-supported active organisation in
+ * that category (by summed `donation.amount`), which is explainable on the
+ * public page and spreads donations evenly.
+ *
+ * A suggestion, not a decision: the caller still shows who it is and
+ * confirms through POST /api/donation like any other choice, because both
+ * the user's record and the public page name the organisation.
+ *
+ * 404 with code `NOT_FOUND` when the category does not exist, and
+ * `NO_ORGANIZATION_AVAILABLE` when it exists but holds no active
+ * organisation.
+ */
+export type GetSuggestedOrganizationResponse = CharityOrganization;
