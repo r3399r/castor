@@ -471,6 +471,7 @@ export default function CharityOrganizationClient() {
                   <label key={category.id} className="flex items-center gap-2 text-sm">
                     <input
                       type="checkbox"
+                      className="shrink-0"
                       checked={form.categoryIds.includes(category.id)}
                       onChange={() => toggleCategory(category.id)}
                     />
@@ -487,8 +488,11 @@ export default function CharityOrganizationClient() {
                     (category) => !category.isActive && form.categoryIds.includes(category.id)
                   )
                   .map((category) => (
-                    <label key={category.id} className="flex items-center gap-2 text-sm opacity-60">
-                      <input type="checkbox" checked disabled />
+                    <label key={category.id} className="flex items-start gap-2 text-sm opacity-60">
+                      {/* items-start, not center: this label wraps to two
+                          lines at form width, and a centred box floats
+                          away from the text it belongs to. */}
+                      <input type="checkbox" className="mt-1 shrink-0" checked disabled />
                       <span>
                         {category.name}（類別已停用，儲存時會被拒絕——請取消勾選）
                       </span>
