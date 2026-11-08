@@ -181,6 +181,9 @@ Until the remaining two artwork sets exist, their store and locked collection st
 - Original PNG sources for runtime assets live outside the public web root under `webapp/source-assets/png/`, preserving their relative directory structure.
 - Do not reference `webapp/source-assets/` from browser code; it is not publicly served.
 - Only commit original PNGs that correspond to assets actually used by the application. Do not commit unused PNG or generated WebP variants unless requested.
+- Guardian artwork must be generated directly from its matching original PNG, never by recompressing an existing WebP. Preserve the source dimensions and do not crop or stretch it during conversion.
+- Guardian runtime images use lossy VP8 WebP, not lossless VP8L. Use Sharp with `webp({ quality: 85, effort: 6, smartSubsample: true })` so every species is encoded consistently; use a different mode only when a specific asset requirement is documented in the same change.
+- After adding or regenerating guardian artwork, verify all output files report VP8 encoding, compare their pixel dimensions with the PNG sources, and visually inspect at least the most detailed image for color shifts, block artifacts, or broken output.
 - Current guardian artwork is under `webapp/public/illustrations/guardians/{bird,cat,deer,otter,rabbit}/lv1.webp` through `lv5.webp`.
 - Shared runtime assets include `/images/locked-egg.webp`, `/images/points-vine-top-left.webp`, `/images/points-vine-bottom-right.webp`, and `/images/spirit-garden-mobile-leaves.webp`.
 
