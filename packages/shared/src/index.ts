@@ -314,7 +314,20 @@ export type Guardian = {
   level: number;
   xp: number;
   nextLevelXp: number | null;
+  /**
+   * The public-interest category this species supports, or null for one
+   * tied to none -- which is what VIP is, and what lets its owner direct
+   * the LV5 donation at any category.
+   *
+   * Not interchangeable with `theme`: that is the egg's own display label.
+   * It reads the same as the category's name today and will diverge once
+   * one category holds several eggs.
+   */
+  category: CharityCategoryName | null;
 };
+
+/** Just enough of a category to render a label beside a spirit. */
+export type CharityCategoryName = { id: number; name: string };
 
 export type GetGuardianResponse = { data: Guardian[]; totalPoints: number };
 
@@ -591,3 +604,292 @@ export type GetUserHistoryResponse = {
   streakDays: number;
   activityMap: { date: string; count: number }[];
 };
+
+// ---------------------------------------------------------------------
+// 公益捐款 (donation)
+//
+// Added alongside the routes that return them, not all at once up front:
+// the batch and donation-record shapes land with /api/donation and
+// /api/info/donation. See DONATION.md for the data model.
+// ---------------------------------------------------------------------
+
+/**
+ * A public-interest category a donation can be directed at.
+ *
+ * Its own table, not the guardian row it used to be folded into: a
+ * category can be added without shipping a new egg, several eggs can
+ * share one, and a species tied to no category at all (VIP) is simply one
+ * whose categoryId is null.
+ */
+export type CharityCategory = {
+  id: number;
+  code: string;
+  name: string;
+};
+
+export type CharityOrganization = {
+  id: number;
+  name: string;
+  /** The 統編. Null for associations that do not publish one. */
+  taxId: string | null;
+  introduction: string;
+  websiteUrl: string | null;
+  logoUrl: string | null;
+  sortOrder: number;
+  /** false takes it out of the picker; existing donations keep pointing at it. */
+  isActive: boolean;
+  categories: CharityCategory[];
+  createdAt: string | null;
+  updatedAt: string | null;
+};
+
+export type GetCharityOrganizationResponse = Paginate<CharityOrganization>;
+
+export type GetCharityOrganizationIdResponse = CharityOrganization;
+
+export type PostCharityOrganizationRequest = {
+  name: string;
+  taxId?: string | null;
+  introduction: string;
+  websiteUrl?: string | null;
+  logoUrl?: string | null;
+  sortOrder?: number;
+  isActive?: boolean;
+  /** At least one; an organization under no category is offered to nobody. */
+  categoryIds: number[];
+};
+
+export type PutCharityOrganizationCategoryRequest = { categoryIds: number[] };
+
+export type PutCharityOrganizationCategoryResponse = { categories: CharityCategory[] };
+
+/**
+ * The payout a donation was settled in, or null while it is still
+ * awaiting one -- `donation.batchId` being NULL is the whole state
+ * machine, there is no status column.
+ */
+export type DonationBatchRef = {
+  id: number;
+  transferredAt: string;
+  /** False while the public page does not show this batch yet. */
+  published: boolean;
+};
+
+export type Donation = {
+  id: number;
+  /** Which maxed spirit paid for it -- how the picker knows one is spent. */
+  userGuardianId: number;
+  /** Frozen at confirmation. Never render DONATION_AMOUNT in its place. */
+  amount: number;
+  confirmedAt: string;
+  category: CharityCategory;
+  organization: Pick<
+    CharityOrganization,
+    'id' | 'name' | 'introduction' | 'websiteUrl' | 'logoUrl'
+  >;
+  batch: DonationBatchRef | null;
+};
+
+export type GetDonationResponse = Paginate<Donation> & {
+  /** What confirming one more spirit would be worth, for the picker. */
+  donationAmount: number;
+};
+
+export type PostDonationRequest = {
+  userGuardianId: number;
+  organizationId: number;
+  /**
+   * Required only for a spirit whose species is tied to no category (VIP);
+   * for any other spirit the only legal value is its own category, so it
+   * can be left out.
+   */
+  categoryId?: number;
+};
+
+export type PostDonationResponse = Donation;
+
+/** One document proving a batch was paid, under /api/info/donation. */
+export type DonationEvidence = {
+  id: number;
+  /** TRANSFER_RECEIPT, ORG_RECEIPT, THANK_YOU_LETTER -- open-ended. */
+  kind: string;
+  url: string;
+  caption: string | null;
+};
+
+/**
+ * One published payout on the public record, carrying the arithmetic
+ * rather than only the total: donationCount x donationUnitAmount +
+ * platformTopUp equals transferredAmount, which is the figure on the
+ * receipt linked from `evidence`.
+ */
+export type DonationRecordBatch = {
+  id: number;
+  transferredAt: string;
+  /** Bank transaction number, or the last digits of the account. */
+  reference: string | null;
+  organization: Pick<
+    CharityOrganization,
+    'id' | 'name' | 'introduction' | 'websiteUrl' | 'logoUrl'
+  >;
+  donationCount: number;
+  donationSubtotal: number;
+  /**
+   * The single frozen amount every member of this batch shares, or null
+   * when they differ. null means the "57 x NT$1,000" line cannot be
+   * printed and only the subtotal is safe to show.
+   */
+  donationUnitAmount: number | null;
+  /** transferredAmount - donationSubtotal. Signed: negative means underpaid. */
+  platformTopUp: number;
+  transferredAmount: number;
+  evidence: DonationEvidence[];
+};
+
+export type DonationRecordSummary = {
+  /** Spirits grown to max level; every one of them is owed. */
+  maxedSpiritCount: number;
+  confirmedCount: number;
+  /** Summed from the frozen per-donation amounts. */
+  confirmedAmount: number;
+  /** Maxed spirits whose owner has not picked an organisation yet. */
+  pendingCount: number;
+  /** pendingCount x donationAmount -- the only figure priced at today's rate. */
+  pendingAmount: number;
+  /** confirmedAmount + pendingAmount. */
+  promisedAmount: number;
+  /** Over published batches only, so the listed batches add up to it. */
+  transferredAmount: number;
+  publishedBatchCount: number;
+  donationAmount: number;
+};
+
+export type GetInfoDonationResponse = Paginate<DonationRecordBatch> & {
+  summary: DonationRecordSummary;
+};
+
+// ---------------------------------------------------------------------------
+// Admin payout workflow (/api/donation-batch). Admin-only, unlike the
+// DonationRecord* types above, which are the public view of the same rows:
+// these name users and carry the internal note, those never do.
+// ---------------------------------------------------------------------------
+
+/** One donation still awaiting payout, under GET /api/donation-batch/unpaid. */
+export type UnpaidDonation = {
+  id: number;
+  userId: number;
+  amount: number;
+  confirmedAt: string;
+  category: Pick<CharityCategory, 'id' | 'name'>;
+};
+
+export type GetUnpaidDonationsResponse = Paginate<UnpaidDonation> & {
+  /**
+   * The whole outstanding set, not the page. A batch can only be built
+   * from what is on screen, so this is how a second page makes itself
+   * known.
+   */
+  summary: { unpaidCount: number; unpaidAmount: number };
+};
+
+/** One proof document as the admin sees it -- with its S3 key. */
+export type DonationBatchEvidence = DonationEvidence & {
+  /**
+   * Present here and absent from the public type: the key is what
+   * deleteFromS3 needs, and it is never useful to a reader of the public
+   * page.
+   */
+  s3Key: string;
+  sortOrder: number;
+  createdAt: string | null;
+};
+
+/**
+ * One payout as the admin sees it, published or not.
+ *
+ * `donationSubtotal` and `platformTopUp` are derived from the member rows
+ * on every read rather than stored, because a batch's membership is frozen
+ * once created -- there is nothing for a stored copy to stay in sync with
+ * except drift.
+ */
+export type DonationBatch = {
+  id: number;
+  organization: Pick<CharityOrganization, 'id' | 'name'> | null;
+  transferredAmount: number;
+  transferredAt: string;
+  reference: string | null;
+  /** The internal memo. Deliberately not part of the public record. */
+  note: string | null;
+  published: boolean;
+  donationCount: number;
+  donationSubtotal: number;
+  /**
+   * Signed, not clamped: a negative value is exactly what
+   * PUT /:id/publish refuses, so the admin screen has to be able to show
+   * the reason.
+   */
+  platformTopUp: number;
+  evidence: DonationBatchEvidence[];
+  createdAt: string | null;
+  updatedAt: string | null;
+};
+
+/** GET /api/donation-batch/:id adds the frozen membership list. */
+export type DonationBatchDetail = DonationBatch & {
+  donations: UnpaidDonation[];
+};
+
+export type GetDonationBatchesResponse = Paginate<DonationBatch>;
+
+export type PostDonationBatchRequest = {
+  organizationId: number;
+  transferredAmount: number;
+  /** ISO 8601. Must not be in the future. */
+  transferredAt: string;
+  reference?: string | null;
+  note?: string | null;
+  /**
+   * Explicit rather than "everything unpaid": the admin pays what they
+   * saw, and a donation confirmed since the list loaded must not be swept
+   * into a transfer that did not cover it. Membership is frozen after
+   * this, so correcting it means DELETE and rebuild.
+   */
+  donationIds: number[];
+};
+
+export type PutDonationBatchRequest = Omit<
+  PostDonationBatchRequest,
+  'organizationId' | 'donationIds'
+>;
+
+export type PostDonationBatchEvidenceRequest = {
+  /** UPPER_SNAKE_CASE. TRANSFER_RECEIPT, ORG_RECEIPT, THANK_YOU_LETTER. */
+  kind: string;
+  /** application/pdf included: a PDF cannot be an <img> source. */
+  mimeType: 'image/jpeg' | 'image/png' | 'image/webp' | 'application/pdf';
+  /** Base64, with or without a `data:` prefix. */
+  data: string;
+  caption?: string | null;
+  sortOrder?: number;
+};
+
+/**
+ * One category as GET /api/charity-category lists it.
+ *
+ * Wider than `CharityCategory`, which is the shape embedded in an
+ * organisation or a donation -- a picker also needs to know which
+ * categories are still accepting organisations, and in what order to show
+ * them.
+ */
+export type CharityCategoryRow = CharityCategory & {
+  sortOrder: number;
+  /**
+   * Inactive categories stay listed: past donations point at them and the
+   * public record keeps naming them. They drop out of the picker only.
+   */
+  isActive: boolean;
+  createdAt: string | null;
+  updatedAt: string | null;
+};
+
+export type GetCharityCategoriesResponse = Paginate<CharityCategoryRow>;

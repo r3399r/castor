@@ -7,8 +7,12 @@ import { requireUser } from 'src/middleware/requireUser';
 import { transaction } from 'src/middleware/transaction';
 import { analysis } from 'src/routes/analysis';
 import { category } from 'src/routes/category';
+import { charityCategory } from 'src/routes/charityCategory';
+import { charityOrganization } from 'src/routes/charityOrganization';
 import { concept } from 'src/routes/concept';
 import { conceptGroup } from 'src/routes/conceptGroup';
+import { donation } from 'src/routes/donation';
+import { donationBatch } from 'src/routes/donationBatch';
 import { exam } from 'src/routes/exam';
 import { filterDimension } from 'src/routes/filterDimension';
 import { filterOption } from 'src/routes/filterOption';
@@ -33,6 +37,7 @@ export const app = new Hono()
   // health check at /api/info stays answerable with the database down.
   .use('/api/info/stats', transaction)
   .use('/api/info/popular', transaction)
+  .use('/api/info/donation', transaction)
   .route('/api/info', info)
   .use('/api/category/*', adminAuth)
   .use('/api/category/*', transaction)
@@ -58,6 +63,22 @@ export const app = new Hono()
   .use('/api/filter-option/*', adminAuth)
   .use('/api/filter-option/*', transaction)
   .route('/api/filter-option', filterOption)
+  // The partner foundations. Same posture as the catalog groups above:
+  // adminAuth gates the writes and leaves GETs open, which here is
+  // intended rather than tolerated -- a foundation's name, blurb and
+  // website are exactly what the public transparency page publishes.
+  // The seven public-interest categories. Read-only (the rows are seeded
+  // and joined to the egg species by `code`), and open like the
+  // organisation reads beside it: these names are printed on the public
+  // transparency page. adminAuth is mounted for symmetry with that
+  // sibling, and gates nothing today because there is no write to gate --
+  // which is the point, since a write added later is covered by default.
+  .use('/api/charity-category/*', adminAuth)
+  .use('/api/charity-category/*', transaction)
+  .route('/api/charity-category', charityCategory)
+  .use('/api/charity-organization/*', adminAuth)
+  .use('/api/charity-organization/*', transaction)
+  .route('/api/charity-organization', charityOrganization)
   .use('/api/user/*', transaction)
   .route('/api/user', user)
   // The caller's own subscription. Behind requireUser but never behind
@@ -114,6 +135,20 @@ export const app = new Hono()
   .use('/api/guardian/*', transaction)
   .use('/api/guardian/*', requireUser)
   .route('/api/guardian', guardian)
+  // A signed-in person spending one maxed spirit, and reading back what
+  // they have already given. Next to /api/guardian because that is the
+  // entitlement it draws on. The *public* record of the same donations
+  // lives under /api/info, which has no Authorization forwarded to it.
+  .use('/api/donation/*', transaction)
+  .use('/api/donation/*', requireUser)
+  .route('/api/donation', donation)
+  // The payout side of the same feature. requireAdmin, not adminAuth:
+  // adminAuth lets GETs through, and GET /unpaid names which user is owed
+  // what -- the public view of these payouts is /api/info/donation, which
+  // shows batches and never users.
+  .use('/api/donation-batch/*', transaction)
+  .use('/api/donation-batch/*', requireAdmin)
+  .route('/api/donation-batch', donationBatch)
   .onError((err, c) => {
     console.error(err);
     const { status, body } = toErrorResponse(err);

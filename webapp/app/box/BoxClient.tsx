@@ -36,18 +36,15 @@ import { artworkByCode, spiritCatalog, type SpiritSpecies } from '@/lib/guardian
 import { apiFetch, apiPost } from '@/lib/api'
 import { useAuth } from '@/contexts/AuthContext'
 import SupportNote from './SupportNote'
-import { DonationDemoBox, FormalDonationEntry } from './DonationDemo'
+import type { Guardian } from '@/types/api'
+import { DonationDemoBox } from './DonationDemo'
+import { DonationEntry } from './DonationFlow'
 
-type GuardianDto = {
-  id: number
-  guardianId: number
-  code: string
-  name: string
-  theme: string
-  level: number
-  xp: number
-  nextLevelXp: number | null
-}
+// The shared contract, not a local copy of it. There used to be a
+// hand-written duplicate here; it silently fell behind when the API began
+// returning the spirit's public-interest category, which the LV5 donation
+// panel needs.
+type GuardianDto = Guardian
 
 type SpeciesDto = {
   id: number
@@ -480,7 +477,7 @@ function RealBoxClient() {
                         nextLevelXp={complete ? null : guardian.nextLevelXp}
                       >
                         {complete ? (
-                          <FormalDonationEntry guardianId={guardian.id} species={artwork} />
+                          <DonationEntry guardian={guardian} species={artwork} />
                         ) : (
                           investControls
                         )}

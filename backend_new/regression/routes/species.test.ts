@@ -1,7 +1,12 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { app } from 'src/app';
 import { closeDb, getDb } from 'src/db/client';
-import { guardianTable, userGuardianTable, userTable } from 'src/db/schema';
+import {
+  charityCategoryTable,
+  guardianTable,
+  userGuardianTable,
+  userTable,
+} from 'src/db/schema';
 import { ADMIN_EMAILS } from 'src/middleware/adminAuth';
 
 vi.mock('src/lib/firebaseAdmin', () => ({ verifyIdToken: vi.fn(), verifyIdTokenUid: vi.fn() }));
@@ -15,6 +20,7 @@ type SpeciesDto = {
   cost: number;
   sortOrder: number;
   isActive: boolean;
+  category: { id: number; name: string } | null;
   ownersByLevel: Record<string, number>;
 };
 
@@ -23,13 +29,32 @@ const getSpecies = () => app.request('/api/species');
 const clearTables = async () => {
   const db = getDb();
   await db.delete(userGuardianTable);
+  // Before the categories: guardian.category_id references them.
   await db.delete(guardianTable);
   await db.delete(userTable);
+  await db.delete(charityCategoryTable);
+};
+
+const seedCategory = async (code: string) => {
+  const [{ insertId }] = await getDb()
+    .insert(charityCategoryTable)
+    .values({ code, name: `${code} category`, sortOrder: 1, isActive: true, createdAt: new Date() });
+  return insertId;
 };
 
 const seedSpecies = async (
   code: string,
-  { cost = 20, sortOrder = 1, isActive = true }: { cost?: number; sortOrder?: number; isActive?: boolean } = {}
+  {
+    cost = 20,
+    sortOrder = 1,
+    isActive = true,
+    categoryId = null,
+  }: {
+    cost?: number;
+    sortOrder?: number;
+    isActive?: boolean;
+    categoryId?: number | null;
+  } = {}
 ) => {
   const [{ insertId }] = await getDb().insert(guardianTable).values({
     code,
@@ -38,6 +63,7 @@ const seedSpecies = async (
     cost,
     sortOrder,
     isActive,
+    categoryId,
     createdAt: new Date(),
   });
   return insertId;
@@ -126,6 +152,34 @@ describe('species', () => {
       // A level nobody has reached is absent rather than zero.
       expect(body.find((s) => s.code === 'owned')?.ownersByLevel['2']).toBeUndefined();
       expect(body.find((s) => s.code === 'unowned')?.ownersByLevel).toEqual({});
+    });
+
+    // The whole reason this field exists: `theme` reads the same as the
+    // category name today, so without it a species seeded with no
+    // category_id is indistinguishable on the page from a correct one.
+    it('names the category a species supports, and says so when there is none', async () => {
+      const categoryId = await seedCategory('children');
+      await seedSpecies('bound', { sortOrder: 1, categoryId });
+      await seedSpecies('unbound', { sortOrder: 2 });
+      vi.mocked(verifyIdToken).mockResolvedValue(ADMIN_EMAILS[0]);
+
+      const body = (await (await getSpecies()).json()) as SpeciesDto[];
+      expect(body.find((s) => s.code === 'bound')?.category).toEqual({
+        id: categoryId,
+        name: 'children category',
+      });
+      // null, not omitted and not an empty object -- the page branches on it.
+      expect(body.find((s) => s.code === 'unbound')?.category).toBeNull();
+    });
+
+    // A left join, not an inner one: an inner join would have hidden the
+    // unbound row entirely, which is the failure this guards.
+    it('still lists a species that supports no category', async () => {
+      await seedSpecies('unbound', { sortOrder: 1 });
+      vi.mocked(verifyIdToken).mockResolvedValue(ADMIN_EMAILS[0]);
+
+      const body = (await (await getSpecies()).json()) as SpeciesDto[];
+      expect(body.map((s) => s.code)).toEqual(['unbound']);
     });
 
     it('exposes no write verbs', async () => {

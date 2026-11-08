@@ -35,6 +35,11 @@ services:
       - ../db/table/point_transaction.sql:/docker-entrypoint-initdb.d/22_point_transaction.sql:ro
       - ../db/table/duration_global_stat.sql:/docker-entrypoint-initdb.d/23_duration_global_stat.sql:ro
       - ../db/table/user_subscription.sql:/docker-entrypoint-initdb.d/24_user_subscription.sql:ro
+      # Before guardian, whose category_id foreign key points at it. The
+      # "24a" prefix sorts between "24_" and "25" -- docker runs these in
+      # name order, and '_' (0x5F) < 'a' (0x61) < '5' -- so it slots in
+      # without renumbering everything after it.
+      - ../db/table/charity_category.sql:/docker-entrypoint-initdb.d/24a_charity_category.sql:ro
       # After user (09), because user_guardian's foreign keys need both it
       # and guardian to exist.
       - ../db/table/guardian.sql:/docker-entrypoint-initdb.d/25_guardian.sql:ro
@@ -43,6 +48,15 @@ services:
       # needs user (09), so the two stay in this order.
       - ../db/table/payment_order.sql:/docker-entrypoint-initdb.d/27_payment_order.sql:ro
       - ../db/table/payment_charge.sql:/docker-entrypoint-initdb.d/28_payment_charge.sql:ro
+      # The donation feature. charity_organization_category needs
+      # charity_category (24a), donation needs user (09), user_guardian
+      # (26), charity_category and the batch table, so this whole block
+      # has to stay after those and in order.
+      - ../db/table/charity_organization.sql:/docker-entrypoint-initdb.d/29_charity_organization.sql:ro
+      - ../db/table/charity_organization_category.sql:/docker-entrypoint-initdb.d/30_charity_organization_category.sql:ro
+      - ../db/table/donation_batch.sql:/docker-entrypoint-initdb.d/31_donation_batch.sql:ro
+      - ../db/table/donation_batch_evidence.sql:/docker-entrypoint-initdb.d/32_donation_batch_evidence.sql:ro
+      - ../db/table/donation.sql:/docker-entrypoint-initdb.d/33_donation.sql:ro
       # Seed data, numbered 9x so it lands after every table above --
       # docker-entrypoint-initdb.d runs files in name order, and these
       # insert into tables created there. Without the guardians, /box shows
@@ -51,6 +65,9 @@ services:
       # tables before their first case, so the rows do not affect them.
       - ../db/script/v1.0.0/insert_category.sql:/docker-entrypoint-initdb.d/90_insert_category.sql:ro
       - ../db/script/v1.0.0/insert_guardian.sql:/docker-entrypoint-initdb.d/91_insert_guardian.sql:ro
+      # Last, because its UPDATE links each guardian to its category by
+      # matching code -- it needs the guardian rows from 91 to exist.
+      - ../db/script/v1.1.0/insert_charity_category.sql:/docker-entrypoint-initdb.d/92_insert_charity_category.sql:ro
     healthcheck:
       test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost', '-u', 'root', '-proot']
       interval: 5s
