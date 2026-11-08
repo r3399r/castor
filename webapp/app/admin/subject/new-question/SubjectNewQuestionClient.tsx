@@ -46,7 +46,7 @@ type QuestionDraft = {
   childQuestions?: ChildQuestionDraft[]
 }
 
-const QUESTION_TYPES = ['GROUP', 'SINGLE', 'MULTIPLE', 'TRUE_FALSE', 'FILL']
+const QUESTION_TYPES = ['GROUP', 'SINGLE', 'MULTIPLE', 'TRUE_FALSE', 'FILL', 'CLOZE']
 
 /**
  * A GROUP carries no options or answer of its own -- its children are what

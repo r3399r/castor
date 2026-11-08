@@ -1,6 +1,6 @@
-import { asc, sql } from 'drizzle-orm';
+import { asc, eq, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
-import { guardianTable, userGuardianTable } from 'src/db/schema';
+import { charityCategoryTable, guardianTable, userGuardianTable } from 'src/db/schema';
 import { TransactionEnv } from 'src/middleware/transaction';
 
 /**
@@ -23,9 +23,27 @@ export const species = new Hono<TransactionEnv>().get('/', async (c) => {
   // Unlike GET /store/species this does not filter on isActive -- a
   // retired species still exists for whoever owns one, and seeing it is
   // the point of a catalog view.
+  //
+  // Columns are listed rather than selected wholesale because of the join
+  // below: a bare .select() with one would nest every row under table
+  // names and silently change this response's shape.
   const rows = await db
-    .select()
+    .select({
+      id: guardianTable.id,
+      code: guardianTable.code,
+      name: guardianTable.name,
+      theme: guardianTable.theme,
+      cost: guardianTable.cost,
+      sortOrder: guardianTable.sortOrder,
+      isActive: guardianTable.isActive,
+      categoryId: charityCategoryTable.id,
+      categoryName: charityCategoryTable.name,
+    })
     .from(guardianTable)
+    // Left, not inner: guardian.category_id is NULL for a species tied to
+    // no category, so an inner join would drop that row out of the
+    // catalog altogether -- strictly worse than not naming its category.
+    .leftJoin(charityCategoryTable, eq(charityCategoryTable.id, guardianTable.categoryId))
     .orderBy(asc(guardianTable.sortOrder), asc(guardianTable.id));
 
   // Owners broken down by the level they have grown to, which is what
@@ -57,6 +75,17 @@ export const species = new Hono<TransactionEnv>().get('/', async (c) => {
       cost: row.cost,
       sortOrder: row.sortOrder,
       isActive: row.isActive,
+      // The donation category this species supports, or null for one
+      // tied to none. Worth returning even though `theme` currently
+      // reads the same: theme is the egg's own label, this is the link
+      // the donation route actually reads. null is both what the planned
+      // VIP spirit is and what a freshly seeded egg looks like when its
+      // category_id was forgotten -- indistinguishable from here, which
+      // is why the admin page says it out loud instead of leaving a gap.
+      category:
+        row.categoryId !== null && row.categoryName !== null
+          ? { id: row.categoryId, name: row.categoryName }
+          : null,
       // Keyed by level. Absent levels simply have no owners; the caller
       // decides which levels to display.
       ownersByLevel: ownersByLevelById.get(row.id) ?? {},

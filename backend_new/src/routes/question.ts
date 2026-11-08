@@ -1,9 +1,10 @@
 import { zValidator } from '@hono/zod-validator';
-import { and, asc, count, desc, eq, gt, inArray, isNull, lte, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, exists, gt, inArray, isNull, lte, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import {
+  categoryTable,
   conceptGroupTable,
   conceptTable,
   examSubjectTable,
@@ -14,6 +15,7 @@ import {
   questionTable,
   questionTagTable,
   replyTable,
+  subjectCategoryTable,
   subjectTable,
   tagTable,
   userConceptStatTable,
@@ -55,6 +57,45 @@ const assertNoImagePlaceholder = (content: string | undefined, where: string): v
     );
 };
 
+/**
+ * A CLOZE question's blank count lives in two places that have to agree:
+ * the number of data-blank markers in the passage, and the length of
+ * `answer` (one character per blank, in the order the blanks appear).
+ *
+ * Checked here because a mismatch raises no error anywhere downstream.
+ * The passage would show ten blanks while the answer area lays out nine
+ * rows, and every blank past the missing one would be scored against the
+ * wrong position -- a question that is quietly mis-scored forever, which
+ * is worse than a 400 the admin sees while the preview page is still
+ * open. Same reasoning as assertNoImagePlaceholder above.
+ *
+ * Only the count is checked, not which numbers were used: those are the
+ * original paper's (31, 32, ...) and carry no meaning here beyond being
+ * the labels the frontend prints beside each row.
+ */
+const DATA_BLANK = /\bdata-blank\s*=\s*["']?\d{1,3}["']?/gi;
+
+const assertClozeBlanksMatchAnswer = (
+  type: string,
+  content: string | undefined,
+  answer: string | undefined,
+  where: string
+): void => {
+  if (type !== 'CLOZE') return;
+  const blanks = content?.match(DATA_BLANK)?.length ?? 0;
+  if (blanks === 0)
+    throw new BadRequestError(
+      `${where} is a CLOZE question but its content has no data-blank marker`,
+      'QUESTION_CLOZE_NO_BLANK'
+    );
+  const answerLength = answer?.length ?? 0;
+  if (blanks !== answerLength)
+    throw new BadRequestError(
+      `${where} has ${blanks} data-blank marker(s) but an answer of length ${answerLength}`,
+      'QUESTION_CLOZE_BLANK_MISMATCH'
+    );
+};
+
 type Db = TransactionEnv['Variables']['db'];
 
 const childQuestionSchema = z.object({
@@ -70,7 +111,7 @@ const childQuestionSchema = z.object({
 // persisted -- there's no column for it on the question table, matching
 // the legacy createQuestion's behavior of silently dropping it too.
 const questionItemSchema = z.object({
-  type: z.enum(['GROUP', 'SINGLE', 'MULTIPLE', 'TRUE_FALSE', 'FILL']),
+  type: z.enum(['GROUP', 'SINGLE', 'MULTIPLE', 'TRUE_FALSE', 'FILL', 'CLOZE']),
   content: z.string().optional(),
   options: z.string().optional(),
   answer: z.string().optional(),
@@ -98,7 +139,7 @@ export const questionBodySchema = z.object({
 // those links. Tag/concept links get their own relation endpoints below,
 // same split as subject's PUT /:id vs PUT /:id/category.
 export const questionUpdateBodySchema = z.object({
-  type: z.enum(['GROUP', 'SINGLE', 'MULTIPLE', 'TRUE_FALSE', 'FILL']),
+  type: z.enum(['GROUP', 'SINGLE', 'MULTIPLE', 'TRUE_FALSE', 'FILL', 'CLOZE']),
   content: z.string().optional(),
   options: z.string().optional(),
   answer: z.string().optional(),
@@ -203,7 +244,7 @@ const aiChildQuestionSchema = z.object({
 });
 
 const aiQuestionSchema = z.object({
-  type: z.enum(['GROUP', 'SINGLE', 'MULTIPLE', 'TRUE_FALSE', 'FILL']),
+  type: z.enum(['GROUP', 'SINGLE', 'MULTIPLE', 'TRUE_FALSE', 'FILL', 'CLOZE']),
   content: z.string().min(1),
   options: z.string().nullish(),
   answer: z.string().nullish(),
@@ -228,7 +269,7 @@ export const questionImageAiSchema = z.array(aiQuestionSchema);
 // accepts. Nullable fields are modelled as simply "not required" here --
 // that subset has no clean nullable, and the zod schema's .nullish()
 // tolerates an explicit null anyway if one slips through.
-const QUESTION_TYPE_ENUM = ['GROUP', 'SINGLE', 'MULTIPLE', 'TRUE_FALSE', 'FILL'];
+const QUESTION_TYPE_ENUM = ['GROUP', 'SINGLE', 'MULTIPLE', 'TRUE_FALSE', 'FILL', 'CLOZE'];
 const CHILD_QUESTION_TYPE_ENUM = ['SINGLE', 'MULTIPLE', 'TRUE_FALSE', 'FILL'];
 
 export const questionImageResponseJsonSchema = {
@@ -297,11 +338,24 @@ const QUESTION_SORT_COLUMNS = {
   difficulty: questionTable.difficulty,
 };
 
+// The admin list's filters are one id per dimension, not the comma-joined
+// lists /count and /adaptive take: those exist so a practice session can
+// draw from several exams at once, whereas this page is someone looking
+// for a particular question. Dimensions combine with AND, so picking an
+// exam and a concept narrows to questions carrying both.
+//
+// categoryId filters by the *subject's* category, since a question has no
+// category of its own; the other three are links on the question itself.
 export const questionListQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(MAX_LIMIT).optional().default(DEFAULT_LIMIT),
   offset: z.coerce.number().int().min(0).optional().default(0),
   sort: z.enum(['id', 'subject', 'type', 'difficulty']).optional().default('id'),
   order: z.enum(['asc', 'desc']).optional().default('desc'),
+  categoryId: z.coerce.number().int().positive().optional(),
+  subjectId: z.coerce.number().int().positive().optional(),
+  examId: z.coerce.number().int().positive().optional(),
+  conceptId: z.coerce.number().int().positive().optional(),
+  tagId: z.coerce.number().int().positive().optional(),
 });
 
 // imageCount matters because the prompt says something different for a
@@ -636,9 +690,12 @@ const createOneQuestion = async (
 
 export const question = new Hono<UserEnv>()
   .get('/', zValidator('query', questionListQuerySchema), async (c) => {
-    const { limit, offset, sort, order } = c.req.valid('query');
+    const { limit, offset, sort, order, categoryId, subjectId, examId, conceptId, tagId } =
+      c.req.valid('query');
     console.log(
-      `GET /api/question limit=${limit} offset=${offset} sort=${sort} order=${order}`
+      `GET /api/question limit=${limit} offset=${offset} sort=${sort} order=${order}` +
+        ` categoryId=${categoryId ?? ''} subjectId=${subjectId ?? ''} examId=${examId ?? ''}` +
+        ` conceptId=${conceptId ?? ''} tagId=${tagId ?? ''}`
     );
     const db = c.get('db');
 
@@ -646,10 +703,77 @@ export const question = new Hono<UserEnv>()
     // independent meaning without their parent, so they're never listed
     // as their own rows here (childCount below is how the admin sees
     // there's more to a GROUP question than what's shown).
+    const conditions = [isNull(questionTable.parentId)];
+
+    // EXISTS rather than a join, so a question linked to several rows of a
+    // link table still produces exactly one row and the pagination count
+    // stays honest. Unlike /count, which materialises matching question
+    // ids in JS, this stays a single statement -- the list is paginated and
+    // pulling every matching id back just to send 10 of them would get
+    // worse as the catalogue grows.
+    if (categoryId !== undefined)
+      conditions.push(
+        exists(
+          db
+            .select({ one: sql`1` })
+            .from(subjectCategoryTable)
+            .where(
+              and(
+                eq(subjectCategoryTable.subjectId, questionTable.subjectId),
+                eq(subjectCategoryTable.categoryId, categoryId)
+              )
+            )
+        )
+      );
+    if (subjectId !== undefined) conditions.push(eq(questionTable.subjectId, subjectId));
+    if (examId !== undefined)
+      conditions.push(
+        exists(
+          db
+            .select({ one: sql`1` })
+            .from(questionExamTable)
+            .where(
+              and(
+                eq(questionExamTable.questionId, questionTable.id),
+                eq(questionExamTable.examId, examId)
+              )
+            )
+        )
+      );
+    if (conceptId !== undefined)
+      conditions.push(
+        exists(
+          db
+            .select({ one: sql`1` })
+            .from(questionConceptTable)
+            .where(
+              and(
+                eq(questionConceptTable.questionId, questionTable.id),
+                eq(questionConceptTable.conceptId, conceptId)
+              )
+            )
+        )
+      );
+    if (tagId !== undefined)
+      conditions.push(
+        exists(
+          db
+            .select({ one: sql`1` })
+            .from(questionTagTable)
+            .where(
+              and(
+                eq(questionTagTable.questionId, questionTable.id),
+                eq(questionTagTable.tagId, tagId)
+              )
+            )
+        )
+      );
+    const where = and(...conditions);
+
     const [{ total }] = await db
       .select({ total: count() })
       .from(questionTable)
-      .where(isNull(questionTable.parentId));
+      .where(where);
     const sortColumn = QUESTION_SORT_COLUMNS[sort];
     const data = await db
       .select({
@@ -669,12 +793,44 @@ export const question = new Hono<UserEnv>()
       })
       .from(questionTable)
       .innerJoin(subjectTable, eq(subjectTable.id, questionTable.subjectId))
-      .where(isNull(questionTable.parentId))
+      .where(where)
       .orderBy(order === 'desc' ? desc(sortColumn) : asc(sortColumn))
       .limit(limit)
       .offset(offset);
 
-    return c.json({ data, paginate: genPagination(total, limit, offset) });
+    // The subject's categories, read for this page's subjects rather than
+    // joined into the query above: subject-to-category is many-to-many, so
+    // a join would either multiply the rows or force a GROUP BY onto a
+    // query whose pagination, sorting and COUNT are already settled. A
+    // subject usually sits in one category, but the column is an array
+    // because nothing stops it from sitting in several.
+    const subjectIds = [...new Set(data.map((row) => row.subjectId))];
+    const categoryLinks =
+      subjectIds.length === 0
+        ? []
+        : await db
+            .select({
+              subjectId: subjectCategoryTable.subjectId,
+              name: categoryTable.name,
+            })
+            .from(subjectCategoryTable)
+            .innerJoin(categoryTable, eq(categoryTable.id, subjectCategoryTable.categoryId))
+            .where(inArray(subjectCategoryTable.subjectId, subjectIds))
+            .orderBy(asc(categoryTable.name));
+    const categoriesBySubject = new Map<number, string[]>();
+    for (const link of categoryLinks) {
+      const list = categoriesBySubject.get(link.subjectId) ?? [];
+      list.push(link.name);
+      categoriesBySubject.set(link.subjectId, list);
+    }
+
+    return c.json({
+      data: data.map((row) => ({
+        ...row,
+        categories: categoriesBySubject.get(row.subjectId) ?? [],
+      })),
+      paginate: genPagination(total, limit, offset),
+    });
   })
   .get('/count', zValidator('query', questionCountQuerySchema), async (c) => {
     const { subjectId, examIds, conceptIds, tagIds } = c.req.valid('query');
@@ -776,6 +932,29 @@ export const question = new Hono<UserEnv>()
 
     const totalQuestions = [...conceptWeights.values()].reduce((a, b) => a + b, 0);
 
+    // The exam/tag filters, resolved to question-id sets once. Needed in
+    // two places below -- the pending-reply match and the per-concept
+    // candidate pools -- which is why they are built up here rather than
+    // next to the first of those.
+    let examQuestionIds: Set<number> | null = null;
+    const examIdList = parseIdList(examIds);
+    if (examIdList.length > 0) {
+      const rows = await db
+        .select({ questionId: questionExamTable.questionId })
+        .from(questionExamTable)
+        .where(inArray(questionExamTable.examId, examIdList));
+      examQuestionIds = new Set(rows.map((r) => r.questionId));
+    }
+    let tagQuestionIds: Set<number> | null = null;
+    const tagIdList = parseIdList(tagIds);
+    if (tagIdList.length > 0) {
+      const rows = await db
+        .select({ questionId: questionTagTable.questionId })
+        .from(questionTagTable)
+        .where(inArray(questionTagTable.tagId, tagIdList));
+      tagQuestionIds = new Set(rows.map((r) => r.questionId));
+    }
+
     // Pending replies: questions already served to this user for this
     // subject that they haven't answered yet -- re-serving them fresh
     // would let a slow client end up with the "same" practice set
@@ -805,6 +984,17 @@ export const question = new Hono<UserEnv>()
         conceptsByQuestion.set(link.questionId, list);
       }
       for (const pending of pendingReplies) {
+        // A pending question still has to satisfy the filters this request
+        // asked for. Without this, a session abandoned halfway through one
+        // exam hands its leftovers to the next session even when that one
+        // picked a different exam -- the user filters to 試卷 A and is
+        // served a 試卷 B question, and because it counts against `count`
+        // they get one fewer 試卷 A question too. The leftover stays
+        // pending (it is still in pendingQuestionIds, so it is also kept
+        // out of the candidate pool) and is picked up again the next time
+        // the user practices somewhere it does belong.
+        if (examQuestionIds && !examQuestionIds.has(pending.questionId)) continue;
+        if (tagQuestionIds && !tagQuestionIds.has(pending.questionId)) continue;
         const questionConcepts = conceptsByQuestion.get(pending.questionId) ?? [];
         if (questionConcepts.some((cid) => conceptWeights.has(cid)))
           matchedPendingIds.push(pending.questionId);
@@ -836,30 +1026,10 @@ export const question = new Hono<UserEnv>()
 
       const baseCandidateTake = conceptWeights.size * (5 + Math.ceil(recentQuestionIds.size / 2));
 
-      // Precomputed once rather than per concept (the legacy version
-      // re-ran an equivalent lookup inside its per-concept loop even
-      // though neither depends on which concept is being scored).
-      let examQuestionIds: Set<number> | null = null;
-      const examIdList = parseIdList(examIds);
-      if (examIdList.length > 0) {
-        const rows = await db
-          .select({ questionId: questionExamTable.questionId })
-          .from(questionExamTable)
-          .where(inArray(questionExamTable.examId, examIdList));
-        examQuestionIds = new Set(rows.map((r) => r.questionId));
-      }
-      let tagQuestionIds: Set<number> | null = null;
-      const tagIdList = parseIdList(tagIds);
-      if (tagIdList.length > 0) {
-        const rows = await db
-          .select({ questionId: questionTagTable.questionId })
-          .from(questionTagTable)
-          .where(inArray(questionTagTable.tagId, tagIdList));
-        tagQuestionIds = new Set(rows.map((r) => r.questionId));
-      }
-
-      // Also batched once across every candidate concept instead of one
-      // query per concept.
+      // Batched once across every candidate concept instead of one query
+      // per concept (the legacy version re-ran an equivalent lookup inside
+      // its per-concept loop even though neither depends on which concept
+      // is being scored).
       const conceptIdsList = [...conceptWeights.keys()];
       const masteryRows = await db
         .select({ conceptId: userConceptStatTable.conceptId, mastery: userConceptStatTable.mastery })
@@ -882,27 +1052,49 @@ export const question = new Hono<UserEnv>()
       const candidateIds = new Set<number>();
       const recentCandidateIds = new Set<number>();
 
+      // Each concept's pool *after* the exam/tag filters, plus their sum.
+      //
+      // Built before the loop because weightedTake needs the filtered
+      // sizes, not conceptWeights'. conceptWeights holds each concept's
+      // question count across the whole subject, which ignores the filters
+      // entirely: with 試卷 A holding 3 questions, all in a concept that
+      // owns 3 of the subject's 203, the share came out at 3/203 and
+      // weightedTake at ceil(10 * 0.0148) = 1, so the LIMIT below pulled
+      // one of the three. The user picked a paper with three questions on
+      // it, asked for five, and got one.
+      //
+      // Sharing out the *filtered* pool instead gives that concept 3/3 and
+      // a take of 10, so all three are candidates. Unfiltered requests are
+      // unaffected: with no filters the filtered pool is the whole pool, so
+      // every share is what it was.
+      const allowedIdsByConcept = new Map<number, number[]>();
+      let filteredTotal = 0;
+      for (const conceptId of conceptWeights.keys()) {
+        let allowedIds = questionIdsByConcept.get(conceptId) ?? [];
+        if (examQuestionIds) allowedIds = allowedIds.filter((id) => examQuestionIds!.has(id));
+        if (tagQuestionIds) allowedIds = allowedIds.filter((id) => tagQuestionIds!.has(id));
+        if (allowedIds.length === 0) continue;
+        allowedIdsByConcept.set(conceptId, allowedIds);
+        filteredTotal += allowedIds.length;
+      }
+
       // The two per-direction queries below (adjustedDifficulty <=
       // mastery vs > mastery) still run once per concept -- take (LIMIT)
       // and the candidate id set both vary per concept, so unlike the
       // lookups above there's no way to batch these into one query
       // without a per-partition LIMIT, which MySQL doesn't support.
-      for (const [conceptId, numberOfQuestions] of conceptWeights) {
-        let allowedIds = questionIdsByConcept.get(conceptId) ?? [];
-        if (examQuestionIds) allowedIds = allowedIds.filter((id) => examQuestionIds!.has(id));
-        if (tagQuestionIds) allowedIds = allowedIds.filter((id) => tagQuestionIds!.has(id));
-        if (allowedIds.length === 0) continue;
-
+      for (const [conceptId, allowedIds] of allowedIdsByConcept) {
         const mastery = masteryByConcept.get(conceptId) ?? 0;
-        // This concept's share of the total candidate pool, scaled by
-        // baseCandidateTake. The legacy version's equivalent line was
+        // This concept's share of the filtered candidate pool, scaled by
+        // baseCandidateTake. (The legacy version's equivalent line was
         // `baseCandidateTake * (conceptIds.get(conceptId) ?? 1 /
-        // totalQuestions)` -- since .get(conceptId) is always defined
-        // for a key drawn from the same map, the `?? 1 / totalQuestions`
-        // branch could never actually run, so it multiplied by the
-        // concept's raw, un-normalized question count instead of its
-        // fraction of the total. Normalizing here fixes that.
-        const weightedTake = Math.max(1, Math.ceil(baseCandidateTake * (numberOfQuestions / totalQuestions)));
+        // totalQuestions)` -- since .get(conceptId) is always defined for
+        // a key drawn from the same map, the `?? 1 / totalQuestions`
+        // branch could never run, so it multiplied by the concept's raw,
+        // un-normalized question count instead of its fraction.)
+        // filteredTotal is non-zero whenever this loop runs at all, since
+        // only concepts with a non-empty pool are in the map.
+        const weightedTake = Math.max(1, Math.ceil(baseCandidateTake * (allowedIds.length / filteredTotal)));
 
         const baseConditions = [
           isNull(questionTable.parentId),
@@ -994,11 +1186,36 @@ export const question = new Hono<UserEnv>()
       .from(questionConceptTable)
       .where(eq(questionConceptTable.questionId, id));
 
+    // A 題組's sub-questions, so the admin preview can show what a user
+    // is actually given rather than just the parent's stem. Empty for a
+    // standalone question. Children carry no exam/tag/concept links of
+    // their own -- those live on the parent -- so only their own fields
+    // are returned.
+    const children = await db
+      .select({
+        id: questionTable.id,
+        type: questionTable.type,
+        sortOrder: questionTable.sortOrder,
+        content: questionTable.content,
+        options: questionTable.options,
+        answer: questionTable.answer,
+        // Both: adjustedDifficulty is what every reader shows, and what
+        // adaptive selection matches against, while difficulty is the
+        // prior it was seeded from and is still weighted into the
+        // recomputation on each reply (see reply.ts).
+        difficulty: questionTable.difficulty,
+        adjustedDifficulty: questionTable.adjustedDifficulty,
+      })
+      .from(questionTable)
+      .where(eq(questionTable.parentId, id))
+      .orderBy(asc(questionTable.sortOrder), asc(questionTable.id));
+
     return c.json({
       ...found,
       examId: examLink?.examId ?? null,
       tagIds: tagLinks.map((l) => l.tagId),
       conceptIds: conceptLinks.map((l) => l.conceptId),
+      children,
     });
   })
   .post('/', zValidator('json', questionBodySchema), async (c) => {
@@ -1019,6 +1236,7 @@ export const question = new Hono<UserEnv>()
 
     data.questions.forEach((item, i) => {
       assertNoImagePlaceholder(item.content, `questions[${i}].content`);
+      assertClozeBlanksMatchAnswer(item.type, item.content, item.answer, `questions[${i}]`);
       item.childQuestions?.forEach((child, j) =>
         assertNoImagePlaceholder(child.content, `questions[${i}].childQuestions[${j}].content`)
       );
@@ -1175,6 +1393,7 @@ export const question = new Hono<UserEnv>()
     if (found === undefined) throw new NotFoundError(`question ${id} not found`);
 
     assertNoImagePlaceholder(data.content, 'content');
+    assertClozeBlanksMatchAnswer(data.type, data.content, data.answer, `question ${id}`);
 
     await validateExamForSubject(db, found.subjectId, data.examId);
 

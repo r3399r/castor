@@ -12,6 +12,7 @@ import {
 import { app } from 'src/app';
 import { closeDb, getDb } from 'src/db/client';
 import {
+  categoryTable,
   conceptGroupTable,
   conceptTable,
   examSubjectTable,
@@ -22,6 +23,7 @@ import {
   questionTable,
   questionTagTable,
   replyTable,
+  subjectCategoryTable,
   subjectTable,
   tagTable,
   userConceptStatTable,
@@ -209,7 +211,9 @@ const clearTables = async () => {
   await db.delete(tagTable);
   await db.delete(examSubjectTable);
   await db.delete(examTable);
+  await db.delete(subjectCategoryTable);
   await db.delete(subjectTable);
+  await db.delete(categoryTable);
   await db.delete(userTable);
 };
 
@@ -594,6 +598,182 @@ describe('question routes', () => {
       expect(singleRow.childCount).toBe(0);
     });
 
+    it("reports the subject's categories, and an empty list when it has none", async () => {
+      const db = getDb();
+      const { subjectId, examId, conceptId } = await seedFixture();
+      // Listed out of alphabetical order on purpose: the response is
+      // sorted by name, not by link or insertion order.
+      const [{ insertId: humanities }] = await db
+        .insert(categoryTable)
+        .values({ name: '社會', createdAt: new Date() });
+      const [{ insertId: science }] = await db
+        .insert(categoryTable)
+        .values({ name: '自然', createdAt: new Date() });
+      await db
+        .insert(subjectCategoryTable)
+        .values([
+          { subjectId, categoryId: science },
+          { subjectId, categoryId: humanities },
+        ]);
+
+      const [{ insertId: orphanSubjectId }] = await db
+        .insert(subjectTable)
+        .values({ name: 'uncategorised subject', createdAt: new Date() });
+      await db.insert(examSubjectTable).values({ examId, subjectId: orphanSubjectId });
+      const [{ insertId: orphanGroupId }] = await db
+        .insert(conceptGroupTable)
+        .values({ name: 'g', subjectId: orphanSubjectId, createdAt: new Date() });
+      const [{ insertId: orphanConceptId }] = await db
+        .insert(conceptTable)
+        .values({ name: 'c', conceptGroupId: orphanGroupId, createdAt: new Date() });
+
+      const filed = await createQuestion(subjectId, examId, { conceptIds: [conceptId] });
+      const unfiled = await createQuestion(orphanSubjectId, examId, {
+        conceptIds: [orphanConceptId],
+      });
+
+      const body = (await (await getQuestionList()).json()) as {
+        data: { id: number; categories: string[] }[];
+      };
+      expect(body.data.find((q) => q.id === filed.id)!.categories).toEqual(['社會', '自然']);
+      // A subject in no category is a real state, not an error.
+      expect(body.data.find((q) => q.id === unfiled.id)!.categories).toEqual([]);
+    });
+
+    describe('filters', () => {
+      /**
+       * Two subjects in different categories, two exams/concepts/tags
+       * inside the first subject, and three questions -- enough that every
+       * dimension has something it must exclude, so a filter that silently
+       * does nothing fails instead of passing by coincidence.
+       */
+      const seedFilterFixture = async () => {
+        const db = getDb();
+        const name = (value: string) => ({ name: value, createdAt: new Date() });
+        const [{ insertId: science }] = await db.insert(categoryTable).values(name('自然'));
+        const [{ insertId: humanities }] = await db.insert(categoryTable).values(name('社會'));
+        const [{ insertId: subjectA }] = await db.insert(subjectTable).values(name('數學'));
+        const [{ insertId: subjectB }] = await db.insert(subjectTable).values(name('歷史'));
+        await db.insert(subjectCategoryTable).values([
+          { subjectId: subjectA, categoryId: science },
+          { subjectId: subjectB, categoryId: humanities },
+        ]);
+
+        const [{ insertId: exam1 }] = await db.insert(examTable).values(name('114 學測'));
+        const [{ insertId: exam2 }] = await db.insert(examTable).values(name('113 分科'));
+        const [{ insertId: examB }] = await db.insert(examTable).values(name('歷史卷'));
+        await db.insert(examSubjectTable).values([
+          { examId: exam1, subjectId: subjectA },
+          { examId: exam2, subjectId: subjectA },
+          { examId: examB, subjectId: subjectB },
+        ]);
+
+        const [{ insertId: tag1 }] = await db
+          .insert(tagTable)
+          .values({ ...name('常考'), subjectId: subjectA });
+        const [{ insertId: tag2 }] = await db
+          .insert(tagTable)
+          .values({ ...name('冷門'), subjectId: subjectA });
+        const [{ insertId: groupA }] = await db
+          .insert(conceptGroupTable)
+          .values({ ...name('函數'), subjectId: subjectA });
+        const [{ insertId: concept1 }] = await db
+          .insert(conceptTable)
+          .values({ ...name('二次函數'), conceptGroupId: groupA });
+        const [{ insertId: concept2 }] = await db
+          .insert(conceptTable)
+          .values({ ...name('指數函數'), conceptGroupId: groupA });
+        const [{ insertId: groupB }] = await db
+          .insert(conceptGroupTable)
+          .values({ ...name('近代史'), subjectId: subjectB });
+        const [{ insertId: conceptB }] = await db
+          .insert(conceptTable)
+          .values({ ...name('條約'), conceptGroupId: groupB });
+
+        const a1 = await createQuestion(subjectA, exam1, {
+          conceptIds: [concept1],
+          tagIds: [tag1],
+        });
+        const a2 = await createQuestion(subjectA, exam2, {
+          conceptIds: [concept2],
+          tagIds: [tag2],
+        });
+        const b = await createQuestion(subjectB, examB, { conceptIds: [conceptB] });
+
+        return {
+          science,
+          humanities,
+          subjectA,
+          subjectB,
+          exam1,
+          exam2,
+          tag1,
+          tag2,
+          concept1,
+          concept2,
+          a1: a1.id,
+          a2: a2.id,
+          b: b.id,
+        };
+      };
+
+      const listedIds = async (query: string) => {
+        const res = await getQuestionList(query);
+        expect(res.status).toBe(200);
+        const body = (await res.json()) as {
+          data: { id: number }[];
+          paginate: { total: number };
+        };
+        // The filtered total is asserted alongside the rows on every case:
+        // a count query that ignored the filter would still return the
+        // right page of rows while making the pager offer empty pages.
+        expect(body.paginate.total).toBe(body.data.length);
+        return body.data.map((q) => q.id).sort((x, y) => x - y);
+      };
+
+      it('filters by the subject category', async () => {
+        const f = await seedFilterFixture();
+        expect(await listedIds(`?categoryId=${f.science}`)).toEqual([f.a1, f.a2]);
+        expect(await listedIds(`?categoryId=${f.humanities}`)).toEqual([f.b]);
+      });
+
+      it('filters by subject', async () => {
+        const f = await seedFilterFixture();
+        expect(await listedIds(`?subjectId=${f.subjectA}`)).toEqual([f.a1, f.a2]);
+        expect(await listedIds(`?subjectId=${f.subjectB}`)).toEqual([f.b]);
+      });
+
+      it('filters by exam, concept and tag', async () => {
+        const f = await seedFilterFixture();
+        expect(await listedIds(`?examId=${f.exam1}`)).toEqual([f.a1]);
+        expect(await listedIds(`?conceptId=${f.concept2}`)).toEqual([f.a2]);
+        expect(await listedIds(`?tagId=${f.tag1}`)).toEqual([f.a1]);
+      });
+
+      it('combines dimensions with AND', async () => {
+        const f = await seedFilterFixture();
+        expect(await listedIds(`?categoryId=${f.science}&tagId=${f.tag2}`)).toEqual([f.a2]);
+        // Both halves match a question, but not the same one.
+        expect(await listedIds(`?examId=${f.exam1}&tagId=${f.tag2}`)).toEqual([]);
+      });
+
+      it('counts a 題組 once per filter, not once per link', async () => {
+        const db = getDb();
+        const f = await seedFilterFixture();
+        // Two tags on one question: an EXISTS filter yields one row, a
+        // join would yield two and double the total.
+        await db
+          .insert(questionTagTable)
+          .values({ questionId: f.a1, tagId: f.tag2 });
+        expect(await listedIds(`?tagId=${f.tag2}`)).toEqual([f.a1, f.a2].sort((x, y) => x - y));
+      });
+
+      it('rejects a non-numeric filter with 400', async () => {
+        const res = await getQuestionList('?subjectId=abc');
+        expect(res.status).toBe(400);
+      });
+    });
+
     it('sorts by difficulty ascending and descending', async () => {
       const { subjectId, examId, conceptId } = await seedFixture();
       const low = await createQuestion(subjectId, examId, { difficulty: 2, conceptIds: [conceptId] });
@@ -854,6 +1034,96 @@ describe('question routes', () => {
       expect(body.map((q) => q.id)).toEqual([wanted.id]);
     });
 
+    // A short paper inside a long subject: the exam holds 3 of the
+    // subject's 20 questions, and the user asks for 5.
+    it('serves every question a small exam holds, not just the per-concept LIMIT', async () => {
+      await seedUser();
+      vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+      const { subjectId, examId, conceptId } = await seedFixture();
+      const db = getDb();
+      const [{ insertId: smallExamId }] = await db
+        .insert(examTable)
+        .values({ name: 'small exam', createdAt: new Date() });
+      await db.insert(examSubjectTable).values({ examId: smallExamId, subjectId });
+
+      const wanted: number[] = [];
+      for (let i = 0; i < 3; i++)
+        wanted.push((await createQuestion(subjectId, smallExamId, { conceptIds: [conceptId] })).id);
+      for (let i = 0; i < 17; i++) await createQuestion(subjectId, examId, { conceptIds: [conceptId] });
+
+      const res = await getAdaptive(`?subjectId=${subjectId}&examIds=${smallExamId}&count=5`);
+      const body = (await res.json()) as AdaptiveDto[];
+      expect(body.map((q) => q.id).sort()).toEqual([...wanted].sort());
+    });
+
+    // The same, but the exam's questions all sit in a concept that owns a
+    // tiny fraction of the subject. weightedTake used to be derived from
+    // that whole-subject fraction (3/203 -> a LIMIT of 1), so two of the
+    // three questions on the chosen paper were unreachable. It is derived
+    // from the filtered pool now.
+    it('does not let a concept with a small share of the subject starve a filtered pool', async () => {
+      await seedUser();
+      vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+      const { subjectId, examId, conceptId } = await seedFixture();
+      const db = getDb();
+      const [{ insertId: smallExamId }] = await db
+        .insert(examTable)
+        .values({ name: 'small exam', createdAt: new Date() });
+      await db.insert(examSubjectTable).values({ examId: smallExamId, subjectId });
+      const [group] = await db.select().from(conceptGroupTable);
+      const [{ insertId: bigConceptId }] = await db
+        .insert(conceptTable)
+        .values({ name: 'bulk concept', conceptGroupId: group.id, createdAt: new Date() });
+
+      const wanted: number[] = [];
+      for (let i = 0; i < 3; i++)
+        wanted.push((await createQuestion(subjectId, smallExamId, { conceptIds: [conceptId] })).id);
+      // A sibling concept large enough to make the first one's whole-subject
+      // share round weightedTake down to 1.
+      for (let i = 0; i < 60; i++) await createQuestion(subjectId, examId, { conceptIds: [bigConceptId] });
+
+      const res = await getAdaptive(`?subjectId=${subjectId}&examIds=${smallExamId}&count=5`);
+      const body = (await res.json()) as AdaptiveDto[];
+      expect(body.map((q) => q.id).sort()).toEqual([...wanted].sort());
+    });
+
+    // An abandoned session leaves pending replies behind. They are served
+    // first so a practice set stays stable, but only where they belong:
+    // handing a 試卷 B leftover to a request filtered to 試卷 A both breaks
+    // the filter and costs the user one of their 試卷 A questions, since
+    // the leftover counts against `count`.
+    it('does not serve a pending question from outside the requested exam', async () => {
+      const userId = await seedUser();
+      vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+      const { subjectId, examId, conceptId } = await seedFixture();
+      const db = getDb();
+      const [{ insertId: otherExamId }] = await db
+        .insert(examTable)
+        .values({ name: 'other exam', createdAt: new Date() });
+      await db.insert(examSubjectTable).values({ examId: otherExamId, subjectId });
+
+      const wanted: number[] = [];
+      for (let i = 0; i < 3; i++)
+        wanted.push((await createQuestion(subjectId, examId, { conceptIds: [conceptId] })).id);
+      const strayQuestion = await createQuestion(subjectId, otherExamId, { conceptIds: [conceptId] });
+      await db.insert(pendingReplyTable).values({
+        questionId: strayQuestion.id,
+        userId,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      const res = await getAdaptive(`?subjectId=${subjectId}&examIds=${examId}&count=5`);
+      const body = (await res.json()) as AdaptiveDto[];
+      expect(body.map((q) => q.id)).not.toContain(strayQuestion.id);
+      expect(body.map((q) => q.id).sort()).toEqual([...wanted].sort());
+
+      // The leftover is still pending, so it comes back when the user
+      // practices the exam it actually belongs to.
+      const other = await getAdaptive(`?subjectId=${subjectId}&examIds=${otherExamId}&count=5`);
+      expect(((await other.json()) as AdaptiveDto[]).map((q) => q.id)).toContain(strayQuestion.id);
+    });
+
     it('prefers a fresh question over one replied to in the last 7 days when both are candidates', async () => {
       const userId = await seedUser();
       vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
@@ -918,6 +1188,52 @@ describe('question routes', () => {
         tagIds: [tagId],
         conceptIds: [conceptId],
       });
+    });
+
+    it("returns a 題組's sub-questions in order, and none for a standalone", async () => {
+      const { subjectId, examId, conceptId } = await seedFixture();
+
+      const standalone = await createQuestion(subjectId, examId, { conceptIds: [conceptId] });
+      const standaloneBody = (await (await getQuestion(standalone.id)).json()) as {
+        children: unknown[];
+      };
+      expect(standaloneBody.children).toEqual([]);
+
+      const groupRes = await postQuestions({
+        subjectId,
+        examId,
+        questions: [
+          {
+            type: 'GROUP',
+            difficulty: 5,
+            conceptIds: [conceptId],
+            // Submitted out of order, to pin that the response is sorted
+            // by sortOrder rather than by insertion.
+            childQuestions: [
+              { type: 'SINGLE', sortOrder: 1, content: 'second', options: 'A|B', answer: 'B', difficulty: 4 },
+              { type: 'SINGLE', sortOrder: 0, content: 'first', options: 'A|B', answer: 'A', difficulty: 3 },
+            ],
+          },
+        ],
+      });
+      const [[group]] = (await groupRes.json()) as QuestionDto[][];
+
+      const body = (await (await getQuestion(group.id)).json()) as {
+        children: {
+          content: string;
+          answer: string;
+          difficulty: number;
+          adjustedDifficulty: number;
+          sortOrder: number;
+        }[];
+      };
+      expect(body.children.map((c) => c.content)).toEqual(['first', 'second']);
+      expect(body.children.map((c) => c.answer)).toEqual(['A', 'B']);
+      // Each sub-question keeps its own difficulty, not the parent's, and
+      // carries the adjusted value every reader actually displays --
+      // seeded from difficulty, so equal to it until the first reply.
+      expect(body.children.map((c) => c.difficulty)).toEqual([3, 4]);
+      expect(body.children.map((c) => c.adjustedDifficulty)).toEqual([3, 4]);
     });
 
     it('404s for an unknown question id', async () => {
@@ -1168,6 +1484,162 @@ describe('question routes', () => {
 
       expect(res.status).toBe(400);
       expect(await res.json()).toMatchObject({ code: 'QUESTION_IMAGE_PLACEHOLDER' });
+    });
+
+    // A CLOZE passage's blank count has to match answer.length, because
+    // the frontend lays out one answer row per character of answer and
+    // labels those rows from the passage's own data-blank numbers. A
+    // mismatch is silent everywhere downstream -- the rows just stop
+    // lining up with the article and every blank past the gap is scored
+    // against the wrong position -- so it is rejected at the door.
+    describe('CLOZE blank count', () => {
+      const clozePassage = (blanks: number) =>
+        Array.from(
+          { length: blanks },
+          (_, i) => `<u data-blank="${31 + i}">&nbsp;&nbsp;${31 + i}&nbsp;&nbsp;</u>`
+        ).join(' ');
+
+      const postCloze = async (
+        subjectId: number,
+        examId: number,
+        conceptId: number,
+        content: string,
+        answer: string
+      ) =>
+        postQuestions({
+          subjectId,
+          examId,
+          questions: [
+            {
+              type: 'CLOZE',
+              content,
+              options: 'A|B|C|D|E',
+              answer,
+              difficulty: 5,
+              conceptIds: [conceptId],
+            },
+          ],
+        });
+
+      it('accepts a CLOZE whose data-blank count equals answer.length', async () => {
+        const { subjectId, examId, conceptId } = await seedFixture();
+
+        const res = await postCloze(subjectId, examId, conceptId, clozePassage(5), 'CADBE');
+        expect(res.status).toBe(201);
+
+        const rows = await getDb().select().from(questionTable);
+        expect(rows).toHaveLength(1);
+        expect(rows[0].type).toBe('CLOZE');
+        // Top-level, not a GROUP child: a passage is a whole question.
+        expect(rows[0].parentId).toBeNull();
+        expect(rows[0].isGroup).toBe(false);
+      });
+
+      // Only the count is checked, never the values. The blank numbers are
+      // the original paper's, so a passage lifted from 第二部分 starts at
+      // 31, and a paper can repeat a number across sections or skip one.
+      // The answer string is positional, so those numbers are labels --
+      // this pins that down against a later "numbers must ascend from 1"
+      // check, which FILL does need (its rows are hard-numbered 1..n) but
+      // which would reject perfectly good CLOZE passages.
+      it('accepts blank numbers that do not start at 1, ascend, or run contiguously', async () => {
+        const { subjectId, examId, conceptId } = await seedFixture();
+        const scattered = [40, 31, 7, 99]
+          .map((n) => `<u data-blank="${n}">&nbsp;&nbsp;${n}&nbsp;&nbsp;</u>`)
+          .join(' ');
+
+        const res = await postCloze(subjectId, examId, conceptId, scattered, 'CADB');
+        expect(res.status).toBe(201);
+      });
+
+      it('rejects a CLOZE with more blanks than answer characters', async () => {
+        const { subjectId, examId, conceptId } = await seedFixture();
+
+        const res = await postCloze(subjectId, examId, conceptId, clozePassage(5), 'CADB');
+        expect(res.status).toBe(400);
+        expect(await res.json()).toMatchObject({ code: 'QUESTION_CLOZE_BLANK_MISMATCH' });
+
+        // Nothing was written -- the whole batch rolls back.
+        expect(await getDb().select().from(questionTable)).toHaveLength(0);
+      });
+
+      it('rejects a CLOZE with fewer blanks than answer characters', async () => {
+        const { subjectId, examId, conceptId } = await seedFixture();
+
+        const res = await postCloze(subjectId, examId, conceptId, clozePassage(3), 'CADBE');
+        expect(res.status).toBe(400);
+        expect(await res.json()).toMatchObject({ code: 'QUESTION_CLOZE_BLANK_MISMATCH' });
+      });
+
+      // The likeliest extraction failure: the model writes the blanks as
+      // plain (31) or __31__ and drops data-blank entirely. Counting zero
+      // against a zero-length answer would otherwise pass this check.
+      it('rejects a CLOZE whose passage has no data-blank marker at all', async () => {
+        const { subjectId, examId, conceptId } = await seedFixture();
+
+        const res = await postCloze(
+          subjectId,
+          examId,
+          conceptId,
+          '<p>The answer is <u>&nbsp;&nbsp;31&nbsp;&nbsp;</u> here.</p>',
+          'C'
+        );
+        expect(res.status).toBe(400);
+        expect(await res.json()).toMatchObject({ code: 'QUESTION_CLOZE_NO_BLANK' });
+      });
+
+      it('leaves non-CLOZE types alone, blanks or not', async () => {
+        const { subjectId, examId, conceptId } = await seedFixture();
+
+        const res = await postQuestions({
+          subjectId,
+          examId,
+          questions: [
+            {
+              type: 'SINGLE',
+              content: '<p>no data-blank anywhere</p>',
+              options: 'A|B',
+              answer: 'A',
+              difficulty: 5,
+              conceptIds: [conceptId],
+            },
+          ],
+        });
+        expect(res.status).toBe(201);
+      });
+
+      // PUT is the admin's edit path, so a mismatch can be introduced
+      // after creation just as easily as during it.
+      it('rejects a PUT that leaves the blank count and answer out of step', async () => {
+        const { subjectId, examId, conceptId } = await seedFixture();
+        const created = await createQuestion(subjectId, examId, { conceptIds: [conceptId] });
+
+        const res = await putQuestion(created.id, {
+          type: 'CLOZE',
+          content: clozePassage(5),
+          options: 'A|B|C|D|E',
+          answer: 'CAD',
+          difficulty: 5,
+          examId,
+        });
+        expect(res.status).toBe(400);
+        expect(await res.json()).toMatchObject({ code: 'QUESTION_CLOZE_BLANK_MISMATCH' });
+      });
+
+      it('accepts a PUT that converts a question to a well-formed CLOZE', async () => {
+        const { subjectId, examId, conceptId } = await seedFixture();
+        const created = await createQuestion(subjectId, examId, { conceptIds: [conceptId] });
+
+        const res = await putQuestion(created.id, {
+          type: 'CLOZE',
+          content: clozePassage(5),
+          options: 'A|B|C|D|E',
+          answer: 'CADBE',
+          difficulty: 5,
+          examId,
+        });
+        expect(res.status).toBe(200);
+      });
     });
 
     it('rejects an empty conceptIds with 400', async () => {

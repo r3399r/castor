@@ -36,18 +36,15 @@ import { artworkByCode, spiritCatalog, type SpiritSpecies } from '@/lib/guardian
 import { apiFetch, apiPost } from '@/lib/api'
 import { useAuth } from '@/contexts/AuthContext'
 import SupportNote from './SupportNote'
-import { DonationDemoBox, FormalDonationEntry } from './DonationDemo'
+import type { Guardian } from '@/types/api'
+import { DonationDemoBox } from './DonationDemo'
+import { DonationEntry } from './DonationFlow'
 
-type GuardianDto = {
-  id: number
-  guardianId: number
-  code: string
-  name: string
-  theme: string
-  level: number
-  xp: number
-  nextLevelXp: number | null
-}
+// The shared contract, not a local copy of it. There used to be a
+// hand-written duplicate here; it silently fell behind when the API began
+// returning the spirit's public-interest category, which the LV5 donation
+// panel needs.
+type GuardianDto = Guardian
 
 type SpeciesDto = {
   id: number
@@ -480,7 +477,7 @@ function RealBoxClient() {
                         nextLevelXp={complete ? null : guardian.nextLevelXp}
                       >
                         {complete ? (
-                          <FormalDonationEntry guardianId={guardian.id} species={artwork} />
+                          <DonationEntry guardian={guardian} species={artwork} />
                         ) : (
                           investControls
                         )}
@@ -534,7 +531,7 @@ function RealBoxClient() {
                     action={
                       <>
                         <a
-                          href="/question"
+                          href="/adaptive"
                           className="sp-button sp-button--primary"
                         >
                           前往練習
@@ -593,7 +590,7 @@ function RealBoxClient() {
               {availablePoints === 0 && (
                 <RewardBanner title="目前還沒有可使用的積分">
                   商品仍可先瀏覽。完成練習累積積分後，就能回來兌換喜歡的蛋。
-                  <a href="/question" className="sp-text-link">
+                  <a href="/adaptive" className="sp-text-link">
                     前往練習 →
                   </a>
                 </RewardBanner>

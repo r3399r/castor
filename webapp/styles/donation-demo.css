@@ -1,3 +1,11 @@
+/* Despite the file name, this is no longer demo-only. The .donation-flow-*,
+   .donation-spirit-*, .donation-org-*, .donation-confirm-* and
+   .donation-record-* rules are shared by three screens: the localStorage
+   design demo (app/box/DonationDemo.tsx), the real LV5 donation flow
+   (app/box/DonationFlow.tsx) and the public transparency page
+   (app/impact/). Only the .donation-demo-* rules belong to the demo alone.
+   Renaming the file is a one-line change in app/globals.css if that ever
+   feels worth doing. */
 .donation-demo-page,
 .donation-demo-box {
   min-height: 100vh;
@@ -148,6 +156,17 @@
 
 .donation-org-card:focus-visible,
 .donation-demo-fields select:focus-visible { outline: var(--spirit-focus-outline); outline-offset: var(--focus-ring-offset); }
+
+/* Public transparency page (app/impact/). It reuses .donation-flow-inner
+   and .donation-record-card; these are the parts it adds. */
+.donation-impact-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 18px 24px; margin: 18px 0 20px; }
+.donation-impact-summary div { display: grid; gap: 4px; }
+.donation-impact-summary dt { color: var(--color-spirit-muted); font-size: var(--text-spirit-small); }
+.donation-impact-summary dd { margin: 0; font-size: var(--text-spirit-heading); font-weight: 700; }
+.donation-impact-list { display: grid; gap: 20px; margin: 24px 0; }
+.donation-impact-list .donation-record-card header { margin-bottom: 20px; padding-bottom: 18px; border-bottom: var(--spirit-border); }
+.donation-impact-list .donation-record-card header h2 { margin: 0 0 6px; font-size: var(--text-spirit-heading); }
+.donation-impact-evidence { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
 
 @media (width < 64rem) {
   .donation-demo-controls { grid-template-columns: 1fr; }

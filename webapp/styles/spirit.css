@@ -1059,7 +1059,12 @@
   color: var(--color-danger-text);
   font-size: var(--text-spirit-caption);
 }
-.ui-field :is(input, select, textarea),
+/* Checkbox and radio are excluded: they have an intrinsic size, and the
+   width/min-height/padding below turn one into a full-width 40px-tall box.
+   The rule is for text-like controls -- anything the user types or picks
+   from -- which is why `select` and `textarea` are listed by name rather
+   than the whole input element being swept in. */
+.ui-field :is(input:not([type='checkbox'], [type='radio']), select, textarea),
 .ui-control {
   width: 100%;
   min-height: var(--control-height-md);
@@ -1070,13 +1075,13 @@
   color: var(--color-spirit-ink);
   font-size: var(--text-spirit-small);
 }
-.ui-field :is(input, select, textarea):focus-visible,
+.ui-field :is(input:not([type='checkbox'], [type='radio']), select, textarea):focus-visible,
 .ui-control:focus-visible {
   border-color: var(--color-spirit-canopy);
   outline: var(--focus-ring-width) solid var(--spirit-focus-ring);
   outline-offset: 1px;
 }
-.ui-field :is(input, select, textarea):disabled,
+.ui-field :is(input:not([type='checkbox'], [type='radio']), select, textarea):disabled,
 .ui-control:disabled {
   cursor: not-allowed;
   opacity: var(--spirit-disabled-opacity);
@@ -1663,6 +1668,12 @@
 }
 .sp-modal--art {
   width: min(620px, calc(100% - 32px));
+}
+/* For a modal whose body is rendered question content rather than a
+   sentence of copy: a 題組 with several sub-questions needs the width to
+   stay readable, and MathJax display equations overflow a 480px dialog. */
+.sp-modal--wide {
+  width: min(820px, calc(100% - 32px));
 }
 .sp-dialog-art {
   max-width: 480px;

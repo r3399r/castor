@@ -1,5 +1,14 @@
 /**
- * 文意選填／篇章結構 sub-questions carry no question text of their own.
+ * Helpers for the numbered blanks of a 文意選填／篇章結構 passage.
+ *
+ * Two authoring forms exist. New questions are a single CLOZE: the passage
+ * is the question, and `answer` holds one character per blank -- those use
+ * blankNumbersFromPassage to label the answer rows. Questions extracted
+ * before CLOZE existed are a GROUP whose children are the blanks, and the
+ * two older helpers serve those. Nothing migrates the old ones, so both
+ * paths stay live.
+ *
+ * On the GROUP form: sub-questions carry no question text of their own.
  *
  * By the authoring rules (QUESTION.md, 題組格式) the passage and the shared
  * option list live on the GROUP, each numbered blank becomes one child, and
@@ -66,6 +75,44 @@ const blankNumberOfElement = (attrs: string, inner: string): number | null => {
   const digits = DIGITS_ONLY.exec(inner);
   return digits ? Number(digits[1]) : null;
 };
+
+// Deliberately NOT the lenient <u>-based matching above. For a CLOZE the
+// server guarantees the shape -- POST/PUT /question reject a passage whose
+// data-blank count doesn't equal answer.length -- so this reads exactly
+// what the server counted, with the same pattern, and nothing else.
+//
+// Matching <u> elements here instead would break row alignment two ways:
+// an ordinary underlined number in the prose ("in the <u>50</u>s") would
+// be picked up as a blank and shift every later row's label by one, and a
+// data-blank on something other than a <u> would be counted by the server
+// but missed here. Either way the Nth row ends up labelled with a number
+// that is not the Nth blank, which is worse than no numbering at all --
+// the user would be answering blank 32 in a row labelled 50.
+//
+// The lenient matcher stays for markBlanksInPassage, whose job is the
+// legacy GROUP form where questions predating the data-blank rule still
+// have to be located as best they can.
+const DATA_BLANK_SCAN = /\bdata-blank\s*=\s*["']?(\d{1,3})["']?/gi;
+
+/**
+ * The blank numbers a CLOZE passage carries, in the order they appear.
+ *
+ * A CLOZE's answer rows are labelled from this rather than counted 1..n,
+ * so each row shows the same number the article does -- the paper's own
+ * 31, 32, ... Without it the article says 31 while the answer area says 1
+ * and the reader has to translate between the two while answering.
+ *
+ * The numbers need not start at 1, be contiguous, or ascend: the answer
+ * string is positional, so these are labels only. What does matter is that
+ * the count matches the answer length, since label i is attached to row i
+ * -- callers must check that and fall back to 1..n if it does not hold.
+ */
+export const blankNumbersFromPassage = (html: string | null | undefined): number[] => {
+  if (!html) return []
+  const numbers: number[] = []
+  for (const match of html.matchAll(DATA_BLANK_SCAN)) numbers.push(Number(match[1]))
+  return numbers
+}
 
 /**
  * Wraps each wanted blank in `className`, and reports which ones were found.

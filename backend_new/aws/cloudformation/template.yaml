@@ -76,6 +76,30 @@ Resources:
                 Action:
                   - s3:PutObject
                 Resource: !Sub arn:aws:s3:::${Project}-public-bucket/questions/figures/*
+              # POST /donation-batch/:id/evidence stores the proof a payout
+              # happened -- a transfer slip, the organisation's receipt, a
+              # thank-you letter -- which the public transparency page links
+              # to. Its own prefix, not questions/: that prefix is subject to
+              # cleanup passes over transient Facebook renders, and payout
+              # evidence has to outlive every one of them.
+              #
+              # DeleteObject here, unlike the figure grant above, because
+              # removing evidence is a designed admin action: the batch is
+              # still unpublished, the admin uploaded the wrong file, and the
+              # route deletes the row and the object together. Publishing
+              # freezes it -- the route refuses a delete once published, so
+              # this permission cannot reach a file the public page cites.
+              #
+              # NOTE: the bucket's *policy* grants anonymous read on
+              # questions/* only, and that policy is hand-maintained outside
+              # this template. Until it also covers donations/*, an uploaded
+              # file is stored correctly and answers 403 to every browser,
+              # with nothing logged anywhere.
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:DeleteObject
+                Resource: !Sub arn:aws:s3:::${Project}-public-bucket/donations/*
 
   RestApi:
     Type: AWS::Serverless::Api

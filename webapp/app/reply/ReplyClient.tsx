@@ -19,6 +19,7 @@ const typeLabel: Record<string, string> = {
   MULTIPLE: '多選題',
   TRUE_FALSE: '是非題',
   FILL: '選填題',
+  CLOZE: '填空題',
   GROUP: '題組',
 }
 
