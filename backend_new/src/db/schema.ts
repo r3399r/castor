@@ -429,7 +429,12 @@ export const guardianTable = mysqlTable('guardian', {
   // spirit. A flag rather than a check on `code`, so the rule is data.
   // Such a guardian is not itself a category and must never end up in
   // donation.guardianId.
-  unrestrictedCategory: boolean('unrestricted_category').notNull().default(false),
+  // The public-interest category this species supports, or null for a
+  // species not tied to one -- which is how the planned VIP spirit says
+  // its owner may direct the donation at any category. Replaced an
+  // unrestrictedCategory boolean that said the same thing without the
+  // database being able to enforce it.
+  categoryId: int('category_id', { unsigned: true }).references(() => charityCategoryTable.id),
   sortOrder: tinyint('sort_order', { unsigned: true }).notNull().default(0),
   isActive: boolean('is_active').notNull().default(true),
   createdAt: datetime('created_at', { mode: 'date', fsp: 3 }),
@@ -538,6 +543,32 @@ export const paymentChargeTable = mysqlTable('payment_charge', {
 // the admin UI; never deleted, because a past donation still has to
 // render its recipient's name on the public record. isActive = false
 // removes it from the chooser and nothing else.
+// A public-interest category a donation can be directed at. Separate
+// from guardian, which it used to be folded into via guardian.theme: a
+// category can now be added without shipping a new egg, several eggs can
+// share one category, and a species with no category at all (VIP) is
+// expressible as categoryId null.
+//
+// Watch the two column names from here on: userGuardian.guardianId is a
+// *species*, donation.categoryId is a *category*. Both were guardianId
+// before, in two tables, meaning two different things.
+export const charityCategoryTable = mysqlTable('charity_category', {
+  id: int('id', { unsigned: true }).autoincrement().primaryKey(),
+  // Stable slug, not shown to users -- the same role guardian.code plays
+  // for artwork.
+  code: varchar('code', { length: 50 }).notNull(),
+  // The displayed name, e.g. '兒少、家庭與婦幼'. The string guardian.theme
+  // used to hold, and unique so two categories cannot share a label.
+  name: varchar('name', { length: 100 }).notNull(),
+  sortOrder: smallint('sort_order', { unsigned: true }).notNull().default(0),
+  // Inactive categories stay here: existing donations point at them and
+  // the public record has to keep naming them. They drop out of the
+  // picker only.
+  isActive: boolean('is_active').notNull().default(true),
+  createdAt: datetime('created_at', { mode: 'date', fsp: 3 }),
+  updatedAt: datetime('updated_at', { mode: 'date', fsp: 3 }),
+});
+
 export const charityOrganizationTable = mysqlTable('charity_organization', {
   id: int('id', { unsigned: true }).autoincrement().primaryKey(),
   name: varchar('name', { length: 100 }).notNull(),
@@ -555,21 +586,20 @@ export const charityOrganizationTable = mysqlTable('charity_organization', {
   updatedAt: datetime('updated_at', { mode: 'date', fsp: 3 }),
 });
 
-// Which public-interest categories an organisation is offered under. The
-// category is the guardian (guardian.theme holds the seven names), so
-// there is no separate category table. Many-to-many because a large
-// foundation plausibly belongs under two eggs at once.
-export const charityOrganizationGuardianTable = mysqlTable(
-  'charity_organization_guardian',
+// Which public-interest categories an organisation is offered under.
+// Many-to-many because a large foundation plausibly belongs under two at
+// once (child welfare and education, say).
+export const charityOrganizationCategoryTable = mysqlTable(
+  'charity_organization_category',
   {
     organizationId: int('organization_id', { unsigned: true })
       .notNull()
       .references(() => charityOrganizationTable.id),
-    guardianId: int('guardian_id', { unsigned: true })
+    categoryId: int('category_id', { unsigned: true })
       .notNull()
-      .references(() => guardianTable.id),
+      .references(() => charityCategoryTable.id),
   },
-  (table) => [primaryKey({ columns: [table.organizationId, table.guardianId] })]
+  (table) => [primaryKey({ columns: [table.organizationId, table.categoryId] })]
 );
 
 // One actual transfer of money to one organisation. Payouts are batched
@@ -635,13 +665,14 @@ export const donationTable = mysqlTable('donation', {
   userGuardianId: int('user_guardian_id', { unsigned: true })
     .notNull()
     .references(() => userGuardianTable.id),
-  // The category the user actually chose. Usually the guardian the
-  // spirit already is, which is why it looks redundant, but a guardian
-  // flagged unrestrictedCategory may pick any of the seven, so it cannot
-  // be recovered by joining through userGuardian.
-  guardianId: int('guardian_id', { unsigned: true })
+  // The category the user actually chose. Usually the category of the
+  // spirit's own species, which is why it looks redundant -- but a
+  // species with no category of its own (VIP, whose categoryId is null)
+  // may pick any of them, so it cannot be recovered by joining through
+  // userGuardian.
+  categoryId: int('category_id', { unsigned: true })
     .notNull()
-    .references(() => guardianTable.id),
+    .references(() => charityCategoryTable.id),
   organizationId: int('organization_id', { unsigned: true })
     .notNull()
     .references(() => charityOrganizationTable.id),

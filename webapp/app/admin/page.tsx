@@ -13,6 +13,8 @@ const ADMIN_FUNCTIONS = [
   { label: '篩選維度管理', description: '新增、編輯、刪除篩選維度', href: '/admin/filter-dimension' },
   { label: '篩選選項管理', description: '新增、編輯、刪除篩選選項', href: '/admin/filter-option' },
   { label: '精靈圖鑑', description: '檢視所有精靈種類與各等級圖卡（唯讀）', href: '/admin/species' },
+  { label: '公益組織管理', description: '新增、編輯、停用 LV5 捐款可選的公益組織', href: '/admin/charity-organization' },
+  { label: '撥款管理', description: '建立撥款批次、上傳匯款證明、公開徵信紀錄', href: '/admin/donation-batch' },
   { label: '使用者管理', description: '檢視使用者列表', href: '/admin/user' },
 ]
 

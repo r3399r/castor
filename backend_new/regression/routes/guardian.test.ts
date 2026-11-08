@@ -2,7 +2,13 @@ import { eq } from 'drizzle-orm';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { app } from 'src/app';
 import { closeDb, getDb } from 'src/db/client';
-import { guardianTable, pointTransactionTable, userGuardianTable, userTable } from 'src/db/schema';
+import {
+  charityCategoryTable,
+  guardianTable,
+  pointTransactionTable,
+  userGuardianTable,
+  userTable,
+} from 'src/db/schema';
 
 vi.mock('src/lib/firebaseAdmin', () => ({ verifyIdTokenUid: vi.fn() }));
 import { verifyIdTokenUid } from 'src/lib/firebaseAdmin';
@@ -16,6 +22,7 @@ type GuardianDto = {
   level: number;
   xp: number;
   nextLevelXp: number | null;
+  category: { id: number; name: string } | null;
 };
 type GetGuardianResponse = { data: GuardianDto[]; totalPoints: number };
 type PostInvestResponse = { guardian: GuardianDto; totalPoints: number };
@@ -30,12 +37,31 @@ const postInvest = (id: number, body: unknown) =>
     body: JSON.stringify(body),
   });
 
+// FK-safe order: guardian references charity_category, so categories go
+// after the species that point at them.
 const clearTables = async () => {
   const db = getDb();
   await db.delete(pointTransactionTable);
   await db.delete(userGuardianTable);
   await db.delete(guardianTable);
   await db.delete(userTable);
+  await db.delete(charityCategoryTable);
+};
+
+let categorySeq = 0;
+
+const seedCategory = async () => {
+  const db = getDb();
+  categorySeq += 1;
+  const [{ insertId }] = await db.insert(charityCategoryTable).values({
+    code: `cat-${categorySeq}`,
+    name: `類別 ${categorySeq}`,
+    sortOrder: 0,
+    isActive: true,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
+  return insertId;
 };
 
 const seedUser = async (totalPoints = 0, firebaseUid = 'fixture-uid') => {
@@ -122,6 +148,32 @@ describe('guardian routes', () => {
       expect(body.totalPoints).toBe(100);
       expect(body.data).toHaveLength(1);
       expect(body.data[0]).toMatchObject({ guardianId: speciesId, level: 1, xp: 0, nextLevelXp: 25_000 });
+    });
+
+    it('names the category the spirit supports, which the LV5 donation screen needs', async () => {
+      // The donation flow is per spirit: it has to list that category's
+      // organisations, and `theme` is only a display label.
+      const userId = await seedUser(0);
+      const categoryId = await seedCategory();
+      const speciesId = await seedSpecies({ categoryId });
+      await seedOwnedGuardian(userId, speciesId);
+
+      const body = (await (await getGuardians()).json()) as GetGuardianResponse;
+      expect(body.data[0].category).toEqual({ id: categoryId, name: '類別 1' });
+    });
+
+    it('still returns a spirit whose species is tied to no category', async () => {
+      // This is what VIP is -- categoryId null, owner may direct the
+      // donation at any category. An inner join here would drop the spirit
+      // out of its owner's own collection, which is strictly worse than
+      // not naming a category.
+      const userId = await seedUser(0);
+      const speciesId = await seedSpecies({ categoryId: null });
+      await seedOwnedGuardian(userId, speciesId);
+
+      const body = (await (await getGuardians()).json()) as GetGuardianResponse;
+      expect(body.data).toHaveLength(1);
+      expect(body.data[0].category).toBeNull();
     });
 
     it('returns nextLevelXp=null for a max-level guardian', async () => {

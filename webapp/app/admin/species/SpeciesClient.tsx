@@ -19,6 +19,8 @@ type SpeciesDto = {
   cost: number
   sortOrder: number
   isActive: boolean
+  /** The donation category, or null for a species tied to none. */
+  category: { id: number; name: string } | null
   /** Keyed by level; a level with no owners is absent. */
   ownersByLevel: Record<string, number>
 }
@@ -134,6 +136,12 @@ export default function SpeciesClient() {
                     <Badge tone="muted">已下架</Badge>
                   )}
                   {art === undefined && <Badge tone="warn">尚無圖檔</Badge>}
+                  {/* Amber on purpose, including for the VIP spirit whose
+                      category really is meant to be null: the badge's job
+                      is to make a reader stop and ask whether this egg
+                      should be unbound, and an egg seeded without a
+                      category_id looks exactly like one that should. */}
+                  {row.category === null && <Badge tone="warn">未綁定類別</Badge>}
                 </div>
                 <span className="text-xs text-black-500">
                   商店名稱 {row.name} · {formatNumber(row.cost)} 點 · 排序 {row.sortOrder} ·{' '}
@@ -144,7 +152,11 @@ export default function SpeciesClient() {
                 </span>
               </div>
 
-              <p className="mb-3 text-xs text-black-500">{row.theme}</p>
+              <p className="mb-3 text-xs text-black-500">
+                {row.theme}
+                {' · '}
+                {row.category === null ? '未綁定公益類別（可任選）' : `公益類別 ${row.category.name}`}
+              </p>
 
               <div className="flex flex-wrap gap-3">
                 {LEVELS.map((level) => (

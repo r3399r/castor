@@ -2,20 +2,24 @@ CREATE TABLE IF NOT EXISTS castor.guardian (
     id INT UNSIGNED AUTO_INCREMENT,
     code VARCHAR(50) NOT NULL, -- stable slug (e.g. 'forest'), not shown to users
     name VARCHAR(100) NOT NULL,
+    -- This egg's own displayed theme. For the seven themed eggs it reads
+    -- the same as their category's name today, but it is the *species'*
+    -- label, not the category's: /api/guardian and /api/store print it,
+    -- including for a species with no category at all (VIP). Once one
+    -- category holds several eggs their themes will differ from it.
     theme VARCHAR(100) NOT NULL,
     cost INT UNSIGNED NOT NULL, -- points required to redeem one of this guardian in the store
-    -- 1 = this spirit may direct its LV5 donation to any public-interest
-    -- category, instead of being confined to its own. Planned for the VIP
-    -- spirit; 0 for all seven themed guardians, which is today's
-    -- behaviour. A flag rather than a hard-coded check on `code`, so the
-    -- rule stays data like the rest of the guardian catalog. A guardian
-    -- with this set is not itself a category and must never be stored in
-    -- donation.guardian_id.
-    unrestricted_category TINYINT(1) NOT NULL DEFAULT 0,
+    -- The public-interest category this species supports, or NULL for a
+    -- species that is not tied to one. NULL is what the VIP spirit is:
+    -- its owner may direct the donation at any category. That replaced
+    -- an unrestricted_category TINYINT flag, which said the same thing
+    -- without the database being able to enforce it.
+    category_id INT UNSIGNED NULL,
     sort_order TINYINT UNSIGNED NOT NULL DEFAULT 0,
     is_active TINYINT NOT NULL DEFAULT 1, -- inactive guardians stay in the catalog (existing owners keep theirs) but drop out of the store listing
     created_at DATETIME(3) NULL DEFAULT CURRENT_TIMESTAMP(3),
     updated_at DATETIME(3) NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
     PRIMARY KEY (id),
-    UNIQUE KEY uk_code (code)
+    UNIQUE KEY uk_code (code),
+    FOREIGN KEY (category_id) REFERENCES castor.charity_category(id)
 );

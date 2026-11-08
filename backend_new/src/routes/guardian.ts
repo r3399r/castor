@@ -2,18 +2,20 @@ import { zValidator } from '@hono/zod-validator';
 import { and, eq, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { guardianTable, pointTransactionTable, userGuardianTable, userTable } from 'src/db/schema';
+import {
+  charityCategoryTable,
+  guardianTable,
+  pointTransactionTable,
+  userGuardianTable,
+  userTable,
+} from 'src/db/schema';
+import { LEVEL_XP_THRESHOLDS, MAX_LEVEL, nextLevelXp } from 'src/lib/guardianLevel';
 import { BadRequestError, NotFoundError } from 'src/model/error';
 import { UserEnv } from 'src/middleware/requireUser';
 
-// XP required to advance from level N to N+1, index 0 = level 1->2.
-// Separate from the redeem cost (store.ts) -- this is purely the growing
-// budget, not counting whatever was spent buying the egg. Ratio 3 per
-// level, totaling 1,000,000: 25,000 * (1+3+9+27) = 1,000,000.
-const LEVEL_XP_THRESHOLDS = [25_000, 75_000, 225_000, 675_000];
-const MAX_LEVEL = LEVEL_XP_THRESHOLDS.length + 1;
-
 export const investBodySchema = z.object({ points: z.number().int().positive() });
+
+type CategoryDto = { id: number; name: string };
 
 type GuardianDto = {
   id: number;
@@ -24,6 +26,17 @@ type GuardianDto = {
   level: number;
   xp: number;
   nextLevelXp: number | null;
+  /**
+   * The public-interest category this species supports, or null for one
+   * tied to none -- which is what VIP is, and what lets its owner direct
+   * the donation at any category.
+   *
+   * Carried here because the LV5 donation screen is per spirit: it has to
+   * list that category's organisations, and `theme` is only a display
+   * label (it reads the same as the category's name today and will
+   * diverge once one category holds several eggs).
+   */
+  category: CategoryDto | null;
 };
 
 const toDto = (row: {
@@ -34,10 +47,19 @@ const toDto = (row: {
   theme: string;
   level: number;
   xp: number;
-}): GuardianDto => ({
-  ...row,
-  nextLevelXp: row.level < MAX_LEVEL ? LEVEL_XP_THRESHOLDS[row.level - 1] : null,
-});
+  categoryId: number | null;
+  categoryName: string | null;
+}): GuardianDto => {
+  const { categoryId, categoryName, ...rest } = row;
+  return {
+    ...rest,
+    nextLevelXp: nextLevelXp(rest.level),
+    category:
+      categoryId !== null && categoryName !== null
+        ? { id: categoryId, name: categoryName }
+        : null,
+  };
+};
 
 export const guardian = new Hono<UserEnv>()
   .get('/', async (c) => {
@@ -54,9 +76,15 @@ export const guardian = new Hono<UserEnv>()
         theme: guardianTable.theme,
         level: userGuardianTable.level,
         xp: userGuardianTable.xp,
+        categoryId: charityCategoryTable.id,
+        categoryName: charityCategoryTable.name,
       })
       .from(userGuardianTable)
       .innerJoin(guardianTable, eq(guardianTable.id, userGuardianTable.guardianId))
+      // Left, not inner: guardian.categoryId is NULL for a species tied to
+      // no category, and an inner join would drop that spirit out of the
+      // owner's own collection entirely.
+      .leftJoin(charityCategoryTable, eq(charityCategoryTable.id, guardianTable.categoryId))
       .where(eq(userGuardianTable.userId, user.id));
 
     return c.json({ data: rows.map(toDto), totalPoints: user.totalPoints });
@@ -80,9 +108,14 @@ export const guardian = new Hono<UserEnv>()
         code: guardianTable.code,
         name: guardianTable.name,
         theme: guardianTable.theme,
+        categoryId: charityCategoryTable.id,
+        categoryName: charityCategoryTable.name,
       })
       .from(userGuardianTable)
       .innerJoin(guardianTable, eq(guardianTable.id, userGuardianTable.guardianId))
+      // Left, for the same reason as the list above: a species tied to no
+      // category must not vanish from its owner's own invest call.
+      .leftJoin(charityCategoryTable, eq(charityCategoryTable.id, guardianTable.categoryId))
       .where(and(eq(userGuardianTable.id, id), eq(userGuardianTable.userId, user.id)));
     if (existing === undefined) throw new NotFoundError(`guardian ${id} not found`);
     if (existing.level >= MAX_LEVEL) throw new BadRequestError('guardian is already at max level', 'ALREADY_MAX_LEVEL');
@@ -132,6 +165,8 @@ export const guardian = new Hono<UserEnv>()
         code: existing.code,
         name: existing.name,
         theme: existing.theme,
+        categoryId: existing.categoryId,
+        categoryName: existing.categoryName,
         level,
         xp,
       }),

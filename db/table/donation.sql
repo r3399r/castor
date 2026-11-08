@@ -17,10 +17,11 @@ CREATE TABLE IF NOT EXISTS castor.donation (
     user_guardian_id INT UNSIGNED NOT NULL,
 
     -- The public-interest category the user actually chose. Usually the
-    -- same guardian the spirit is, which is why it looks redundant, but
-    -- a guardian flagged unrestricted_category may donate to any of the
-    -- seven, so it cannot be recovered by joining through user_guardian.
-    guardian_id INT UNSIGNED NOT NULL,
+    -- category of the spirit's own species, which is why it looks
+    -- redundant -- but a species with no category of its own (VIP, whose
+    -- guardian.category_id is NULL) may donate to any of them, so it
+    -- cannot be recovered by joining through user_guardian.
+    category_id INT UNSIGNED NOT NULL,
 
     organization_id INT UNSIGNED NOT NULL,
 
@@ -41,7 +42,7 @@ CREATE TABLE IF NOT EXISTS castor.donation (
     PRIMARY KEY (id),
     FOREIGN KEY (user_id) REFERENCES castor.user(id),
     FOREIGN KEY (user_guardian_id) REFERENCES castor.user_guardian(id),
-    FOREIGN KEY (guardian_id) REFERENCES castor.guardian(id),
+    FOREIGN KEY (category_id) REFERENCES castor.charity_category(id),
     FOREIGN KEY (organization_id) REFERENCES castor.charity_organization(id),
     FOREIGN KEY (batch_id) REFERENCES castor.donation_batch(id),
     UNIQUE KEY uk_user_guardian (user_guardian_id),
