@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { app } from 'src/app';
 import { closeDb, getDb } from 'src/db/client';
 import { charityCategoryTable } from 'src/db/schema';
