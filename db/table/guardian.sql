@@ -21,5 +21,13 @@ CREATE TABLE IF NOT EXISTS castor.guardian (
     updated_at DATETIME(3) NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
     PRIMARY KEY (id),
     UNIQUE KEY uk_code (code),
-    FOREIGN KEY (category_id) REFERENCES castor.charity_category(id)
+    -- Named, unlike every other foreign key in this schema, because this
+    -- is the one table built by two different paths: a fresh environment
+    -- gets it from this file, while an existing database got it from
+    -- db/script/v1.1.0/donation.sql, whose ALTER names it. Leaving it
+    -- unnamed here gives a rebuilt dev database `guardian_ibfk_1` while
+    -- production carries `fk_guardian_category` -- two schemas that look
+    -- identical until something tries to DROP FOREIGN KEY by name.
+    CONSTRAINT fk_guardian_category
+      FOREIGN KEY (category_id) REFERENCES castor.charity_category(id)
 );
