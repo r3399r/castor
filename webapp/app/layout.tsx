@@ -29,7 +29,13 @@ export const metadata: Metadata = {
   // request to infer the host from, so the canonical public origin is stated
   // here. Without it Next falls back to localhost and every share preview
   // points at a machine nobody else can reach.
-  metadataBase: new URL('https://pmp.celestialstudio.net'),
+  //
+  // The one place the public hostname is written in application code. Every
+  // other copy -- the Route53 record, the CloudFront alias, the CORS origin,
+  // PUBLIC_BASE_URL and therefore ECPay's callback URLs -- is derived from
+  // `SubDomain` in the CloudFormation template, which deploy.sh passes in.
+  // Keep this in step with deploy.sh's `subDomain` by hand.
+  metadataBase: new URL('https://learnforgood.celestialstudio.net'),
   title: TITLE,
   description: DESCRIPTION,
   openGraph: {

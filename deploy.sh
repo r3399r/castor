@@ -3,7 +3,7 @@ set -e
 
 env=$1
 project=castor
-subDomain=pmp
+subDomain=learnforgood
 domain=celestialstudio.net
 
 echo ====================================================================================
