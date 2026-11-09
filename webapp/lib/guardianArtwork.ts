@@ -32,8 +32,9 @@ export const spiritCatalog: Record<SpiritSpecies, SpiritDefinition> = {
   dog: {
     name: '狗精靈',
     category: '高齡長照與失智照護',
+    artwork: '/illustrations/guardians/dog',
     tone: 'forest',
-    stages: [],
+    stages: ['初生', '萌芽', '探索', '茁壯', '綻放'],
   },
   rabbit: {
     name: '兔子精靈',
@@ -73,6 +74,7 @@ export const spiritCatalog: Record<SpiritSpecies, SpiritDefinition> = {
  */
 export const artworkByCode: Partial<Record<string, SpiritSpecies>> = {
   children: 'cat',
+  eldercare: 'dog',
   forest: 'deer',
   healing: 'rabbit',
   neurodevelopment: 'otter',

@@ -184,13 +184,13 @@ The *donation category* is no longer this row. It used to be: `guardian.theme` h
 | --- | --- | --- | --- | --- |
 | `children` | 兒少、家庭與婦幼 | 貓 | LV1-LV5 available | 暖陽之蛋 |
 | `neurodevelopment` | 身心障礙與神經發展 | 水獺 | LV1-LV5 available | 星光之蛋 |
-| `eldercare` | 高齡長照與失智照護 | 狗 | Pending | 長青之蛋 |
+| `eldercare` | 高齡長照與失智照護 | 狗 | LV1-LV5 available | 長青之蛋 |
 | `healing` | 疾病醫療、心理與善終 | 兔子 | LV1-LV5 available | 療癒之蛋 |
 | `rights` | 人權、法治、性別與社區 | 海豚 | Pending | 共鳴之蛋 |
 | `wisdom` | 教育翻轉、人文與藝術 | 鳥 | LV1-LV5 available | 智慧之蛋 |
 | `forest` | 生態環境與動物福利 | 鹿 | LV1-LV5 available | 森林之蛋 |
 
-Until the remaining two artwork sets exist, their store and locked collection states use the shared egg asset rather than substitute character artwork. Keep spirit artwork data-driven; do not hard-code the UI to a particular spirit. `spiritCatalog` already defines all seven (names and categories); only the `artwork` field distinguishes the ones with drawings, and `spiritImage()` returns `undefined` for the rest so components fall back on their own.
+Until the remaining artwork set exists, its store and locked collection states use the shared egg asset rather than substitute character artwork. Keep spirit artwork data-driven; do not hard-code the UI to a particular spirit. `spiritCatalog` already defines all seven (names and categories); only the `artwork` field distinguishes the ones with drawings, and `spiritImage()` returns `undefined` for the rest so components fall back on their own.
 
 **Image asset policy**
 
@@ -201,7 +201,7 @@ Until the remaining two artwork sets exist, their store and locked collection st
 - Guardian artwork must be generated directly from its matching original PNG, never by recompressing an existing WebP. Preserve the source dimensions and do not crop or stretch it during conversion.
 - Guardian runtime images use lossy VP8 WebP, not lossless VP8L. Use Sharp with `webp({ quality: 85, effort: 6, smartSubsample: true })` so every species is encoded consistently; use a different mode only when a specific asset requirement is documented in the same change.
 - After adding or regenerating guardian artwork, verify all output files report VP8 encoding, compare their pixel dimensions with the PNG sources, and visually inspect at least the most detailed image for color shifts, block artifacts, or broken output.
-- Current guardian artwork is under `webapp/public/illustrations/guardians/{bird,cat,deer,otter,rabbit}/lv1.webp` through `lv5.webp`.
+- Current guardian artwork is under `webapp/public/illustrations/guardians/{bird,cat,deer,dog,otter,rabbit}/lv1.webp` through `lv5.webp`.
 - Shared runtime assets include `/images/locked-egg.webp`, `/images/points-vine-top-left.webp`, `/images/points-vine-bottom-right.webp`, and `/images/spirit-garden-mobile-leaves.webp`.
 
 **Responsive and accessibility requirements**
