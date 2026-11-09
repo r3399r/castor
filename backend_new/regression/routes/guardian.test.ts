@@ -147,7 +147,7 @@ describe('guardian routes', () => {
       const body = (await res.json()) as GetGuardianResponse;
       expect(body.totalPoints).toBe(100);
       expect(body.data).toHaveLength(1);
-      expect(body.data[0]).toMatchObject({ guardianId: speciesId, level: 1, xp: 0, nextLevelXp: 25_000 });
+      expect(body.data[0]).toMatchObject({ guardianId: speciesId, level: 1, xp: 0, nextLevelXp: 2_500 });
     });
 
     it('names the category the spirit supports, which the LV5 donation screen needs', async () => {
@@ -213,7 +213,7 @@ describe('guardian routes', () => {
       const res = await postInvest(userGuardianId, { points: 500 });
       expect(res.status).toBe(200);
       const body = (await res.json()) as PostInvestResponse;
-      expect(body.guardian).toMatchObject({ level: 1, xp: 500, nextLevelXp: 25_000 });
+      expect(body.guardian).toMatchObject({ level: 1, xp: 500, nextLevelXp: 2_500 });
       expect(body.totalPoints).toBe(500);
 
       const db = getDb();
@@ -226,45 +226,45 @@ describe('guardian routes', () => {
       const speciesId = await seedSpecies();
       const userGuardianId = await seedOwnedGuardian(userId, speciesId);
 
-      // 25,000 needed for Lv1->2; investing 25,500 should land at level 2
+      // 2,500 needed for Lv1->2; investing 3,000 should land at level 2
       // with 500 xp carried over.
-      const res = await postInvest(userGuardianId, { points: 25_500 });
+      const res = await postInvest(userGuardianId, { points: 3_000 });
       const body = (await res.json()) as PostInvestResponse;
-      expect(body.guardian).toMatchObject({ level: 2, xp: 500, nextLevelXp: 75_000 });
+      expect(body.guardian).toMatchObject({ level: 2, xp: 500, nextLevelXp: 7_500 });
     });
 
     it('jumps multiple levels in a single large investment', async () => {
-      const userId = await seedUser(1_000_000);
+      const userId = await seedUser(100_000);
       const speciesId = await seedSpecies();
       const userGuardianId = await seedOwnedGuardian(userId, speciesId);
 
-      // 25,000 + 75,000 + 100 = 100,100 -> lands at level 3 with 100 xp.
-      const res = await postInvest(userGuardianId, { points: 100_100 });
+      // 2,500 + 7,500 + 100 = 10,100 -> lands at level 3 with 100 xp.
+      const res = await postInvest(userGuardianId, { points: 10_100 });
       const body = (await res.json()) as PostInvestResponse;
-      expect(body.guardian).toMatchObject({ level: 3, xp: 100, nextLevelXp: 225_000 });
+      expect(body.guardian).toMatchObject({ level: 3, xp: 100, nextLevelXp: 22_500 });
     });
 
-    it('reaches exactly max level with zero leftover xp when investing exactly 1,000,000', async () => {
-      const userId = await seedUser(1_050_000);
+    it('reaches exactly max level with zero leftover xp when investing exactly 100,000', async () => {
+      const userId = await seedUser(105_000);
       const speciesId = await seedSpecies();
       const userGuardianId = await seedOwnedGuardian(userId, speciesId);
 
-      const res = await postInvest(userGuardianId, { points: 1_000_000 });
+      const res = await postInvest(userGuardianId, { points: 100_000 });
       const body = (await res.json()) as PostInvestResponse;
       expect(body.guardian).toMatchObject({ level: 5, xp: 0, nextLevelXp: null });
     });
 
     it('reaches max level and discards any xp overflow beyond the final threshold', async () => {
-      const userId = await seedUser(1_500_000);
+      const userId = await seedUser(150_000);
       const speciesId = await seedSpecies();
       const userGuardianId = await seedOwnedGuardian(userId, speciesId);
 
-      // Full chain to max level is 1,000,000; investing 1,050,000 overshoots.
-      const res = await postInvest(userGuardianId, { points: 1_050_000 });
+      // Full chain to max level is 100,000; investing 105,000 overshoots.
+      const res = await postInvest(userGuardianId, { points: 105_000 });
       const body = (await res.json()) as PostInvestResponse;
       expect(body.guardian).toMatchObject({ level: 5, xp: 0, nextLevelXp: null });
       // Full requested amount still deducted, no partial refund for the overflow.
-      expect(body.totalPoints).toBe(450_000);
+      expect(body.totalPoints).toBe(45_000);
     });
 
     it('rejects with 400 once already at max level', async () => {

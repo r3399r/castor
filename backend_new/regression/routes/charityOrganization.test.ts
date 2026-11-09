@@ -477,7 +477,11 @@ describe('charity organization routes', () => {
         userId,
         guardianId: speciesId,
         level: 5,
-        xp: 675000,
+        // 0, which is what invest() actually leaves at max level -- it
+        // stops tracking xp once there is no level left to spend it on.
+        // This used to be the old final threshold, which was never a state
+        // the code produces.
+        xp: 0,
         createdAt: new Date(),
         updatedAt: new Date(),
       });
