@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { knownApiOrigin } from 'src/lib/apiOrigin';
 import { BadGatewayError } from 'src/model/error';
 
 /**
@@ -72,16 +73,39 @@ const baseUrl = (): string => requiredEnv('PUBLIC_BASE_URL').replace(/\/+$/, '')
  * filters non-browser requests. The public domain here is CloudFront, so
  * these have to address the API Gateway stage directly.
  *
- * Falls back to the public origin when unset, which keeps local runs and
- * tests working with one variable; a deployed stack always sets it (see
- * ECPAY_CALLBACK_BASE_URL in the CloudFormation template). The failure
- * this guards against is the worst kind in this feature: for ATM and
- * convenience-store payments the callback arrives days later, after the
- * student has already handed over cash, so a dropped notification means
- * money taken and nothing granted.
+ * Three sources, in order:
+ *
+ * 1. ECPAY_CALLBACK_BASE_URL, if someone has configured one. Nothing
+ *    sets it in the deployed stack today -- naming the API there is a
+ *    CloudFormation circular dependency, see src/lib/apiOrigin.ts -- so
+ *    this is the override point rather than the normal path.
+ * 2. The API Gateway origin learned from the invocation event, which is
+ *    what a deployed stack actually uses.
+ * 3. The public origin, which is the CDN and therefore the value this
+ *    whole function exists to avoid. Reached only outside Lambda: local
+ *    runs and tests, where one variable is all that is wanted.
+ *
+ * The failure this guards against is the worst kind in this feature: for
+ * ATM and convenience-store payments the callback arrives days later,
+ * after the student has already handed over cash, so a dropped
+ * notification means money taken and nothing granted.
  */
-const callbackBaseUrl = (): string =>
-  (process.env.ECPAY_CALLBACK_BASE_URL ?? requiredEnv('PUBLIC_BASE_URL')).replace(/\/+$/, '');
+const callbackBaseUrl = (): string => {
+  const origin = process.env.ECPAY_CALLBACK_BASE_URL ?? knownApiOrigin();
+  if (origin !== undefined && origin !== '') return origin.replace(/\/+$/, '');
+
+  // Inside Lambda this line should be unreachable: every invocation
+  // behind API Gateway carries an api id, and apiOrigin records it before
+  // any route runs. Logged rather than thrown, because the fallback is
+  // not certainly broken -- the public origin is CloudFront, which ECPay
+  // advises against but which forwards these POSTs to this very API as
+  // its origin. A noisy fallback beats a refused checkout; what is not
+  // acceptable is reaching it without anyone finding out.
+  if (process.env.AWS_LAMBDA_FUNCTION_NAME !== undefined)
+    console.error('ECPay callback origin unknown; falling back to the public (CDN) origin');
+
+  return requiredEnv('PUBLIC_BASE_URL').replace(/\/+$/, '');
+};
 
 export const returnUrl = (): string => `${callbackBaseUrl()}/api/webhook/ecpay/notify`;
 export const periodReturnUrl = (): string => `${callbackBaseUrl()}/api/webhook/ecpay/period`;

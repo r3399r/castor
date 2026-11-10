@@ -1,4 +1,5 @@
 import { desc, eq } from 'drizzle-orm';
+import type { LambdaEvent } from 'hono/aws-lambda';
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { app } from 'src/app';
 import { closeDb, getDb } from 'src/db/client';
@@ -9,6 +10,7 @@ import {
   userSubscriptionTable,
   userTable,
 } from 'src/db/schema';
+import { forgetApiOrigin } from 'src/lib/apiOrigin';
 
 vi.mock('src/lib/firebaseAdmin', () => ({ verifyIdToken: vi.fn(), verifyIdTokenUid: vi.fn() }));
 import { verifyIdTokenUid } from 'src/lib/firebaseAdmin';
@@ -28,6 +30,25 @@ import {
 } from 'src/lib/paymentSweep';
 
 const FIXTURE_UID = 'daypass-fixture-uid';
+
+/**
+ * Enough of an APIGatewayProxyEvent for the two middlewares that read
+ * one: `resource` is what both use to tell a REST API event from an ALB
+ * or HTTP-API one, and requestLogger reaches for `identity.sourceIp`.
+ */
+const API_GATEWAY_EVENT = {
+  resource: '/{proxy+}',
+  path: '/api/payment/checkout',
+  httpMethod: 'POST',
+  headers: {},
+  queryStringParameters: null,
+  body: null,
+  requestContext: {
+    apiId: 'restapi123',
+    stage: 'prod',
+    identity: { sourceIp: '127.0.0.1' },
+  },
+} as unknown as LambdaEvent;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 const clearTables = async () => {
@@ -152,6 +173,9 @@ describe('day pass', () => {
     process.env.ECPAY_MODE = 'stage';
     process.env.PUBLIC_BASE_URL = 'https://example.test';
     delete process.env.ECPAY_CALLBACK_BASE_URL;
+    // Process-wide and container-lived by design, so one test would
+    // otherwise decide what the next one's callbacks say.
+    forgetApiOrigin();
     await clearTables();
   });
 
@@ -318,6 +342,47 @@ it('sends the browser back by GET only, never by a POST we cannot answer', async
         );
         // The browser still goes to the public domain.
         expect(atm.ClientBackURL).toBe('https://example.test/subscription/result');
+      });
+
+      it('reads the callback origin off the invocation event', async () => {
+        // The value CloudFormation cannot supply: naming ${RestApi} in
+        // this function's Environment makes the function depend on the
+        // API that SAM already makes depend on the function, and the
+        // whole stack is rejected for a circular dependency. So the
+        // origin comes from the event, and if that ever stops working the
+        // callbacks fall back to the CloudFront domain -- silently, and
+        // for ATM days after the cash was handed over.
+        const region = process.env.AWS_REGION;
+        process.env.AWS_REGION = 'ap-northeast-1';
+        try {
+          await seedUser();
+          vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
+
+          const res = await app.request(
+            '/api/payment/checkout',
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ plan: 'days30', method: 'ATM' }),
+            },
+            // The third argument is hono/aws-lambda's bindings, which is
+            // the only place an API Gateway event reaches the app.
+            { event: API_GATEWAY_EVENT }
+          );
+          const { params } = (await res.json()) as { params: Record<string, string> };
+
+          expect(params.ReturnURL).toBe(
+            'https://restapi123.execute-api.ap-northeast-1.amazonaws.com/prod/api/webhook/ecpay/notify'
+          );
+          expect(params.PaymentInfoURL).toBe(
+            'https://restapi123.execute-api.ap-northeast-1.amazonaws.com/prod/api/webhook/ecpay/payment-info'
+          );
+          // Unchanged: the browser is still sent to the public domain.
+          expect(params.ClientBackURL).toBe('https://example.test/subscription/result');
+        } finally {
+          if (region === undefined) delete process.env.AWS_REGION;
+          else process.env.AWS_REGION = region;
+        }
       });
 
       it('signs the form, so neither amount nor callback can be edited', async () => {

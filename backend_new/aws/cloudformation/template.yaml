@@ -191,13 +191,35 @@ Resources:
             - IsProd
             - !Sub 'https://${SubDomain}.${Domain}'
             - !Sub 'https://${SubDomain}-${TargetEnvr}.${Domain}'
-          # The origin ECPay's own servers call, which must NOT be the
-          # CloudFront domain above. ECPay's integration notes require it:
-          # "若使用 CDN，ReturnURL 要設成來源主機的網址" -- a CDN changes the
+          # There is deliberately no ECPAY_CALLBACK_BASE_URL here, and
+          # its absence is the fix for a stack that would not deploy.
+          #
+          # ECPay's own servers must NOT be called back on the CloudFront
+          # domain above -- their integration notes require it: "若使用
+          # CDN，ReturnURL 要設成來源主機的網址", because a CDN changes the
           # source IP and filters non-browser requests, so a
           # server-to-server callback aimed at one can be refused or
-          # rewritten. This addresses the API Gateway stage directly, the
-          # same endpoint CloudFront itself uses as its origin.
+          # rewritten. The value therefore has to name the API Gateway
+          # stage, which can only be written as
+          # 'https://${RestApi}.execute-api.${AWS::Region}.amazonaws.com/...'
+          # -- and that makes this function depend on RestApi while SAM
+          # already makes RestApi depend on this function, since
+          # AWS::Serverless::Api generates a definition body with this
+          # function's ARN in its Lambda integration. CloudFormation
+          # rejects the whole stack:
+          #
+          #   Circular dependency between resources:
+          #   [CloudFrontDistribution, RestApiStage, RestApi,
+          #   ApiFunctionAnyRoutePermissionStage, Route53RecordSet,
+          #   ApiFunction, RestApiDeployment...]
+          #
+          # So the function reads its own API Gateway origin off the
+          # invocation event instead (src/middleware/apiOrigin.ts), which
+          # needs no deploy-time value at all. Setting
+          # ECPAY_CALLBACK_BASE_URL here still wins over that, so this
+          # remains the override point -- and becomes the normal path
+          # again the day the API gets a custom domain, which is a fixed
+          # name that does not reference the generated id.
           #
           # Getting this wrong is silent and expensive. For ATM and
           # convenience-store payments the callback arrives days after the
@@ -205,7 +227,6 @@ Resources:
           # a dropped notification means money taken and no access
           # granted -- with nothing in our logs, because the request never
           # arrived.
-          ECPAY_CALLBACK_BASE_URL: !Sub 'https://${RestApi}.execute-api.${AWS::Region}.amazonaws.com/${TargetEnvr}'
       Events:
         AnyRoute:
           Type: Api

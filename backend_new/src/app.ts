@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { toErrorResponse } from 'src/lib/errorResponse';
 import { adminAuth, requireAdmin } from 'src/middleware/adminAuth';
+import { apiOrigin } from 'src/middleware/apiOrigin';
 import { requestLogger } from 'src/middleware/requestLogger';
 import { requireSubscription } from 'src/middleware/requireSubscription';
 import { requireUser } from 'src/middleware/requireUser';
@@ -33,6 +34,11 @@ import { wrongQuestion } from 'src/routes/wrongQuestion';
 
 export const app = new Hono()
   .use('*', requestLogger)
+  // Before every route, because a route that builds an ECPay order needs
+  // the origin ECPay will call us back on, and that origin cannot be
+  // injected by CloudFormation without a circular dependency. See
+  // src/lib/apiOrigin.ts.
+  .use('*', apiOrigin)
   // Bound to the two paths that read the database, not /api/info/*, so the
   // health check at /api/info stays answerable with the database down.
   .use('/api/info/stats', transaction)
