@@ -1,26 +1,40 @@
 import { zValidator } from '@hono/zod-validator';
-import { and, eq } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { paymentOrderTable } from 'src/db/schema';
+import { paymentOrderTable, paymentPurchaseTable } from 'src/db/schema';
 import {
   ECPAY_PROVIDER,
+  ONE_TIME_PAYMENT_METHODS,
+  buildOneTimeCheckoutParams,
   buildPeriodCheckoutParams,
   cancelPeriodOrder,
   checkoutUrl,
   generateMerchantTradeNo,
 } from 'src/lib/ecpay';
 import {
-  ORDER_STATUS_ACTIVE,
   ORDER_STATUS_CANCELLED,
   ORDER_STATUS_CREATED,
+  findActiveOrder,
 } from 'src/lib/paymentOrder';
 import { setSubscription } from 'src/lib/subscription';
-import { findPlan } from 'src/lib/subscriptionPlan';
+import { findPlan, isDayPassPlan } from 'src/lib/subscriptionPlan';
+import {
+  PURCHASE_STATUS_CREATED,
+} from 'src/lib/paymentPurchase';
 import { BadRequestError, NotFoundError } from 'src/model/error';
 import { UserEnv } from 'src/middleware/requireUser';
 
-export const checkoutBodySchema = z.object({ plan: z.string().min(1) });
+export const checkoutBodySchema = z.object({
+  plan: z.string().min(1),
+  /**
+   * Required for a day pass, meaningless for the recurring plan (which is
+   * credit-card only, by ECPay's product). Validated against the plan
+   * below rather than by the schema, so the error says which of the two
+   * is wrong.
+   */
+  method: z.enum(ONE_TIME_PAYMENT_METHODS).optional(),
+});
 
 /**
  * Starting and replacing a recurring payment agreement.
@@ -50,20 +64,52 @@ export const payment = new Hono<UserEnv>()
     const plan = findPlan(planCode);
     if (plan === undefined) throw new NotFoundError(`unknown plan ${planCode}`, 'UNKNOWN_PLAN');
 
-    const [live] = await db
-      .select({
-        id: paymentOrderTable.id,
-        plan: paymentOrderTable.plan,
-        merchantTradeNo: paymentOrderTable.merchantTradeNo,
-      })
-      .from(paymentOrderTable)
-      .where(
-        and(
-          eq(paymentOrderTable.userId, user.id),
-          eq(paymentOrderTable.status, ORDER_STATUS_ACTIVE)
-        )
-      )
-      .limit(1);
+    /**
+     * A day pass buys days once. It creates no agreement, so none of the
+     * payment_order handling below applies -- and in particular it must
+     * not cancel a live recurring agreement here. ECPay's cancel is
+     * one-way, while an ATM or store payment can go unpaid for a week:
+     * cancelling now would leave someone who never pays with no
+     * subscription and no pass. The cancel happens once the money
+     * actually arrives, swept by housekeep rather than done inside the
+     * callback.
+     */
+    if (isDayPassPlan(plan)) {
+      const { method } = c.req.valid('json');
+      if (method === undefined)
+        throw new BadRequestError('a payment method is required', 'PAYMENT_METHOD_REQUIRED');
+
+      const now = new Date();
+      const merchantTradeNo = generateMerchantTradeNo();
+      await db.insert(paymentPurchaseTable).values({
+        userId: user.id,
+        plan: plan.code,
+        provider: ECPAY_PROVIDER,
+        merchantTradeNo,
+        // Frozen here, never re-read from the catalog: this is what was
+        // sold at this moment.
+        amount: plan.amount,
+        days: plan.days,
+        choosePayment: method,
+        status: PURCHASE_STATUS_CREATED,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      return c.json({
+        action: checkoutUrl(),
+        params: buildOneTimeCheckoutParams({
+          merchantTradeNo,
+          tradeDate: now,
+          itemName: plan.itemName,
+          tradeDesc: plan.tradeDesc,
+          amount: plan.amount,
+          method,
+        }),
+      });
+    }
+
+    const live = await findActiveOrder(db, user.id);
 
     // Re-buying the plan they are already on would just charge them
     // again for the same thing. Refused with a distinct code so the UI
@@ -123,4 +169,52 @@ export const payment = new Hono<UserEnv>()
         execTimes: plan.execTimes,
       }),
     });
+  })
+  /**
+   * The caller's own day-pass purchases, newest first.
+   *
+   * Exists because an ATM or convenience-store payer has to be able to
+   * come back for the number. They leave our site to pay, possibly days
+   * later, from a different device, and the virtual account was shown to
+   * them once on a page they have long closed. Without this the only copy
+   * is in an email ECPay may or may not have sent.
+   *
+   * Scoped to the signed-in user by the query, not by an id in the path,
+   * so there is no id to guess at and nothing to get wrong.
+   */
+  .get('/purchases', async (c) => {
+    const user = c.get('user');
+    const db = c.get('db');
+    console.log(`GET /api/payment/purchases userId=${user.id}`);
+
+    const rows = await db
+      .select({
+        id: paymentPurchaseTable.id,
+        plan: paymentPurchaseTable.plan,
+        amount: paymentPurchaseTable.amount,
+        days: paymentPurchaseTable.days,
+        choosePayment: paymentPurchaseTable.choosePayment,
+        status: paymentPurchaseTable.status,
+        paymentType: paymentPurchaseTable.paymentType,
+        bankCode: paymentPurchaseTable.bankCode,
+        vAccount: paymentPurchaseTable.vAccount,
+        paymentNo: paymentPurchaseTable.paymentNo,
+        barcode1: paymentPurchaseTable.barcode1,
+        barcode2: paymentPurchaseTable.barcode2,
+        barcode3: paymentPurchaseTable.barcode3,
+        expireAt: paymentPurchaseTable.expireAt,
+        paidAt: paymentPurchaseTable.paidAt,
+        grantedUntil: paymentPurchaseTable.grantedUntil,
+        createdAt: paymentPurchaseTable.createdAt,
+      })
+      .from(paymentPurchaseTable)
+      .where(eq(paymentPurchaseTable.userId, user.id))
+      // id as the tiebreaker: two purchases in the same millisecond are
+      // possible, and the newest is the one the payer is looking for.
+      .orderBy(desc(paymentPurchaseTable.createdAt), desc(paymentPurchaseTable.id))
+      // A person cannot plausibly have more than a handful, and the
+      // screen shows the open one plus a short history.
+      .limit(20);
+
+    return c.json({ data: rows });
   });

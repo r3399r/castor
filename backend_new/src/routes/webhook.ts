@@ -1,10 +1,21 @@
 import { eq } from 'drizzle-orm';
 import { Hono } from 'hono';
-import { paymentChargeTable, paymentOrderTable } from 'src/db/schema';
-import { ECPAY_ACK, ECPAY_PROVIDER, parseEcpayDate, verifyCheckMacValue } from 'src/lib/ecpay';
+import { paymentChargeTable, paymentOrderTable, paymentPurchaseTable } from 'src/db/schema';
+import {
+  ECPAY_ACK,
+  ECPAY_PROVIDER,
+  parseEcpayDate,
+  parseEcpayExpireDate,
+  verifyCheckMacValue,
+} from 'src/lib/ecpay';
 import { ORDER_STATUS_ACTIVE, ORDER_STATUS_FAILED } from 'src/lib/paymentOrder';
-import { renewSubscriptionPeriod } from 'src/lib/subscription';
-import { findPlan } from 'src/lib/subscriptionPlan';
+import {
+  PURCHASE_STATUS_AWAITING,
+  PURCHASE_STATUS_FAILED,
+  PURCHASE_STATUS_PAID,
+} from 'src/lib/paymentPurchase';
+import { extendSubscriptionByDays, renewSubscriptionPeriod } from 'src/lib/subscription';
+import { findDayPassPlan, findRecurringPlan } from 'src/lib/subscriptionPlan';
 import { BadRequestError } from 'src/model/error';
 import { TransactionEnv } from 'src/middleware/transaction';
 
@@ -26,6 +37,23 @@ type Payload = Record<string, string>;
 
 /** ECPay reports a declined authorisation as anything other than 1. */
 const RTN_CODE_SUCCESS = 1;
+
+/**
+ * "Result not final yet." ECPay says explicitly not to treat this as a
+ * failure and to confirm in their back office, so the purchase is left
+ * open rather than marked failed -- a later notification decides it.
+ */
+const RTN_CODE_PENDING = 10300066;
+
+/**
+ * A code or virtual account was issued -- not a payment.
+ *
+ * Two values for one event, because ECPay uses a different one for ATM
+ * than for the two store methods. Both are *success*: treating either as
+ * an error cancels an order the consumer is about to go and pay.
+ */
+const RTN_CODE_ATM_ISSUED = 2;
+const RTN_CODE_STORE_ISSUED = 10100073;
 
 /**
  * The body as ECPay actually sends it, parsed without relying on
@@ -112,11 +140,28 @@ const recordNotification = async (db: Db, payload: Payload, source: string): Pro
     .where(eq(paymentOrderTable.merchantTradeNo, merchantTradeNo))
     .limit(1);
 
-  // A notification for an order we have no record of. Retrying will not
-  // conjure one, so it is acknowledged and logged rather than left to
-  // bounce off us until ECPay gives up.
+  /**
+   * One ReturnURL serves both products, so the trade number is what says
+   * which this is: a recurring agreement's charge, or a one-time day
+   * pass. Looking in payment_order first keeps the pre-existing path
+   * untouched; the generator is shared and both columns are UNIQUE, so a
+   * number can only ever be in one of them.
+   */
   if (order === undefined) {
-    console.error(`${source}: no payment_order for merchantTradeNo=${merchantTradeNo}`);
+    const [purchase] = await db
+      .select()
+      .from(paymentPurchaseTable)
+      .where(eq(paymentPurchaseTable.merchantTradeNo, merchantTradeNo))
+      .limit(1);
+    if (purchase !== undefined) {
+      await recordDayPassPayment(db, payload, source, purchase);
+      return;
+    }
+
+    // A notification for something we have no record of at all. Retrying
+    // will not conjure one, so it is acknowledged and logged rather than
+    // left to bounce off us until ECPay gives up.
+    console.error(`${source}: no payment_order or payment_purchase for ${merchantTradeNo}`);
     return;
   }
 
@@ -182,9 +227,15 @@ const recordNotification = async (db: Db, payload: Payload, source: string): Pro
     return;
   }
 
-  const plan = findPlan(order.plan);
+  // findRecurringPlan, not findPlan: a payment_order is by definition an
+  // agreement, so a row naming a day pass would be corrupt rather than
+  // something to renew. `annual`, retired 2026-11-10, also lands here --
+  // logged and acknowledged rather than guessed at.
+  const plan = findRecurringPlan(order.plan);
   if (plan === undefined) {
-    console.error(`${source}: payment_order ${order.id} names unknown plan ${order.plan}`);
+    console.error(
+      `${source}: payment_order ${order.id} names unknown recurring plan ${order.plan}`
+    );
     return;
   }
 
@@ -209,6 +260,160 @@ const recordNotification = async (db: Db, payload: Payload, source: string): Pro
     `${source}: granted userId=${order.userId} plan=${plan.code} ` +
       `until=${period.currentPeriodEnd.toISOString()}`
   );
+};
+
+type Purchase = typeof paymentPurchaseTable.$inferSelect;
+
+/**
+ * The payment result for a one-time day pass.
+ *
+ * Deliberately does NOT cancel a live recurring agreement, even though a
+ * paid pass should stop one: that cancel is an outbound call to ECPay,
+ * and this handler runs inside a callback ECPay gives ten seconds and
+ * rate-limits (their notes: too-frequent calls answer HTTP 403 and need a
+ * 30-minute wait). Failing it would either roll back a payment that
+ * really happened, or be swallowed and leave the user charged monthly
+ * forever. So this does local work only, and the daily housekeep sweep
+ * performs the cancel with retries -- derived from state, not from a flag.
+ */
+const recordDayPassPayment = async (
+  db: Db,
+  payload: Payload,
+  source: string,
+  purchase: Purchase
+): Promise<void> => {
+  const rtnCode = Number(payload.RtnCode);
+  const now = new Date();
+
+  // Already granted. ECPay retries anything it did not get `1|OK` for, up
+  // to four times a day, so this is the normal case rather than an
+  // anomaly -- and without it a retry would grant the days twice.
+  if (purchase.status === PURCHASE_STATUS_PAID) {
+    console.log(`${source}: purchase ${purchase.id} already paid, acknowledging again`);
+    return;
+  }
+
+  if (rtnCode === RTN_CODE_PENDING) {
+    console.log(`${source}: purchase ${purchase.id} result still pending, leaving open`);
+    return;
+  }
+
+  // ECPay's back office can replay a notification as a test. It looks
+  // exactly like a real one, but no money moved, so it must not buy
+  // anything.
+  const simulatePaid = clean(payload.SimulatePaid) === '1';
+  if (rtnCode === RTN_CODE_SUCCESS && simulatePaid) {
+    console.log(`${source}: purchase ${purchase.id} simulated, granting nothing`);
+    return;
+  }
+
+  if (rtnCode !== RTN_CODE_SUCCESS) {
+    console.error(`${source}: purchase ${purchase.id} failed rtnCode=${rtnCode}`);
+    await db
+      .update(paymentPurchaseTable)
+      .set({ status: PURCHASE_STATUS_FAILED, updatedAt: now })
+      .where(eq(paymentPurchaseTable.id, purchase.id));
+    return;
+  }
+
+  // The days and the price were frozen on the purchase row, but the plan
+  // is still looked up: `days` is what to grant, and the catalog entry is
+  // what user_subscription.plan has to name.
+  const plan = findDayPassPlan(purchase.plan);
+  if (plan === undefined) {
+    console.error(`${source}: purchase ${purchase.id} names unknown day pass ${purchase.plan}`);
+    return;
+  }
+
+  const period = await extendSubscriptionByDays(
+    db,
+    purchase.userId,
+    // The stored days win over the catalog's, so re-pricing a plan never
+    // changes what an already-paid purchase bought.
+    { ...plan, days: purchase.days },
+    ECPAY_PROVIDER,
+    purchase.merchantTradeNo
+  );
+
+  await db
+    .update(paymentPurchaseTable)
+    .set({
+      status: PURCHASE_STATUS_PAID,
+      paymentType: clean(payload.PaymentType) ?? null,
+      ecpayTradeNo: clean(payload.TradeNo) ?? null,
+      paidAt: parseEcpayDate(clean(payload.PaymentDate)) ?? now,
+      grantedUntil: period.currentPeriodEnd,
+      updatedAt: now,
+    })
+    .where(eq(paymentPurchaseTable.id, purchase.id));
+
+  console.log(
+    `${source}: granted userId=${purchase.userId} plan=${purchase.plan} ` +
+      `days=${purchase.days} until=${period.currentPeriodEnd.toISOString()}`
+  );
+};
+
+/**
+ * The code or virtual account ECPay just issued for an unpaid purchase.
+ *
+ * This is not a payment and must never grant anything. It exists because
+ * the consumer cannot pay without it: ECPay posts the virtual account or
+ * store code here, and a merchant that does not implement this endpoint
+ * leaves the payer with nothing to take to the ATM.
+ */
+const recordPaymentInfo = async (db: Db, payload: Payload, source: string): Promise<void> => {
+  const merchantTradeNo = payload.MerchantTradeNo ?? '';
+  const rtnCode = Number(payload.RtnCode);
+  console.log(
+    `${source} merchantTradeNo=${merchantTradeNo} rtnCode=${rtnCode} rtnMsg=${payload.RtnMsg}`
+  );
+
+  const [purchase] = await db
+    .select()
+    .from(paymentPurchaseTable)
+    .where(eq(paymentPurchaseTable.merchantTradeNo, merchantTradeNo))
+    .limit(1);
+  if (purchase === undefined) {
+    console.error(`${source}: no payment_purchase for merchantTradeNo=${merchantTradeNo}`);
+    return;
+  }
+
+  // The payment notification can overtake this one if ECPay retries, and
+  // an already-paid purchase must not be pushed back to awaiting.
+  if (purchase.status === PURCHASE_STATUS_PAID) {
+    console.log(`${source}: purchase ${purchase.id} already paid, ignoring code issue`);
+    return;
+  }
+
+  const issued = rtnCode === RTN_CODE_ATM_ISSUED || rtnCode === RTN_CODE_STORE_ISSUED;
+  if (!issued) {
+    console.error(`${source}: purchase ${purchase.id} code issue failed rtnCode=${rtnCode}`);
+    await db
+      .update(paymentPurchaseTable)
+      .set({ status: PURCHASE_STATUS_FAILED, updatedAt: new Date() })
+      .where(eq(paymentPurchaseTable.id, purchase.id));
+    return;
+  }
+
+  await db
+    .update(paymentPurchaseTable)
+    .set({
+      status: PURCHASE_STATUS_AWAITING,
+      paymentType: clean(payload.PaymentType) ?? null,
+      ecpayTradeNo: clean(payload.TradeNo) ?? null,
+      bankCode: clean(payload.BankCode) ?? null,
+      vAccount: clean(payload.vAccount) ?? null,
+      paymentNo: clean(payload.PaymentNo) ?? null,
+      barcode1: clean(payload.Barcode1) ?? null,
+      barcode2: clean(payload.Barcode2) ?? null,
+      barcode3: clean(payload.Barcode3) ?? null,
+      // Two formats behind one field name -- see parseEcpayExpireDate.
+      expireAt: parseEcpayExpireDate(clean(payload.ExpireDate)),
+      updatedAt: new Date(),
+    })
+    .where(eq(paymentPurchaseTable.id, purchase.id));
+
+  console.log(`${source}: purchase ${purchase.id} awaiting payment`);
 };
 
 /**
@@ -237,6 +442,17 @@ export const webhook = new Hono<TransactionEnv>()
   .post('/ecpay/period', async (c) => {
     const payload = verified(parseFormBody(await c.req.text()));
     await recordNotification(c.get('db'), payload, 'POST /api/webhook/ecpay/period');
+
+    return c.text(ECPAY_ACK);
+  })
+  /**
+   * The code or virtual account for an unpaid day pass (ECPay's
+   * PaymentInfoURL). Not a payment -- the money arrives later, through
+   * /ecpay/notify, possibly a week later.
+   */
+  .post('/ecpay/payment-info', async (c) => {
+    const payload = verified(parseFormBody(await c.req.text()));
+    await recordPaymentInfo(c.get('db'), payload, 'POST /api/webhook/ecpay/payment-info');
 
     return c.text(ECPAY_ACK);
   });

@@ -48,6 +48,9 @@ services:
       # needs user (09), so the two stay in this order.
       - ../db/table/payment_order.sql:/docker-entrypoint-initdb.d/27_payment_order.sql:ro
       - ../db/table/payment_charge.sql:/docker-entrypoint-initdb.d/28_payment_charge.sql:ro
+      # Day-pass purchases. Needs only `user`, so it could sit anywhere
+      # after 09; kept beside the other payment tables.
+      - ../db/table/payment_purchase.sql:/docker-entrypoint-initdb.d/28a_payment_purchase.sql:ro
       # The donation feature. charity_organization_category needs
       # charity_category (24a), donation needs user (09), user_guardian
       # (26), charity_category and the batch table, so this whole block

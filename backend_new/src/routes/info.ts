@@ -19,7 +19,7 @@ import {
 import { DONATION_AMOUNT } from 'src/lib/donationAmount';
 import { MAX_LEVEL } from 'src/lib/guardianLevel';
 import { DEFAULT_LIMIT, genPagination, MAX_LIMIT } from 'src/lib/paginator';
-import { SUBSCRIPTION_PLANS } from 'src/lib/subscriptionPlan';
+import { PLANS } from 'src/lib/subscriptionPlan';
 import { TransactionEnv } from 'src/middleware/transaction';
 
 // Sized for the landing page's card grid (three across on a wide screen,
@@ -60,12 +60,28 @@ export const info = new Hono<TransactionEnv>()
     console.log('GET /api/info/plans');
 
     return c.json(
-      SUBSCRIPTION_PLANS.map(({ code, amount, periodType, frequency }) => ({
-        code,
-        amount,
-        periodType,
-        frequency,
-      }))
+      // Discriminated on `kind`, because the two shapes answer different
+      // questions and collapsing them would invite the client to guess.
+      // A recurring plan is "charged every N periods, indefinitely"; a day
+      // pass is "N days, once". There is no periodType that honestly
+      // describes a day pass -- 'D' with frequency 30 would read as
+      // "charged every 30 days", which is exactly what it is not.
+      PLANS.map((plan) =>
+        plan.kind === 'recurring'
+          ? {
+              kind: 'recurring' as const,
+              code: plan.code,
+              amount: plan.amount,
+              periodType: plan.periodType,
+              frequency: plan.frequency,
+            }
+          : {
+              kind: 'dayPass' as const,
+              code: plan.code,
+              amount: plan.amount,
+              days: plan.days,
+            }
+      )
     );
   })
   /**

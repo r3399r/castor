@@ -16,7 +16,12 @@
 CREATE TABLE IF NOT EXISTS castor.user_subscription (
     id INT UNSIGNED AUTO_INCREMENT,
     user_id INT UNSIGNED NOT NULL,
-    plan VARCHAR(32) NOT NULL, -- monthly, annual
+    -- monthly (recurring agreement), or days30/days90/days365 (a day
+    -- pass, which inserts a period here the same way a renewal does).
+    -- `annual` was retired on 2026-11-10 and may still appear in an old
+    -- row: entitlement reads only status and the dates, so it keeps
+    -- working, and nothing matches on this value to grant access.
+    plan VARCHAR(32) NOT NULL,
     status VARCHAR(16) NOT NULL, -- active, cancelled, expired, past_due
     current_period_start DATETIME(3) NOT NULL,
     -- Access is granted on status = 'active' AND this being in the future,

@@ -17,11 +17,13 @@ import { usePlanAmounts } from '@/hooks/usePlanAmounts'
 import { ApiError, apiFetch, apiPost } from '@/lib/api'
 import { submitCheckout } from '@/lib/checkout'
 import {
+  dayPassPaymentMethods,
   deriveSubscriptionView,
   formatPlanPrice,
   formatTaiwanDate,
   getSubscriptionPlan,
   subscriptionPlans,
+  type DayPassPaymentMethod,
   type SubscriptionPlanCode,
   type SubscriptionView,
 } from '@/lib/subscription'
@@ -106,6 +108,9 @@ function CurrentSubscriptionSummary({ view }: { view: SubscriptionView }) {
 export default function SubscriptionPageClient() {
   const { user, loading: authLoading } = useAuth()
   const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlanCode>('monthly')
+  // Only sent for a day pass. The recurring plan takes none -- ECPay's
+  // 定期定額 is credit-card only, which is the reason the passes exist.
+  const [selectedMethod, setSelectedMethod] = useState<DayPassPaymentMethod>('Credit')
   const [view, setView] = useState<SubscriptionView | null>(null)
   const [statusLoading, setStatusLoading] = useState(false)
   const [statusError, setStatusError] = useState<string | null>(null)
@@ -160,16 +165,22 @@ export default function SubscriptionPageClient() {
   // only state with nothing to offer is "already on this exact plan with
   // auto-renew on". A cancelled subscriber choosing their own plan again
   // is resubscribing, which is a new agreement and therefore allowed.
-  const alreadyOnThisPlan = view?.kind === 'active' && selectedIsCurrent
+  // Only an agreement can be "the plan you are already on": buying a
+  // second pass is a perfectly good thing to do, and the backend allows
+  // it, so the button must not refuse it.
+  const alreadyOnThisPlan =
+    view?.kind === 'active' && selectedIsCurrent && selected.kind === 'recurring'
   const actionLabel = alreadyOnThisPlan
     ? '目前使用此方案'
-    : view?.kind === 'active'
-      ? `改用${selected.name}`
-      : view?.kind === 'cancelled'
-        ? selectedIsCurrent
-          ? '重新訂閱'
-          : `改用${selected.name}`
-        : '開始訂閱'
+    : selected.kind === 'dayPass'
+      ? `購買 ${selected.name}`
+      : view?.kind === 'active'
+        ? `改用${selected.name}`
+        : view?.kind === 'cancelled'
+          ? selectedIsCurrent
+            ? '重新訂閱'
+            : `改用${selected.name}`
+          : '開始訂閱'
 
   // A purchase is never offered at a price the server has not confirmed:
   // the amount shown has to be the amount that gets charged.
@@ -189,6 +200,11 @@ export default function SubscriptionPageClient() {
     try {
       const checkout = await apiPost<PostPaymentCheckoutResponse>('payment/checkout', {
         plan: selected.code,
+        // Omitted for the recurring plan, where it is meaningless, and
+        // required for a pass -- the backend refuses one without it
+        // rather than guessing, because the order's expiry parameter
+        // depends on which method it is.
+        ...(selected.kind === 'dayPass' ? { method: selectedMethod } : {}),
       })
       // Leaves the page, so nothing after this runs on success.
       submitCheckout(checkout)
@@ -201,7 +217,7 @@ export default function SubscriptionPageClient() {
           : '無法前往付款頁面，請稍後再試。',
       )
     }
-  }, [selected.code])
+  }, [selected.code, selected.kind, selectedMethod])
 
   return (
     <>
@@ -272,6 +288,47 @@ export default function SubscriptionPageClient() {
           </div>
         </div>
 
+        {/*
+          Shown only for a day pass, and the choice is sent to ECPay as a
+          fixed ChoosePayment rather than letting their page offer
+          everything. Two reasons, both from their own documentation: they
+          add and change payment methods over time, so a fixed value keeps
+          the result notifications predictable; and the expiry parameter
+          differs per method -- StoreExpireDate means minutes for a store
+          code but days for a barcode -- so the order cannot be built
+          correctly until the method is known.
+        */}
+        {selected.kind === 'dayPass' && (
+          <div
+            className={styles.billingFieldset}
+            role="radiogroup"
+            aria-label="付款方式"
+            aria-disabled={!canChoosePlan}
+          >
+            <div className={styles.planOptions}>
+              {dayPassPaymentMethods.map((method) => (
+                <label key={method.value} className={styles.planOption}>
+                  <input
+                    type="radio"
+                    name="payment-method"
+                    value={method.value}
+                    checked={selectedMethod === method.value}
+                    disabled={!canChoosePlan}
+                    onChange={() => setSelectedMethod(method.value)}
+                  />
+                  <span className={styles.radioMark} aria-hidden="true" />
+                  <span className={styles.planOptionContent}>
+                    <span className={styles.planOptionHeading}>
+                      <strong>{method.label}</strong>
+                    </span>
+                    <small>{method.note}</small>
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className={styles.planAction}>
             {statePending ? (
             <>
@@ -291,12 +348,51 @@ export default function SubscriptionPageClient() {
             <p>付款狀態需要處理，目前無法開始或變更方案。</p>
             ) : (
             <>
+              {/*
+                Ordered by what is being bought, not by what the user
+                already has: a day pass behaves the same whatever state
+                they are in, and testing `cancelled` first used to show
+                somebody buying a pass the copy for resubscribing.
+              */}
               {!user ? (
                 <p>請先登入，才能開始訂閱。</p>
+              ) : selected.kind === 'dayPass' ? (
+                <>
+                  <p>
+                    {selected.name}為一次付費，<strong>不會自動續訂</strong>。
+                    天數會接在你目前的期限之後，已付費的天數不會損失。
+                  </p>
+                  {selectedMethod !== 'Credit' && (
+                    <p>
+                      繳費後才會開通，可能需要幾分鐘到幾小時。代碼或虛擬帳號可在
+                      <strong>個人資料頁</strong>再次查看，逾期未繳則自動失效。
+                      {/* ECPay's refund API covers credit card only; a
+                          counter or transfer payment can be refunded by
+                          hand in their back office at best, so saying so
+                          before the money moves is the honest order. */}
+                      非信用卡付款恕不提供線上退款。
+                    </p>
+                  )}
+                  {view?.kind === 'active' && (
+                    <p>
+                      你目前有自動續訂中的方案。
+                      <strong>完成付款後會自動停止自動續訂</strong>，已付費的天數不受影響。
+                    </p>
+                  )}
+                </>
               ) : view?.kind === 'cancelled' ? (
                 <p>
                   原訂閱權益可使用至 {formatTaiwanDate(view.entitlementEndsAt)}。
                   重新訂閱會立即扣款，新的訂閱期間接在該日之後開始。
+                </p>
+              ) : view?.kind === 'unmanaged' ? (
+                /* Paid days with nothing renewing them -- a pass, or a
+                   period granted by hand. Subscribing keeps them: the
+                   first charge happens now, and the agreement's period
+                   starts where the existing one ends. */
+                <p>
+                  目前的權益可使用至 {formatTaiwanDate(view.entitlementEndsAt)}，這些天數不會損失。
+                  訂閱會立即扣款，訂閱期間接在該日之後開始，之後{selected.renewalLabel}自動續訂。
                 </p>
               ) : view?.kind === 'active' ? (
                 <p>
@@ -317,7 +413,13 @@ export default function SubscriptionPageClient() {
                   // Replacing a live agreement is irreversible, so it is
                   // confirmed; a first subscription is not, because
                   // ECPay's own payment page is the next step either way.
-                  if (managedSubscription) setConfirming(true)
+                  //
+                  // A day pass is never that: it cancels nothing at
+                  // checkout, precisely because an ATM payment can go
+                  // unpaid for a week and cancelling now would leave
+                  // someone who never pays with neither. The cancel
+                  // happens after the money arrives.
+                  if (managedSubscription && selected.kind === 'recurring') setConfirming(true)
                   else startCheckout()
                 }}
               >

@@ -6,7 +6,12 @@ import { useAuth } from '@/hooks/useAuth'
 import { apiFetch } from '@/lib/api'
 import { formatTaiwanDate, getSubscriptionPlan } from '@/lib/subscription'
 import { Button, ButtonLink, ContentPanel } from '@/components/ui'
-import type { SubscriptionStatus } from '@/types/api'
+import DayPassInstructions from '@/components/DayPassInstructions'
+import type {
+  DayPassPurchase,
+  GetPaymentPurchasesResponse,
+  SubscriptionStatus,
+} from '@/types/api'
 import styles from '../subscription.module.css'
 
 /**
@@ -25,7 +30,34 @@ const POLL_INTERVAL_MS = 1500
 type Outcome =
   | { kind: 'waiting' }
   | { kind: 'active'; plan: string | null; expiresAt: string | null }
+  /**
+   * A day pass whose code has been issued and not yet paid. A terminal
+   * state for this page: nothing is coming for hours or days, so polling
+   * would only burn requests and end on a timeout message that reads as
+   * a failure.
+   */
+  | { kind: 'awaiting'; purchase: DayPassPurchase }
   | { kind: 'timeout' }
+
+/**
+ * The newest day-pass purchase still waiting to be paid, if any.
+ *
+ * Checked before the subscription poll because for ATM and store
+ * payments that poll can only ever time out -- the money has not moved,
+ * and "尚未收到付款結果" is the wrong thing to tell somebody who has not
+ * been to the counter yet.
+ *
+ * `created` counts as waiting too: ECPay posts the code to our server a
+ * moment after the order, so this is the gap between the redirect and
+ * that notification, and the right answer is to look again rather than
+ * to conclude anything.
+ */
+const findUnpaidPass = (purchases: DayPassPurchase[]): DayPassPurchase | undefined =>
+  purchases.find(
+    (purchase) =>
+      purchase.choosePayment !== 'Credit' &&
+      (purchase.status === 'awaiting' || purchase.status === 'created')
+  )
 
 export default function SubscriptionResultClient() {
   const { user, loading: authLoading, refreshSubscription } = useAuth()
@@ -48,6 +80,19 @@ export default function SubscriptionResultClient() {
           // So every gated block elsewhere stops showing its locked
           // state without the user having to reload the site.
           await refreshSubscription()
+          return
+        }
+
+        // Not subscribed yet -- which for a counter or transfer payment
+        // is simply the truth, and will stay true until they go and pay.
+        // Showing them the number beats telling them nothing arrived.
+        const purchases = await apiFetch<GetPaymentPurchasesResponse>('payment/purchases')
+        const unpaid = findUnpaidPass(purchases?.data ?? [])
+        // Only once the code exists: a `created` row has nothing to show
+        // yet, so the loop keeps waiting for ECPay to issue one.
+        if (unpaid !== undefined && unpaid.status === 'awaiting') {
+          if (runRef.current !== run) return
+          setOutcome({ kind: 'awaiting', purchase: unpaid })
           return
         }
       } catch {
@@ -83,6 +128,8 @@ export default function SubscriptionResultClient() {
       </ContentPanel>
     )
   }
+
+  if (outcome.kind === 'awaiting') return <DayPassInstructions purchase={outcome.purchase} />
 
   if (outcome.kind === 'active') {
     const plan = getSubscriptionPlan(outcome.plan)

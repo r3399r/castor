@@ -1,8 +1,8 @@
-import { and, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { paymentOrderTable } from 'src/db/schema';
 import { cancelPeriodOrder } from 'src/lib/ecpay';
-import { ORDER_STATUS_ACTIVE, ORDER_STATUS_CANCELLED } from 'src/lib/paymentOrder';
+import { ORDER_STATUS_CANCELLED, findActiveOrder } from 'src/lib/paymentOrder';
 import {
   findActiveSubscription,
   listSubscriptionHistory,
@@ -28,12 +28,23 @@ export const subscription = new Hono<UserEnv>()
     const user = c.get('user');
     console.log(`GET /api/subscription/me userId=${user.id}`);
 
-    const active = await findActiveSubscription(c.get('db'), user.id);
+    const db = c.get('db');
+    const [active, order] = await Promise.all([
+      findActiveSubscription(db, user.id),
+      findActiveOrder(db, user.id),
+    ]);
 
     return c.json({
       active: active !== undefined,
       plan: active?.plan ?? null,
       expiresAt: active?.currentPeriodEnd ?? null,
+      // Whether anything will charge the card again, which is a
+      // different question from whether they have access: a day pass
+      // grants access with no agreement behind it. The client needs this
+      // to decide whether a cancel button means anything at all --
+      // deriving it from entitlement told day-pass buyers their one-off
+      // purchase renewed every month.
+      autoRenew: order !== undefined,
     });
   })
   /**
@@ -65,16 +76,7 @@ export const subscription = new Hono<UserEnv>()
     const db = c.get('db');
     console.log(`POST /api/subscription/cancel userId=${user.id}`);
 
-    const [order] = await db
-      .select({
-        id: paymentOrderTable.id,
-        merchantTradeNo: paymentOrderTable.merchantTradeNo,
-      })
-      .from(paymentOrderTable)
-      .where(
-        and(eq(paymentOrderTable.userId, user.id), eq(paymentOrderTable.status, ORDER_STATUS_ACTIVE))
-      )
-      .limit(1);
+    const order = await findActiveOrder(db, user.id);
 
     // No agreement to stop is not an error: a subscription granted by
     // hand has no payment order behind it, and the caller's intent --
@@ -98,5 +100,9 @@ export const subscription = new Hono<UserEnv>()
       active: active !== undefined,
       plan: active?.plan ?? null,
       expiresAt: active?.currentPeriodEnd ?? null,
+      // False by definition once this route has run: either there was an
+      // agreement and it has just been cancelled, or there never was
+      // one and the caller's intent was already true.
+      autoRenew: false,
     });
   });

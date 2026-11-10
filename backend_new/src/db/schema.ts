@@ -538,6 +538,56 @@ export const paymentChargeTable = mysqlTable('payment_charge', {
   createdAt: datetime('created_at', { mode: 'date', fsp: 3 }),
 });
 
+// One one-time purchase of a fixed number of access days. Its own table
+// rather than a flavour of paymentOrder: that one is a recurring
+// agreement, with a schedule, a cancel action and UNIQUE(activeUserId) so
+// nobody holds two. A day pass has none of those, and buying a second one
+// is fine. It also spends most of its life unpaid -- an ATM or
+// convenience-store code is issued first and the money arrives whenever
+// the consumer gets round to it.
+//
+// Entitlement stays in userSubscription, which a paid pass *extends*
+// rather than adds a row to (that table allows one active row per user).
+export const paymentPurchaseTable = mysqlTable('payment_purchase', {
+  id: int('id', { unsigned: true }).autoincrement().primaryKey(),
+  userId: int('user_id', { unsigned: true })
+    .notNull()
+    .references(() => userTable.id),
+  plan: varchar('plan', { length: 32 }).notNull(),
+  provider: varchar('provider', { length: 32 }).notNull().default('ecpay'),
+  merchantTradeNo: varchar('merchant_trade_no', { length: 20 }).notNull(),
+  // Both frozen at checkout, like donation.amount: the price and the
+  // length are what was sold at that moment, and editing the catalog must
+  // not rewrite what a past purchase says was bought.
+  amount: int('amount', { unsigned: true }).notNull(),
+  days: smallint('days', { unsigned: true }).notNull(),
+  // Credit, ATM, CVS or BARCODE -- fixed per purchase, never ALL, because
+  // the expiry parameter differs per method and StoreExpireDate means
+  // minutes for CVS and days for BARCODE.
+  choosePayment: varchar('choose_payment', { length: 16 }).notNull(),
+  // created | awaiting | paid | expired | failed
+  status: varchar('status', { length: 16 }).notNull(),
+  // ECPay's own value, e.g. Credit_CreditCard or ATM_TAISHIN -- what we
+  // sent as `Credit` comes back expanded. Also what decides whether a
+  // refund is even possible: their DoAction covers credit card only.
+  paymentType: varchar('payment_type', { length: 32 }),
+  bankCode: varchar('bank_code', { length: 10 }),
+  vAccount: varchar('v_account', { length: 32 }),
+  paymentNo: varchar('payment_no', { length: 32 }),
+  barcode1: varchar('barcode_1', { length: 32 }),
+  barcode2: varchar('barcode_2', { length: 32 }),
+  barcode3: varchar('barcode_3', { length: 32 }),
+  // A moment, not the duration ECPay was sent: those units are not
+  // comparable between methods and nothing downstream should have to
+  // remember which was which.
+  expireAt: datetime('expire_at', { mode: 'date', fsp: 3 }),
+  ecpayTradeNo: varchar('ecpay_trade_no', { length: 32 }),
+  paidAt: datetime('paid_at', { mode: 'date', fsp: 3 }),
+  grantedUntil: datetime('granted_until', { mode: 'date', fsp: 3 }),
+  createdAt: datetime('created_at', { mode: 'date', fsp: 3 }),
+  updatedAt: datetime('updated_at', { mode: 'date', fsp: 3 }),
+});
+
 // A foundation or association the platform contributes to on a user's
 // behalf once they grow a spirit to max level. Curated by hand through
 // the admin UI; never deleted, because a past donation still has to

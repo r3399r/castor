@@ -17,7 +17,11 @@
 CREATE TABLE IF NOT EXISTS castor.payment_order (
     id INT UNSIGNED AUTO_INCREMENT,
     user_id INT UNSIGNED NOT NULL,
-    plan VARCHAR(32) NOT NULL, -- monthly or annual, matching user_subscription.plan
+    -- Always `monthly` now: this table is only for recurring
+    -- agreements, and `annual` was retired on 2026-11-10. A fixed number
+    -- of days is bought through payment_purchase instead, which is not
+    -- an agreement and has nothing to charge later.
+    plan VARCHAR(32) NOT NULL,
     provider VARCHAR(32) NOT NULL DEFAULT 'ecpay',
 
     -- The ECPay MerchantTradeNo: ours to generate, max 20 characters,

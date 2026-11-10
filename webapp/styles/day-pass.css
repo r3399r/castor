@@ -1,0 +1,77 @@
+/* Payment instructions for an unpaid day pass -- the virtual account or
+   store code somebody has to retype into an ATM or read to a clerk.
+   Its own file because it is the only screen in the app whose job is to
+   make a long number legible and copyable; the rest of the payment UI
+   reuses the subscription page's styles. */
+.daypass-instructions {
+  display: grid;
+  gap: 14px;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: clamp(20px, 4vw, 36px);
+}
+/* Centred and narrow is right when the panel is the whole screen, as it
+   is on the payment result page. Embedded under the subscription card it
+   has to line up with the cards around it instead. */
+.daypass-instructions--inline {
+  max-width: none;
+  margin: 16px 0 0;
+}
+.daypass-number {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 12px 14px;
+  border: var(--spirit-border);
+  border-radius: var(--radius-spirit-control);
+  background: var(--color-spirit-mist);
+}
+.daypass-number__label {
+  flex: none;
+  min-width: 72px;
+  color: var(--color-spirit-muted);
+  font-size: var(--text-spirit-small);
+}
+/* Tabular figures and generous tracking: these digits get read aloud and
+   checked against a screen one group at a time, and a proportional font
+   makes 1/7 and 0/8 harder than they need to be. */
+.daypass-number__value {
+  flex: 1 1 auto;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 1.125rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.08em;
+  word-break: break-all;
+}
+.daypass-number__copy {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 10px;
+  border: var(--spirit-border);
+  border-radius: var(--radius-spirit-small);
+  background: var(--spirit-surface);
+  color: var(--color-spirit-teal);
+  font-size: var(--text-spirit-small);
+  cursor: pointer;
+}
+.daypass-number__copy:hover {
+  background: var(--color-spirit-cream);
+}
+.daypass-number__copy:focus-visible {
+  outline: var(--spirit-focus-outline);
+  outline-offset: 2px;
+}
+@media (width < 30rem) {
+  /* The number gets its own line rather than being squeezed beside the
+     label and the button. */
+  .daypass-number {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .daypass-number__copy {
+    align-self: flex-start;
+  }
+}

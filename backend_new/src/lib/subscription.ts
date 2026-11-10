@@ -1,8 +1,11 @@
 import { and, desc, eq, gt, inArray } from 'drizzle-orm';
 import { userSubscriptionTable } from 'src/db/schema';
 import {
+  DayPassPlan,
   RENEWAL_GRACE_MS,
-  SubscriptionPlan,
+  RecurringPlan,
+  dayPassEnd,
+  findPlan,
   nominalPeriodEnd,
 } from 'src/lib/subscriptionPlan';
 import { TransactionEnv } from 'src/middleware/transaction';
@@ -252,7 +255,7 @@ export const setSubscription = async (
 export const renewSubscriptionPeriod = async (
   db: Db,
   userId: number,
-  plan: SubscriptionPlan,
+  plan: RecurringPlan,
   provider: string,
   providerRef: string
 ): Promise<{ currentPeriodStart: Date; currentPeriodEnd: Date }> => {
@@ -273,7 +276,10 @@ export const renewSubscriptionPeriod = async (
   // The furthest-out end, not the newest row: picking by recency could
   // shorten someone whose longer period was recorded first.
   const [entitled] = await db
-    .select({ currentPeriodEnd: userSubscriptionTable.currentPeriodEnd })
+    .select({
+      plan: userSubscriptionTable.plan,
+      currentPeriodEnd: userSubscriptionTable.currentPeriodEnd,
+    })
     .from(userSubscriptionTable)
     .where(
       and(
@@ -291,10 +297,21 @@ export const renewSubscriptionPeriod = async (
   // Subtracting the grace recovers the moment the previous period was
   // actually paid up to. Chaining onto the stored end instead would add
   // the grace again every cycle until it was worth more than a month.
+  //
+  // Only for a period that has grace in it. A day-pass period does not
+  // -- dayPassEnd adds exactly the days sold -- so subtracting here
+  // would start the agreement three days before the pass runs out and
+  // quietly eat three days somebody paid for.
   const currentPeriodStart =
     entitled === undefined
       ? now
-      : new Date(Math.max(now.getTime(), entitled.currentPeriodEnd.getTime() - RENEWAL_GRACE_MS));
+      : new Date(
+          Math.max(
+            now.getTime(),
+            entitled.currentPeriodEnd.getTime() -
+              (storedEndIncludesGrace(entitled.plan) ? RENEWAL_GRACE_MS : 0)
+          )
+        );
 
   if (live !== undefined)
     await db
@@ -305,6 +322,121 @@ export const renewSubscriptionPeriod = async (
   const currentPeriodEnd = new Date(
     nominalPeriodEnd(plan, currentPeriodStart).getTime() + RENEWAL_GRACE_MS
   );
+
+  await db.insert(userSubscriptionTable).values({
+    userId,
+    plan: plan.code,
+    status: SUBSCRIPTION_STATUS_ACTIVE,
+    currentPeriodStart,
+    currentPeriodEnd,
+    provider,
+    providerRef,
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  return { currentPeriodStart, currentPeriodEnd };
+};
+
+/**
+ * Whether a stored period's `current_period_end` has the renewal grace
+ * baked into it.
+ *
+ * Recurring periods do; day passes do not. The distinction matters only
+ * when chaining a new period onto an existing one: subtract the grace
+ * from a recurring end to recover the moment it was really paid up to,
+ * but subtracting it from a day pass would take back three days the user
+ * bought.
+ *
+ * A plan code no longer in the catalog -- `annual`, retired 2026-11-10 --
+ * is treated as ungraced. That errs towards three extra days rather than
+ * silently shortening access somebody paid for, which is the direction to
+ * be wrong in.
+ */
+const storedEndIncludesGrace = (planCode: string): boolean => {
+  const plan = findPlan(planCode);
+  return plan !== undefined && plan.kind === 'recurring';
+};
+
+/**
+ * Adds a day pass's days to a user's entitlement.
+ *
+ * Stacks rather than replaces: the days go onto whichever is later, now
+ * or the furthest-out period the user is still entitled to. Buying a pass
+ * while subscribed, or buying a second pass, therefore never discards
+ * time already paid for -- which is the whole reason the day-based plans
+ * exist alongside the recurring one.
+ *
+ * Mirrors renewSubscriptionPeriod's shape (close the live row, insert the
+ * next) rather than updating the existing row in place, because
+ * user_subscription is one row per period by design and the history is
+ * the point. The difference is only in where the end comes from.
+ */
+export const extendSubscriptionByDays = async (
+  db: Db,
+  userId: number,
+  plan: DayPassPlan,
+  provider: string,
+  providerRef: string
+): Promise<{ currentPeriodStart: Date; currentPeriodEnd: Date }> => {
+  const now = new Date();
+
+  // At most one, enforced by the generated activeUserId column.
+  const [live] = await db
+    .select({ id: userSubscriptionTable.id })
+    .from(userSubscriptionTable)
+    .where(
+      and(
+        eq(userSubscriptionTable.userId, userId),
+        eq(userSubscriptionTable.status, SUBSCRIPTION_STATUS_ACTIVE)
+      )
+    )
+    .limit(1);
+
+  // The furthest-out end, not the newest row -- picking by recency could
+  // shorten someone whose longer period was recorded first. A cancelled
+  // period counts: it still grants access until it runs out.
+  const [entitled] = await db
+    .select({
+      plan: userSubscriptionTable.plan,
+      currentPeriodEnd: userSubscriptionTable.currentPeriodEnd,
+    })
+    .from(userSubscriptionTable)
+    .where(
+      and(
+        eq(userSubscriptionTable.userId, userId),
+        inArray(userSubscriptionTable.status, [
+          SUBSCRIPTION_STATUS_ACTIVE,
+          SUBSCRIPTION_STATUS_CANCELLED,
+        ]),
+        gt(userSubscriptionTable.currentPeriodEnd, now)
+      )
+    )
+    .orderBy(desc(userSubscriptionTable.currentPeriodEnd))
+    .limit(1);
+
+  const currentPeriodStart =
+    entitled === undefined
+      ? now
+      : new Date(
+          Math.max(
+            now.getTime(),
+            entitled.currentPeriodEnd.getTime() -
+              (storedEndIncludesGrace(entitled.plan) ? RENEWAL_GRACE_MS : 0)
+          )
+        );
+
+  if (live !== undefined)
+    await db
+      .update(userSubscriptionTable)
+      .set({ status: 'expired', updatedAt: now })
+      .where(eq(userSubscriptionTable.id, live.id));
+
+  // No grace added. A day pass is paid up front for an exact number of
+  // days with nothing scheduled to follow it, so there is no provider
+  // clock to be out of step with -- grace here would simply be three free
+  // days on every purchase, 10% of the 30-day plan.
+  const currentPeriodEnd = dayPassEnd(plan, currentPeriodStart);
 
   await db.insert(userSubscriptionTable).values({
     userId,

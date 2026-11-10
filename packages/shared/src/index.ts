@@ -410,23 +410,116 @@ export type SubscriptionStatus = {
   active: boolean;
   plan: string | null;
   expiresAt: string | null;
-  autoRenew?: boolean | null;
+  /**
+   * Whether a recurring agreement will charge again.
+   *
+   * Not the same question as `active`, and the difference is the whole
+   * reason this field exists: a day pass grants access with no agreement
+   * behind it, so entitlement cannot tell the client whether a cancel
+   * button has anything to cancel. Inferring one from the other showed
+   * day-pass buyers "將每月自動續訂" and a cancel button that reported
+   * success while stopping nothing.
+   *
+   * True only while a `payment_order` row is active. That includes the
+   * hours between buying a day pass as an existing subscriber and
+   * housekeep cancelling the superseded agreement -- which is correct:
+   * until it is cancelled, ECPay really will charge again.
+   */
+  autoRenew: boolean;
 };
 
 // GET /api/info/plans. Public and unauthenticated, because the pricing
 // page is read before signing in. `amount` is the authoritative price in
 // NTD -- the webapp must render this rather than a constant of its own,
 // or it can show one number and charge another.
-export type SubscriptionPlanInfo = {
+//
+// Discriminated on `kind`, because the two shapes answer different
+// questions. A recurring plan is "charged every N periods, indefinitely";
+// a day pass is "N days, once". No periodType honestly describes the
+// second -- 'D' with frequency 30 reads as "charged every 30 days", which
+// is exactly what it is not.
+export type RecurringPlanInfo = {
+  kind: 'recurring';
   code: string;
   amount: number;
   periodType: 'D' | 'M' | 'Y';
   frequency: number;
 };
 
+export type DayPassPlanInfo = {
+  kind: 'dayPass';
+  code: string;
+  amount: number;
+  /** Days of access, added to whatever the user already has. */
+  days: number;
+};
+
+export type SubscriptionPlanInfo = RecurringPlanInfo | DayPassPlanInfo;
+
 export type GetInfoPlansResponse = SubscriptionPlanInfo[];
 
-export type PostPaymentCheckoutRequest = { plan: string };
+/**
+ * The payment methods a day pass accepts.
+ *
+ * Chosen before the order is created, never left to ECPay's
+ * ChoosePayment=ALL: the expiry parameter differs per method and
+ * StoreExpireDate means minutes for CVS and days for BARCODE, so one
+ * order cannot carry a correct expiry for a method nobody has picked.
+ *
+ * The recurring plan takes no method -- ECPay's 定期定額 is credit card
+ * only, which is the reason the day passes exist at all: a student with
+ * no card cannot buy the recurring plan.
+ */
+export type OneTimePaymentMethod = 'Credit' | 'ATM' | 'CVS' | 'BARCODE';
+
+export type PostPaymentCheckoutRequest = {
+  plan: string;
+  /** Required for a day pass, meaningless for the recurring plan. */
+  method?: OneTimePaymentMethod;
+};
+
+/**
+ * One day-pass purchase, from GET /api/payment/purchases.
+ *
+ * `status` is the whole state machine:
+ *   created  -- the form was handed over; nothing is reserved
+ *   awaiting -- ECPay issued a code or account. **Nothing is paid yet.**
+ *               For ATM/CVS/BARCODE this is most of the row's life.
+ *   paid     -- confirmed, and `grantedUntil` says what it bought
+ *   expired  -- the code's deadline passed unpaid
+ *   failed   -- ECPay reported a failure
+ */
+export type DayPassPurchase = {
+  id: number;
+  plan: string;
+  /** Frozen at checkout, so a re-priced plan never rewrites this. */
+  amount: number;
+  days: number;
+  choosePayment: OneTimePaymentMethod;
+  status: 'created' | 'awaiting' | 'paid' | 'expired' | 'failed';
+  /** ECPay's expanded value, e.g. `ATM_TAISHIN`. Null until paid. */
+  paymentType: string | null;
+  /** ATM. Null for every other method. */
+  bankCode: string | null;
+  vAccount: string | null;
+  /** Convenience-store code. Null for every other method. */
+  paymentNo: string | null;
+  /**
+   * Store barcode, in three segments. ECPay returns the digits only --
+   * rendering them as a scannable Code39 barcode is the client's job.
+   */
+  barcode1: string | null;
+  barcode2: string | null;
+  barcode3: string | null;
+  /** When the code stops being payable. Null before one is issued. */
+  expireAt: string | null;
+  paidAt: string | null;
+  /** What the subscription was extended to. Null until paid. */
+  grantedUntil: string | null;
+  createdAt: string | null;
+};
+
+export type GetPaymentPurchasesResponse = { data: DayPassPurchase[] };
 
 // POST /api/payment/checkout. Not a payment: it is a signed form the
 // browser has to POST to `action` so the cardholder lands on the

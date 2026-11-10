@@ -182,17 +182,30 @@ Resources:
           # defaults to stage for anything that is not exactly
           # 'production'.
           ECPAY_MODE: !Sub '{{resolve:ssm:${Project}-test-ecpay-mode}}'
-          # Origin ECPay calls back on, and the one the browser is sent
-          # back to. Derived from the same parameters as the CloudFront
-          # alias below rather than configured separately, so it cannot
-          # drift from the domain that actually serves the site -- a
-          # wrong value here means payments succeed at ECPay and are
-          # never recorded. ECPay rejects an IP address, so this has to
-          # stay a domain name.
+          # The origin a *browser* is sent back to. Derived from the same
+          # parameters as the CloudFront alias below rather than
+          # configured separately, so it cannot drift from the domain that
+          # actually serves the site. ECPay rejects an IP address, so this
+          # has to stay a domain name.
           PUBLIC_BASE_URL: !If
             - IsProd
             - !Sub 'https://${SubDomain}.${Domain}'
             - !Sub 'https://${SubDomain}-${TargetEnvr}.${Domain}'
+          # The origin ECPay's own servers call, which must NOT be the
+          # CloudFront domain above. ECPay's integration notes require it:
+          # "若使用 CDN，ReturnURL 要設成來源主機的網址" -- a CDN changes the
+          # source IP and filters non-browser requests, so a
+          # server-to-server callback aimed at one can be refused or
+          # rewritten. This addresses the API Gateway stage directly, the
+          # same endpoint CloudFront itself uses as its origin.
+          #
+          # Getting this wrong is silent and expensive. For ATM and
+          # convenience-store payments the callback arrives days after the
+          # order, once the student has already paid cash at a counter, so
+          # a dropped notification means money taken and no access
+          # granted -- with nothing in our logs, because the request never
+          # arrived.
+          ECPAY_CALLBACK_BASE_URL: !Sub 'https://${RestApi}.execute-api.${AWS::Region}.amazonaws.com/${TargetEnvr}'
       Events:
         AnyRoute:
           Type: Api

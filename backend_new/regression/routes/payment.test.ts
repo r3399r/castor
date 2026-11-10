@@ -5,6 +5,7 @@ import { closeDb, getDb } from 'src/db/client';
 import {
   paymentChargeTable,
   paymentOrderTable,
+  paymentPurchaseTable,
   userSubscriptionTable,
   userTable,
 } from 'src/db/schema';
@@ -26,9 +27,14 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 const clearTables = async () => {
   const db = getDb();
-  // Charges reference orders, orders and subscriptions reference user.
+  // Charges reference orders; orders, purchases and subscriptions all
+  // reference user. payment_purchase is cleared here even though this file
+  // never writes it: `delete from user` below fails on its foreign key if
+  // any row survives, which is what happens when a file that does write it
+  // has run first.
   await db.delete(paymentChargeTable);
   await db.delete(paymentOrderTable);
+  await db.delete(paymentPurchaseTable);
   await db.delete(userSubscriptionTable);
   await db.delete(userTable);
 };
@@ -121,7 +127,7 @@ describe('payment', () => {
       const body = (await res.json()) as { action: string; params: Record<string, string> };
 
       expect(body.action).toContain('payment-stage.ecpay.com.tw');
-      expect(body.params.TotalAmount).toBe('199');
+      expect(body.params.TotalAmount).toBe('179');
       expect(body.params.ChoosePayment).toBe('Credit');
 
       const [order] = await getDb()
@@ -164,15 +170,25 @@ describe('payment', () => {
     // ECPay cannot amend an agreement, so switching plan has to stop the
     // old one. If that call fails the whole request must roll back,
     // rather than leaving a user paying for two plans.
+    //
+    // The live order names `annual`, which the catalog no longer offers.
+    // That is not a contrivance to keep this test alive: it is the only
+    // shape this branch can still take now that there is one recurring
+    // plan, and it is what a subscriber on the retired yearly plan
+    // actually hits when they buy the current one.
     it('stops the previous agreement when switching plan', async () => {
       const userId = await seedUser();
-      await seedOrder(userId, { status: 'active', merchantTradeNo: 'CSOLD1' });
+      await seedOrder(userId, {
+        status: 'active',
+        merchantTradeNo: 'CSOLD1',
+        plan: 'annual',
+      });
       vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
 
       const res = await app.request('/api/payment/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan: 'annual' }),
+        body: JSON.stringify({ plan: 'monthly' }),
       });
       expect(res.status).toBe(200);
       expect(vi.mocked(cancelPeriodOrder)).toHaveBeenCalledWith('CSOLD1');
@@ -186,14 +202,18 @@ describe('payment', () => {
 
     it('rolls everything back when ECPay refuses the cancellation', async () => {
       const userId = await seedUser();
-      await seedOrder(userId, { status: 'active', merchantTradeNo: 'CSOLD1' });
+      await seedOrder(userId, {
+        status: 'active',
+        merchantTradeNo: 'CSOLD1',
+        plan: 'annual',
+      });
       vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
       vi.mocked(cancelPeriodOrder).mockRejectedValue(new Error('ECPay said no'));
 
       const res = await app.request('/api/payment/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan: 'annual' }),
+        body: JSON.stringify({ plan: 'monthly' }),
       });
       expect(res.status).toBe(500);
 
@@ -581,12 +601,47 @@ describe('payment', () => {
   });
 
   describe('GET /api/info/plans', () => {
+    type PlanInfo = {
+      kind: string;
+      code: string;
+      amount: number;
+      periodType?: string;
+      frequency?: number;
+      days?: number;
+    };
+
     it('is readable without signing in, since the pricing page is', async () => {
       const res = await app.request('/api/info/plans');
       expect(res.status).toBe(200);
-      const plans = (await res.json()) as { code: string; amount: number }[];
-      expect(plans.map((p) => p.code)).toEqual(['monthly', 'annual']);
-      expect(plans[0].amount).toBe(199);
+      const plans = (await res.json()) as PlanInfo[];
+      expect(plans.map((p) => p.code)).toEqual(['monthly', 'days30', 'days90', 'days365']);
+    });
+
+    it('states the amount for every plan, since the client renders no price of its own', async () => {
+      // The whole reason this endpoint exists: a price shown in one place
+      // and signed in another is a bug that charges a real card the wrong
+      // number.
+      const plans = (await (await app.request('/api/info/plans')).json()) as PlanInfo[];
+      expect(plans.find((p) => p.code === 'monthly')?.amount).toBe(179);
+      expect(plans.find((p) => p.code === 'days30')?.amount).toBe(199);
+      expect(plans.find((p) => p.code === 'days90')?.amount).toBe(549);
+      expect(plans.find((p) => p.code === 'days365')?.amount).toBe(1999);
+    });
+
+    it('describes the two kinds differently, so the client need not guess', async () => {
+      // A recurring plan is "charged every N periods, indefinitely"; a day
+      // pass is "N days, once". There is no periodType that honestly
+      // describes the second -- 'D' with frequency 30 reads as "charged
+      // every 30 days", which is exactly what it is not.
+      const plans = (await (await app.request('/api/info/plans')).json()) as PlanInfo[];
+
+      const monthly = plans.find((p) => p.code === 'monthly')!;
+      expect(monthly).toMatchObject({ kind: 'recurring', periodType: 'M', frequency: 1 });
+      expect(monthly.days).toBeUndefined();
+
+      const pass = plans.find((p) => p.code === 'days90')!;
+      expect(pass).toMatchObject({ kind: 'dayPass', days: 90 });
+      expect(pass.periodType).toBeUndefined();
     });
   });
 });

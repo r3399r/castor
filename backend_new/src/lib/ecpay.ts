@@ -56,15 +56,64 @@ const endpoints = () =>
 export const checkoutUrl = (): string => endpoints().checkout;
 
 /**
- * Public origin of the deployed site, used to build the three URLs ECPay
- * calls back on. One variable rather than three because CloudFront
- * serves the webapp and /api/* from the same distribution. ECPay
- * requires a domain name here -- an IP is rejected.
+ * Public origin of the deployed site: the domain a person types, and
+ * therefore the one every URL ECPay sends a *browser* to must use.
+ * ECPay requires a domain name here -- an IP is rejected.
  */
 const baseUrl = (): string => requiredEnv('PUBLIC_BASE_URL').replace(/\/+$/, '');
 
-export const returnUrl = (): string => `${baseUrl()}/api/webhook/ecpay/notify`;
-export const periodReturnUrl = (): string => `${baseUrl()}/api/webhook/ecpay/period`;
+/**
+ * Origin for the URLs ECPay's own servers call, which is deliberately
+ * NOT the public domain.
+ *
+ * ECPay's integration notes say it outright: "若使用 CDN，ReturnURL 要
+ * 設成來源主機的網址" -- point a server-to-server callback at a CDN and
+ * it may be refused or rewritten, because a CDN changes the source IP and
+ * filters non-browser requests. The public domain here is CloudFront, so
+ * these have to address the API Gateway stage directly.
+ *
+ * Falls back to the public origin when unset, which keeps local runs and
+ * tests working with one variable; a deployed stack always sets it (see
+ * ECPAY_CALLBACK_BASE_URL in the CloudFormation template). The failure
+ * this guards against is the worst kind in this feature: for ATM and
+ * convenience-store payments the callback arrives days later, after the
+ * student has already handed over cash, so a dropped notification means
+ * money taken and nothing granted.
+ */
+const callbackBaseUrl = (): string =>
+  (process.env.ECPAY_CALLBACK_BASE_URL ?? requiredEnv('PUBLIC_BASE_URL')).replace(/\/+$/, '');
+
+export const returnUrl = (): string => `${callbackBaseUrl()}/api/webhook/ecpay/notify`;
+export const periodReturnUrl = (): string => `${callbackBaseUrl()}/api/webhook/ecpay/period`;
+/**
+ * Where ECPay posts the code or virtual account it just issued, which is
+ * not a payment -- the money has not moved yet. Missing this endpoint
+ * means the consumer never learns what to pay.
+ */
+export const paymentInfoUrl = (): string => `${callbackBaseUrl()}/api/webhook/ecpay/payment-info`;
+
+/**
+ * The browser destination, on the public domain.
+ *
+ * The only one of ECPay's three browser parameters this codebase uses,
+ * and the reason is the webapp itself: it is a static export on S3, which
+ * cannot answer an HTTP POST at all.
+ *
+ *   ClientBackURL      -- plain GET, carries no result. Safe.
+ *   OrderResultURL     -- POSTs the result to us. Would 405, and ECPay
+ *                         does not support it for ATM/CVS/BARCODE anyway.
+ *   ClientRedirectURL  -- documented as returning the payment details to
+ *                         the client. Whether that is a GET or a POST is
+ *                         not stated on any page I could read (the
+ *                         parameter's own page 404s), so it is not used:
+ *                         the option that cannot break is worth more than
+ *                         the automatic redirect it would buy.
+ *
+ * Nothing is passed through the browser as a result. This page finds out
+ * what happened by asking our own API -- GET /api/payment/purchases for a
+ * day pass, the subscription status for an agreement -- which is also the
+ * only trustworthy source, since the browser never sees ECPay's signature.
+ */
 export const clientBackUrl = (): string => `${baseUrl()}/subscription/result`;
 
 /**
@@ -169,14 +218,40 @@ export const parseEcpayDate = (value: string | undefined): Date | null => {
 };
 
 /**
+ * ECPay's `ExpireDate`, which is not one format.
+ *
+ * For ATM it is `yyyy/MM/dd` and the deadline is the end of that day --
+ * their own example: an order placed 7/1 with three days expires "7/4
+ * 23:59". For CVS it is `yyyy/MM/dd HH:mm:ss` and means exactly that
+ * moment. Reading the date-only form as midnight would cut a full day
+ * off every ATM payer's window, and the ones it would cut off are the
+ * people paying on the last day.
+ */
+export const parseEcpayExpireDate = (value: string | undefined): Date | null => {
+  if (value === undefined) return null;
+  const trimmed = value.trim();
+
+  const withTime = parseEcpayDate(trimmed);
+  if (withTime !== null) return withTime;
+
+  const m = /^(\d{4})\/(\d{2})\/(\d{2})$/.exec(trimmed);
+  if (m === null) return null;
+  return new Date(
+    Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 23, 59, 59) - TAIPEI_OFFSET_MS
+  );
+};
+
+/**
  * A MerchantTradeNo: ours to invent, at most 20 characters, letters and
  * digits only, and unique forever because ECPay rejects a reused one.
  *
  * Time-ordered prefix so the orders sort usefully in ECPay's back
  * office, with random bytes after it because two checkouts in the same
  * millisecond are possible and the collision would only surface at their
- * gateway. payment_order.merchant_trade_no is UNIQUE as well, so a
- * collision fails here instead.
+ * gateway. merchant_trade_no is UNIQUE on both payment_order and
+ * payment_purchase, so a collision fails on insert instead -- and the two
+ * tables share this one generator precisely so that a notification can be
+ * matched by looking in one table and then the other.
  */
 export const generateMerchantTradeNo = (): string =>
   `CS${Date.now().toString(36)}${crypto.randomBytes(4).toString('hex')}`.toUpperCase().slice(0, 20);
@@ -261,6 +336,85 @@ export const buildPeriodCheckoutParams = (input: PeriodCheckoutInput): Record<st
     ExecTimes: String(input.execTimes),
     PeriodReturnURL: periodReturnUrl(),
   };
+
+  return { ...params, CheckMacValue: genCheckMacValue(params) };
+};
+
+/** The methods offered for a one-time day-pass payment. */
+export const ONE_TIME_PAYMENT_METHODS = ['Credit', 'ATM', 'CVS', 'BARCODE'] as const;
+export type OneTimePaymentMethod = (typeof ONE_TIME_PAYMENT_METHODS)[number];
+
+/**
+ * How long an unpaid code or virtual account stays payable, per method.
+ *
+ * The units are not a typo and not ours. ECPay uses a different parameter
+ * for ATM than for the two store methods, and the one it shares between
+ * those two means different things:
+ *
+ *   ATM      ExpireDate       days    (1-60, default 3)
+ *   CVS      StoreExpireDate  MINUTES (default 10080 = 7d, capped 43200)
+ *   BARCODE  StoreExpireDate  days    (1-30, default 7, longer needs approval)
+ *
+ * Seven days for all three, expressed in whatever unit the method wants.
+ * This is the single strongest reason the payment method is chosen before
+ * the order is created rather than left to ChoosePayment=ALL: one order
+ * cannot carry a correct expiry for a method nobody has picked yet, and
+ * `StoreExpireDate: 7` would silently mean seven *minutes* to a
+ * convenience-store payer.
+ */
+const UNPAID_DAYS = 7;
+
+export type OneTimeCheckoutInput = {
+  merchantTradeNo: string;
+  tradeDate: Date;
+  itemName: string;
+  tradeDesc: string;
+  amount: number;
+  method: OneTimePaymentMethod;
+};
+
+/**
+ * The hidden form fields the browser POSTs to ECPay for a single payment.
+ *
+ * Same AIO endpoint and signature as the recurring form; what differs is
+ * that nothing is scheduled, and that three of the four methods do not
+ * take the money now. For those, ECPay issues a code, posts it to
+ * PaymentInfoURL, and only notifies ReturnURL once the consumer actually
+ * pays -- which may be a week later.
+ */
+export const buildOneTimeCheckoutParams = (
+  input: OneTimeCheckoutInput
+): Record<string, string> => {
+  const params: Record<string, string> = {
+    MerchantID: requiredEnv('ECPAY_MERCHANT_ID'),
+    MerchantTradeNo: input.merchantTradeNo,
+    MerchantTradeDate: formatEcpayDate(input.tradeDate),
+    PaymentType: 'aio',
+    TotalAmount: String(input.amount),
+    TradeDesc: input.tradeDesc,
+    ItemName: input.itemName,
+    ReturnURL: returnUrl(),
+    // A fixed method, never ALL. ECPay's own guidance is that they add and
+    // change payment methods over time, so a fixed value is what keeps
+    // result notifications predictable -- and the expiry parameters above
+    // cannot be set correctly without knowing the method.
+    ChoosePayment: input.method,
+    EncryptType: '1',
+  };
+
+  // A plain GET back to our page, for every method -- see clientBackUrl
+  // for why neither OrderResultURL nor ClientRedirectURL is used.
+  params.ClientBackURL = clientBackUrl();
+
+  if (input.method !== 'Credit') {
+    // Without this ECPay has nowhere to post the code it issues, and the
+    // payer never learns what to pay.
+    params.PaymentInfoURL = paymentInfoUrl();
+
+    if (input.method === 'ATM') params.ExpireDate = String(UNPAID_DAYS);
+    else if (input.method === 'CVS') params.StoreExpireDate = String(UNPAID_DAYS * 24 * 60);
+    else params.StoreExpireDate = String(UNPAID_DAYS);
+  }
 
   return { ...params, CheckMacValue: genCheckMacValue(params) };
 };
