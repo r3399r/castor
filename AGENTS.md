@@ -4,10 +4,9 @@ Guidance for AI coding agents (Claude Code, Codex, Cursor, etc.) working in this
 
 ## Project structure
 
-npm workspaces monorepo (`webapp`, `backend`, `backend_new`, `packages/*`):
+npm workspaces monorepo (`webapp`, `backend_new`, `packages/*`):
 
 - `backend_new/` — **active** backend (Hono + Drizzle ORM + MySQL, deployed as AWS Lambdas). Do new backend work here.
-- `backend/` — legacy backend (TypeORM + Inversify). Being phased out; avoid adding to it unless asked.
 - `webapp/` — Next.js 15 (App Router) admin/user web frontend.
 - `mobile/` — Flutter app.
 - `db/` — raw SQL table definitions (`db/table/*.sql`), also used to seed the local Docker MySQL for `backend_new` tests.
@@ -47,12 +46,11 @@ thing it describes has at least one failure mode that produces no error.
 - Do not modify production database structure directly.
 - Data backfills/seeds belong in `db/script/<version>/`, not in application code. `docker-compose.yml` mounts them after the table DDL (`9x_` prefixes) so a fresh local DB is not empty.
 - A seed containing non-ASCII text must start with `SET NAMES utf8mb4;`. The client that `docker-entrypoint-initdb.d` runs it with takes its charset from the container environment, which is latin1, so every Chinese character is silently double-encoded — 暖陽之蛋 lands as 12 characters, 29 bytes, nothing errors, and the rows read as mojibake forever after. `char_length()` is how you tell that apart from a terminal that simply cannot print CJK.
-- `backend/` (legacy) entities in `src/model/entity/` are not the source of truth; do not add tables there.
 - There is no migration tool. A new table in `db/table/*.sql` reaches a real environment only when someone runs the DDL by hand, and reaches the local test DB only on a fresh volume (`docker-entrypoint-initdb.d` does not re-run) — so also add the file to `backend_new/docker-compose.yml` and tell the user to run it against prod. Say so explicitly when a deploy would otherwise ship code that queries a table that is not there yet.
 
 ### Backend
 
-- Do new backend work in `backend_new/`. Treat `backend/` as legacy — change it only when the task explicitly targets it.
+- All backend work happens in `backend_new/`. The legacy TypeORM/Inversify backend was deleted on 2026-11-12 after confirming that every path the webapp calls is served by `backend_new` and that nothing in CI or `deploy.sh` built it; `git log -- backend/` still has it.
 - API contracts must stay backward compatible unless the task explicitly requires a breaking change; `webapp/` and `mobile/` both consume them.
 - Validate request input with zod in the route file, and throw `HttpError` subclasses from `src/model/error/` rather than returning ad-hoc error responses.
 - Do not bypass the middleware chain in `src/app.ts` (`adminAuth` / `requireAdmin` / `transaction` / `requireUser` / `requireSubscription`). New routes go behind the same chain as comparable existing routes.
@@ -277,7 +275,6 @@ already.
 | An object is stored in the public bucket under a new prefix | `castor-public-bucket`’s policy grants public `s3:GetObject` on **`questions/*` only**, and the bucket is not managed by this template, so the policy is edited by hand. Anything written outside that prefix uploads successfully and then answers 403 to every browser — a broken image with no error logged anywhere. Keep new objects under `questions/` (figures go to `questions/figures/`) or get the policy widened first. Check with `curl -o /dev/null -w "%{http_code}" https://castor-public-bucket.s3.ap-east-2.amazonaws.com/<key>`. |
 | The accepted image types for a question figure change | Two lists must agree: `QUESTION_FIGURE_MIME_TYPES` in `src/routes/question.ts` and `ACCEPTED_MIME_TYPES` in `webapp/components/QuestionFigurePanel.tsx`. It is deliberately narrower than the screenshot uploader’s list, which feeds Gemini: a figure ends up in an `<img>` a student views, so PDF cannot work at all and HEIC/HEIF decode only on Apple platforms — both would upload successfully and then display as nothing. |
 | Anything touching the LV5 public-contribution promise | Read `DONATION.md` first — it carries the decisions and their reasons. Six tables and five routes exist — `/api/charity-category` (read-only; the rows are seeded and joined to the egg species by `code`, so new ones go in through SQL), `/api/charity-organization`, `/api/donation`, `/api/info/donation` and the admin-only `/api/donation-batch` — plus two admin pages (`/admin/charity-organization`, `/admin/donation-batch`), the real user flow (`app/box/DonationFlow.tsx`) and the public record at `/impact`. The feature is complete end to end **except** that evidence files are written under the S3 `donations/` prefix, which the bucket policy does not grant public read on yet, so they upload fine and answer 403 to every browser. `GET /api/charity-organization/suggest?categoryId=` picks the least-supported active organisation for a user with no preference — a suggestion only, because the record and the public page both name the organisation, so it is filled into the choose screen rather than decided inside `POST /api/donation`. It is declared before `/:id`; swapping them makes it `Number('suggest')` = NaN. A batch becomes public only through `PUT /api/donation-batch/:id/publish`, which refuses one that transferred less than its donations' subtotal or carries no evidence — `/api/info/donation` reports `platformTopUp` signed rather than clamped because of that guard, so weakening it breaks the public page's arithmetic. The cap is per **species** (`user_guardian`'s UNIQUE), not per category: adding an egg raises every user's ceiling by one donation. `donation.amount` is frozen at confirmation and must never be re-rendered from `DONATION_AMOUNT`. |
-| Shared types in `packages/shared` change | `backend/` (legacy) has not compiled for some time (10 errors, 8 of them pre-dating recent work). Do not "fix" it unasked, and do not read new errors there as a regression you caused. |
 
 ## Commands
 
@@ -310,7 +307,7 @@ Deploy: `./deploy.sh <env>` (run from repo root, requires AWS creds) — builds+
 - **`adminAuth`** only gates mutating methods (POST/PUT/DELETE) against a hard-coded email allowlist (`ADMIN_EMAILS` in `src/middleware/adminAuth.ts`) — GETs pass through. `requireAdmin` gates everything, for PII-bearing resources.
 - **`requireSubscription`** must run after `requireUser` (it reads the resolved user row) and gates the subscriber-only `/api/analysis/*`. See *Subscription and paid features* above before changing anything it depends on.
 - **`transaction`**: every request in a transaction-wrapped route runs inside one Drizzle `db.transaction()`. Because Hono's `onError` intercepts thrown errors before they propagate back through the callback, the middleware checks `c.error` after `next()` and rethrows it so Drizzle rolls back instead of auto-committing — don't remove that check when touching this file.
-- **`requestLogger`**: best-effort, fires an SQS message to the same queue/consumer as the legacy backend. It's a no-op locally (`@hono/node-server` doesn't populate `c.env.event`) and only acts on real API Gateway REST events.
+- **`requestLogger`**: best-effort, fires an SQS message to `polaris-<env>-logger-queue` — a queue owned by another project, which is why no template here defines it and why deleting the legacy backend did not affect it. It's a no-op locally (`@hono/node-server` doesn't populate `c.env.event`) and only acts on real API Gateway REST events.
 - **Errors**: routes throw subclasses of `HttpError` (`src/model/error/*`); `toErrorResponse` (`src/lib/errorResponse.ts`) maps them to `{status, name, message, code}` JSON in the app's `onError` handler. Anything not an `HttpError` becomes a generic 500.
 - **DB access**: `getDb()` (`src/db/client.ts`) lazily creates one connection pool per warm Lambda container and never tears it down between invocations — pool size is capped via `DB_POOL_SIZE` per-container, not globally, so raising it multiplies against concurrent warm containers. `closeDb()` is test-only teardown.
 - **Routes** (`src/routes/*.ts`) are self-contained Hono sub-apps: zod schemas for validation, Drizzle queries, exported for reuse in tests. Multi-entity reads (e.g. `category`'s `/:id/subject`) favor a few flat batched queries over N+1 composition.

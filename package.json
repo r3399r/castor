@@ -3,7 +3,6 @@
   "private": true,
   "workspaces": [
     "webapp",
-    "backend",
     "backend_new",
     "packages/*"
   ],
