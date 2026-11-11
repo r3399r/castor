@@ -36,7 +36,20 @@ import { artworkByCode, spiritCatalog, type SpiritSpecies } from '@/lib/guardian
 import { apiFetch, apiPost } from '@/lib/api'
 import { useAuth } from '@/contexts/AuthContext'
 import SupportNote from './SupportNote'
-import type { Guardian } from '@/types/api'
+/**
+ * Runtime code comes straight from the shared package, never through
+ * `@/types/api`.
+ *
+ * That barrel is `export * from '@castor/shared'`, so this would work
+ * either way -- but it is the webapp's type barrel, used for types by
+ * every other screen, and an import of a *function* from a file called
+ * `types` reads like a type-only import that the compiler erases. The
+ * growth bonus is the first runtime code the shared package has ever
+ * carried; keeping its import path visibly different is what stops the
+ * next reader from assuming otherwise.
+ */
+import { investmentXp, pointsForXp } from '@castor/shared'
+import type { Guardian, PostGuardianInvestResponse } from '@/types/api'
 import { DonationDemoBox } from './DonationDemo'
 import { DonationEntry } from './DonationFlow'
 
@@ -151,15 +164,30 @@ function RealBoxClient() {
   const availablePoints = totalPoints
   const level = guardian?.level ?? 1
   const complete = level >= MAX_LEVEL
-  const pointsUntilNextLevel =
+  // `entitled`, not `active`: cancelling auto-renew flips the period to
+  // `cancelled` immediately while the days already paid for keep running,
+  // so `active` goes false for someone who still has paid access -- and
+  // the server grants them the bonus regardless of what this says. A day
+  // pass reports both, having no agreement to cancel in the first place.
+  const hasMemberExperienceBonus = subscription?.entitled === true
+  const xpUntilNextLevel =
     guardian === undefined || guardian.nextLevelXp === null
       ? 0
       : Math.max(guardian.nextLevelXp - guardian.xp, 0)
+  /**
+   * Points, not XP: the growth bonus means these differ for a subscriber.
+   *
+   * This is both the cap and the figure shown as the amount this stage
+   * still needs, so it has to be what the user would actually spend --
+   * 2,273 points for a 2,500 XP gap, not 2,500. If the entitlement flag
+   * here is stale the cap is merely 10% generous or 10% tight; the grant
+   * is the server's own, computed from its own lookup.
+   */
+  const pointsUntilNextLevel = pointsForXp(xpUntilNextLevel, hasMemberExperienceBonus)
   const maxInvestablePoints = Math.min(availablePoints, pointsUntilNextLevel)
   const shownLevel = previewLevel ?? level
-  const hasMemberExperienceBonus = subscription?.active === true
-  const memberBonusXp = Number((pointsToUse * 0.1).toFixed(1))
-  const totalExperienceXp = Number((pointsToUse + memberBonusXp).toFixed(1))
+  const totalExperienceXp = investmentXp(pointsToUse, hasMemberExperienceBonus)
+  const memberBonusXp = totalExperienceXp - pointsToUse
 
   useEffect(() => {
     setPointsToUse((value) => {
@@ -206,12 +234,26 @@ function RealBoxClient() {
 
   const confirmInvest = async () => {
     if (guardian === undefined) return
-    const reachesNextLevel =
-      guardian.nextLevelXp !== null && pointsToUse >= pointsUntilNextLevel
     setBusy(true)
     setActionError(null)
+    /**
+     * Whether to celebrate is read off the response, not predicted from
+     * `pointsToUse >= pointsUntilNextLevel`.
+     *
+     * That prediction was wrong for exactly the people the growth bonus
+     * is for: with the bonus counted, 2,273 points reach a 2,500 XP
+     * threshold, so a subscriber investing anything in 2,273..2,499
+     * levelled up on the server while the client concluded they had not
+     * -- the new level simply appeared after the refresh, with no
+     * celebration. Comparing levels cannot drift, and it is also right
+     * when the client's own idea of entitlement is stale.
+     */
+    let result
     try {
-      await apiPost(`guardian/${guardian.id}/invest`, { points: pointsToUse })
+      result = await apiPost<PostGuardianInvestResponse>(
+        `guardian/${guardian.id}/invest`,
+        { points: pointsToUse }
+      )
     } catch {
       setActionError('投入失敗，請稍後再試一次。')
       setBusy(false)
@@ -219,10 +261,10 @@ function RealBoxClient() {
     }
     setShowInvestDialog(false)
     setBusy(false)
-    if (reachesNextLevel) {
+    if (result.guardian.level > guardian.level) {
       setLevelUpCelebration({
         name: artwork ? spiritCatalog[artwork].name : guardian.name,
-        level: Math.min(guardian.level + 1, MAX_LEVEL),
+        level: Math.min(result.guardian.level, MAX_LEVEL),
         species: artwork,
       })
     }
@@ -941,8 +983,8 @@ function TransactionSummary({
 }
 
 function MemberExperienceBonus({ amount }: { amount: number }) {
-  const bonus = Number((amount * 0.1).toFixed(1))
-  const total = Number((amount + bonus).toFixed(1))
+  const total = investmentXp(amount, true)
+  const bonus = total - amount
   return (
     <div className="sp-member-bonus sp-member-bonus--dialog">
       <Badge tone="growth">訂閱會員 +10%</Badge>

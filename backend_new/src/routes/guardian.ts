@@ -9,7 +9,8 @@ import {
   userGuardianTable,
   userTable,
 } from 'src/db/schema';
-import { LEVEL_XP_THRESHOLDS, MAX_LEVEL, nextLevelXp } from 'src/lib/guardianLevel';
+import { LEVEL_XP_THRESHOLDS, MAX_LEVEL, investmentXp, nextLevelXp } from 'src/lib/guardianLevel';
+import { findEntitledSubscription } from 'src/lib/subscription';
 import { BadRequestError, NotFoundError } from 'src/model/error';
 import { UserEnv } from 'src/middleware/requireUser';
 
@@ -121,17 +122,30 @@ export const guardian = new Hono<UserEnv>()
     if (existing.level >= MAX_LEVEL) throw new BadRequestError('guardian is already at max level', 'ALREADY_MAX_LEVEL');
     if (user.totalPoints < points) throw new BadRequestError('insufficient points', 'INSUFFICIENT_POINTS');
 
-    // Every invested point becomes xp 1:1. Levels up as many times as the
-    // xp covers in one call (a single large investment can jump multiple
-    // levels). Once MAX_LEVEL is reached, any xp beyond the final
-    // threshold is simply not tracked further -- there's no level left
-    // for it to count toward, and further invests are rejected above once
-    // level === MAX_LEVEL, so it could never be spent anyway. The full
-    // requested `points` is still deducted regardless (no partial refund
-    // for that discarded remainder) -- matches this codebase's other
-    // spends, which never partially fail once the up-front checks pass.
+    // Paid access earns the growth bonus the box and subscription pages
+    // promise. Read here rather than taken from the client: the request
+    // body carries only `points`, and the bonus is value being granted,
+    // so the only acceptable source is the server's own entitlement
+    // lookup. findEntitledSubscription, not findActiveSubscription --
+    // the same question requireSubscription asks, so a cancelled
+    // agreement still inside its paid period earns it, and a day pass
+    // does too.
+    const entitled = await findEntitledSubscription(db, user.id);
+    const xpGained = investmentXp(points, entitled !== undefined);
+
+    // Every invested point becomes at least 1 xp, plus the bonus above.
+    // Levels up as many times as the xp covers in one call (a single
+    // large investment can jump multiple levels). Once MAX_LEVEL is
+    // reached, any xp beyond the final threshold is simply not tracked
+    // further -- there's no level left for it to count toward, and
+    // further invests are rejected above once level === MAX_LEVEL, so it
+    // could never be spent anyway. The full requested `points` is still
+    // deducted regardless (no partial refund for that discarded
+    // remainder, and the bonus is never a discount) -- matches this
+    // codebase's other spends, which never partially fail once the
+    // up-front checks pass.
     let level = existing.level;
-    let xp = existing.xp + points;
+    let xp = existing.xp + xpGained;
     while (level < MAX_LEVEL && xp >= LEVEL_XP_THRESHOLDS[level - 1]) {
       xp -= LEVEL_XP_THRESHOLDS[level - 1];
       level++;
@@ -171,5 +185,9 @@ export const guardian = new Hono<UserEnv>()
         xp,
       }),
       totalPoints: newTotalPoints,
+      // What was actually granted, so the client can state the outcome
+      // instead of re-deriving it from a rate it would have to keep in
+      // step with the server's rounding.
+      xpGained,
     });
   });

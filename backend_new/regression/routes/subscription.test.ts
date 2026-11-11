@@ -111,7 +111,45 @@ describe('subscription', () => {
       vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
 
       const res = await app.request('/api/subscription/me');
-      expect(await res.json()).toMatchObject({ active: false });
+      expect(await res.json()).toMatchObject({ active: false, entitled: false });
+    });
+
+    /**
+     * `entitled`, which is what the client gates subscriber-only UI on.
+     *
+     * It answers a different question from `active`, and the two
+     * diverge in exactly one state -- which is also the state nobody
+     * remembers to check. Reading `active` instead showed a
+     * cancelled-but-paid user the free-member treatment on features the
+     * API was serving them perfectly happily.
+     */
+    it('reports entitled:true while a cancelled period is still paid for', async () => {
+      const userId = await seedUser();
+      await grant(userId, { status: 'cancelled' });
+      vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
+
+      const res = await app.request('/api/subscription/me');
+      expect(await res.json()).toMatchObject({ active: false, entitled: true });
+    });
+
+    it('reports entitled:false once a cancelled period has run out', async () => {
+      const userId = await seedUser();
+      await grant(userId, { status: 'cancelled', endsInDays: -1 });
+      vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
+
+      const res = await app.request('/api/subscription/me');
+      expect(await res.json()).toMatchObject({ active: false, entitled: false });
+    });
+
+    it('reports both for a live agreement', async () => {
+      // So an inverted `entitled` cannot pass on the cancelled cases
+      // alone.
+      const userId = await seedUser();
+      await grant(userId, {});
+      vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
+
+      const res = await app.request('/api/subscription/me');
+      expect(await res.json()).toMatchObject({ active: true, entitled: true });
     });
   });
 

@@ -7,6 +7,7 @@ import {
   guardianTable,
   pointTransactionTable,
   userGuardianTable,
+  userSubscriptionTable,
   userTable,
 } from 'src/db/schema';
 
@@ -25,7 +26,7 @@ type GuardianDto = {
   category: { id: number; name: string } | null;
 };
 type GetGuardianResponse = { data: GuardianDto[]; totalPoints: number };
-type PostInvestResponse = { guardian: GuardianDto; totalPoints: number };
+type PostInvestResponse = { guardian: GuardianDto; totalPoints: number; xpGained: number };
 type ErrorBody = { message: string; code?: string };
 
 const getGuardians = () => app.request('/api/guardian');
@@ -43,9 +44,39 @@ const clearTables = async () => {
   const db = getDb();
   await db.delete(pointTransactionTable);
   await db.delete(userGuardianTable);
+  await db.delete(userSubscriptionTable);
   await db.delete(guardianTable);
   await db.delete(userTable);
   await db.delete(charityCategoryTable);
+};
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * A subscription period, seeded directly rather than bought.
+ *
+ * `status` and `currentPeriodEnd` are the only two columns entitlement is
+ * decided from, so they are the only interesting arguments. 'cancelled'
+ * with an end in the future is the state this file's bonus block exists
+ * for: auto-renew off, days still paid for.
+ */
+const seedSubscription = async (
+  userId: number,
+  { plan = 'monthly', status = 'active', endsInDays = 30 } = {}
+) => {
+  const db = getDb();
+  const now = new Date();
+  await db.insert(userSubscriptionTable).values({
+    userId,
+    plan,
+    status,
+    currentPeriodStart: new Date(now.getTime() - DAY_MS),
+    currentPeriodEnd: new Date(now.getTime() + endsInDays * DAY_MS),
+    provider: 'ecpay',
+    providerRef: `fixture-${userId}-${status}`,
+    createdAt: now,
+    updatedAt: now,
+  });
 };
 
 let categorySeq = 0;
@@ -219,6 +250,80 @@ describe('guardian routes', () => {
       const db = getDb();
       const [row] = await db.select().from(userGuardianTable).where(eq(userGuardianTable.id, userGuardianId));
       expect(row).toMatchObject({ level: 1, xp: 500 });
+    });
+
+    /**
+     * The subscriber growth bonus, which the box and subscription pages
+     * promise in four places.
+     *
+     * One case per state a user can be in, because the gate is not "has
+     * an agreement" but "has paid access" -- the same question
+     * requireSubscription asks. Getting it wrong is invisible from the
+     * outside: the invest still succeeds, it just quietly pays the wrong
+     * amount, and the user has no way to check.
+     */
+    describe('the subscriber growth bonus', () => {
+      const investWith = async (
+        points: number,
+        subscription?: { plan?: string; status?: string; endsInDays?: number }
+      ) => {
+        const userId = await seedUser(100_000);
+        if (subscription !== undefined) await seedSubscription(userId, subscription);
+        const speciesId = await seedSpecies();
+        const userGuardianId = await seedOwnedGuardian(userId, speciesId);
+
+        const res = await postInvest(userGuardianId, { points });
+        expect(res.status).toBe(200);
+        return (await res.json()) as PostInvestResponse;
+      };
+
+      it('pays nothing to a user with no entitlement', async () => {
+        const body = await investWith(1_000);
+        expect(body.xpGained).toBe(1_000);
+        expect(body.guardian).toMatchObject({ xp: 1_000 });
+      });
+
+      it('pays 10% on a live agreement', async () => {
+        const body = await investWith(1_000, { status: 'active' });
+        expect(body.xpGained).toBe(1_100);
+        expect(body.guardian).toMatchObject({ xp: 1_100 });
+      });
+
+      it('pays 10% on a cancelled agreement that has not run out', async () => {
+        // The state nothing considered. Cancelling auto-renew flips the
+        // period to 'cancelled' at once, but the days are already paid
+        // for: findActiveSubscription says no, findEntitledSubscription
+        // says yes, and the paid answer is the correct one.
+        const body = await investWith(1_000, { status: 'cancelled', endsInDays: 12 });
+        expect(body.xpGained).toBe(1_100);
+      });
+
+      it('pays 10% on a day pass, which has no agreement at all', async () => {
+        const body = await investWith(1_000, { plan: 'days30', endsInDays: 30 });
+        expect(body.xpGained).toBe(1_100);
+      });
+
+      it('pays nothing once the paid period has ended', async () => {
+        const body = await investWith(1_000, { status: 'cancelled', endsInDays: -1 });
+        expect(body.xpGained).toBe(1_000);
+      });
+
+      it('spends the points asked for, never the bonus', async () => {
+        // The bonus is growth, not a discount: 1,000 invested costs
+        // 1,000 whether or not the user has paid access.
+        const body = await investWith(1_000, { status: 'active' });
+        expect(body.xpGained).toBe(1_100);
+        expect(body.totalPoints).toBe(99_000);
+      });
+
+      it('counts the bonus toward levelling up', async () => {
+        // 2,500 is the Lv1->Lv2 threshold: 2,273 + 227 reaches it and
+        // 2,273 alone does not, so this fails if the bonus is added
+        // after the level loop instead of before it.
+        const body = await investWith(2_273, { status: 'active' });
+        expect(body.xpGained).toBe(2_500);
+        expect(body.guardian).toMatchObject({ level: 2, xp: 0 });
+      });
     });
 
     it('levels up and carries the xp remainder over the threshold', async () => {

@@ -237,7 +237,7 @@ describe('user routes', () => {
       expect(body.lastLoginAt).toEqual(expect.any(String));
       // Present even on the create path, so the client never has to
       // branch on the status code to find the field.
-      expect(body.subscription).toEqual({ active: false, plan: null, expiresAt: null });
+      expect(body.subscription).toEqual({ active: false, plan: null, expiresAt: null, entitled: false });
 
       const rows = await getDb().select().from(userTable).where(eq(userTable.firebaseUid, 'new-uid'));
       expect(rows).toHaveLength(1);

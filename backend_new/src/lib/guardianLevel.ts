@@ -31,3 +31,16 @@ export const MAX_LEVEL = LEVEL_XP_THRESHOLDS.length + 1;
 /** The XP needed for the next level, or null for a spirit already maxed. */
 export const nextLevelXp = (level: number): number | null =>
   level < MAX_LEVEL ? LEVEL_XP_THRESHOLDS[level - 1] : null;
+
+/**
+ * The subscriber growth bonus is defined once, in @castor/shared, and
+ * re-exported here so this module stays the single place to look for a
+ * spirit's arithmetic.
+ *
+ * It lives in the shared package because the webapp computes the same sum
+ * to show the user before they confirm. Do not add a second definition
+ * here, however small -- the number on screen and the number granted have
+ * to be the same integer, rounding included, and nothing but one
+ * definition enforces that.
+ */
+export { SUBSCRIBER_XP_BONUS_PERCENT, investmentXp, pointsForXp } from '@castor/shared';

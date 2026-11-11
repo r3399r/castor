@@ -5,6 +5,7 @@ import { cancelPeriodOrder } from 'src/lib/ecpay';
 import { ORDER_STATUS_CANCELLED, findActiveOrder } from 'src/lib/paymentOrder';
 import {
   findActiveSubscription,
+  findEntitledSubscription,
   listSubscriptionHistory,
   setSubscription,
 } from 'src/lib/subscription';
@@ -29,8 +30,9 @@ export const subscription = new Hono<UserEnv>()
     console.log(`GET /api/subscription/me userId=${user.id}`);
 
     const db = c.get('db');
-    const [active, order] = await Promise.all([
+    const [active, entitled, order] = await Promise.all([
       findActiveSubscription(db, user.id),
+      findEntitledSubscription(db, user.id),
       findActiveOrder(db, user.id),
     ]);
 
@@ -38,6 +40,12 @@ export const subscription = new Hono<UserEnv>()
       active: active !== undefined,
       plan: active?.plan ?? null,
       expiresAt: active?.currentPeriodEnd ?? null,
+      // Whether paid features are available right now, which `active`
+      // does not answer: a cancelled agreement inside its paid period
+      // reports active:false and is still entitled. That gap is what
+      // showed a cancelled-but-paid user the free-member treatment on a
+      // feature the API was happily serving them.
+      entitled: entitled !== undefined,
       // Whether anything will charge the card again, which is a
       // different question from whether they have access: a day pass
       // grants access with no agreement behind it. The client needs this
@@ -94,12 +102,19 @@ export const subscription = new Hono<UserEnv>()
     // Reports active:false the moment auto-renew is off, matching
     // GET /me. Remaining entitlement is visible in /history, which is
     // where the client derives "cancelled but still usable" from.
-    const active = await findActiveSubscription(db, user.id);
+    const [active, entitled] = await Promise.all([
+      findActiveSubscription(db, user.id),
+      findEntitledSubscription(db, user.id),
+    ]);
 
     return c.json({
       active: active !== undefined,
       plan: active?.plan ?? null,
       expiresAt: active?.currentPeriodEnd ?? null,
+      // Normally true right after a cancel: the period just paid for runs
+      // to its end. This is the field that keeps the subscriber-only
+      // parts of the UI switched on for the rest of it.
+      entitled: entitled !== undefined,
       // False by definition once this route has run: either there was an
       // agreement and it has just been cancelled, or there never was
       // one and the caller's intent was already true.

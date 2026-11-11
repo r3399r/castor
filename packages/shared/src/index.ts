@@ -333,7 +333,93 @@ export type GetGuardianResponse = { data: Guardian[]; totalPoints: number };
 
 export type PostGuardianInvestRequest = { points: number };
 
-export type PostGuardianInvestResponse = { guardian: Guardian; totalPoints: number };
+/**
+ * The subscriber growth bonus -- the one piece of runtime code in this
+ * package, and the reason it is here rather than in either app.
+ *
+ * Both sides compute it. The webapp states the sum to the user before
+ * they confirm, and the server decides what is actually granted; two
+ * copies of the arithmetic meant two numbers that nothing kept equal,
+ * and the user sees both. So this is the single definition, imported by
+ * `backend_new/src/lib/guardianLevel.ts` and the box page.
+ *
+ * Deliberately an integer percentage rather than 0.1: `points * 0.1` is
+ * not always what it looks like, because 0.1 has no exact binary form.
+ * `3 * 0.1` is 0.30000000000000004, and the error has no fixed sign, so
+ * a value that should land exactly on an integer can come out just under
+ * it and lose a whole XP to the floor below. `(points * 10) / 100` keeps
+ * every step on integers until the single division, which IEEE-754
+ * rounds correctly, so an exact result stays exact.
+ */
+export const SUBSCRIBER_XP_BONUS_PERCENT = 10;
+
+/**
+ * What an investment of `points` becomes in XP.
+ *
+ * Rounded down, because `user_guardian.xp` is an INT column: an
+ * investment of 5 earns 0 bonus XP rather than the 0.5 an earlier
+ * frontend estimate displayed and nothing could ever store.
+ *
+ * `entitled` means paid access, which is broader than "subscribed" --
+ * see findEntitledSubscription. A cancelled agreement still inside its
+ * paid period earns the bonus, because the period is paid for, and so
+ * does a day pass, which has no agreement at all. The server reads that
+ * for itself on every invest; the client's copy only decides what to
+ * show.
+ *
+ * The spend is always the full `points`: the bonus is growth, never a
+ * discount.
+ */
+export const investmentXp = (points: number, entitled: boolean): number =>
+  points + (entitled ? Math.floor((points * SUBSCRIBER_XP_BONUS_PERCENT) / 100) : 0);
+
+/**
+ * The fewest points whose investment reaches `targetXp` -- the inverse of
+ * investmentXp, and what the invest slider caps at.
+ *
+ * Capping at the raw XP gap asks a subscriber to spend points the bonus
+ * already covers: 2,500 XP short of a level, they only need 2,273. The
+ * surplus would not have been lost (xp carries into the next level), but
+ * "this stage needs N points" that is 10% too high is wrong, and the user
+ * asked for the cap not to overshoot.
+ *
+ * Derived rather than searched from zero, then corrected: the closed form
+ * `ceil(targetXp * 100 / (100 + percent))` is right for a 10% bonus, but
+ * the division is floating point and the bonus is floored, so it can sit
+ * one off for another rate or at a boundary. Both loops run a couple of
+ * iterations at most and make the answer true by construction -- the
+ * smallest points whose investmentXp is not short -- for any rate, which a
+ * bare formula would not be if the percentage ever changes.
+ *
+ * Reaching the target exactly is not always possible: the bonus moves in
+ * whole XP, so 21 XP needs 20 points and grants 22. Overshooting the XP is
+ * unavoidable; overshooting the points is not.
+ */
+export const pointsForXp = (targetXp: number, entitled: boolean): number => {
+  if (targetXp <= 0) return 0;
+  if (!entitled) return targetXp;
+  let points = Math.ceil((targetXp * 100) / (100 + SUBSCRIBER_XP_BONUS_PERCENT));
+  while (points > 0 && investmentXp(points - 1, true) >= targetXp) points -= 1;
+  while (investmentXp(points, true) < targetXp) points += 1;
+  return points;
+};
+
+export type PostGuardianInvestResponse = {
+  guardian: Guardian;
+  totalPoints: number;
+  /**
+   * The XP this investment actually added, including the subscriber
+   * bonus and after rounding down.
+   *
+   * Reported rather than left to the client to recompute: the bonus rate
+   * and its rounding live on the server, and a client that re-derived
+   * them would be a second copy to keep in step. Note it is not
+   * `guardian.xp` -- that is the xp remaining in the current level after
+   * any level-ups this call caused, which is a smaller number whenever
+   * the spirit advanced.
+   */
+  xpGained: number;
+};
 
 export type PostQuestionRequest = {
   subjectId: number;
@@ -407,9 +493,27 @@ export type GetUserStatsResponse = StatsSubject[];
 // agreement, so a plan change is a new agreement charged immediately,
 // never a change scheduled for the end of the period.
 export type SubscriptionStatus = {
+  /**
+   * Whether an agreement period is in status `active`. A billing fact,
+   * not an access one -- see `entitled`.
+   */
   active: boolean;
   plan: string | null;
   expiresAt: string | null;
+  /**
+   * Whether paid features are available right now.
+   *
+   * The field to gate subscriber-only UI on, and the reason it is not
+   * `active`: cancelling auto-renew flips the period to `cancelled`
+   * immediately while the days already paid for keep running, so
+   * `active` goes false while access stays on. The server's own gate
+   * (requireSubscription) has always asked this broader question, so
+   * reading `active` on the client showed a cancelled-but-paid user the
+   * free-member treatment on features the API was serving them.
+   *
+   * True for a day pass as well, which carries no agreement at all.
+   */
+  entitled: boolean;
   /**
    * Whether a recurring agreement will charge again.
    *
@@ -604,6 +708,14 @@ export type GetAnalysisOverviewResponse = {
 
 // The admin listing carries each user's entitlement so the page can
 // show and toggle it without a request per row.
+/**
+ * A row of the admin user listing.
+ *
+ * Known gap: the listing populates only `active`, `plan` and `expiresAt`
+ * on `subscription`. `autoRenew` and `entitled` would each cost another
+ * query per page, and no admin screen reads them -- so do not reach for
+ * them here without making the route produce them first.
+ */
 export type AdminUser = User & { subscription: SubscriptionStatus };
 
 export type PutUserSubscriptionRequest = {

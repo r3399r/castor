@@ -17,6 +17,7 @@ import { DEFAULT_LIMIT, genPagination, MAX_LIMIT } from 'src/lib/paginator';
 import {
   findActiveSubscription,
   findActiveSubscriptions,
+  findEntitledSubscription,
   setSubscription,
 } from 'src/lib/subscription';
 import { verifyIdTokenFull } from 'src/lib/firebaseAdmin';
@@ -149,13 +150,23 @@ export const user = new Hono<UserEnv>()
     if (existing) {
       await db.update(userTable).set({ lastLoginAt: now, updatedAt: now }).where(eq(userTable.id, existing.id));
       const [updated] = await db.select().from(userTable).where(eq(userTable.id, existing.id));
-      const active = await findActiveSubscription(db, existing.id);
+      // Both, in one round trip: `active` is the billing state and
+      // `entitled` is whether paid features are on, and they differ for
+      // a cancelled agreement that has not run out yet. Sign-in is the
+      // only place the client gets this before its first
+      // /subscription/me, so a missing `entitled` here means the paid UI
+      // starts off wrong for exactly those users.
+      const [active, entitled] = await Promise.all([
+        findActiveSubscription(db, existing.id),
+        findEntitledSubscription(db, existing.id),
+      ]);
       return c.json({
         ...updated,
         subscription: {
           active: active !== undefined,
           plan: active?.plan ?? null,
           expiresAt: active?.currentPeriodEnd ?? null,
+          entitled: entitled !== undefined,
         },
       });
     }
@@ -174,7 +185,7 @@ export const user = new Hono<UserEnv>()
     // cannot have a subscription yet. Still reported, so the client never
     // has to branch on the status code to find the field.
     return c.json(
-      { ...created, subscription: { active: false, plan: null, expiresAt: null } },
+      { ...created, subscription: { active: false, plan: null, expiresAt: null, entitled: false } },
       201
     );
   })
