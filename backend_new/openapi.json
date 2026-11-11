@@ -1,0 +1,224 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "castor API",
+    "description": "The API behind the 學益 webapp. Generated from the backend_new route definitions by tools/openapi.ts -- do not edit by hand.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://api.learnforgood.org",
+      "description": "production"
+    }
+  ],
+  "components": {},
+  "paths": {
+    "/api/guardian": {
+      "get": {
+        "operationId": "getApiGuardian",
+        "summary": "List the caller's spirits",
+        "description": "Every spirit this user owns, with the caller's point balance.",
+        "tags": [
+          "guardian"
+        ],
+        "responses": {
+          "200": {
+            "description": "The spirits and the balance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "guardianId": {
+                            "type": "integer"
+                          },
+                          "code": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "theme": {
+                            "type": "string"
+                          },
+                          "level": {
+                            "type": "integer"
+                          },
+                          "xp": {
+                            "type": "integer"
+                          },
+                          "nextLevelXp": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ]
+                          },
+                          "category": {
+                            "type": [
+                              "object",
+                              "null"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "integer"
+                              },
+                              "name": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "guardianId",
+                          "code",
+                          "name",
+                          "theme",
+                          "level",
+                          "xp",
+                          "nextLevelXp",
+                          "category"
+                        ]
+                      }
+                    },
+                    "totalPoints": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "totalPoints"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/guardian/{id}/invest": {
+      "post": {
+        "operationId": "postApiGuardianByIdInvest",
+        "summary": "Invest points into a spirit",
+        "description": "Spends the full `points` and adds XP, levelling the spirit up as many times as the XP covers. Paid access earns a growth bonus, which the server decides for itself from the caller's entitlement -- the request body cannot ask for it.",
+        "tags": [
+          "guardian"
+        ],
+        "responses": {
+          "200": {
+            "description": "The spirit after the investment, the new balance, and the XP granted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "guardian": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer"
+                        },
+                        "guardianId": {
+                          "type": "integer"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "theme": {
+                          "type": "string"
+                        },
+                        "level": {
+                          "type": "integer"
+                        },
+                        "xp": {
+                          "type": "integer"
+                        },
+                        "nextLevelXp": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        },
+                        "category": {
+                          "type": [
+                            "object",
+                            "null"
+                          ],
+                          "properties": {
+                            "id": {
+                              "type": "integer"
+                            },
+                            "name": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "guardianId",
+                        "code",
+                        "name",
+                        "theme",
+                        "level",
+                        "xp",
+                        "nextLevelXp",
+                        "category"
+                      ]
+                    },
+                    "totalPoints": {
+                      "type": "integer"
+                    },
+                    "xpGained": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "guardian",
+                    "totalPoints",
+                    "xpGained"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Already at the maximum level, or not enough points"
+          },
+          "404": {
+            "description": "No such spirit belongs to this caller"
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ]
+      }
+    }
+  }
+}

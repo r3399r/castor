@@ -1,6 +1,7 @@
 import { zValidator } from '@hono/zod-validator';
 import { and, eq, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
+import { describeRoute, resolver } from 'hono-openapi';
 import { z } from 'zod';
 import {
   charityCategoryTable,
@@ -16,29 +17,93 @@ import { UserEnv } from 'src/middleware/requireUser';
 
 export const investBodySchema = z.object({ points: z.number().int().positive() });
 
-type CategoryDto = { id: number; name: string };
+const categorySchema = z.object({ id: z.number().int(), name: z.string() });
 
-type GuardianDto = {
-  id: number;
-  guardianId: number;
-  code: string;
-  name: string;
-  theme: string;
-  level: number;
-  xp: number;
-  nextLevelXp: number | null;
+/**
+ * A spirit as this API reports it.
+ *
+ * A schema rather than a hand-written type, because it is the single
+ * description of the response: the handler's return is checked against
+ * it, the OpenAPI document is generated from it, and the DTO type below
+ * is inferred from it. A type beside a separately written document is two
+ * things that drift.
+ *
+ * `.describe()` is not a comment -- it reaches the generated document,
+ * and so reaches whoever writes a client against it.
+ */
+const guardianSchema = z.object({
+  id: z.number().int(),
+  guardianId: z.number().int(),
+  code: z.string(),
+  name: z.string(),
+  theme: z.string(),
+  level: z.number().int(),
+  xp: z.number().int(),
+  nextLevelXp: z
+    .number()
+    .int()
+    .nullable()
+    .describe('XP this spirit still needs for its next level, or null at the maximum'),
   /**
-   * The public-interest category this species supports, or null for one
-   * tied to none -- which is what VIP is, and what lets its owner direct
-   * the donation at any category.
+   * Null for a species tied to no category -- which is what VIP is, and
+   * what lets its owner direct the donation at any category.
    *
    * Carried here because the LV5 donation screen is per spirit: it has to
    * list that category's organisations, and `theme` is only a display
    * label (it reads the same as the category's name today and will
    * diverge once one category holds several eggs).
    */
-  category: CategoryDto | null;
-};
+  category: categorySchema
+    .nullable()
+    .describe('The public-interest category this species supports, or null for one tied to none'),
+});
+
+export const getGuardianResponseSchema = z.object({
+  data: z.array(guardianSchema),
+  totalPoints: z.number().int(),
+});
+
+export const postGuardianInvestResponseSchema = z.object({
+  guardian: guardianSchema,
+  totalPoints: z.number().int(),
+  xpGained: z.number().int().describe('XP actually granted, growth bonus included'),
+});
+
+type GuardianDto = z.infer<typeof guardianSchema>;
+
+/**
+ * The OpenAPI entries for the two routes below.
+ *
+ * Hoisted out of the route definitions so the handlers keep their own
+ * indentation and the route lines stay one line each; `describeRoute` is
+ * middleware, so where it is constructed makes no difference.
+ */
+const listDoc = describeRoute({
+  summary: "List the caller's spirits",
+  description: "Every spirit this user owns, with the caller's point balance.",
+  tags: ['guardian'],
+  responses: {
+    200: {
+      description: 'The spirits and the balance',
+      content: { 'application/json': { schema: resolver(getGuardianResponseSchema) } },
+    },
+  },
+});
+
+const investDoc = describeRoute({
+  summary: 'Invest points into a spirit',
+  description:
+    'Spends the full `points` and adds XP, levelling the spirit up as many times as the XP covers. Paid access earns a growth bonus, which the server decides for itself from the caller\'s entitlement -- the request body cannot ask for it.',
+  tags: ['guardian'],
+  responses: {
+    200: {
+      description: 'The spirit after the investment, the new balance, and the XP granted',
+      content: { 'application/json': { schema: resolver(postGuardianInvestResponseSchema) } },
+    },
+    400: { description: 'Already at the maximum level, or not enough points' },
+    404: { description: 'No such spirit belongs to this caller' },
+  },
+});
 
 const toDto = (row: {
   id: number;
@@ -63,7 +128,7 @@ const toDto = (row: {
 };
 
 export const guardian = new Hono<UserEnv>()
-  .get('/', async (c) => {
+  .get('/', listDoc, async (c) => {
     const user = c.get('user');
     const db = c.get('db');
     console.log(`GET /api/guardian userId=${user.id}`);
@@ -88,9 +153,12 @@ export const guardian = new Hono<UserEnv>()
       .leftJoin(charityCategoryTable, eq(charityCategoryTable.id, guardianTable.categoryId))
       .where(eq(userGuardianTable.userId, user.id));
 
-    return c.json({ data: rows.map(toDto), totalPoints: user.totalPoints });
+    return c.json({
+      data: rows.map(toDto),
+      totalPoints: user.totalPoints,
+    } satisfies z.infer<typeof getGuardianResponseSchema>);
   })
-  .post('/:id/invest', zValidator('json', investBodySchema), async (c) => {
+  .post('/:id/invest', investDoc, zValidator('json', investBodySchema), async (c) => {
     const id = Number(c.req.param('id'));
     const { points } = c.req.valid('json');
     const user = c.get('user');
@@ -189,5 +257,5 @@ export const guardian = new Hono<UserEnv>()
       // instead of re-deriving it from a rate it would have to keep in
       // step with the server's rounding.
       xpGained,
-    });
+    } satisfies z.infer<typeof postGuardianInvestResponseSchema>);
   });

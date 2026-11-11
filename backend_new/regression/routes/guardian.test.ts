@@ -1,5 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { z } from 'zod';
 import { app } from 'src/app';
 import { closeDb, getDb } from 'src/db/client';
 import {
@@ -11,22 +12,20 @@ import {
   userTable,
 } from 'src/db/schema';
 
+import { getGuardianResponseSchema, postGuardianInvestResponseSchema } from 'src/routes/guardian';
+
 vi.mock('src/lib/firebaseAdmin', () => ({ verifyIdTokenUid: vi.fn() }));
 import { verifyIdTokenUid } from 'src/lib/firebaseAdmin';
 
-type GuardianDto = {
-  id: number;
-  guardianId: number;
-  code: string;
-  name: string;
-  theme: string;
-  level: number;
-  xp: number;
-  nextLevelXp: number | null;
-  category: { id: number; name: string } | null;
-};
-type GetGuardianResponse = { data: GuardianDto[]; totalPoints: number };
-type PostInvestResponse = { guardian: GuardianDto; totalPoints: number; xpGained: number };
+/**
+ * Inferred from the route's own schemas, not written again here.
+ *
+ * This file used to carry a third hand-written copy of the guardian
+ * shape -- after packages/shared's and the route's -- and a test that
+ * describes the response for itself cannot notice the response changing.
+ */
+type GetGuardianResponse = z.infer<typeof getGuardianResponseSchema>;
+type PostInvestResponse = z.infer<typeof postGuardianInvestResponseSchema>;
 type ErrorBody = { message: string; code?: string };
 
 const getGuardians = () => app.request('/api/guardian');
@@ -216,6 +215,44 @@ describe('guardian routes', () => {
       const body = (await res.json()) as GetGuardianResponse;
       expect(body.data[0].nextLevelXp).toBeNull();
     });
+
+    /**
+     * What the OpenAPI document promises, checked against what the
+     * server actually sends.
+     *
+     * The schema is the document's only source, so a response that does
+     * not match it means the document is wrong -- and the clients
+     * generated from it with it. The key check is separate on purpose:
+     * zod strips unknown keys rather than rejecting them, so a column
+     * added to the query and spread into the DTO would pass the parse
+     * while appearing in no document.
+     *
+     * Last in this block because seedCategory numbers the categories it
+     * creates ('類別 1', '類別 2'), and a test above asserts that name.
+     */
+    it('sends exactly what the OpenAPI document describes', async () => {
+      const userId = await seedUser(100);
+      const categoryId = await seedCategory();
+      const speciesId = await seedSpecies({ categoryId });
+      await seedOwnedGuardian(userId, speciesId);
+
+      const body: unknown = await (await getGuardians()).json();
+
+      const parsed = getGuardianResponseSchema.safeParse(body);
+      expect(parsed.error?.issues ?? []).toEqual([]);
+      expect(parsed.success).toBe(true);
+      expect(Object.keys((body as GetGuardianResponse).data[0]).sort()).toEqual([
+        'category',
+        'code',
+        'guardianId',
+        'id',
+        'level',
+        'name',
+        'nextLevelXp',
+        'theme',
+        'xp',
+      ]);
+    });
   });
 
   describe('POST /:id/invest', () => {
@@ -324,6 +361,25 @@ describe('guardian routes', () => {
         expect(body.xpGained).toBe(2_500);
         expect(body.guardian).toMatchObject({ level: 2, xp: 0 });
       });
+    });
+
+    it('sends exactly what the OpenAPI document describes', async () => {
+      const userId = await seedUser(5_000);
+      const speciesId = await seedSpecies();
+      const guardianId = await seedOwnedGuardian(userId, speciesId);
+
+      const res = await postInvest(guardianId, { points: 100 });
+      expect(res.status).toBe(200);
+      const body: unknown = await res.json();
+
+      const parsed = postGuardianInvestResponseSchema.safeParse(body);
+      expect(parsed.error?.issues ?? []).toEqual([]);
+      expect(parsed.success).toBe(true);
+      expect(Object.keys(body as PostInvestResponse).sort()).toEqual([
+        'guardian',
+        'totalPoints',
+        'xpGained',
+      ]);
     });
 
     it('levels up and carries the xp remainder over the threshold', async () => {
