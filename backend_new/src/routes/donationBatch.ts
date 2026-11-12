@@ -2,6 +2,7 @@ import { zValidator } from '@hono/zod-validator';
 import { randomUUID } from 'crypto';
 import { and, asc, count, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
+import { describeRoute, resolver } from 'hono-openapi';
 import { z } from 'zod';
 import {
   charityCategoryTable,
@@ -10,7 +11,7 @@ import {
   donationBatchTable,
   donationTable,
 } from 'src/db/schema';
-import { DEFAULT_LIMIT, genPagination, MAX_LIMIT } from 'src/lib/paginator';
+import { DEFAULT_LIMIT, genPagination, MAX_LIMIT, paginationSchema } from 'src/lib/paginator';
 import { deleteFromS3, uploadToS3 } from 'src/lib/s3';
 import { TransactionEnv } from 'src/middleware/transaction';
 import { BadRequestError, NotFoundError } from 'src/model/error';
@@ -120,6 +121,89 @@ export const donationBatchListQuerySchema = z.object({
   published: z.enum(['true', 'false']).optional(),
 });
 
+/**
+ * The payout shapes as this API reports them.
+ *
+ * Schemas rather than hand-written types: each is the single description
+ * of its response, every handler's return is checked against it, and the
+ * OpenAPI document is generated from it. See "The OpenAPI document" in
+ * AGENTS.md.
+ */
+export const donationBatchEvidenceSchema = z.object({
+  id: z.number().int(),
+  kind: z.string().describe('TRANSFER_RECEIPT, ORG_RECEIPT, THANK_YOU_LETTER -- open-ended'),
+  url: z.string(),
+  s3Key: z
+    .string()
+    .describe(
+      'What deleteFromS3 needs. Present here and absent from the public response: it is never useful to a reader of the public page'
+    ),
+  caption: z.string().nullable(),
+  sortOrder: z.number().int(),
+  createdAt: z.string().nullable().describe('ISO 8601'),
+});
+
+/**
+ * One donation as the payout side sees it -- with the user id, which the
+ * public record never carries.
+ */
+export const donationMemberSchema = z.object({
+  id: z.number().int(),
+  userId: z.number().int(),
+  amount: z.number().int().describe('Frozen at confirmation'),
+  confirmedAt: z.string().describe('ISO 8601'),
+  category: z.object({ id: z.number().int(), name: z.string() }),
+});
+
+export const donationBatchSchema = z.object({
+  id: z.number().int(),
+  organization: z
+    .object({ id: z.number().int(), name: z.string() })
+    .nullable()
+    .describe('null only if the organisation row has gone, which a FK should prevent'),
+  transferredAmount: z.number().int().describe('What actually left the bank account'),
+  transferredAt: z.string().describe('ISO 8601. The date the money moved, not the date typed in'),
+  reference: z.string().nullable().describe('Bank transaction number, or the last account digits'),
+  note: z
+    .string()
+    .nullable()
+    .describe('The internal memo. Deliberately not part of the public record'),
+  published: z.boolean().describe('Whether the public page shows it'),
+  donationCount: z.number().int().describe('Members, aggregated on read rather than stored'),
+  donationSubtotal: z.number().int().describe('Their frozen amounts, summed'),
+  platformTopUp: z
+    .number()
+    .int()
+    .describe(
+      'transferredAmount - donationSubtotal. Signed, deliberately not clamped: a negative value is exactly what PUT /{id}/publish refuses, so hiding it would hide the reason'
+    ),
+  evidence: z.array(donationBatchEvidenceSchema),
+  createdAt: z.string().nullable().describe('ISO 8601'),
+  updatedAt: z.string().nullable().describe('ISO 8601'),
+});
+
+export const donationBatchDetailResponseSchema = donationBatchSchema.extend({
+  donations: z.array(donationMemberSchema).describe('The frozen membership list'),
+});
+
+export const getDonationBatchListResponseSchema = z.object({
+  data: z.array(donationBatchSchema),
+  paginate: paginationSchema,
+});
+
+export const getUnpaidDonationsResponseSchema = z.object({
+  data: z.array(donationMemberSchema),
+  paginate: paginationSchema,
+  summary: z
+    .object({
+      unpaidCount: z.number().int(),
+      unpaidAmount: z.number().int(),
+    })
+    .describe(
+      'The whole outstanding set, not the page. A batch can only be built from what is on screen, so this is how a second page makes itself known.'
+    ),
+});
+
 export const unpaidDonationQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(MAX_LIMIT).optional().default(DEFAULT_LIMIT),
   offset: z.coerce.number().int().min(0).optional().default(0),
@@ -186,18 +270,43 @@ const memberTotalsByBatch = async (db: Db, batchIds: number[]) => {
   return byBatch;
 };
 
-type EvidenceDto = {
+/**
+ * Serialises one evidence row.
+ *
+ * `createdAt` is converted rather than left to `c.json`: the local type
+ * this replaced said `Date | null` while packages/shared said
+ * `string | null`, and both were written down -- nothing compared them.
+ */
+const toEvidenceDto = (
+  row: typeof donationBatchEvidenceTable.$inferSelect
+): z.infer<typeof donationBatchEvidenceSchema> => ({
+  id: row.id,
+  kind: row.kind,
+  url: row.url,
+  s3Key: row.s3Key,
+  caption: row.caption,
+  sortOrder: row.sortOrder,
+  createdAt: row.createdAt?.toISOString() ?? null,
+});
+
+/** Serialises one member of a batch, or one donation awaiting payout. */
+const toMemberDto = (row: {
   id: number;
-  kind: string;
-  url: string;
-  s3Key: string;
-  caption: string | null;
-  sortOrder: number;
-  createdAt: Date | null;
-};
+  userId: number;
+  amount: number;
+  confirmedAt: Date;
+  categoryId: number;
+  categoryName: string;
+}): z.infer<typeof donationMemberSchema> => ({
+  id: row.id,
+  userId: row.userId,
+  amount: row.amount,
+  confirmedAt: row.confirmedAt.toISOString(),
+  category: { id: row.categoryId, name: row.categoryName },
+});
 
 const evidenceByBatch = async (db: Db, batchIds: number[]) => {
-  const byBatch = new Map<number, EvidenceDto[]>();
+  const byBatch = new Map<number, z.infer<typeof donationBatchEvidenceSchema>[]>();
   if (batchIds.length === 0) return byBatch;
 
   const rows = await db
@@ -207,30 +316,29 @@ const evidenceByBatch = async (db: Db, batchIds: number[]) => {
     .orderBy(asc(donationBatchEvidenceTable.sortOrder), asc(donationBatchEvidenceTable.id));
   for (const row of rows) {
     const list = byBatch.get(row.batchId) ?? [];
-    list.push({
-      id: row.id,
-      kind: row.kind,
-      url: row.url,
-      s3Key: row.s3Key,
-      caption: row.caption,
-      sortOrder: row.sortOrder,
-      createdAt: row.createdAt,
-    });
+    list.push(toEvidenceDto(row));
     byBatch.set(row.batchId, list);
   }
   return byBatch;
 };
 
+/**
+ * Serialises one batch.
+ *
+ * The three dates are converted here rather than left to `c.json`: the
+ * columns are Dates, every type in the repo calls these fields strings,
+ * and JSON.stringify happening to agree is not a contract.
+ */
 const buildBatchDto = (
   batch: typeof donationBatchTable.$inferSelect,
   organization: { id: number; name: string } | null,
   totals: { donationCount: number; subtotal: number },
-  evidence: EvidenceDto[]
-) => ({
+  evidence: z.infer<typeof donationBatchEvidenceSchema>[]
+): z.infer<typeof donationBatchSchema> => ({
   id: batch.id,
   organization,
   transferredAmount: batch.transferredAmount,
-  transferredAt: batch.transferredAt,
+  transferredAt: batch.transferredAt.toISOString(),
   reference: batch.reference,
   // Present here and absent from the public response on purpose: the note
   // is an internal memo ("called their finance office twice"), not part of
@@ -244,8 +352,190 @@ const buildBatchDto = (
   // button is going to say no.
   platformTopUp: batch.transferredAmount - totals.subtotal,
   evidence,
-  createdAt: batch.createdAt,
-  updatedAt: batch.updatedAt,
+  createdAt: batch.createdAt?.toISOString() ?? null,
+  updatedAt: batch.updatedAt?.toISOString() ?? null,
+});
+
+/**
+ * The OpenAPI entries for the routes below.
+ *
+ * Hoisted out of the route definitions so the handlers keep their own
+ * indentation and each route line stays one line; `describeRoute` is
+ * middleware, so where it is constructed makes no difference.
+ *
+ * Every route here is behind requireAdmin -- every method, GET included,
+ * because GET /unpaid lists which user owes which amount. `adminAuth`
+ * would have let every read through.
+ */
+const unpaidDoc = describeRoute({
+  summary: 'What is still owed to one foundation',
+  description:
+    'Admin only. The starting point of a payout: donations for this organisation with no batch yet (`donation.batch_id` NULL is the entire state machine -- there is no status column). Paginated, so `summary` reports the whole unpaid set rather than the page.',
+  tags: ['donation-batch'],
+  responses: {
+    200: {
+      description: 'One page of unpaid donations, and the totals for all of them',
+      content: { 'application/json': { schema: resolver(getUnpaidDonationsResponseSchema) } },
+    },
+    400: { description: 'organizationId missing, or a malformed limit, offset or order' },
+    401: { description: 'No valid identity' },
+    403: { description: 'Not an admin' },
+  },
+});
+
+const listDoc = describeRoute({
+  summary: 'List the payout batches',
+  description:
+    'Admin only, published and unpublished alike -- the public view of the same payouts is GET /api/info/donation, which shows published batches and never users.',
+  tags: ['donation-batch'],
+  responses: {
+    200: {
+      description: 'One page of batches, newest transfer first by default',
+      content: { 'application/json': { schema: resolver(getDonationBatchListResponseSchema) } },
+    },
+    400: { description: 'limit beyond the cap, or a malformed order, organizationId or published' },
+    401: { description: 'No valid identity' },
+    403: { description: 'Not an admin' },
+  },
+});
+
+const getDoc = describeRoute({
+  summary: 'Read one batch, with its frozen membership list',
+  description: 'Admin only. The members are what the transfer covered and cannot change.',
+  tags: ['donation-batch'],
+  responses: {
+    200: {
+      description: 'The batch, its evidence and its donations',
+      content: { 'application/json': { schema: resolver(donationBatchDetailResponseSchema) } },
+    },
+    401: { description: 'No valid identity' },
+    403: { description: 'Not an admin' },
+    404: { description: 'No such batch' },
+  },
+});
+
+const createDoc = describeRoute({
+  summary: 'Record a transfer',
+  description:
+    'Admin only. Created unpublished: the batch exists, holds its donations and is invisible until PUT /{id}/publish. `donationIds` is explicit rather than "everything unpaid" -- the admin pays what they saw, and a donation confirmed since the list loaded must not be swept into a transfer that did not cover it. Membership is frozen afterwards, so correcting it means DELETE and rebuild.',
+  tags: ['donation-batch'],
+  responses: {
+    201: {
+      description: 'The batch as recorded, unpublished and with no evidence yet',
+      content: { 'application/json': { schema: resolver(donationBatchSchema) } },
+    },
+    400: {
+      description:
+        'A transfer date in the future (BATCH_FUTURE_TRANSFER), a donation that does not exist (DONATION_NOT_FOUND), one owed to another foundation (DONATION_ORGANIZATION_MISMATCH) or one already paid (DONATION_ALREADY_BATCHED) -- the code in the body says which',
+    },
+    401: { description: 'No valid identity' },
+    403: { description: 'Not an admin' },
+    404: { description: 'No such organisation' },
+  },
+});
+
+const updateDoc = describeRoute({
+  summary: 'Correct the figures of an unpublished batch',
+  description:
+    'Admin only, and unpublished only: a published batch is part of the public record. Membership is not editable here -- to fix the wrong set of donations, DELETE the batch, which releases them, and build it again.',
+  tags: ['donation-batch'],
+  responses: {
+    200: {
+      description: 'The batch as saved',
+      content: { 'application/json': { schema: resolver(donationBatchSchema) } },
+    },
+    400: {
+      description:
+        'It is published (BATCH_PUBLISHED) or the transfer date is in the future (BATCH_FUTURE_TRANSFER)',
+    },
+    401: { description: 'No valid identity' },
+    403: { description: 'Not an admin' },
+    404: { description: 'No such batch' },
+  },
+});
+
+const addEvidenceDoc = describeRoute({
+  summary: 'Attach one proof document',
+  description:
+    "Admin only, and the one write allowed on a published batch: a foundation's receipt and its thank-you letter routinely arrive weeks after the money does, and hiding a real payout again just to append them would be worse. The body carries the file as base64 (with or without a `data:` prefix); it is uploaded to S3 under `donations/{batchId}/` and the row keeps the key.",
+  tags: ['donation-batch'],
+  responses: {
+    201: {
+      description: 'The evidence row as saved',
+      content: { 'application/json': { schema: resolver(donationBatchEvidenceSchema) } },
+    },
+    400: {
+      description:
+        'A kind that is not UPPER_SNAKE_CASE, an unsupported mimeType, or data that is not base64 or is beyond the size cap',
+    },
+    401: { description: 'No valid identity' },
+    403: { description: 'Not an admin' },
+    404: { description: 'No such batch' },
+  },
+});
+
+const deleteEvidenceDoc = describeRoute({
+  summary: 'Remove one proof document',
+  description:
+    'Admin only, and unpublished only: removing proof from a published batch would leave the public page asserting a payout it can no longer evidence. The S3 object goes with the row.',
+  tags: ['donation-batch'],
+  responses: {
+    204: { description: 'Deleted' },
+    400: { description: 'The batch is published (BATCH_PUBLISHED)' },
+    401: { description: 'No valid identity' },
+    403: { description: 'Not an admin' },
+    404: { description: 'No such batch, or no such evidence on it' },
+  },
+});
+
+const publishDoc = describeRoute({
+  summary: 'Make one batch visible on the public page',
+  description:
+    'Admin only. The guards live here, because GET /api/info/donation reports platformTopUp with its sign on the grounds that an underpaid batch should never have been published: this is the place that has to be true. Evidence is required -- a transparency page with nothing to show is just a claim.',
+  tags: ['donation-batch'],
+  responses: {
+    200: {
+      description: 'The batch, now published',
+      content: { 'application/json': { schema: resolver(donationBatchSchema) } },
+    },
+    400: {
+      description:
+        'Already published (BATCH_ALREADY_PUBLISHED), less was transferred than the donations total (BATCH_UNDERPAID), or nothing is attached to show (BATCH_NO_EVIDENCE)',
+    },
+    401: { description: 'No valid identity' },
+    403: { description: 'Not an admin' },
+    404: { description: 'No such batch' },
+  },
+});
+
+const unpublishDoc = describeRoute({
+  summary: 'Hide one batch again',
+  description: 'Admin only. The way back out of a mis-click; the public page lists published only.',
+  tags: ['donation-batch'],
+  responses: {
+    200: {
+      description: 'The batch, no longer published',
+      content: { 'application/json': { schema: resolver(donationBatchSchema) } },
+    },
+    400: { description: 'It is not published (BATCH_NOT_PUBLISHED)' },
+    401: { description: 'No valid identity' },
+    403: { description: 'Not an admin' },
+    404: { description: 'No such batch' },
+  },
+});
+
+const deleteDoc = describeRoute({
+  summary: 'Discard an unpublished batch',
+  description:
+    'Admin only, and unpublished only. The only way to correct a wrong membership list: every member goes back to `batch_id` NULL, and the evidence rows and their S3 objects go with it.',
+  tags: ['donation-batch'],
+  responses: {
+    204: { description: 'Deleted, and its donations released' },
+    400: { description: 'The batch is published (BATCH_PUBLISHED)' },
+    401: { description: 'No valid identity' },
+    403: { description: 'Not an admin' },
+    404: { description: 'No such batch' },
+  },
 });
 
 export const donationBatch = new Hono<TransactionEnv>()
@@ -257,7 +547,7 @@ export const donationBatch = new Hono<TransactionEnv>()
    * reports the whole unpaid set, not the page, so a second page cannot go
    * unnoticed.
    */
-  .get('/unpaid', zValidator('query', unpaidDonationQuerySchema), async (c) => {
+  .get('/unpaid', unpaidDoc, zValidator('query', unpaidDonationQuerySchema), async (c) => {
     const { limit, offset, order, organizationId } = c.req.valid('query');
     console.log(
       `GET /api/donation-batch/unpaid organizationId=${organizationId} limit=${limit} offset=${offset} order=${order}`
@@ -301,18 +591,12 @@ export const donationBatch = new Hono<TransactionEnv>()
       .offset(offset);
 
     return c.json({
-      data: rows.map((row) => ({
-        id: row.id,
-        userId: row.userId,
-        amount: row.amount,
-        confirmedAt: row.confirmedAt,
-        category: { id: row.categoryId, name: row.categoryName },
-      })),
+      data: rows.map(toMemberDto),
       paginate: genPagination(total, limit, offset),
       summary: { unpaidCount: total, unpaidAmount },
-    });
+    } satisfies z.infer<typeof getUnpaidDonationsResponseSchema>);
   })
-  .get('/', zValidator('query', donationBatchListQuerySchema), async (c) => {
+  .get('/', listDoc, zValidator('query', donationBatchListQuerySchema), async (c) => {
     const { limit, offset, order, organizationId, published } = c.req.valid('query');
     console.log(
       `GET /api/donation-batch limit=${limit} offset=${offset} order=${order} organizationId=${organizationId ?? ''} published=${published ?? ''}`
@@ -364,9 +648,12 @@ export const donationBatch = new Hono<TransactionEnv>()
       )
     );
 
-    return c.json({ data, paginate: genPagination(total, limit, offset) });
+    return c.json({
+      data,
+      paginate: genPagination(total, limit, offset),
+    } satisfies z.infer<typeof getDonationBatchListResponseSchema>);
   })
-  .get('/:id', async (c) => {
+  .get('/:id', getDoc, async (c) => {
     const db = c.get('db');
     const id = Number(c.req.param('id'));
     console.log(`GET /api/donation-batch/${id}`);
@@ -396,16 +683,10 @@ export const donationBatch = new Hono<TransactionEnv>()
 
     return c.json({
       ...buildBatchDto(batch, organization ?? null, totals, evidence.get(id) ?? []),
-      donations: members.map((row) => ({
-        id: row.id,
-        userId: row.userId,
-        amount: row.amount,
-        confirmedAt: row.confirmedAt,
-        category: { id: row.categoryId, name: row.categoryName },
-      })),
-    });
+      donations: members.map(toMemberDto),
+    } satisfies z.infer<typeof donationBatchDetailResponseSchema>);
   })
-  .post('/', zValidator('json', donationBatchBodySchema), async (c) => {
+  .post('/', createDoc, zValidator('json', donationBatchBodySchema), async (c) => {
     const body = c.req.valid('json');
     const db = c.get('db');
     console.log(
@@ -483,7 +764,12 @@ export const donationBatch = new Hono<TransactionEnv>()
       .from(charityOrganizationTable)
       .where(eq(charityOrganizationTable.id, body.organizationId));
 
-    return c.json(buildBatchDto(batch, organizationRow ?? null, totals, []), 201);
+    return c.json(
+      buildBatchDto(batch, organizationRow ?? null, totals, []) satisfies z.infer<
+        typeof donationBatchSchema
+      >,
+      201
+    );
   })
   /**
    * Corrects the transfer figures of an unpublished batch.
@@ -493,7 +779,7 @@ export const donationBatch = new Hono<TransactionEnv>()
    * arithmetic identity depends on it. To fix the wrong set of donations,
    * DELETE the batch -- which releases them -- and build it again.
    */
-  .put('/:id', zValidator('json', donationBatchUpdateBodySchema), async (c) => {
+  .put('/:id', updateDoc, zValidator('json', donationBatchUpdateBodySchema), async (c) => {
     const db = c.get('db');
     const id = Number(c.req.param('id'));
     const body = c.req.valid('json');
@@ -524,7 +810,11 @@ export const donationBatch = new Hono<TransactionEnv>()
       .where(eq(charityOrganizationTable.id, updated.organizationId));
     const evidence = await evidenceByBatch(db, [id]);
 
-    return c.json(buildBatchDto(updated, organization ?? null, totals, evidence.get(id) ?? []));
+    return c.json(
+      buildBatchDto(updated, organization ?? null, totals, evidence.get(id) ?? []) satisfies z.infer<
+        typeof donationBatchSchema
+      >
+    );
   })
   /**
    * Attaches one proof document.
@@ -534,7 +824,7 @@ export const donationBatch = new Hono<TransactionEnv>()
    * money does, and hiding a real payout again just to append them would
    * be worse than letting the published record grow.
    */
-  .post('/:id/evidence', zValidator('json', donationBatchEvidenceBodySchema), async (c) => {
+  .post('/:id/evidence', addEvidenceDoc, zValidator('json', donationBatchEvidenceBodySchema), async (c) => {
     const db = c.get('db');
     const id = Number(c.req.param('id'));
     const { kind, mimeType, data, caption, sortOrder } = c.req.valid('json');
@@ -573,20 +863,9 @@ export const donationBatch = new Hono<TransactionEnv>()
       .from(donationBatchEvidenceTable)
       .where(eq(donationBatchEvidenceTable.id, inserted.insertId));
 
-    return c.json(
-      {
-        id: row.id,
-        kind: row.kind,
-        url: row.url,
-        s3Key: row.s3Key,
-        caption: row.caption,
-        sortOrder: row.sortOrder,
-        createdAt: row.createdAt,
-      },
-      201
-    );
+    return c.json(toEvidenceDto(row) satisfies z.infer<typeof donationBatchEvidenceSchema>, 201);
   })
-  .delete('/:id/evidence/:evidenceId', async (c) => {
+  .delete('/:id/evidence/:evidenceId', deleteEvidenceDoc, async (c) => {
     const db = c.get('db');
     const id = Number(c.req.param('id'));
     const evidenceId = Number(c.req.param('evidenceId'));
@@ -631,7 +910,7 @@ export const donationBatch = new Hono<TransactionEnv>()
    * should never have been published in the first place. This is the place
    * that has to be true.
    */
-  .put('/:id/publish', async (c) => {
+  .put('/:id/publish', publishDoc, async (c) => {
     const db = c.get('db');
     const id = Number(c.req.param('id'));
     console.log(`PUT /api/donation-batch/${id}/publish`);
@@ -678,10 +957,14 @@ export const donationBatch = new Hono<TransactionEnv>()
       .where(eq(charityOrganizationTable.id, updated.organizationId));
     const evidence = await evidenceByBatch(db, [id]);
 
-    return c.json(buildBatchDto(updated, organization ?? null, totals, evidence.get(id) ?? []));
+    return c.json(
+      buildBatchDto(updated, organization ?? null, totals, evidence.get(id) ?? []) satisfies z.infer<
+        typeof donationBatchSchema
+      >
+    );
   })
   /** The way back out of a mis-click. The public page lists published only. */
-  .put('/:id/unpublish', async (c) => {
+  .put('/:id/unpublish', unpublishDoc, async (c) => {
     const db = c.get('db');
     const id = Number(c.req.param('id'));
     console.log(`PUT /api/donation-batch/${id}/unpublish`);
@@ -704,7 +987,11 @@ export const donationBatch = new Hono<TransactionEnv>()
       .where(eq(charityOrganizationTable.id, updated.organizationId));
     const evidence = await evidenceByBatch(db, [id]);
 
-    return c.json(buildBatchDto(updated, organization ?? null, totals, evidence.get(id) ?? []));
+    return c.json(
+      buildBatchDto(updated, organization ?? null, totals, evidence.get(id) ?? []) satisfies z.infer<
+        typeof donationBatchSchema
+      >
+    );
   })
   /**
    * Discards an unpublished batch and releases its donations.
@@ -714,7 +1001,7 @@ export const donationBatch = new Hono<TransactionEnv>()
    * deleted batch would read as paid forever, and the FK would refuse the
    * delete anyway.
    */
-  .delete('/:id', async (c) => {
+  .delete('/:id', deleteDoc, async (c) => {
     const db = c.get('db');
     const id = Number(c.req.param('id'));
     console.log(`DELETE /api/donation-batch/${id}`);

@@ -1,6 +1,7 @@
 import { zValidator } from '@hono/zod-validator';
 import { and, asc, count, desc, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
+import { describeRoute, resolver } from 'hono-openapi';
 import { z } from 'zod';
 import {
   charityCategoryTable,
@@ -13,7 +14,7 @@ import {
 } from 'src/db/schema';
 import { DONATION_AMOUNT } from 'src/lib/donationAmount';
 import { MAX_LEVEL } from 'src/lib/guardianLevel';
-import { DEFAULT_LIMIT, genPagination, MAX_LIMIT } from 'src/lib/paginator';
+import { DEFAULT_LIMIT, genPagination, MAX_LIMIT, paginationSchema } from 'src/lib/paginator';
 import { UserEnv } from 'src/middleware/requireUser';
 import { BadRequestError, NotFoundError } from 'src/model/error';
 
@@ -77,11 +78,113 @@ const selectDonations = (db: Db) =>
 // the row array -- no need to restate the selected columns by hand.
 type DonationRow = Awaited<ReturnType<typeof selectDonations>>[number];
 
-const toDto = (row: DonationRow) => ({
+
+/**
+ * One donation as this API reports it to the person who made it.
+ *
+ * A schema rather than a hand-written type: it is the single description
+ * of the response, both handlers' returns are checked against it, and
+ * the OpenAPI document is generated from it. See "The OpenAPI document"
+ * in AGENTS.md.
+ */
+export const donationSchema = z.object({
+  id: z.number().int(),
+  userGuardianId: z
+    .number()
+    .int()
+    .describe('Which maxed spirit paid for it -- how the picker knows one is spent'),
+  amount: z
+    .number()
+    .int()
+    .describe('Frozen at confirmation. Never render the current donationAmount in its place'),
+  confirmedAt: z.string().describe('ISO 8601'),
+  category: z.object({
+    id: z.number().int(),
+    code: z.string(),
+    name: z.string(),
+  }),
+  organization: z.object({
+    id: z.number().int(),
+    name: z.string(),
+    introduction: z.string(),
+    websiteUrl: z.string().nullable(),
+    logoUrl: z.string().nullable(),
+  }),
+  batch: z
+    .object({
+      id: z.number().int(),
+      transferredAt: z.string().describe('ISO 8601'),
+      published: z
+        .boolean()
+        .describe(
+          'Whether the public page shows this batch yet. A donation can be paid before its evidence is uploaded, and this record should not link to a batch nobody can read.'
+        ),
+    })
+    .nullable()
+    .describe('null while the money has not gone out yet -- there is no status column'),
+});
+
+export const getDonationResponseSchema = z.object({
+  data: z.array(donationSchema),
+  paginate: paginationSchema,
+  donationAmount: z
+    .number()
+    .int()
+    .describe(
+      'What confirming one more spirit would be worth. The figure a *new* donation would freeze, which is why every row above carries its own amount instead.'
+    ),
+});
+
+const listDoc = describeRoute({
+  summary: "The caller's own donations",
+  description:
+    'Behind requireUser, and scoped to the caller. Carries `userGuardianId` so the client can tell which of its maxed spirits have already chosen: this list and GET /api/guardian are what the picker is built from.',
+  tags: ['donation'],
+  responses: {
+    200: {
+      description: 'One page of donations, newest first by default',
+      content: { 'application/json': { schema: resolver(getDonationResponseSchema) } },
+    },
+    400: { description: 'limit beyond the cap, or a malformed offset or order' },
+    401: { description: 'No valid identity' },
+  },
+});
+
+const createDoc = describeRoute({
+  summary: 'Confirm which organisation one maxed spirit supports',
+  description:
+    'Behind requireUser. Irreversible by design: `donation.user_guardian_id` is UNIQUE, so one spirit means one donation forever. `categoryId` is required only for a species tied to no category (the VIP spirit, whose owner may direct the donation anywhere); for any other spirit the only legal value is its own category, so it can be left out.',
+  tags: ['donation'],
+  responses: {
+    201: {
+      description: 'The donation as recorded, awaiting payout',
+      content: { 'application/json': { schema: resolver(donationSchema) } },
+    },
+    400: {
+      description:
+        'The spirit is not at the maximum level (GUARDIAN_NOT_MAX_LEVEL), it has already chosen (DONATION_ALREADY_CONFIRMED), a category is required (DONATION_CATEGORY_REQUIRED) or not its own (DONATION_CATEGORY_INVALID) or out of circulation (DONATION_CATEGORY_INACTIVE), the organisation is out of circulation (ORGANIZATION_INACTIVE) or is not offered under the chosen category (ORGANIZATION_CATEGORY_MISMATCH) -- the code in the body says which',
+    },
+    401: { description: 'No valid identity' },
+    404: {
+      description:
+        'No such spirit belongs to this caller, or no such organisation. Someone else\'s spirit reads as not-found rather than forbidden: whether a given id exists is not this caller\'s business',
+    },
+  },
+});
+
+/**
+ * Serialises one donation row.
+ *
+ * The dates are converted here rather than left to `c.json`: the columns
+ * are Dates, every type in the repo calls these fields strings, and
+ * JSON.stringify happening to agree is not a contract. The bytes on the
+ * wire are identical.
+ */
+const toDto = (row: DonationRow): z.infer<typeof donationSchema> => ({
   id: row.id,
   userGuardianId: row.userGuardianId,
   amount: row.amount,
-  confirmedAt: row.confirmedAt,
+  confirmedAt: row.confirmedAt.toISOString(),
   category: {
     id: row.categoryId,
     code: row.categoryCode,
@@ -94,15 +197,20 @@ const toDto = (row: DonationRow) => ({
     websiteUrl: row.organizationWebsiteUrl,
     logoUrl: row.organizationLogoUrl,
   },
+  // All three checked together, although batchId alone decides it at
+  // runtime: the left join widens every donation_batch column to
+  // nullable, NOT NULL ones included, and TypeScript cannot see that a
+  // set batchId means the row matched. This is why the response used to
+  // be typed `transferredAt: Date | null, published: boolean | null`
+  // while packages/shared said `string` and `boolean` -- narrowing here
+  // makes the honest type the one the document carries, without a
+  // non-null assertion.
   batch:
-    row.batchId === null
+    row.batchId === null || row.batchTransferredAt === null || row.batchPublished === null
       ? null
       : {
           id: row.batchId,
-          transferredAt: row.batchTransferredAt,
-          // Whether the public page shows this batch yet. A confirmed
-          // donation can be paid before the evidence is uploaded, and the
-          // user's own page should not link to a batch nobody can read.
+          transferredAt: row.batchTransferredAt.toISOString(),
           published: row.batchPublished,
         },
 });
@@ -113,7 +221,7 @@ export const donation = new Hono<UserEnv>()
    * tell which of its maxed spirits have already chosen -- the two lists
    * (/api/guardian and this one) are what the picker is built from.
    */
-  .get('/', zValidator('query', donationListQuerySchema), async (c) => {
+  .get('/', listDoc, zValidator('query', donationListQuerySchema), async (c) => {
     const user = c.get('user');
     const { limit, offset, order } = c.req.valid('query');
     console.log(`GET /api/donation userId=${user.id} limit=${limit} offset=${offset} order=${order}`);
@@ -143,7 +251,7 @@ export const donation = new Hono<UserEnv>()
       // second endpoint. It is the figure a *new* donation would freeze,
       // which is why each row above carries its own amount instead.
       donationAmount: DONATION_AMOUNT,
-    });
+    } satisfies z.infer<typeof getDonationResponseSchema>);
   })
   /**
    * Confirm which organisation one maxed spirit supports.
@@ -154,7 +262,7 @@ export const donation = new Hono<UserEnv>()
    * meaningful instead of a driver error, not to be the only line of
    * defence against a replayed request.
    */
-  .post('/', zValidator('json', donationBodySchema), async (c) => {
+  .post('/', createDoc, zValidator('json', donationBodySchema), async (c) => {
     const user = c.get('user');
     const { userGuardianId, organizationId, categoryId } = c.req.valid('json');
     console.log(
@@ -283,5 +391,5 @@ export const donation = new Hono<UserEnv>()
 
     const [saved] = await selectDonations(db).where(eq(donationTable.id, insertId));
 
-    return c.json(toDto(saved), 201);
+    return c.json(toDto(saved) satisfies z.infer<typeof donationSchema>, 201);
   });

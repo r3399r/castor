@@ -33,6 +33,8 @@ type ListDto = {
   donationAmount: number;
 };
 
+import { donationSchema, getDonationResponseSchema } from 'src/routes/donation';
+
 const getDonations = (query = '') => app.request(`/api/donation${query}`);
 
 const postDonation = (body: unknown) =>
@@ -514,6 +516,107 @@ describe('donation routes', () => {
 
       const rest = (await (await getDonations('?limit=2&offset=2')).json()) as ListDto;
       expect(rest.data).toHaveLength(1);
+    });
+  });
+
+  /**
+   * What the OpenAPI document promises, against what is sent.
+   *
+   * The key checks are separate from the parse because zod strips
+   * unknown keys instead of rejecting them, and the handler's
+   * `satisfies` does not catch an extra one either: a row with
+   * properties the schema does not mention is still assignable to it.
+   */
+  describe('the OpenAPI document', () => {
+    const donationKeys = [
+      'amount',
+      'batch',
+      'category',
+      'confirmedAt',
+      'id',
+      'organization',
+      'userGuardianId',
+    ];
+
+    it('describes exactly what confirming and listing send', async () => {
+      const userId = await seedUser();
+      const categoryId = await seedCategory();
+      const organizationId = await seedOrganization([categoryId]);
+      const speciesId = await seedSpecies(categoryId);
+      const userGuardianId = await seedSpirit(userId, categoryId);
+
+      const created: unknown = await (
+        await postDonation({ userGuardianId, organizationId })
+      ).json();
+
+      expect(donationSchema.safeParse(created).error?.issues ?? []).toEqual([]);
+      expect(Object.keys(created as object).sort()).toEqual(donationKeys);
+      expect(Object.keys((created as { category: object }).category).sort()).toEqual([
+        'code',
+        'id',
+        'name',
+      ]);
+      // Five of the organisation's columns: no taxId, no sortOrder, no
+      // isActive, no timestamps. This is the giver's own record, not the
+      // admin directory.
+      expect(Object.keys((created as { organization: object }).organization).sort()).toEqual([
+        'id',
+        'introduction',
+        'logoUrl',
+        'name',
+        'websiteUrl',
+      ]);
+      // Awaiting payout, so no batch: `batch` null is the whole state
+      // machine, and there is no status column to disagree with it.
+      expect((created as { batch: unknown }).batch).toBeNull();
+      expect(speciesId).toEqual(expect.any(Number));
+
+      const list: unknown = await (await getDonations()).json();
+      const parsed = getDonationResponseSchema.safeParse(list);
+      expect(parsed.error?.issues ?? []).toEqual([]);
+      expect(parsed.success).toBe(true);
+      expect(Object.keys(list as object).sort()).toEqual([
+        'data',
+        'donationAmount',
+        'paginate',
+      ]);
+      expect(Object.keys((list as { data: object[] }).data[0]).sort()).toEqual(donationKeys);
+    });
+
+    it('describes the batch reference once the money has gone out', async () => {
+      const userId = await seedUser();
+      const categoryId = await seedCategory();
+      const organizationId = await seedOrganization([categoryId]);
+      await seedSpecies(categoryId);
+      const userGuardianId = await seedSpirit(userId, categoryId);
+      const created = (await (
+        await postDonation({ userGuardianId, organizationId })
+      ).json()) as DonationDto;
+
+      const db = getDb();
+      const [{ insertId: batchId }] = await db.insert(donationBatchTable).values({
+        organizationId,
+        transferredAmount: 1000,
+        transferredAt: new Date('2026-11-05T00:00:00.000Z'),
+        published: true,
+        createdAt: new Date(),
+      });
+      await db
+        .update(donationTable)
+        .set({ batchId })
+        .where(eq(donationTable.id, created.id));
+
+      const list: unknown = await (await getDonations()).json();
+      expect(getDonationResponseSchema.safeParse(list).error?.issues ?? []).toEqual([]);
+      const [row] = (list as { data: { batch: object }[] }).data;
+      // Three fields, and no nulls among them: the left join widens every
+      // batch column, so this is what the narrowing in toDto is for.
+      expect(Object.keys(row.batch).sort()).toEqual(['id', 'published', 'transferredAt']);
+      expect(row.batch).toEqual({
+        id: batchId,
+        published: true,
+        transferredAt: '2026-11-05T00:00:00.000Z',
+      });
     });
   });
 });

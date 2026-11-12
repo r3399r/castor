@@ -5884,6 +5884,1747 @@
           }
         ]
       }
+    },
+    "/api/donation": {
+      "get": {
+        "operationId": "getApiDonation",
+        "summary": "The caller's own donations",
+        "description": "Behind requireUser, and scoped to the caller. Carries `userGuardianId` so the client can tell which of its maxed spirits have already chosen: this list and GET /api/guardian are what the picker is built from.",
+        "tags": [
+          "donation"
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of donations, newest first by default",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "userGuardianId": {
+                            "type": "integer",
+                            "description": "Which maxed spirit paid for it -- how the picker knows one is spent"
+                          },
+                          "amount": {
+                            "type": "integer",
+                            "description": "Frozen at confirmation. Never render the current donationAmount in its place"
+                          },
+                          "confirmedAt": {
+                            "type": "string",
+                            "description": "ISO 8601"
+                          },
+                          "category": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "integer"
+                              },
+                              "code": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "code",
+                              "name"
+                            ]
+                          },
+                          "organization": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "integer"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "introduction": {
+                                "type": "string"
+                              },
+                              "websiteUrl": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "logoUrl": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name",
+                              "introduction",
+                              "websiteUrl",
+                              "logoUrl"
+                            ]
+                          },
+                          "batch": {
+                            "type": [
+                              "object",
+                              "null"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "integer"
+                              },
+                              "transferredAt": {
+                                "type": "string",
+                                "description": "ISO 8601"
+                              },
+                              "published": {
+                                "type": "boolean",
+                                "description": "Whether the public page shows this batch yet. A donation can be paid before its evidence is uploaded, and this record should not link to a batch nobody can read."
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "transferredAt",
+                              "published"
+                            ],
+                            "description": "null while the money has not gone out yet -- there is no status column"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "userGuardianId",
+                          "amount",
+                          "confirmedAt",
+                          "category",
+                          "organization",
+                          "batch"
+                        ]
+                      }
+                    },
+                    "paginate": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer",
+                          "description": "Rows matching the query, ignoring limit and offset"
+                        },
+                        "page": {
+                          "type": "integer",
+                          "description": "1-indexed, derived from offset and limit"
+                        },
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "totalPages": {
+                          "type": "integer",
+                          "description": "At least 1, so an empty result reads as \"page 1 of 1\" rather than \"of 0\""
+                        }
+                      },
+                      "required": [
+                        "total",
+                        "page",
+                        "limit",
+                        "totalPages"
+                      ]
+                    },
+                    "donationAmount": {
+                      "type": "integer",
+                      "description": "What confirming one more spirit would be worth. The figure a *new* donation would freeze, which is why every row above carries its own amount instead."
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "paginate",
+                    "donationAmount"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "limit beyond the cap, or a malformed offset or order"
+          },
+          "401": {
+            "description": "No valid identity"
+          }
+        }
+      },
+      "post": {
+        "operationId": "postApiDonation",
+        "summary": "Confirm which organisation one maxed spirit supports",
+        "description": "Behind requireUser. Irreversible by design: `donation.user_guardian_id` is UNIQUE, so one spirit means one donation forever. `categoryId` is required only for a species tied to no category (the VIP spirit, whose owner may direct the donation anywhere); for any other spirit the only legal value is its own category, so it can be left out.",
+        "tags": [
+          "donation"
+        ],
+        "responses": {
+          "201": {
+            "description": "The donation as recorded, awaiting payout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "userGuardianId": {
+                      "type": "integer",
+                      "description": "Which maxed spirit paid for it -- how the picker knows one is spent"
+                    },
+                    "amount": {
+                      "type": "integer",
+                      "description": "Frozen at confirmation. Never render the current donationAmount in its place"
+                    },
+                    "confirmedAt": {
+                      "type": "string",
+                      "description": "ISO 8601"
+                    },
+                    "category": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "code",
+                        "name"
+                      ]
+                    },
+                    "organization": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "introduction": {
+                          "type": "string"
+                        },
+                        "websiteUrl": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "logoUrl": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "introduction",
+                        "websiteUrl",
+                        "logoUrl"
+                      ]
+                    },
+                    "batch": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "integer"
+                        },
+                        "transferredAt": {
+                          "type": "string",
+                          "description": "ISO 8601"
+                        },
+                        "published": {
+                          "type": "boolean",
+                          "description": "Whether the public page shows this batch yet. A donation can be paid before its evidence is uploaded, and this record should not link to a batch nobody can read."
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "transferredAt",
+                        "published"
+                      ],
+                      "description": "null while the money has not gone out yet -- there is no status column"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "userGuardianId",
+                    "amount",
+                    "confirmedAt",
+                    "category",
+                    "organization",
+                    "batch"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The spirit is not at the maximum level (GUARDIAN_NOT_MAX_LEVEL), it has already chosen (DONATION_ALREADY_CONFIRMED), a category is required (DONATION_CATEGORY_REQUIRED) or not its own (DONATION_CATEGORY_INVALID) or out of circulation (DONATION_CATEGORY_INACTIVE), the organisation is out of circulation (ORGANIZATION_INACTIVE) or is not offered under the chosen category (ORGANIZATION_CATEGORY_MISMATCH) -- the code in the body says which"
+          },
+          "401": {
+            "description": "No valid identity"
+          },
+          "404": {
+            "description": "No such spirit belongs to this caller, or no such organisation. Someone else's spirit reads as not-found rather than forbidden: whether a given id exists is not this caller's business"
+          }
+        }
+      }
+    },
+    "/api/donation-batch/unpaid": {
+      "get": {
+        "operationId": "getApiDonationBatchUnpaid",
+        "summary": "What is still owed to one foundation",
+        "description": "Admin only. The starting point of a payout: donations for this organisation with no batch yet (`donation.batch_id` NULL is the entire state machine -- there is no status column). Paginated, so `summary` reports the whole unpaid set rather than the page.",
+        "tags": [
+          "donation-batch"
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of unpaid donations, and the totals for all of them",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "userId": {
+                            "type": "integer"
+                          },
+                          "amount": {
+                            "type": "integer",
+                            "description": "Frozen at confirmation"
+                          },
+                          "confirmedAt": {
+                            "type": "string",
+                            "description": "ISO 8601"
+                          },
+                          "category": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "integer"
+                              },
+                              "name": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "userId",
+                          "amount",
+                          "confirmedAt",
+                          "category"
+                        ]
+                      }
+                    },
+                    "paginate": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer",
+                          "description": "Rows matching the query, ignoring limit and offset"
+                        },
+                        "page": {
+                          "type": "integer",
+                          "description": "1-indexed, derived from offset and limit"
+                        },
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "totalPages": {
+                          "type": "integer",
+                          "description": "At least 1, so an empty result reads as \"page 1 of 1\" rather than \"of 0\""
+                        }
+                      },
+                      "required": [
+                        "total",
+                        "page",
+                        "limit",
+                        "totalPages"
+                      ]
+                    },
+                    "summary": {
+                      "type": "object",
+                      "properties": {
+                        "unpaidCount": {
+                          "type": "integer"
+                        },
+                        "unpaidAmount": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "unpaidCount",
+                        "unpaidAmount"
+                      ],
+                      "description": "The whole outstanding set, not the page. A batch can only be built from what is on screen, so this is how a second page makes itself known."
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "paginate",
+                    "summary"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "organizationId missing, or a malformed limit, offset or order"
+          },
+          "401": {
+            "description": "No valid identity"
+          },
+          "403": {
+            "description": "Not an admin"
+          }
+        }
+      }
+    },
+    "/api/donation-batch": {
+      "get": {
+        "operationId": "getApiDonationBatch",
+        "summary": "List the payout batches",
+        "description": "Admin only, published and unpublished alike -- the public view of the same payouts is GET /api/info/donation, which shows published batches and never users.",
+        "tags": [
+          "donation-batch"
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of batches, newest transfer first by default",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "organization": {
+                            "type": [
+                              "object",
+                              "null"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "integer"
+                              },
+                              "name": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name"
+                            ],
+                            "description": "null only if the organisation row has gone, which a FK should prevent"
+                          },
+                          "transferredAmount": {
+                            "type": "integer",
+                            "description": "What actually left the bank account"
+                          },
+                          "transferredAt": {
+                            "type": "string",
+                            "description": "ISO 8601. The date the money moved, not the date typed in"
+                          },
+                          "reference": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "Bank transaction number, or the last account digits"
+                          },
+                          "note": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "The internal memo. Deliberately not part of the public record"
+                          },
+                          "published": {
+                            "type": "boolean",
+                            "description": "Whether the public page shows it"
+                          },
+                          "donationCount": {
+                            "type": "integer",
+                            "description": "Members, aggregated on read rather than stored"
+                          },
+                          "donationSubtotal": {
+                            "type": "integer",
+                            "description": "Their frozen amounts, summed"
+                          },
+                          "platformTopUp": {
+                            "type": "integer",
+                            "description": "transferredAmount - donationSubtotal. Signed, deliberately not clamped: a negative value is exactly what PUT /{id}/publish refuses, so hiding it would hide the reason"
+                          },
+                          "evidence": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "integer"
+                                },
+                                "kind": {
+                                  "type": "string",
+                                  "description": "TRANSFER_RECEIPT, ORG_RECEIPT, THANK_YOU_LETTER -- open-ended"
+                                },
+                                "url": {
+                                  "type": "string"
+                                },
+                                "s3Key": {
+                                  "type": "string",
+                                  "description": "What deleteFromS3 needs. Present here and absent from the public response: it is never useful to a reader of the public page"
+                                },
+                                "caption": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "sortOrder": {
+                                  "type": "integer"
+                                },
+                                "createdAt": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ],
+                                  "description": "ISO 8601"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "kind",
+                                "url",
+                                "s3Key",
+                                "caption",
+                                "sortOrder",
+                                "createdAt"
+                              ]
+                            }
+                          },
+                          "createdAt": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "ISO 8601"
+                          },
+                          "updatedAt": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "ISO 8601"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "organization",
+                          "transferredAmount",
+                          "transferredAt",
+                          "reference",
+                          "note",
+                          "published",
+                          "donationCount",
+                          "donationSubtotal",
+                          "platformTopUp",
+                          "evidence",
+                          "createdAt",
+                          "updatedAt"
+                        ]
+                      }
+                    },
+                    "paginate": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer",
+                          "description": "Rows matching the query, ignoring limit and offset"
+                        },
+                        "page": {
+                          "type": "integer",
+                          "description": "1-indexed, derived from offset and limit"
+                        },
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "totalPages": {
+                          "type": "integer",
+                          "description": "At least 1, so an empty result reads as \"page 1 of 1\" rather than \"of 0\""
+                        }
+                      },
+                      "required": [
+                        "total",
+                        "page",
+                        "limit",
+                        "totalPages"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "paginate"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "limit beyond the cap, or a malformed order, organizationId or published"
+          },
+          "401": {
+            "description": "No valid identity"
+          },
+          "403": {
+            "description": "Not an admin"
+          }
+        }
+      },
+      "post": {
+        "operationId": "postApiDonationBatch",
+        "summary": "Record a transfer",
+        "description": "Admin only. Created unpublished: the batch exists, holds its donations and is invisible until PUT /{id}/publish. `donationIds` is explicit rather than \"everything unpaid\" -- the admin pays what they saw, and a donation confirmed since the list loaded must not be swept into a transfer that did not cover it. Membership is frozen afterwards, so correcting it means DELETE and rebuild.",
+        "tags": [
+          "donation-batch"
+        ],
+        "responses": {
+          "201": {
+            "description": "The batch as recorded, unpublished and with no evidence yet",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "organization": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "integer"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name"
+                      ],
+                      "description": "null only if the organisation row has gone, which a FK should prevent"
+                    },
+                    "transferredAmount": {
+                      "type": "integer",
+                      "description": "What actually left the bank account"
+                    },
+                    "transferredAt": {
+                      "type": "string",
+                      "description": "ISO 8601. The date the money moved, not the date typed in"
+                    },
+                    "reference": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Bank transaction number, or the last account digits"
+                    },
+                    "note": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "The internal memo. Deliberately not part of the public record"
+                    },
+                    "published": {
+                      "type": "boolean",
+                      "description": "Whether the public page shows it"
+                    },
+                    "donationCount": {
+                      "type": "integer",
+                      "description": "Members, aggregated on read rather than stored"
+                    },
+                    "donationSubtotal": {
+                      "type": "integer",
+                      "description": "Their frozen amounts, summed"
+                    },
+                    "platformTopUp": {
+                      "type": "integer",
+                      "description": "transferredAmount - donationSubtotal. Signed, deliberately not clamped: a negative value is exactly what PUT /{id}/publish refuses, so hiding it would hide the reason"
+                    },
+                    "evidence": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "description": "TRANSFER_RECEIPT, ORG_RECEIPT, THANK_YOU_LETTER -- open-ended"
+                          },
+                          "url": {
+                            "type": "string"
+                          },
+                          "s3Key": {
+                            "type": "string",
+                            "description": "What deleteFromS3 needs. Present here and absent from the public response: it is never useful to a reader of the public page"
+                          },
+                          "caption": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "sortOrder": {
+                            "type": "integer"
+                          },
+                          "createdAt": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "ISO 8601"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind",
+                          "url",
+                          "s3Key",
+                          "caption",
+                          "sortOrder",
+                          "createdAt"
+                        ]
+                      }
+                    },
+                    "createdAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601"
+                    },
+                    "updatedAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "organization",
+                    "transferredAmount",
+                    "transferredAt",
+                    "reference",
+                    "note",
+                    "published",
+                    "donationCount",
+                    "donationSubtotal",
+                    "platformTopUp",
+                    "evidence",
+                    "createdAt",
+                    "updatedAt"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A transfer date in the future (BATCH_FUTURE_TRANSFER), a donation that does not exist (DONATION_NOT_FOUND), one owed to another foundation (DONATION_ORGANIZATION_MISMATCH) or one already paid (DONATION_ALREADY_BATCHED) -- the code in the body says which"
+          },
+          "401": {
+            "description": "No valid identity"
+          },
+          "403": {
+            "description": "Not an admin"
+          },
+          "404": {
+            "description": "No such organisation"
+          }
+        }
+      }
+    },
+    "/api/donation-batch/{id}": {
+      "get": {
+        "operationId": "getApiDonationBatchById",
+        "summary": "Read one batch, with its frozen membership list",
+        "description": "Admin only. The members are what the transfer covered and cannot change.",
+        "tags": [
+          "donation-batch"
+        ],
+        "responses": {
+          "200": {
+            "description": "The batch, its evidence and its donations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "organization": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "integer"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name"
+                      ],
+                      "description": "null only if the organisation row has gone, which a FK should prevent"
+                    },
+                    "transferredAmount": {
+                      "type": "integer",
+                      "description": "What actually left the bank account"
+                    },
+                    "transferredAt": {
+                      "type": "string",
+                      "description": "ISO 8601. The date the money moved, not the date typed in"
+                    },
+                    "reference": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Bank transaction number, or the last account digits"
+                    },
+                    "note": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "The internal memo. Deliberately not part of the public record"
+                    },
+                    "published": {
+                      "type": "boolean",
+                      "description": "Whether the public page shows it"
+                    },
+                    "donationCount": {
+                      "type": "integer",
+                      "description": "Members, aggregated on read rather than stored"
+                    },
+                    "donationSubtotal": {
+                      "type": "integer",
+                      "description": "Their frozen amounts, summed"
+                    },
+                    "platformTopUp": {
+                      "type": "integer",
+                      "description": "transferredAmount - donationSubtotal. Signed, deliberately not clamped: a negative value is exactly what PUT /{id}/publish refuses, so hiding it would hide the reason"
+                    },
+                    "evidence": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "description": "TRANSFER_RECEIPT, ORG_RECEIPT, THANK_YOU_LETTER -- open-ended"
+                          },
+                          "url": {
+                            "type": "string"
+                          },
+                          "s3Key": {
+                            "type": "string",
+                            "description": "What deleteFromS3 needs. Present here and absent from the public response: it is never useful to a reader of the public page"
+                          },
+                          "caption": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "sortOrder": {
+                            "type": "integer"
+                          },
+                          "createdAt": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "ISO 8601"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind",
+                          "url",
+                          "s3Key",
+                          "caption",
+                          "sortOrder",
+                          "createdAt"
+                        ]
+                      }
+                    },
+                    "createdAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601"
+                    },
+                    "updatedAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601"
+                    },
+                    "donations": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "userId": {
+                            "type": "integer"
+                          },
+                          "amount": {
+                            "type": "integer",
+                            "description": "Frozen at confirmation"
+                          },
+                          "confirmedAt": {
+                            "type": "string",
+                            "description": "ISO 8601"
+                          },
+                          "category": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "integer"
+                              },
+                              "name": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "userId",
+                          "amount",
+                          "confirmedAt",
+                          "category"
+                        ]
+                      },
+                      "description": "The frozen membership list"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "organization",
+                    "transferredAmount",
+                    "transferredAt",
+                    "reference",
+                    "note",
+                    "published",
+                    "donationCount",
+                    "donationSubtotal",
+                    "platformTopUp",
+                    "evidence",
+                    "createdAt",
+                    "updatedAt",
+                    "donations"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid identity"
+          },
+          "403": {
+            "description": "Not an admin"
+          },
+          "404": {
+            "description": "No such batch"
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ]
+      },
+      "put": {
+        "operationId": "putApiDonationBatchById",
+        "summary": "Correct the figures of an unpublished batch",
+        "description": "Admin only, and unpublished only: a published batch is part of the public record. Membership is not editable here -- to fix the wrong set of donations, DELETE the batch, which releases them, and build it again.",
+        "tags": [
+          "donation-batch"
+        ],
+        "responses": {
+          "200": {
+            "description": "The batch as saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "organization": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "integer"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name"
+                      ],
+                      "description": "null only if the organisation row has gone, which a FK should prevent"
+                    },
+                    "transferredAmount": {
+                      "type": "integer",
+                      "description": "What actually left the bank account"
+                    },
+                    "transferredAt": {
+                      "type": "string",
+                      "description": "ISO 8601. The date the money moved, not the date typed in"
+                    },
+                    "reference": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Bank transaction number, or the last account digits"
+                    },
+                    "note": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "The internal memo. Deliberately not part of the public record"
+                    },
+                    "published": {
+                      "type": "boolean",
+                      "description": "Whether the public page shows it"
+                    },
+                    "donationCount": {
+                      "type": "integer",
+                      "description": "Members, aggregated on read rather than stored"
+                    },
+                    "donationSubtotal": {
+                      "type": "integer",
+                      "description": "Their frozen amounts, summed"
+                    },
+                    "platformTopUp": {
+                      "type": "integer",
+                      "description": "transferredAmount - donationSubtotal. Signed, deliberately not clamped: a negative value is exactly what PUT /{id}/publish refuses, so hiding it would hide the reason"
+                    },
+                    "evidence": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "description": "TRANSFER_RECEIPT, ORG_RECEIPT, THANK_YOU_LETTER -- open-ended"
+                          },
+                          "url": {
+                            "type": "string"
+                          },
+                          "s3Key": {
+                            "type": "string",
+                            "description": "What deleteFromS3 needs. Present here and absent from the public response: it is never useful to a reader of the public page"
+                          },
+                          "caption": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "sortOrder": {
+                            "type": "integer"
+                          },
+                          "createdAt": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "ISO 8601"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind",
+                          "url",
+                          "s3Key",
+                          "caption",
+                          "sortOrder",
+                          "createdAt"
+                        ]
+                      }
+                    },
+                    "createdAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601"
+                    },
+                    "updatedAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "organization",
+                    "transferredAmount",
+                    "transferredAt",
+                    "reference",
+                    "note",
+                    "published",
+                    "donationCount",
+                    "donationSubtotal",
+                    "platformTopUp",
+                    "evidence",
+                    "createdAt",
+                    "updatedAt"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "It is published (BATCH_PUBLISHED) or the transfer date is in the future (BATCH_FUTURE_TRANSFER)"
+          },
+          "401": {
+            "description": "No valid identity"
+          },
+          "403": {
+            "description": "Not an admin"
+          },
+          "404": {
+            "description": "No such batch"
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "deleteApiDonationBatchById",
+        "summary": "Discard an unpublished batch",
+        "description": "Admin only, and unpublished only. The only way to correct a wrong membership list: every member goes back to `batch_id` NULL, and the evidence rows and their S3 objects go with it.",
+        "tags": [
+          "donation-batch"
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted, and its donations released"
+          },
+          "400": {
+            "description": "The batch is published (BATCH_PUBLISHED)"
+          },
+          "401": {
+            "description": "No valid identity"
+          },
+          "403": {
+            "description": "Not an admin"
+          },
+          "404": {
+            "description": "No such batch"
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ]
+      }
+    },
+    "/api/donation-batch/{id}/evidence": {
+      "post": {
+        "operationId": "postApiDonationBatchByIdEvidence",
+        "summary": "Attach one proof document",
+        "description": "Admin only, and the one write allowed on a published batch: a foundation's receipt and its thank-you letter routinely arrive weeks after the money does, and hiding a real payout again just to append them would be worse. The body carries the file as base64 (with or without a `data:` prefix); it is uploaded to S3 under `donations/{batchId}/` and the row keeps the key.",
+        "tags": [
+          "donation-batch"
+        ],
+        "responses": {
+          "201": {
+            "description": "The evidence row as saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "description": "TRANSFER_RECEIPT, ORG_RECEIPT, THANK_YOU_LETTER -- open-ended"
+                    },
+                    "url": {
+                      "type": "string"
+                    },
+                    "s3Key": {
+                      "type": "string",
+                      "description": "What deleteFromS3 needs. Present here and absent from the public response: it is never useful to a reader of the public page"
+                    },
+                    "caption": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "sortOrder": {
+                      "type": "integer"
+                    },
+                    "createdAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "kind",
+                    "url",
+                    "s3Key",
+                    "caption",
+                    "sortOrder",
+                    "createdAt"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A kind that is not UPPER_SNAKE_CASE, an unsupported mimeType, or data that is not base64 or is beyond the size cap"
+          },
+          "401": {
+            "description": "No valid identity"
+          },
+          "403": {
+            "description": "Not an admin"
+          },
+          "404": {
+            "description": "No such batch"
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ]
+      }
+    },
+    "/api/donation-batch/{id}/evidence/{evidenceId}": {
+      "delete": {
+        "operationId": "deleteApiDonationBatchByIdEvidenceByEvidenceId",
+        "summary": "Remove one proof document",
+        "description": "Admin only, and unpublished only: removing proof from a published batch would leave the public page asserting a payout it can no longer evidence. The S3 object goes with the row.",
+        "tags": [
+          "donation-batch"
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "400": {
+            "description": "The batch is published (BATCH_PUBLISHED)"
+          },
+          "401": {
+            "description": "No valid identity"
+          },
+          "403": {
+            "description": "Not an admin"
+          },
+          "404": {
+            "description": "No such batch, or no such evidence on it"
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "evidenceId",
+            "required": true
+          }
+        ]
+      }
+    },
+    "/api/donation-batch/{id}/publish": {
+      "put": {
+        "operationId": "putApiDonationBatchByIdPublish",
+        "summary": "Make one batch visible on the public page",
+        "description": "Admin only. The guards live here, because GET /api/info/donation reports platformTopUp with its sign on the grounds that an underpaid batch should never have been published: this is the place that has to be true. Evidence is required -- a transparency page with nothing to show is just a claim.",
+        "tags": [
+          "donation-batch"
+        ],
+        "responses": {
+          "200": {
+            "description": "The batch, now published",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "organization": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "integer"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name"
+                      ],
+                      "description": "null only if the organisation row has gone, which a FK should prevent"
+                    },
+                    "transferredAmount": {
+                      "type": "integer",
+                      "description": "What actually left the bank account"
+                    },
+                    "transferredAt": {
+                      "type": "string",
+                      "description": "ISO 8601. The date the money moved, not the date typed in"
+                    },
+                    "reference": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Bank transaction number, or the last account digits"
+                    },
+                    "note": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "The internal memo. Deliberately not part of the public record"
+                    },
+                    "published": {
+                      "type": "boolean",
+                      "description": "Whether the public page shows it"
+                    },
+                    "donationCount": {
+                      "type": "integer",
+                      "description": "Members, aggregated on read rather than stored"
+                    },
+                    "donationSubtotal": {
+                      "type": "integer",
+                      "description": "Their frozen amounts, summed"
+                    },
+                    "platformTopUp": {
+                      "type": "integer",
+                      "description": "transferredAmount - donationSubtotal. Signed, deliberately not clamped: a negative value is exactly what PUT /{id}/publish refuses, so hiding it would hide the reason"
+                    },
+                    "evidence": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "description": "TRANSFER_RECEIPT, ORG_RECEIPT, THANK_YOU_LETTER -- open-ended"
+                          },
+                          "url": {
+                            "type": "string"
+                          },
+                          "s3Key": {
+                            "type": "string",
+                            "description": "What deleteFromS3 needs. Present here and absent from the public response: it is never useful to a reader of the public page"
+                          },
+                          "caption": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "sortOrder": {
+                            "type": "integer"
+                          },
+                          "createdAt": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "ISO 8601"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind",
+                          "url",
+                          "s3Key",
+                          "caption",
+                          "sortOrder",
+                          "createdAt"
+                        ]
+                      }
+                    },
+                    "createdAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601"
+                    },
+                    "updatedAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "organization",
+                    "transferredAmount",
+                    "transferredAt",
+                    "reference",
+                    "note",
+                    "published",
+                    "donationCount",
+                    "donationSubtotal",
+                    "platformTopUp",
+                    "evidence",
+                    "createdAt",
+                    "updatedAt"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Already published (BATCH_ALREADY_PUBLISHED), less was transferred than the donations total (BATCH_UNDERPAID), or nothing is attached to show (BATCH_NO_EVIDENCE)"
+          },
+          "401": {
+            "description": "No valid identity"
+          },
+          "403": {
+            "description": "Not an admin"
+          },
+          "404": {
+            "description": "No such batch"
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ]
+      }
+    },
+    "/api/donation-batch/{id}/unpublish": {
+      "put": {
+        "operationId": "putApiDonationBatchByIdUnpublish",
+        "summary": "Hide one batch again",
+        "description": "Admin only. The way back out of a mis-click; the public page lists published only.",
+        "tags": [
+          "donation-batch"
+        ],
+        "responses": {
+          "200": {
+            "description": "The batch, no longer published",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "organization": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "integer"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name"
+                      ],
+                      "description": "null only if the organisation row has gone, which a FK should prevent"
+                    },
+                    "transferredAmount": {
+                      "type": "integer",
+                      "description": "What actually left the bank account"
+                    },
+                    "transferredAt": {
+                      "type": "string",
+                      "description": "ISO 8601. The date the money moved, not the date typed in"
+                    },
+                    "reference": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Bank transaction number, or the last account digits"
+                    },
+                    "note": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "The internal memo. Deliberately not part of the public record"
+                    },
+                    "published": {
+                      "type": "boolean",
+                      "description": "Whether the public page shows it"
+                    },
+                    "donationCount": {
+                      "type": "integer",
+                      "description": "Members, aggregated on read rather than stored"
+                    },
+                    "donationSubtotal": {
+                      "type": "integer",
+                      "description": "Their frozen amounts, summed"
+                    },
+                    "platformTopUp": {
+                      "type": "integer",
+                      "description": "transferredAmount - donationSubtotal. Signed, deliberately not clamped: a negative value is exactly what PUT /{id}/publish refuses, so hiding it would hide the reason"
+                    },
+                    "evidence": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "description": "TRANSFER_RECEIPT, ORG_RECEIPT, THANK_YOU_LETTER -- open-ended"
+                          },
+                          "url": {
+                            "type": "string"
+                          },
+                          "s3Key": {
+                            "type": "string",
+                            "description": "What deleteFromS3 needs. Present here and absent from the public response: it is never useful to a reader of the public page"
+                          },
+                          "caption": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "sortOrder": {
+                            "type": "integer"
+                          },
+                          "createdAt": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "ISO 8601"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind",
+                          "url",
+                          "s3Key",
+                          "caption",
+                          "sortOrder",
+                          "createdAt"
+                        ]
+                      }
+                    },
+                    "createdAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601"
+                    },
+                    "updatedAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "organization",
+                    "transferredAmount",
+                    "transferredAt",
+                    "reference",
+                    "note",
+                    "published",
+                    "donationCount",
+                    "donationSubtotal",
+                    "platformTopUp",
+                    "evidence",
+                    "createdAt",
+                    "updatedAt"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "It is not published (BATCH_NOT_PUBLISHED)"
+          },
+          "401": {
+            "description": "No valid identity"
+          },
+          "403": {
+            "description": "Not an admin"
+          },
+          "404": {
+            "description": "No such batch"
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ]
+      }
     }
   }
 }

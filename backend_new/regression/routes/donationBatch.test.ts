@@ -50,6 +50,14 @@ type BatchDto = {
 };
 type ErrorBody = { code?: string };
 
+import {
+  donationBatchDetailResponseSchema,
+  donationBatchEvidenceSchema,
+  donationBatchSchema,
+  getDonationBatchListResponseSchema,
+  getUnpaidDonationsResponseSchema,
+} from 'src/routes/donationBatch';
+
 const base = '/api/donation-batch';
 
 const getUnpaid = (query: string) => app.request(`${base}/unpaid${query}`);
@@ -945,6 +953,106 @@ describe('donation batch routes', () => {
 
     it('answers 404 for a batch that does not exist', async () => {
       expect((await deleteBatch(999999)).status).toBe(404);
+    });
+  });
+
+  /**
+   * What the OpenAPI document promises, against what is sent.
+   *
+   * The key checks are separate from the parse because zod strips
+   * unknown keys instead of rejecting them, and the handler's
+   * `satisfies` does not catch an extra one either: a row with
+   * properties the schema does not mention is still assignable to it.
+   * `note` and `userId` appearing here and nowhere in
+   * GET /api/info/donation is the distinction these two sets of keys
+   * exist to hold.
+   */
+  describe('the OpenAPI document', () => {
+    const batchKeys = [
+      'createdAt',
+      'donationCount',
+      'donationSubtotal',
+      'evidence',
+      'id',
+      'note',
+      'organization',
+      'platformTopUp',
+      'published',
+      'reference',
+      'transferredAmount',
+      'transferredAt',
+      'updatedAt',
+    ];
+    const memberKeys = ['amount', 'category', 'confirmedAt', 'id', 'userId'];
+    const evidenceKeys = ['caption', 'createdAt', 'id', 'kind', 's3Key', 'sortOrder', 'url'];
+
+    it('describes exactly what the unpaid list sends', async () => {
+      const { organizationId } = await setupUnpaid(2);
+
+      const body: unknown = await (await getUnpaid(`?organizationId=${organizationId}`)).json();
+
+      const parsed = getUnpaidDonationsResponseSchema.safeParse(body);
+      expect(parsed.error?.issues ?? []).toEqual([]);
+      expect(parsed.success).toBe(true);
+      expect(Object.keys(body as object).sort()).toEqual(['data', 'paginate', 'summary']);
+      const record = body as { data: { category: object }[]; summary: object };
+      expect(Object.keys(record.data[0]).sort()).toEqual(memberKeys);
+      expect(Object.keys(record.data[0].category).sort()).toEqual(['id', 'name']);
+      expect(Object.keys(record.summary).sort()).toEqual(['unpaidAmount', 'unpaidCount']);
+    });
+
+    it('describes exactly what the batch reads and writes send', async () => {
+      const { batchId } = await setupPublishable();
+
+      const one: unknown = await (await getBatch(batchId)).json();
+      const parsed = donationBatchDetailResponseSchema.safeParse(one);
+      expect(parsed.error?.issues ?? []).toEqual([]);
+      expect(parsed.success).toBe(true);
+      // The detail read adds the frozen membership list, and nothing else.
+      expect(Object.keys(one as object).sort()).toEqual(['donations', ...batchKeys].sort());
+      const detail = one as { donations: object[]; evidence: object[] };
+      expect(Object.keys(detail.donations[0]).sort()).toEqual(memberKeys);
+      expect(Object.keys(detail.evidence[0]).sort()).toEqual(evidenceKeys);
+
+      const list: unknown = await (await getBatches()).json();
+      expect(getDonationBatchListResponseSchema.safeParse(list).error?.issues ?? []).toEqual([]);
+      expect(Object.keys(list as object).sort()).toEqual(['data', 'paginate']);
+      expect(Object.keys((list as { data: object[] }).data[0]).sort()).toEqual(batchKeys);
+
+      const published: unknown = await (await publish(batchId)).json();
+      expect(donationBatchSchema.safeParse(published).error?.issues ?? []).toEqual([]);
+      expect(Object.keys(published as object).sort()).toEqual(batchKeys);
+
+      const hidden: unknown = await (await unpublish(batchId)).json();
+      expect(donationBatchSchema.safeParse(hidden).error?.issues ?? []).toEqual([]);
+      expect(Object.keys(hidden as object).sort()).toEqual(batchKeys);
+
+      const updated: unknown = await (
+        await putBatch(batchId, {
+          transferredAmount: 3000,
+          transferredAt: '2026-11-06T00:00:00.000Z',
+        })
+      ).json();
+      expect(donationBatchSchema.safeParse(updated).error?.issues ?? []).toEqual([]);
+      expect(Object.keys(updated as object).sort()).toEqual(batchKeys);
+    });
+
+    it('describes exactly what attaching evidence sends', async () => {
+      const { organizationId, donationIds } = await setupUnpaid(1);
+      const created = (await (
+        await postBatch({
+          organizationId,
+          transferredAmount: 1000,
+          transferredAt: '2026-11-05T00:00:00.000Z',
+          donationIds,
+        })
+      ).json()) as BatchDto;
+      expect(Object.keys(created).sort()).toEqual(batchKeys);
+
+      const evidence: unknown = await (await postEvidence(created.id, validEvidence())).json();
+
+      expect(donationBatchEvidenceSchema.safeParse(evidence).error?.issues ?? []).toEqual([]);
+      expect(Object.keys(evidence as object).sort()).toEqual(evidenceKeys);
     });
   });
 });
