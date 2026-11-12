@@ -1,6 +1,7 @@
 import { zValidator } from '@hono/zod-validator';
 import { and, eq, gte, inArray, isNotNull } from 'drizzle-orm';
 import { Hono } from 'hono';
+import { describeRoute, resolver } from 'hono-openapi';
 import { z } from 'zod';
 import {
   categoryTable,
@@ -52,8 +53,6 @@ const MASTERY_STRENGTH_MULTIPLIER = 2;
 
 const RISK_HIGH_BELOW = 0.5;
 const RISK_MEDIUM_BELOW = 0.75;
-
-export type RiskLevel = 'high' | 'medium' | 'low';
 
 /**
  * Probability the concept is still recallable now, 0-1.
@@ -213,10 +212,23 @@ const loadForgettingRisk = async (db: Db, userId: number, limit: number) => {
     db,
     [...new Set(ranked.map((item) => item.subjectId))]
   );
+  // Field by field rather than `...item`: `lastAttemptAt` is a Date on
+  // the row and every type in the repo calls this field a string, and a
+  // spread would also carry any column added to user_concept_stat into
+  // a response described nowhere.
   return ranked.map((item) => ({
-    ...item,
+    conceptId: item.conceptId,
+    concept: item.concept,
+    subjectId: item.subjectId,
+    subject: item.subject,
     categories: categories.get(item.subjectId) ?? [],
-  }));
+    mastery: item.mastery,
+    attemptCount: item.attemptCount,
+    lastAttemptAt: item.lastAttemptAt?.toISOString() ?? null,
+    daysSinceReview: item.daysSinceReview,
+    retention: item.retention,
+    level: item.level,
+  })) satisfies z.infer<typeof forgettingRiskItemSchema>[];
 };
 
 /**
@@ -374,6 +386,109 @@ export const overviewQuerySchema = z.object({
     .default(DEFAULT_PROGRESS_DAYS),
 });
 
+/**
+ * What this route reports.
+ *
+ * Schemas rather than inferred object literals: they are the single
+ * description of the response, the handler's return is checked against
+ * them, and the OpenAPI document is generated from them. See "The
+ * OpenAPI document" in AGENTS.md.
+ *
+ * The three sections are independent -- a client can render any one of
+ * them without the others -- but they share a gate and a page section,
+ * which is why they share a request.
+ */
+const categoriesSchema = z
+  .array(z.string())
+  .describe(
+    'Every category the subject belongs to, name-sorted. Subject names are not unique -- two exams can both have a 數學 -- so the category is what tells them apart. Empty for a subject filed under no category'
+  );
+
+export const dailyMasterySchema = z.object({
+  date: z.string().describe('YYYY-MM-DD, the calendar date stored in the row'),
+  weightedMastery: z.number(),
+});
+
+export const forgettingRiskItemSchema = z.object({
+  conceptId: z.number().int(),
+  concept: z.string(),
+  subjectId: z.number().int(),
+  subject: z.string(),
+  categories: categoriesSchema,
+  mastery: z.number().describe('0-10'),
+  attemptCount: z.number().int(),
+  lastAttemptAt: z.string().nullable().describe('ISO 8601'),
+  daysSinceReview: z.number().int(),
+  retention: z
+    .number()
+    .describe(
+      'Probability the concept is still recallable now, 0-1. Exponential decay since the last attempt, with a strength that grows with how well it was known'
+    ),
+  level: z
+    .enum(['high', 'medium', 'low'])
+    .describe('retention < 0.5 is high, < 0.75 is medium, otherwise low'),
+});
+
+export const speedComparisonSchema = z.object({
+  subjectId: z.number().int(),
+  subject: z.string(),
+  categories: categoriesSchema,
+  userMedianMs: z.number().int(),
+  platformMedianMs: z
+    .number()
+    .int()
+    .nullable()
+    .describe('null until the subject has enough samples platform-wide'),
+  deltaMs: z
+    .number()
+    .int()
+    .nullable()
+    .describe(
+      'userMedianMs - platformMedianMs, or null whenever the comparison would be unsound: no platform median yet, or fewer than five timed answers of the caller own'
+    ),
+  accuracy: z.number().describe('0-100. Reported beside speed, because fast is only good news if the answers were right'),
+  sampleCount: z.number().int().describe('Timed answers the median was taken over'),
+});
+
+export const getAnalysisOverviewResponseSchema = z.object({
+  progress: z.object({
+    overall: z
+      .array(dailyMasterySchema)
+      .describe('Every subject weighted by its question count, carried forward over days with no practice'),
+    subjects: z.array(
+      z.object({
+        subjectId: z.number().int(),
+        subjectName: z.string(),
+        dailyStats: z.array(dailyMasterySchema),
+      })
+    ),
+  }),
+  forgettingRisk: z
+    .array(forgettingRiskItemSchema)
+    .describe('Most urgent first -- lowest retention, not oldest'),
+  speed: z.array(speedComparisonSchema).describe('By subject name'),
+});
+
+export type RiskLevel = z.infer<typeof forgettingRiskItemSchema>['level'];
+
+const overviewDoc = describeRoute({
+  summary: 'The subscriber-only analysis page, in one request',
+  description:
+    'Behind requireUser **and** requireSubscription, and scoped to the caller. Three independent sections -- the mastery curve, the concepts most likely to have been forgotten, and answer speed against the platform -- fetched together because they share a gate and a page section. Deliberately not merged with the free GET /api/user/stats and /api/user/history: folding those in would mean demoting this route to requireUser and deciding entitlement with an `if` inside the handler, and a forgotten `if` leaks paid data silently where a forgotten middleware fails loudly.',
+  tags: ['analysis'],
+  responses: {
+    200: {
+      description: 'The three sections, each possibly empty for a caller with no history',
+      content: {
+        'application/json': { schema: resolver(getAnalysisOverviewResponseSchema) },
+      },
+    },
+    400: { description: 'A day range beyond 365, or a riskLimit beyond 100' },
+    401: { description: 'No valid identity' },
+    403: { description: 'No paid access' },
+  },
+});
+
 export const analysis = new Hono<SubscriptionEnv>()
   /**
    * Everything the subscriber-only part of the analysis page needs, in
@@ -393,7 +508,7 @@ export const analysis = new Hono<SubscriptionEnv>()
    * where a forgotten middleware fails loudly -- not a trade worth one
    * fewer request.
    */
-  .get('/overview', zValidator('query', overviewQuerySchema), async (c) => {
+  .get('/overview', overviewDoc, zValidator('query', overviewQuerySchema), async (c) => {
     const user = c.get('user');
     const { speedDays, riskLimit, progressDays } = c.req.valid('query');
     console.log(
@@ -407,5 +522,9 @@ export const analysis = new Hono<SubscriptionEnv>()
       loadSpeedComparison(db, user.id, speedDays),
     ]);
 
-    return c.json({ progress, forgettingRisk, speed });
+    return c.json({
+      progress,
+      forgettingRisk,
+      speed,
+    } satisfies z.infer<typeof getAnalysisOverviewResponseSchema>);
   });

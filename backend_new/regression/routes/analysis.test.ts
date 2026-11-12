@@ -18,6 +18,7 @@ import {
 
 vi.mock('src/lib/firebaseAdmin', () => ({ verifyIdToken: vi.fn(), verifyIdTokenUid: vi.fn() }));
 import { verifyIdTokenUid } from 'src/lib/firebaseAdmin';
+import { getAnalysisOverviewResponseSchema } from 'src/routes/analysis';
 
 const FIXTURE_UID = 'analysis-fixture-uid';
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -689,6 +690,94 @@ describe('analysis', () => {
 
       const res = await app.request('/api/analysis/overview');
       expect(res.status).toBe(403);
+    });
+  });
+
+  /**
+   * What the OpenAPI document promises, against what is sent.
+   *
+   * The key checks are separate from the parse because zod strips
+   * unknown keys instead of rejecting them, and the handler's
+   * `satisfies` does not catch an extra one either: a row with
+   * properties the schema does not mention is still assignable to it.
+   * That matters more here than elsewhere -- every field in this
+   * response is paid-for data read straight off user_concept_stat and
+   * reply, so a column added to either table is a column added to a
+   * subscriber-only response.
+   */
+  describe('the OpenAPI document', () => {
+    it('describes exactly what the overview sends', async () => {
+      const { userId, subjectId, groupId } = await seed();
+      await grantSubscription(userId);
+      await fileUnderCategory(subjectId, '高中');
+      const conceptId = await addConcept(groupId, '三角函數');
+      await addStat(userId, conceptId, { mastery: 6, days: 20 });
+      await addActivity(userId, subjectId);
+      const questionId = await addQuestion(subjectId);
+      await addReplies(userId, subjectId, questionId, [
+        { durationMs: 30_000 },
+        { durationMs: 31_000 },
+        { durationMs: 32_000 },
+        { durationMs: 33_000 },
+        { durationMs: 34_000 },
+      ]);
+      vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
+
+      const body: unknown = await (await app.request('/api/analysis/overview')).json();
+
+      const parsed = getAnalysisOverviewResponseSchema.safeParse(body);
+      expect(parsed.error?.issues ?? []).toEqual([]);
+      expect(parsed.success).toBe(true);
+      expect(Object.keys(body as object).sort()).toEqual([
+        'forgettingRisk',
+        'progress',
+        'speed',
+      ]);
+
+      const record = body as {
+        progress: { overall: object[]; subjects: { dailyStats: object[] }[] };
+        forgettingRisk: object[];
+        speed: object[];
+      };
+      expect(Object.keys(record.progress).sort()).toEqual(['overall', 'subjects']);
+      expect(Object.keys(record.progress.overall[0]).sort()).toEqual([
+        'date',
+        'weightedMastery',
+      ]);
+      expect(Object.keys(record.progress.subjects[0]).sort()).toEqual([
+        'dailyStats',
+        'subjectId',
+        'subjectName',
+      ]);
+      expect(Object.keys(record.progress.subjects[0].dailyStats[0]).sort()).toEqual([
+        'date',
+        'weightedMastery',
+      ]);
+      // No userId and no conceptGroupId: the caller is the only user this
+      // can be about, and the group is not something the page shows.
+      expect(Object.keys(record.forgettingRisk[0]).sort()).toEqual([
+        'attemptCount',
+        'categories',
+        'concept',
+        'conceptId',
+        'daysSinceReview',
+        'lastAttemptAt',
+        'level',
+        'mastery',
+        'retention',
+        'subject',
+        'subjectId',
+      ]);
+      expect(Object.keys(record.speed[0]).sort()).toEqual([
+        'accuracy',
+        'categories',
+        'deltaMs',
+        'platformMedianMs',
+        'sampleCount',
+        'subject',
+        'subjectId',
+        'userMedianMs',
+      ]);
     });
   });
 });

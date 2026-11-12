@@ -5329,6 +5329,239 @@
         }
       }
     },
+    "/api/analysis/overview": {
+      "get": {
+        "operationId": "getApiAnalysisOverview",
+        "summary": "The subscriber-only analysis page, in one request",
+        "description": "Behind requireUser **and** requireSubscription, and scoped to the caller. Three independent sections -- the mastery curve, the concepts most likely to have been forgotten, and answer speed against the platform -- fetched together because they share a gate and a page section. Deliberately not merged with the free GET /api/user/stats and /api/user/history: folding those in would mean demoting this route to requireUser and deciding entitlement with an `if` inside the handler, and a forgotten `if` leaks paid data silently where a forgotten middleware fails loudly.",
+        "tags": [
+          "analysis"
+        ],
+        "responses": {
+          "200": {
+            "description": "The three sections, each possibly empty for a caller with no history",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "progress": {
+                      "type": "object",
+                      "properties": {
+                        "overall": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "date": {
+                                "type": "string",
+                                "description": "YYYY-MM-DD, the calendar date stored in the row"
+                              },
+                              "weightedMastery": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "date",
+                              "weightedMastery"
+                            ]
+                          },
+                          "description": "Every subject weighted by its question count, carried forward over days with no practice"
+                        },
+                        "subjects": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "subjectId": {
+                                "type": "integer"
+                              },
+                              "subjectName": {
+                                "type": "string"
+                              },
+                              "dailyStats": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "date": {
+                                      "type": "string",
+                                      "description": "YYYY-MM-DD, the calendar date stored in the row"
+                                    },
+                                    "weightedMastery": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "date",
+                                    "weightedMastery"
+                                  ]
+                                }
+                              }
+                            },
+                            "required": [
+                              "subjectId",
+                              "subjectName",
+                              "dailyStats"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "overall",
+                        "subjects"
+                      ]
+                    },
+                    "forgettingRisk": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "conceptId": {
+                            "type": "integer"
+                          },
+                          "concept": {
+                            "type": "string"
+                          },
+                          "subjectId": {
+                            "type": "integer"
+                          },
+                          "subject": {
+                            "type": "string"
+                          },
+                          "categories": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "Every category the subject belongs to, name-sorted. Subject names are not unique -- two exams can both have a 數學 -- so the category is what tells them apart. Empty for a subject filed under no category"
+                          },
+                          "mastery": {
+                            "type": "number",
+                            "description": "0-10"
+                          },
+                          "attemptCount": {
+                            "type": "integer"
+                          },
+                          "lastAttemptAt": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "ISO 8601"
+                          },
+                          "daysSinceReview": {
+                            "type": "integer"
+                          },
+                          "retention": {
+                            "type": "number",
+                            "description": "Probability the concept is still recallable now, 0-1. Exponential decay since the last attempt, with a strength that grows with how well it was known"
+                          },
+                          "level": {
+                            "type": "string",
+                            "enum": [
+                              "high",
+                              "medium",
+                              "low"
+                            ],
+                            "description": "retention < 0.5 is high, < 0.75 is medium, otherwise low"
+                          }
+                        },
+                        "required": [
+                          "conceptId",
+                          "concept",
+                          "subjectId",
+                          "subject",
+                          "categories",
+                          "mastery",
+                          "attemptCount",
+                          "lastAttemptAt",
+                          "daysSinceReview",
+                          "retention",
+                          "level"
+                        ]
+                      },
+                      "description": "Most urgent first -- lowest retention, not oldest"
+                    },
+                    "speed": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "subjectId": {
+                            "type": "integer"
+                          },
+                          "subject": {
+                            "type": "string"
+                          },
+                          "categories": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "Every category the subject belongs to, name-sorted. Subject names are not unique -- two exams can both have a 數學 -- so the category is what tells them apart. Empty for a subject filed under no category"
+                          },
+                          "userMedianMs": {
+                            "type": "integer"
+                          },
+                          "platformMedianMs": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ],
+                            "description": "null until the subject has enough samples platform-wide"
+                          },
+                          "deltaMs": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ],
+                            "description": "userMedianMs - platformMedianMs, or null whenever the comparison would be unsound: no platform median yet, or fewer than five timed answers of the caller own"
+                          },
+                          "accuracy": {
+                            "type": "number",
+                            "description": "0-100. Reported beside speed, because fast is only good news if the answers were right"
+                          },
+                          "sampleCount": {
+                            "type": "integer",
+                            "description": "Timed answers the median was taken over"
+                          }
+                        },
+                        "required": [
+                          "subjectId",
+                          "subject",
+                          "categories",
+                          "userMedianMs",
+                          "platformMedianMs",
+                          "deltaMs",
+                          "accuracy",
+                          "sampleCount"
+                        ]
+                      },
+                      "description": "By subject name"
+                    }
+                  },
+                  "required": [
+                    "progress",
+                    "forgettingRisk",
+                    "speed"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A day range beyond 365, or a riskLimit beyond 100"
+          },
+          "401": {
+            "description": "No valid identity"
+          },
+          "403": {
+            "description": "No paid access"
+          }
+        }
+      }
+    },
     "/api/reply": {
       "post": {
         "operationId": "postApiReply",
