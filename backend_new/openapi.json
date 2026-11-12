@@ -5329,6 +5329,1318 @@
         }
       }
     },
+    "/api/reply": {
+      "post": {
+        "operationId": "postApiReply",
+        "summary": "Submit a batch of answers",
+        "description": "Behind requireUser. One request is one submitted batch: every reply in it shares a `repliedAt`, which is what groups them into a history row. Scoring, the points award, the per-subject statistics and the wrong-question list are all written here, and a question scoring below 10 is added to that list automatically.",
+        "tags": [
+          "reply"
+        ],
+        "responses": {
+          "200": {
+            "description": "One result per answer submitted, in the order they were sent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "questionId": {
+                        "type": "integer"
+                      },
+                      "repliedAnswer": {
+                        "type": "string"
+                      },
+                      "correctAnswer": {
+                        "type": "string",
+                        "description": "The answer key, returned so the result screen can mark the attempt"
+                      },
+                      "score": {
+                        "type": "integer",
+                        "description": "0-10 for this sub-question"
+                      },
+                      "awardedPoints": {
+                        "type": "integer",
+                        "description": "Points actually granted, time weighting and the growth bonus included"
+                      },
+                      "fbPostId": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "description": "The 討論區 link target -- a child's answer carries its parent's post id"
+                      }
+                    },
+                    "required": [
+                      "questionId",
+                      "repliedAnswer",
+                      "correctAnswer",
+                      "score",
+                      "awardedPoints",
+                      "fbPostId"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A malformed body, or an empty batch"
+          },
+          "401": {
+            "description": "No valid identity"
+          }
+        }
+      },
+      "get": {
+        "operationId": "getApiReply",
+        "summary": "The caller's answer history",
+        "description": "Behind requireUser, and scoped to the caller. **Paginated by group, not by row**: a 題組 answered in one batch is one history row, however many sub-questions it holds, so `paginate.total` counts groups. Filterable by category, subject, exam or tag -- the exam and tag links live on the top-level question, so they are matched against the group.",
+        "tags": [
+          "reply"
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of history rows, most recently answered first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "repliedAt": {
+                            "type": "string",
+                            "description": "ISO 8601. Every reply from one POST shares it, which is half of what identifies a history row"
+                          },
+                          "parentQuestion": {
+                            "type": [
+                              "object",
+                              "null"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "integer"
+                              },
+                              "uuid": {
+                                "type": "string"
+                              },
+                              "subjectId": {
+                                "type": "integer"
+                              },
+                              "parentId": {
+                                "type": [
+                                  "integer",
+                                  "null"
+                                ]
+                              },
+                              "fbPostId": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ],
+                                "description": "The Facebook post this was published as, which is what the 討論區 link is built from. Only ever set on a top-level question: facebookPoster renders a group and its children into one image and writes the id back to the parent, so a child reads its parent"
+                              },
+                              "isGroup": {
+                                "type": "boolean"
+                              },
+                              "type": {
+                                "type": "string",
+                                "description": "GROUP, SINGLE, MULTIPLE, TRUE_FALSE, FILL or CLOZE. Every write validates against those six; the column is a varchar, so a reader should not assume it"
+                              },
+                              "sortOrder": {
+                                "type": [
+                                  "integer",
+                                  "null"
+                                ]
+                              },
+                              "content": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "options": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "answer": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ],
+                                "description": "The answer key. Present on every read of this shape -- see AGENTS.md"
+                              },
+                              "difficulty": {
+                                "type": "integer",
+                                "description": "1-10, as authored"
+                              },
+                              "adjustedDifficulty": {
+                                "type": "number",
+                                "description": "Moves with how people actually score; a group averages its children"
+                              },
+                              "exam": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "integer"
+                                    },
+                                    "name": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "name"
+                                  ]
+                                }
+                              },
+                              "tag": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "integer"
+                                    },
+                                    "name": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "name"
+                                  ]
+                                }
+                              },
+                              "concept": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "integer"
+                                    },
+                                    "name": {
+                                      "type": "string"
+                                    },
+                                    "conceptGroup": {
+                                      "type": "object",
+                                      "properties": {
+                                        "id": {
+                                          "type": "integer"
+                                        },
+                                        "name": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "id",
+                                        "name"
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "name",
+                                    "conceptGroup"
+                                  ]
+                                }
+                              },
+                              "children": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "integer"
+                                    },
+                                    "type": {
+                                      "type": "string",
+                                      "description": "GROUP, SINGLE, MULTIPLE, TRUE_FALSE, FILL or CLOZE. Every write validates against those six; the column is a varchar, so a reader should not assume it"
+                                    },
+                                    "sortOrder": {
+                                      "type": [
+                                        "integer",
+                                        "null"
+                                      ]
+                                    },
+                                    "content": {
+                                      "type": [
+                                        "string",
+                                        "null"
+                                      ]
+                                    },
+                                    "options": {
+                                      "type": [
+                                        "string",
+                                        "null"
+                                      ]
+                                    },
+                                    "answer": {
+                                      "type": [
+                                        "string",
+                                        "null"
+                                      ]
+                                    },
+                                    "difficulty": {
+                                      "type": "integer"
+                                    },
+                                    "adjustedDifficulty": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "type",
+                                    "sortOrder",
+                                    "content",
+                                    "options",
+                                    "answer",
+                                    "difficulty",
+                                    "adjustedDifficulty"
+                                  ]
+                                },
+                                "description": "Empty unless this is a 題組; the children of one carry the questions"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "uuid",
+                              "subjectId",
+                              "parentId",
+                              "fbPostId",
+                              "isGroup",
+                              "type",
+                              "sortOrder",
+                              "content",
+                              "options",
+                              "answer",
+                              "difficulty",
+                              "adjustedDifficulty",
+                              "exam",
+                              "tag",
+                              "concept",
+                              "children"
+                            ],
+                            "description": "The 題組 these answers belong to, or null for a standalone question"
+                          },
+                          "subject": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "integer"
+                              },
+                              "name": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name"
+                            ],
+                            "description": "Id and name only -- the practice page resolves anything more from its own list"
+                          },
+                          "subjectId": {
+                            "type": "integer"
+                          },
+                          "children": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "integer",
+                                  "description": "The reply row"
+                                },
+                                "questionId": {
+                                  "type": "integer"
+                                },
+                                "question": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "integer"
+                                    },
+                                    "uuid": {
+                                      "type": "string"
+                                    },
+                                    "subjectId": {
+                                      "type": "integer"
+                                    },
+                                    "parentId": {
+                                      "type": [
+                                        "integer",
+                                        "null"
+                                      ]
+                                    },
+                                    "fbPostId": {
+                                      "type": [
+                                        "string",
+                                        "null"
+                                      ],
+                                      "description": "The Facebook post this was published as, which is what the 討論區 link is built from. Only ever set on a top-level question: facebookPoster renders a group and its children into one image and writes the id back to the parent, so a child reads its parent"
+                                    },
+                                    "isGroup": {
+                                      "type": "boolean"
+                                    },
+                                    "type": {
+                                      "type": "string",
+                                      "description": "GROUP, SINGLE, MULTIPLE, TRUE_FALSE, FILL or CLOZE. Every write validates against those six; the column is a varchar, so a reader should not assume it"
+                                    },
+                                    "sortOrder": {
+                                      "type": [
+                                        "integer",
+                                        "null"
+                                      ]
+                                    },
+                                    "content": {
+                                      "type": [
+                                        "string",
+                                        "null"
+                                      ]
+                                    },
+                                    "options": {
+                                      "type": [
+                                        "string",
+                                        "null"
+                                      ]
+                                    },
+                                    "answer": {
+                                      "type": [
+                                        "string",
+                                        "null"
+                                      ],
+                                      "description": "The answer key. Present on every read of this shape -- see AGENTS.md"
+                                    },
+                                    "difficulty": {
+                                      "type": "integer",
+                                      "description": "1-10, as authored"
+                                    },
+                                    "adjustedDifficulty": {
+                                      "type": "number",
+                                      "description": "Moves with how people actually score; a group averages its children"
+                                    },
+                                    "exam": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "id": {
+                                            "type": "integer"
+                                          },
+                                          "name": {
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": [
+                                          "id",
+                                          "name"
+                                        ]
+                                      }
+                                    },
+                                    "tag": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "id": {
+                                            "type": "integer"
+                                          },
+                                          "name": {
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": [
+                                          "id",
+                                          "name"
+                                        ]
+                                      }
+                                    },
+                                    "concept": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "id": {
+                                            "type": "integer"
+                                          },
+                                          "name": {
+                                            "type": "string"
+                                          },
+                                          "conceptGroup": {
+                                            "type": "object",
+                                            "properties": {
+                                              "id": {
+                                                "type": "integer"
+                                              },
+                                              "name": {
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": [
+                                              "id",
+                                              "name"
+                                            ]
+                                          }
+                                        },
+                                        "required": [
+                                          "id",
+                                          "name",
+                                          "conceptGroup"
+                                        ]
+                                      }
+                                    },
+                                    "children": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "id": {
+                                            "type": "integer"
+                                          },
+                                          "type": {
+                                            "type": "string",
+                                            "description": "GROUP, SINGLE, MULTIPLE, TRUE_FALSE, FILL or CLOZE. Every write validates against those six; the column is a varchar, so a reader should not assume it"
+                                          },
+                                          "sortOrder": {
+                                            "type": [
+                                              "integer",
+                                              "null"
+                                            ]
+                                          },
+                                          "content": {
+                                            "type": [
+                                              "string",
+                                              "null"
+                                            ]
+                                          },
+                                          "options": {
+                                            "type": [
+                                              "string",
+                                              "null"
+                                            ]
+                                          },
+                                          "answer": {
+                                            "type": [
+                                              "string",
+                                              "null"
+                                            ]
+                                          },
+                                          "difficulty": {
+                                            "type": "integer"
+                                          },
+                                          "adjustedDifficulty": {
+                                            "type": "number"
+                                          }
+                                        },
+                                        "required": [
+                                          "id",
+                                          "type",
+                                          "sortOrder",
+                                          "content",
+                                          "options",
+                                          "answer",
+                                          "difficulty",
+                                          "adjustedDifficulty"
+                                        ]
+                                      },
+                                      "description": "Empty unless this is a 題組; the children of one carry the questions"
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "uuid",
+                                    "subjectId",
+                                    "parentId",
+                                    "fbPostId",
+                                    "isGroup",
+                                    "type",
+                                    "sortOrder",
+                                    "content",
+                                    "options",
+                                    "answer",
+                                    "difficulty",
+                                    "adjustedDifficulty",
+                                    "exam",
+                                    "tag",
+                                    "concept",
+                                    "children"
+                                  ]
+                                },
+                                "parentId": {
+                                  "type": [
+                                    "integer",
+                                    "null"
+                                  ]
+                                },
+                                "score": {
+                                  "type": "integer"
+                                },
+                                "repliedAnswer": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "createdAt": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ],
+                                  "description": "ISO 8601"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "questionId",
+                                "question",
+                                "parentId",
+                                "score",
+                                "repliedAnswer",
+                                "createdAt"
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "repliedAt",
+                          "parentQuestion",
+                          "subject",
+                          "subjectId",
+                          "children"
+                        ]
+                      }
+                    },
+                    "paginate": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer",
+                          "description": "Rows matching the query, ignoring limit and offset"
+                        },
+                        "page": {
+                          "type": "integer",
+                          "description": "1-indexed, derived from offset and limit"
+                        },
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "totalPages": {
+                          "type": "integer",
+                          "description": "At least 1, so an empty result reads as \"page 1 of 1\" rather than \"of 0\""
+                        }
+                      },
+                      "required": [
+                        "total",
+                        "page",
+                        "limit",
+                        "totalPages"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "paginate"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "limit beyond the cap, or a malformed filter"
+          },
+          "401": {
+            "description": "No valid identity"
+          }
+        }
+      }
+    },
+    "/api/wrong-question": {
+      "get": {
+        "operationId": "getApiWrongQuestion",
+        "summary": "The caller's wrong questions",
+        "description": "Behind requireUser, and scoped to the caller. **Paginated by group, not by row**: a 題組 holds one row per wrong sub-question, and a flat page repeated the whole passage once per row and could split siblings across a page boundary. `paginate.total` therefore counts groups. A row whose question has since been deleted is dropped rather than rendered broken, and a group left empty goes with it. Same filters as GET /api/reply.",
+        "tags": [
+          "wrong-question"
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of groups, most recently wrong first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "description": "The group key: the parent's question id, or the question's own id when standalone -- in which case parentQuestion is null and entries holds exactly one"
+                          },
+                          "parentQuestion": {
+                            "type": [
+                              "object",
+                              "null"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "integer"
+                              },
+                              "uuid": {
+                                "type": "string"
+                              },
+                              "subjectId": {
+                                "type": "integer"
+                              },
+                              "parentId": {
+                                "type": [
+                                  "integer",
+                                  "null"
+                                ]
+                              },
+                              "fbPostId": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ],
+                                "description": "The Facebook post this was published as, which is what the 討論區 link is built from. Only ever set on a top-level question: facebookPoster renders a group and its children into one image and writes the id back to the parent, so a child reads its parent"
+                              },
+                              "isGroup": {
+                                "type": "boolean"
+                              },
+                              "type": {
+                                "type": "string",
+                                "description": "GROUP, SINGLE, MULTIPLE, TRUE_FALSE, FILL or CLOZE. Every write validates against those six; the column is a varchar, so a reader should not assume it"
+                              },
+                              "sortOrder": {
+                                "type": [
+                                  "integer",
+                                  "null"
+                                ]
+                              },
+                              "content": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "options": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "answer": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ],
+                                "description": "The answer key. Present on every read of this shape -- see AGENTS.md"
+                              },
+                              "difficulty": {
+                                "type": "integer",
+                                "description": "1-10, as authored"
+                              },
+                              "adjustedDifficulty": {
+                                "type": "number",
+                                "description": "Moves with how people actually score; a group averages its children"
+                              },
+                              "exam": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "integer"
+                                    },
+                                    "name": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "name"
+                                  ]
+                                }
+                              },
+                              "tag": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "integer"
+                                    },
+                                    "name": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "name"
+                                  ]
+                                }
+                              },
+                              "concept": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "integer"
+                                    },
+                                    "name": {
+                                      "type": "string"
+                                    },
+                                    "conceptGroup": {
+                                      "type": "object",
+                                      "properties": {
+                                        "id": {
+                                          "type": "integer"
+                                        },
+                                        "name": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "id",
+                                        "name"
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "name",
+                                    "conceptGroup"
+                                  ]
+                                }
+                              },
+                              "children": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "integer"
+                                    },
+                                    "type": {
+                                      "type": "string",
+                                      "description": "GROUP, SINGLE, MULTIPLE, TRUE_FALSE, FILL or CLOZE. Every write validates against those six; the column is a varchar, so a reader should not assume it"
+                                    },
+                                    "sortOrder": {
+                                      "type": [
+                                        "integer",
+                                        "null"
+                                      ]
+                                    },
+                                    "content": {
+                                      "type": [
+                                        "string",
+                                        "null"
+                                      ]
+                                    },
+                                    "options": {
+                                      "type": [
+                                        "string",
+                                        "null"
+                                      ]
+                                    },
+                                    "answer": {
+                                      "type": [
+                                        "string",
+                                        "null"
+                                      ]
+                                    },
+                                    "difficulty": {
+                                      "type": "integer"
+                                    },
+                                    "adjustedDifficulty": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "type",
+                                    "sortOrder",
+                                    "content",
+                                    "options",
+                                    "answer",
+                                    "difficulty",
+                                    "adjustedDifficulty"
+                                  ]
+                                },
+                                "description": "Empty unless this is a 題組; the children of one carry the questions"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "uuid",
+                              "subjectId",
+                              "parentId",
+                              "fbPostId",
+                              "isGroup",
+                              "type",
+                              "sortOrder",
+                              "content",
+                              "options",
+                              "answer",
+                              "difficulty",
+                              "adjustedDifficulty",
+                              "exam",
+                              "tag",
+                              "concept",
+                              "children"
+                            ]
+                          },
+                          "subject": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "integer"
+                              },
+                              "name": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name"
+                            ]
+                          },
+                          "subjectId": {
+                            "type": "integer"
+                          },
+                          "lastWrongAt": {
+                            "type": "string",
+                            "description": "ISO 8601. The most recent in the group -- what the list sorts on"
+                          },
+                          "entries": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "integer",
+                                  "description": "The user_wrong_question row -- what PUT /{id}/note and DELETE /{id} act on. The note is per sub-question, since that is the granularity a user writes it at"
+                                },
+                                "question": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "integer"
+                                    },
+                                    "uuid": {
+                                      "type": "string"
+                                    },
+                                    "subjectId": {
+                                      "type": "integer"
+                                    },
+                                    "parentId": {
+                                      "type": [
+                                        "integer",
+                                        "null"
+                                      ]
+                                    },
+                                    "fbPostId": {
+                                      "type": [
+                                        "string",
+                                        "null"
+                                      ],
+                                      "description": "The Facebook post this was published as, which is what the 討論區 link is built from. Only ever set on a top-level question: facebookPoster renders a group and its children into one image and writes the id back to the parent, so a child reads its parent"
+                                    },
+                                    "isGroup": {
+                                      "type": "boolean"
+                                    },
+                                    "type": {
+                                      "type": "string",
+                                      "description": "GROUP, SINGLE, MULTIPLE, TRUE_FALSE, FILL or CLOZE. Every write validates against those six; the column is a varchar, so a reader should not assume it"
+                                    },
+                                    "sortOrder": {
+                                      "type": [
+                                        "integer",
+                                        "null"
+                                      ]
+                                    },
+                                    "content": {
+                                      "type": [
+                                        "string",
+                                        "null"
+                                      ]
+                                    },
+                                    "options": {
+                                      "type": [
+                                        "string",
+                                        "null"
+                                      ]
+                                    },
+                                    "answer": {
+                                      "type": [
+                                        "string",
+                                        "null"
+                                      ],
+                                      "description": "The answer key. Present on every read of this shape -- see AGENTS.md"
+                                    },
+                                    "difficulty": {
+                                      "type": "integer",
+                                      "description": "1-10, as authored"
+                                    },
+                                    "adjustedDifficulty": {
+                                      "type": "number",
+                                      "description": "Moves with how people actually score; a group averages its children"
+                                    },
+                                    "exam": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "id": {
+                                            "type": "integer"
+                                          },
+                                          "name": {
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": [
+                                          "id",
+                                          "name"
+                                        ]
+                                      }
+                                    },
+                                    "tag": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "id": {
+                                            "type": "integer"
+                                          },
+                                          "name": {
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": [
+                                          "id",
+                                          "name"
+                                        ]
+                                      }
+                                    },
+                                    "concept": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "id": {
+                                            "type": "integer"
+                                          },
+                                          "name": {
+                                            "type": "string"
+                                          },
+                                          "conceptGroup": {
+                                            "type": "object",
+                                            "properties": {
+                                              "id": {
+                                                "type": "integer"
+                                              },
+                                              "name": {
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": [
+                                              "id",
+                                              "name"
+                                            ]
+                                          }
+                                        },
+                                        "required": [
+                                          "id",
+                                          "name",
+                                          "conceptGroup"
+                                        ]
+                                      }
+                                    },
+                                    "children": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "id": {
+                                            "type": "integer"
+                                          },
+                                          "type": {
+                                            "type": "string",
+                                            "description": "GROUP, SINGLE, MULTIPLE, TRUE_FALSE, FILL or CLOZE. Every write validates against those six; the column is a varchar, so a reader should not assume it"
+                                          },
+                                          "sortOrder": {
+                                            "type": [
+                                              "integer",
+                                              "null"
+                                            ]
+                                          },
+                                          "content": {
+                                            "type": [
+                                              "string",
+                                              "null"
+                                            ]
+                                          },
+                                          "options": {
+                                            "type": [
+                                              "string",
+                                              "null"
+                                            ]
+                                          },
+                                          "answer": {
+                                            "type": [
+                                              "string",
+                                              "null"
+                                            ]
+                                          },
+                                          "difficulty": {
+                                            "type": "integer"
+                                          },
+                                          "adjustedDifficulty": {
+                                            "type": "number"
+                                          }
+                                        },
+                                        "required": [
+                                          "id",
+                                          "type",
+                                          "sortOrder",
+                                          "content",
+                                          "options",
+                                          "answer",
+                                          "difficulty",
+                                          "adjustedDifficulty"
+                                        ]
+                                      },
+                                      "description": "Empty unless this is a 題組; the children of one carry the questions"
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "uuid",
+                                    "subjectId",
+                                    "parentId",
+                                    "fbPostId",
+                                    "isGroup",
+                                    "type",
+                                    "sortOrder",
+                                    "content",
+                                    "options",
+                                    "answer",
+                                    "difficulty",
+                                    "adjustedDifficulty",
+                                    "exam",
+                                    "tag",
+                                    "concept",
+                                    "children"
+                                  ]
+                                },
+                                "score": {
+                                  "type": "integer",
+                                  "description": "0-10, from the most recent wrong attempt"
+                                },
+                                "wrongCount": {
+                                  "type": "integer",
+                                  "description": "How many times this has gone wrong"
+                                },
+                                "lastWrongAt": {
+                                  "type": "string",
+                                  "description": "ISO 8601"
+                                },
+                                "note": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                },
+                                "createdAt": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ],
+                                  "description": "ISO 8601"
+                                },
+                                "updatedAt": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ],
+                                  "description": "ISO 8601"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "question",
+                                "score",
+                                "wrongCount",
+                                "lastWrongAt",
+                                "note",
+                                "createdAt",
+                                "updatedAt"
+                              ]
+                            },
+                            "description": "In the order the sub-questions appear in the paper, not by when each went wrong"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "parentQuestion",
+                          "subject",
+                          "subjectId",
+                          "lastWrongAt",
+                          "entries"
+                        ]
+                      }
+                    },
+                    "paginate": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer",
+                          "description": "Rows matching the query, ignoring limit and offset"
+                        },
+                        "page": {
+                          "type": "integer",
+                          "description": "1-indexed, derived from offset and limit"
+                        },
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "totalPages": {
+                          "type": "integer",
+                          "description": "At least 1, so an empty result reads as \"page 1 of 1\" rather than \"of 0\""
+                        }
+                      },
+                      "required": [
+                        "total",
+                        "page",
+                        "limit",
+                        "totalPages"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "paginate"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "limit beyond the cap, or a malformed filter"
+          },
+          "401": {
+            "description": "No valid identity"
+          }
+        }
+      }
+    },
+    "/api/wrong-question/{id}/note": {
+      "put": {
+        "operationId": "putApiWrongQuestionByIdNote",
+        "summary": "Write or clear the note on one wrong sub-question",
+        "description": "Behind requireUser, and scoped to the caller: a row belonging to someone else reads as 404 rather than 403, so this never confirms that a given id exists for another user. `note: null` clears it.",
+        "tags": [
+          "wrong-question"
+        ],
+        "responses": {
+          "200": {
+            "description": "The id, the note as saved, and when",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "note": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "description": "ISO 8601. Always set -- this response is the write that just happened"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "note",
+                    "updatedAt"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "note missing, or longer than 2000 characters"
+          },
+          "401": {
+            "description": "No valid identity"
+          },
+          "404": {
+            "description": "No such row belongs to this caller"
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ]
+      }
+    },
+    "/api/wrong-question/{id}": {
+      "delete": {
+        "operationId": "deleteApiWrongQuestionById",
+        "summary": "Remove one wrong sub-question from the list",
+        "description": "Behind requireUser, and scoped to the caller. Answering it wrong again puts it back -- POST /api/reply re-adds anything scoring below 10.",
+        "tags": [
+          "wrong-question"
+        ],
+        "responses": {
+          "204": {
+            "description": "Removed"
+          },
+          "401": {
+            "description": "No valid identity"
+          },
+          "404": {
+            "description": "No such row belongs to this caller"
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ]
+      }
+    },
     "/api/wallet": {
       "get": {
         "operationId": "getApiWallet",

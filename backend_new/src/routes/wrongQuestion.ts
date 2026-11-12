@@ -1,6 +1,7 @@
 import { zValidator } from '@hono/zod-validator';
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
+import { describeRoute, resolver } from 'hono-openapi';
 import { z } from 'zod';
 import {
   questionExamTable,
@@ -9,8 +10,8 @@ import {
   subjectTable,
   userWrongQuestionTable,
 } from 'src/db/schema';
-import { DEFAULT_LIMIT, genPagination, MAX_LIMIT } from 'src/lib/paginator';
-import { buildQuestionDtos, parseIdList, QuestionDetailDto } from 'src/routes/question';
+import { DEFAULT_LIMIT, genPagination, MAX_LIMIT, paginationSchema } from 'src/lib/paginator';
+import { buildQuestionDtos, parseIdList, questionDetailSchema } from 'src/routes/question';
 import { UserEnv } from 'src/middleware/requireUser';
 import { NotFoundError } from 'src/model/error';
 
@@ -31,36 +32,116 @@ export const wrongQuestionNoteBodySchema = z.object({
   note: z.string().max(2000).nullable(),
 });
 
-// One wrong sub-question. `id` is the user_wrong_question row, which is
-// what PUT /:id/note and DELETE /:id act on -- the note stays per
-// sub-question, since that is the granularity a user writes it at.
-type WrongQuestionEntryDto = {
-  id: number;
-  question: QuestionDetailDto;
-  score: number;
-  wrongCount: number;
-  lastWrongAt: string;
-  note: string | null;
-  createdAt: string | null;
-  updatedAt: string | null;
-};
+/**
+ * What this API reports, one schema per response.
+ *
+ * Schemas rather than the hand-written DTOs that used to sit here: each
+ * is the single description of its response, the handlers' returns are
+ * checked against it, and the OpenAPI document is generated from it.
+ * `questionDetailSchema` comes from the question group, which is where
+ * that shape belongs. See "The OpenAPI document" in AGENTS.md.
+ */
+export const wrongQuestionEntrySchema = z.object({
+  id: z
+    .number()
+    .int()
+    .describe(
+      'The user_wrong_question row -- what PUT /{id}/note and DELETE /{id} act on. The note is per sub-question, since that is the granularity a user writes it at'
+    ),
+  question: questionDetailSchema,
+  score: z.number().int().describe('0-10, from the most recent wrong attempt'),
+  wrongCount: z.number().int().describe('How many times this has gone wrong'),
+  lastWrongAt: z.string().describe('ISO 8601'),
+  note: z.string().nullable(),
+  createdAt: z.string().nullable().describe('ISO 8601'),
+  updatedAt: z.string().nullable().describe('ISO 8601'),
+});
 
-// One top-level question and every sub-question of it the user got wrong.
-// `id` is the group key: the parent's question id, or the question's own
-// id when it is standalone (then `entries` has exactly one element and
-// `parentQuestion` is null).
-type WrongQuestionGroupDto = {
-  id: number;
-  parentQuestion: QuestionDetailDto | null;
-  subject: { id: number; name: string };
-  subjectId: number;
-  /** The most recent lastWrongAt in the group -- what the list sorts on. */
-  lastWrongAt: string;
-  entries: WrongQuestionEntryDto[];
-};
+export const wrongQuestionGroupSchema = z.object({
+  id: z
+    .number()
+    .int()
+    .describe(
+      "The group key: the parent's question id, or the question's own id when standalone -- in which case parentQuestion is null and entries holds exactly one"
+    ),
+  parentQuestion: questionDetailSchema.nullable(),
+  subject: z.object({ id: z.number().int(), name: z.string() }),
+  subjectId: z.number().int(),
+  lastWrongAt: z
+    .string()
+    .describe('ISO 8601. The most recent in the group -- what the list sorts on'),
+  entries: z
+    .array(wrongQuestionEntrySchema)
+    .describe('In the order the sub-questions appear in the paper, not by when each went wrong'),
+});
+
+export const getWrongQuestionResponseSchema = z.object({
+  data: z.array(wrongQuestionGroupSchema),
+  paginate: paginationSchema,
+});
+
+export const putWrongQuestionNoteResponseSchema = z.object({
+  id: z.number().int(),
+  note: z.string().nullable(),
+  updatedAt: z
+    .string()
+    .describe('ISO 8601. Always set -- this response is the write that just happened'),
+});
+
+/**
+ * The OpenAPI entries for the routes below.
+ *
+ * Hoisted out of the route definitions so the handlers keep their own
+ * indentation; `describeRoute` is middleware, so where it is
+ * constructed makes no difference.
+ */
+const listDoc = describeRoute({
+  summary: "The caller's wrong questions",
+  description:
+    'Behind requireUser, and scoped to the caller. **Paginated by group, not by row**: a 題組 holds one row per wrong sub-question, and a flat page repeated the whole passage once per row and could split siblings across a page boundary. `paginate.total` therefore counts groups. A row whose question has since been deleted is dropped rather than rendered broken, and a group left empty goes with it. Same filters as GET /api/reply.',
+  tags: ['wrong-question'],
+  responses: {
+    200: {
+      description: 'One page of groups, most recently wrong first',
+      content: { 'application/json': { schema: resolver(getWrongQuestionResponseSchema) } },
+    },
+    400: { description: 'limit beyond the cap, or a malformed filter' },
+    401: { description: 'No valid identity' },
+  },
+});
+
+const noteDoc = describeRoute({
+  summary: 'Write or clear the note on one wrong sub-question',
+  description:
+    'Behind requireUser, and scoped to the caller: a row belonging to someone else reads as 404 rather than 403, so this never confirms that a given id exists for another user. `note: null` clears it.',
+  tags: ['wrong-question'],
+  responses: {
+    200: {
+      description: 'The id, the note as saved, and when',
+      content: { 'application/json': { schema: resolver(putWrongQuestionNoteResponseSchema) } },
+    },
+    400: { description: 'note missing, or longer than 2000 characters' },
+    401: { description: 'No valid identity' },
+    404: { description: 'No such row belongs to this caller' },
+  },
+});
+
+const deleteDoc = describeRoute({
+  summary: 'Remove one wrong sub-question from the list',
+  description:
+    'Behind requireUser, and scoped to the caller. Answering it wrong again puts it back -- POST /api/reply re-adds anything scoring below 10.',
+  tags: ['wrong-question'],
+  responses: {
+    204: { description: 'Removed' },
+    401: { description: 'No valid identity' },
+    404: { description: 'No such row belongs to this caller' },
+  },
+});
+
+type WrongQuestionGroupDto = z.infer<typeof wrongQuestionGroupSchema>;
 
 export const wrongQuestion = new Hono<UserEnv>()
-  .get('/', zValidator('query', wrongQuestionListQuerySchema), async (c) => {
+  .get('/', listDoc, zValidator('query', wrongQuestionListQuerySchema), async (c) => {
     const { limit, offset, categoryId, subjectId, examIds, tagIds } = c.req.valid('query');
     const user = c.get('user');
     const db = c.get('db');
@@ -130,7 +211,10 @@ export const wrongQuestion = new Hono<UserEnv>()
       .where(and(...userConditions));
 
     if (groupRows.length === 0)
-      return c.json({ data: [], paginate: genPagination(total, limit, offset) });
+      return c.json({
+        data: [],
+        paginate: genPagination(total, limit, offset),
+      } satisfies z.infer<typeof getWrongQuestionResponseSchema>);
 
     // Only used to restore this page's group order after the fetch below,
     // which comes back ordered by row rather than by group.
@@ -204,9 +288,12 @@ export const wrongQuestion = new Hono<UserEnv>()
         ),
       }));
 
-    return c.json({ data, paginate: genPagination(total, limit, offset) });
+    return c.json({
+      data,
+      paginate: genPagination(total, limit, offset),
+    } satisfies z.infer<typeof getWrongQuestionResponseSchema>);
   })
-  .put('/:id/note', zValidator('json', wrongQuestionNoteBodySchema), async (c) => {
+  .put('/:id/note', noteDoc, zValidator('json', wrongQuestionNoteBodySchema), async (c) => {
     const db = c.get('db');
     const user = c.get('user');
     const id = Number(c.req.param('id'));
@@ -226,9 +313,13 @@ export const wrongQuestion = new Hono<UserEnv>()
     const updatedAt = new Date();
     await db.update(userWrongQuestionTable).set({ note, updatedAt }).where(eq(userWrongQuestionTable.id, id));
 
-    return c.json({ id, note, updatedAt: updatedAt.toISOString() });
+    return c.json({
+      id,
+      note,
+      updatedAt: updatedAt.toISOString(),
+    } satisfies z.infer<typeof putWrongQuestionNoteResponseSchema>);
   })
-  .delete('/:id', async (c) => {
+  .delete('/:id', deleteDoc, async (c) => {
     const db = c.get('db');
     const user = c.get('user');
     const id = Number(c.req.param('id'));

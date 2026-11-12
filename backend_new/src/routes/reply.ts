@@ -1,6 +1,7 @@
 import { zValidator } from '@hono/zod-validator';
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
+import { describeRoute, resolver } from 'hono-openapi';
 import { z } from 'zod';
 import {
   conceptGroupTable,
@@ -20,8 +21,8 @@ import {
   userTable,
   userWrongQuestionTable,
 } from 'src/db/schema';
-import { DEFAULT_LIMIT, genPagination, MAX_LIMIT } from 'src/lib/paginator';
-import { buildQuestionDtos, parseIdList, QuestionDetailDto } from 'src/routes/question';
+import { DEFAULT_LIMIT, genPagination, MAX_LIMIT, paginationSchema } from 'src/lib/paginator';
+import { buildQuestionDtos, parseIdList, questionDetailSchema } from 'src/routes/question';
 import { UserEnv } from 'src/middleware/requireUser';
 import { TransactionEnv } from 'src/middleware/transaction';
 
@@ -374,24 +375,108 @@ const upsertWrongQuestion = async (
   });
 };
 
-type ReplyGroupDto = {
-  repliedAt: string;
-  parentQuestion: QuestionDetailDto | null;
-  subject: { id: number; name: string };
-  subjectId: number;
-  children: {
-    id: number;
-    questionId: number;
-    question: QuestionDetailDto;
-    parentId: number | null;
-    score: number;
-    repliedAnswer: string | null;
-    createdAt: string | null;
-  }[];
-};
+/**
+ * What this API reports, one schema per response.
+ *
+ * Schemas rather than the hand-written DTO that used to sit here: each
+ * is the single description of its response, the handlers' returns are
+ * checked against it, and the OpenAPI document is generated from it.
+ * `questionDetailSchema` comes from the question group, which is where
+ * that shape belongs -- /reply, /wrong-question and
+ * /question/adaptive all embed it. See "The OpenAPI document" in
+ * AGENTS.md.
+ */
+export const postReplyResponseSchema = z.array(
+  z.object({
+    questionId: z.number().int(),
+    repliedAnswer: z.string(),
+    correctAnswer: z
+      .string()
+      .describe('The answer key, returned so the result screen can mark the attempt'),
+    score: z.number().int().describe('0-10 for this sub-question'),
+    awardedPoints: z
+      .number()
+      .int()
+      .describe('Points actually granted, time weighting and the growth bonus included'),
+    fbPostId: z
+      .string()
+      .nullable()
+      .describe("The 討論區 link target -- a child's answer carries its parent's post id"),
+  })
+);
+
+export const replyGroupSchema = z.object({
+  repliedAt: z
+    .string()
+    .describe(
+      'ISO 8601. Every reply from one POST shares it, which is half of what identifies a history row'
+    ),
+  parentQuestion: questionDetailSchema
+    .nullable()
+    .describe('The 題組 these answers belong to, or null for a standalone question'),
+  subject: z
+    .object({ id: z.number().int(), name: z.string() })
+    .describe('Id and name only -- the practice page resolves anything more from its own list'),
+  subjectId: z.number().int(),
+  children: z.array(
+    z.object({
+      id: z.number().int().describe('The reply row'),
+      questionId: z.number().int(),
+      question: questionDetailSchema,
+      parentId: z.number().int().nullable(),
+      score: z.number().int(),
+      repliedAnswer: z.string().nullable(),
+      createdAt: z.string().nullable().describe('ISO 8601'),
+    })
+  ),
+});
+
+export const getReplyResponseSchema = z.object({
+  data: z.array(replyGroupSchema),
+  paginate: paginationSchema,
+});
+
+/**
+ * The OpenAPI entries for the two routes below.
+ *
+ * Hoisted out of the route definitions so the handlers keep their own
+ * indentation; `describeRoute` is middleware, so where it is
+ * constructed makes no difference.
+ */
+const createDoc = describeRoute({
+  summary: 'Submit a batch of answers',
+  description:
+    'Behind requireUser. One request is one submitted batch: every reply in it shares a `repliedAt`, which is what groups them into a history row. Scoring, the points award, the per-subject statistics and the wrong-question list are all written here, and a question scoring below 10 is added to that list automatically.',
+  tags: ['reply'],
+  responses: {
+    200: {
+      description: 'One result per answer submitted, in the order they were sent',
+      content: { 'application/json': { schema: resolver(postReplyResponseSchema) } },
+    },
+    400: { description: 'A malformed body, or an empty batch' },
+    401: { description: 'No valid identity' },
+  },
+});
+
+const listDoc = describeRoute({
+  summary: "The caller's answer history",
+  description:
+    'Behind requireUser, and scoped to the caller. **Paginated by group, not by row**: a 題組 answered in one batch is one history row, however many sub-questions it holds, so `paginate.total` counts groups. Filterable by category, subject, exam or tag -- the exam and tag links live on the top-level question, so they are matched against the group.',
+  tags: ['reply'],
+  responses: {
+    200: {
+      description: 'One page of history rows, most recently answered first',
+      content: { 'application/json': { schema: resolver(getReplyResponseSchema) } },
+    },
+    400: { description: 'limit beyond the cap, or a malformed filter' },
+    401: { description: 'No valid identity' },
+  },
+});
+
+type ReplyGroupDto = z.infer<typeof replyGroupSchema>;
 
 export const reply = new Hono<UserEnv>()
-  .post('/', zValidator('json', replyBodySchema), async (c) => {
+  .post('/', createDoc, zValidator('json', replyBodySchema), async (c) => {
     const items = c.req.valid('json');
     const user = c.get('user');
     const db = c.get('db');
@@ -485,14 +570,7 @@ export const reply = new Hono<UserEnv>()
       await db.delete(pendingReplyTable).where(inArray(pendingReplyTable.id, clearedPendingIds));
 
     const repliedAt = new Date();
-    const responses: {
-      questionId: number;
-      repliedAnswer: string;
-      correctAnswer: string;
-      score: number;
-      awardedPoints: number;
-      fbPostId: string | null;
-    }[] = [];
+    const responses: z.infer<typeof postReplyResponseSchema> = [];
     const replyRows: (typeof replyTable.$inferInsert)[] = [];
     // Keyed by subjectId -- "correct" mirrors the legacy field name
     // (dailyCorrect), but it's actually the sum of scores (0-10 each),
@@ -683,9 +761,9 @@ export const reply = new Hono<UserEnv>()
     for (const [subjectId, { attempts, correct, points }] of subjectBatch)
       await upsertStatHistory(db, user.id, subjectId, attempts, correct, points);
 
-    return c.json(responses);
+    return c.json(responses satisfies z.infer<typeof postReplyResponseSchema>);
   })
-  .get('/', zValidator('query', replyListQuerySchema), async (c) => {
+  .get('/', listDoc, zValidator('query', replyListQuerySchema), async (c) => {
     const { limit, offset, categoryId, subjectId, examIds, tagIds } = c.req.valid('query');
     const user = c.get('user');
     const db = c.get('db');
@@ -818,5 +896,8 @@ export const reply = new Hono<UserEnv>()
       .sort(([a], [b]) => (pageOrder.get(a) ?? 0) - (pageOrder.get(b) ?? 0))
       .map(([, group]) => group);
 
-    return c.json({ data, paginate: genPagination(total, limit, offset) });
+    return c.json({
+      data,
+      paginate: genPagination(total, limit, offset),
+    } satisfies z.infer<typeof getReplyResponseSchema>);
   });

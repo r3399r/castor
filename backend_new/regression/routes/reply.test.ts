@@ -25,6 +25,7 @@ import {
   userWrongQuestionTable,
 } from 'src/db/schema';
 import { ADMIN_EMAILS } from 'src/middleware/adminAuth';
+import { getReplyResponseSchema, postReplyResponseSchema } from 'src/routes/reply';
 
 // Two separate identities are exercised here: verifyIdToken backs the
 // admin-only POST /api/question used to seed fixture questions, and
@@ -1387,6 +1388,129 @@ describe('reply routes', () => {
         expect(body.paginate.total).toBe(1);
         expect(body.data[0].children[0].questionId).toBe(q1.id);
       });
+    });
+  });
+
+  /**
+   * What the OpenAPI document promises, against what is sent.
+   *
+   * The key checks are separate from the parse because zod strips
+   * unknown keys instead of rejecting them, and the handler's
+   * `satisfies` does not catch an extra one either: a row with
+   * properties the schema does not mention is still assignable to it.
+   *
+   * The embedded question is the point of the key list below. It is the
+   * one shape three responses share, and packages/shared's `Question`
+   * claims six fields it has never carried -- `subject`, `enabled`,
+   * `attempCount`, `scoringTotal` and both timestamps.
+   */
+  describe('the OpenAPI document', () => {
+      const questionKeys = [
+        'adjustedDifficulty',
+        'answer',
+        'children',
+        'concept',
+        'content',
+        'difficulty',
+        'exam',
+        'fbPostId',
+        'id',
+        'isGroup',
+        'options',
+        'parentId',
+        'sortOrder',
+        'subjectId',
+        'tag',
+        'type',
+        'uuid',
+      ];
+
+    it('describes exactly what submitting answers sends', async () => {
+      await seedUser();
+      const { subjectId, examId, conceptId } = await seedFixture();
+      const question = await createQuestion(subjectId, examId, { conceptIds: [conceptId] });
+      vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+
+      const body: unknown = await (
+        await postReply([{ questionId: question.id, repliedAnswer: 'A' }])
+      ).json();
+
+      const parsed = postReplyResponseSchema.safeParse(body);
+      expect(parsed.error?.issues ?? []).toEqual([]);
+      expect(parsed.success).toBe(true);
+      expect(Object.keys((body as object[])[0]).sort()).toEqual([
+        'awardedPoints',
+        'correctAnswer',
+        'fbPostId',
+        'questionId',
+        'repliedAnswer',
+        'score',
+      ]);
+    });
+
+    it('describes exactly what the history sends, embedded question and all', async () => {
+      await seedUser();
+      const { subjectId, examId, tagId, conceptId } = await seedFixture();
+      // The first element is the 題組 itself; only its children are
+      // answerable, which is the whole reason a history row is a group.
+      const [, child1, child2] = await createGroupQuestion(subjectId, examId, [conceptId], [
+        { answer: 'A', options: 'A|B' },
+        { answer: 'B', options: 'A|B' },
+      ]);
+      vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+      await postReply([
+        { questionId: child1.id, repliedAnswer: 'A' },
+        { questionId: child2.id, repliedAnswer: 'A' },
+      ]);
+
+      const body: unknown = await (await getReplyList()).json();
+
+      const parsed = getReplyResponseSchema.safeParse(body);
+      expect(parsed.error?.issues ?? []).toEqual([]);
+      expect(parsed.success).toBe(true);
+      expect(Object.keys(body as object).sort()).toEqual(['data', 'paginate']);
+
+      const [group] = (body as {
+        data: {
+          subject: object;
+          parentQuestion: { concept: object[] };
+          children: { question: { concept: object[]; children: object[] } }[];
+        }[];
+      }).data;
+      expect(Object.keys(group).sort()).toEqual([
+        'children',
+        'parentQuestion',
+        'repliedAt',
+        'subject',
+        'subjectId',
+      ]);
+      // An id and a name, not the Subject type shared claims -- which
+      // would drag its exams, tags, concept groups and category along.
+      expect(Object.keys(group.subject).sort()).toEqual(['id', 'name']);
+      expect(Object.keys(group.parentQuestion).sort()).toEqual(questionKeys);
+
+      const [child] = group.children;
+      expect(Object.keys(child).sort()).toEqual([
+        'createdAt',
+        'id',
+        'parentId',
+        'question',
+        'questionId',
+        'repliedAnswer',
+        'score',
+      ]);
+      expect(Object.keys(child.question).sort()).toEqual(questionKeys);
+      // The concept links live on the top-level row, so they are on the
+      // parent and the sub-question's own arrays are empty -- the shape
+      // is the same either way, which is what the schema describes.
+      expect(Object.keys(group.parentQuestion.concept[0]).sort()).toEqual([
+        'conceptGroup',
+        'id',
+        'name',
+      ]);
+      expect(child.question.concept).toEqual([]);
+      expect(child.question.children).toEqual([]);
+      expect(tagId).toEqual(expect.any(Number));
     });
   });
 });

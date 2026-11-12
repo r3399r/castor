@@ -23,6 +23,10 @@ import {
   userWrongQuestionTable,
 } from 'src/db/schema';
 import { ADMIN_EMAILS } from 'src/middleware/adminAuth';
+import {
+  getWrongQuestionResponseSchema,
+  putWrongQuestionNoteResponseSchema,
+} from 'src/routes/wrongQuestion';
 
 // Two separate identities are exercised here: verifyIdToken backs the
 // admin-only POST /api/question used to seed fixture questions, and
@@ -661,6 +665,82 @@ describe('wrongQuestion routes', () => {
       vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
       const res = await deleteWrongQuestion(999999);
       expect(res.status).toBe(404);
+    });
+  });
+
+  /**
+   * What the OpenAPI document promises, against what is sent.
+   *
+   * The key checks are separate from the parse because zod strips
+   * unknown keys instead of rejecting them, and the handler's
+   * `satisfies` does not catch an extra one either.
+   */
+  describe('the OpenAPI document', () => {
+      const questionKeys = [
+        'adjustedDifficulty',
+        'answer',
+        'children',
+        'concept',
+        'content',
+        'difficulty',
+        'exam',
+        'fbPostId',
+        'id',
+        'isGroup',
+        'options',
+        'parentId',
+        'sortOrder',
+        'subjectId',
+        'tag',
+        'type',
+        'uuid',
+      ];
+
+    it('describes exactly what the list and the note write send', async () => {
+      await seedUser();
+      vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+      const { subjectId, examId, conceptId } = await seedFixture();
+      await seedWrongQuestion(subjectId, examId, conceptId);
+
+      const body: unknown = await (await getWrongQuestionList()).json();
+
+      const parsed = getWrongQuestionResponseSchema.safeParse(body);
+      expect(parsed.error?.issues ?? []).toEqual([]);
+      expect(parsed.success).toBe(true);
+      expect(Object.keys(body as object).sort()).toEqual(['data', 'paginate']);
+
+      const [group] = (body as {
+        data: { subject: object; entries: { id: number; question: object }[] }[];
+      }).data;
+      expect(Object.keys(group).sort()).toEqual([
+        'entries',
+        'id',
+        'lastWrongAt',
+        'parentQuestion',
+        'subject',
+        'subjectId',
+      ]);
+      expect(Object.keys(group.subject).sort()).toEqual(['id', 'name']);
+
+      const [entry] = group.entries;
+      expect(Object.keys(entry).sort()).toEqual([
+        'createdAt',
+        'id',
+        'lastWrongAt',
+        'note',
+        'question',
+        'score',
+        'updatedAt',
+        'wrongCount',
+      ]);
+      expect(Object.keys(entry.question).sort()).toEqual(questionKeys);
+
+      const saved: unknown = await (await putWrongQuestionNote(entry.id, '記一下')).json();
+      expect(putWrongQuestionNoteResponseSchema.safeParse(saved).error?.issues ?? []).toEqual([]);
+      // updatedAt is never null here: this response is the write that
+      // just happened, although the shared type allows a null.
+      expect(Object.keys(saved as object).sort()).toEqual(['id', 'note', 'updatedAt']);
+      expect((saved as { updatedAt: string | null }).updatedAt).toEqual(expect.any(String));
     });
   });
 });

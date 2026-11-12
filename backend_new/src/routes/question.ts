@@ -392,41 +392,86 @@ export const questionAdaptiveQuerySchema = z.object({
   count: z.coerce.number().int().positive().max(50).optional().default(1),
 });
 
-export type QuestionDetailChildDto = {
-  id: number;
-  type: string;
-  sortOrder: number | null;
-  content: string | null;
-  options: string | null;
-  answer: string | null;
-  difficulty: number;
-  adjustedDifficulty: number;
-};
+/**
+ * The question type, as a string rather than the six-value union.
+ *
+ * Every write path validates against `['GROUP', 'SINGLE', 'MULTIPLE',
+ * 'TRUE_FALSE', 'FILL', 'CLOZE']`, but the column is a `varchar` and
+ * these rows predate this backend, so a response cannot *promise* one of
+ * the six. packages/shared types it as the union, which is a narrower
+ * claim than the data supports -- a client narrowing on it would be
+ * trusting a constraint the database does not hold.
+ */
+const questionTypeSchema = z
+  .string()
+  .describe(
+    'GROUP, SINGLE, MULTIPLE, TRUE_FALSE, FILL or CLOZE. Every write validates against those six; the column is a varchar, so a reader should not assume it'
+  );
 
-export type QuestionDetailDto = {
-  id: number;
-  uuid: string;
-  subjectId: number;
-  parentId: number | null;
-  // The Facebook post this question was published as, which is what the
-  // 討論區 link is built from. Only ever set on a top-level question:
-  // facebookPoster renders a group and its children into one image and
-  // writes the id back to the parent, so a child's own column stays null
-  // and callers must read the parent's.
-  fbPostId: string | null;
-  isGroup: boolean;
-  type: string;
-  sortOrder: number | null;
-  content: string | null;
-  options: string | null;
-  answer: string | null;
-  difficulty: number;
-  adjustedDifficulty: number;
-  exam: { id: number; name: string }[];
-  tag: { id: number; name: string }[];
-  concept: { id: number; name: string; conceptGroup: { id: number; name: string } }[];
-  children: QuestionDetailChildDto[];
-};
+const namedSchema = z.object({ id: z.number().int(), name: z.string() });
+
+/**
+ * One sub-question of a 題組, as this API reports it.
+ *
+ * Deliberately not a whole question: a child carries no exam, tag or
+ * concept links of its own (those only ever live on the top-level row),
+ * no uuid, and no Facebook post id.
+ */
+export const questionDetailChildSchema = z.object({
+  id: z.number().int(),
+  type: questionTypeSchema,
+  sortOrder: z.number().int().nullable(),
+  content: z.string().nullable(),
+  options: z.string().nullable(),
+  answer: z.string().nullable(),
+  difficulty: z.number().int(),
+  adjustedDifficulty: z.number(),
+});
+
+/**
+ * A question as every response that embeds one reports it.
+ *
+ * The shared shape behind `/api/question/adaptive`, `/api/reply` and
+ * `/api/wrong-question`, which is why it is a schema here rather than in
+ * any one of them -- see "The OpenAPI document" in AGENTS.md. The
+ * question group's own routes are not migrated yet; this is the piece
+ * the other two needed.
+ */
+export const questionDetailSchema = z.object({
+  id: z.number().int(),
+  uuid: z.string(),
+  subjectId: z.number().int(),
+  parentId: z.number().int().nullable(),
+  fbPostId: z
+    .string()
+    .nullable()
+    .describe(
+      'The Facebook post this was published as, which is what the 討論區 link is built from. Only ever set on a top-level question: facebookPoster renders a group and its children into one image and writes the id back to the parent, so a child reads its parent'
+    ),
+  isGroup: z.boolean(),
+  type: questionTypeSchema,
+  sortOrder: z.number().int().nullable(),
+  content: z.string().nullable(),
+  options: z.string().nullable(),
+  answer: z
+    .string()
+    .nullable()
+    .describe('The answer key. Present on every read of this shape -- see AGENTS.md'),
+  difficulty: z.number().int().describe('1-10, as authored'),
+  adjustedDifficulty: z
+    .number()
+    .describe('Moves with how people actually score; a group averages its children'),
+  exam: z.array(namedSchema),
+  tag: z.array(namedSchema),
+  concept: z.array(namedSchema.extend({ conceptGroup: namedSchema })),
+  children: z
+    .array(questionDetailChildSchema)
+    .describe('Empty unless this is a 題組; the children of one carry the questions'),
+});
+
+export type QuestionDetailChildDto = z.infer<typeof questionDetailChildSchema>;
+
+export type QuestionDetailDto = z.infer<typeof questionDetailSchema>;
 
 // Builds full nested DTOs only for the ids passed in -- the adaptive
 // selection below deliberately keeps its candidate-scoring queries to
