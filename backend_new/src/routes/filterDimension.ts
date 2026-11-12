@@ -1,3 +1,4 @@
+import 'zod-openapi/extend';
 import { zValidator } from '@hono/zod-validator';
 import { asc, count, desc, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
@@ -48,7 +49,7 @@ export const filterDimensionSchema = z.object({
   categoryId: z.number().int(),
   name: z.string(),
   sortOrder: z.number().int().describe('Ascending; the order the filter rows are shown in'),
-});
+}).openapi({ ref: 'FilterDimension' });
 
 const toFilterDimensionDto = (row: {
   id: number;

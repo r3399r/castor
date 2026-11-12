@@ -1,3 +1,4 @@
+import 'zod-openapi/extend';
 import { asc, eq, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { describeRoute, resolver } from 'hono-openapi';
@@ -46,7 +47,7 @@ export const adminSpeciesSchema = z.object({
     .describe(
       'Owners keyed by the level they have grown to. An absent level has no owners; the caller decides which levels to show. Keys are strings because JSON object keys are.'
     ),
-});
+}).openapi({ ref: 'AdminSpecies' });
 
 export const getSpeciesResponseSchema = z.array(adminSpeciesSchema);
 

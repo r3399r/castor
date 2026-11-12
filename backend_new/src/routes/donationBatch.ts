@@ -1,3 +1,4 @@
+import 'zod-openapi/extend';
 import { zValidator } from '@hono/zod-validator';
 import { randomUUID } from 'crypto';
 import { and, asc, count, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
@@ -141,7 +142,7 @@ export const donationBatchEvidenceSchema = z.object({
   caption: z.string().nullable(),
   sortOrder: z.number().int(),
   createdAt: z.string().nullable().describe('ISO 8601'),
-});
+}).openapi({ ref: 'DonationBatchEvidence' });
 
 /**
  * One donation as the payout side sees it -- with the user id, which the
@@ -153,7 +154,7 @@ export const donationMemberSchema = z.object({
   amount: z.number().int().describe('Frozen at confirmation'),
   confirmedAt: z.string().describe('ISO 8601'),
   category: z.object({ id: z.number().int(), name: z.string() }),
-});
+}).openapi({ ref: 'DonationMember' });
 
 export const donationBatchSchema = z.object({
   id: z.number().int(),
@@ -180,7 +181,7 @@ export const donationBatchSchema = z.object({
   evidence: z.array(donationBatchEvidenceSchema),
   createdAt: z.string().nullable().describe('ISO 8601'),
   updatedAt: z.string().nullable().describe('ISO 8601'),
-});
+}).openapi({ ref: 'DonationBatch' });
 
 export const donationBatchDetailResponseSchema = donationBatchSchema.extend({
   donations: z.array(donationMemberSchema).describe('The frozen membership list'),

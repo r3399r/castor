@@ -1,3 +1,4 @@
+import 'zod-openapi/extend';
 import { zValidator } from '@hono/zod-validator';
 import { asc, count, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
@@ -53,7 +54,7 @@ export const charityCategoryRowSchema = z.object({
     ),
   createdAt: z.string().nullable().describe('ISO 8601'),
   updatedAt: z.string().nullable().describe('ISO 8601'),
-});
+}).openapi({ ref: 'CharityCategoryRow' });
 
 export const getCharityCategoryListResponseSchema = z.object({
   data: z.array(charityCategoryRowSchema),

@@ -1,3 +1,4 @@
+import 'zod-openapi/extend';
 import { zValidator } from '@hono/zod-validator';
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
@@ -429,7 +430,7 @@ export const replyGroupSchema = z.object({
       createdAt: z.string().nullable().describe('ISO 8601'),
     })
   ),
-});
+}).openapi({ ref: 'ReplyGroup' });
 
 export const getReplyResponseSchema = z.object({
   data: z.array(replyGroupSchema),

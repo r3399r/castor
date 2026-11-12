@@ -1,3 +1,4 @@
+import 'zod-openapi/extend';
 import { zValidator } from '@hono/zod-validator';
 import { asc, count, desc, eq, inArray, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
@@ -86,7 +87,7 @@ export const userSchema = z.object({
   lastLoginAt: z.string().nullable().describe('ISO 8601'),
   createdAt: z.string().nullable().describe('ISO 8601'),
   updatedAt: z.string().nullable().describe('ISO 8601'),
-});
+}).openapi({ ref: 'User' });
 
 /**
  * Listed field by field rather than spread, so a column added to the

@@ -1,3 +1,4 @@
+import 'zod-openapi/extend';
 import { eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { describeRoute, resolver } from 'hono-openapi';
@@ -44,7 +45,7 @@ export const subscriptionStatusSchema = z.object({
     .describe(
       'Whether anything will charge the card again. Not derivable from entitlement -- a day pass grants access with no agreement behind it.'
     ),
-});
+}).openapi({ ref: 'SubscriptionStatus' });
 
 export const subscriptionHistoryItemSchema = z.object({
   id: z.number().int(),
@@ -52,7 +53,7 @@ export const subscriptionHistoryItemSchema = z.object({
   status: z.string().describe('active, cancelled, expired or past_due'),
   currentPeriodStart: z.string().describe('ISO 8601'),
   currentPeriodEnd: z.string().describe('ISO 8601'),
-});
+}).openapi({ ref: 'SubscriptionHistoryItem' });
 
 export const getSubscriptionHistoryResponseSchema = z.array(subscriptionHistoryItemSchema);
 

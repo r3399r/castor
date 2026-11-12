@@ -1,3 +1,4 @@
+import 'zod-openapi/extend';
 import { zValidator } from '@hono/zod-validator';
 import { and, asc, count, desc, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
@@ -122,7 +123,7 @@ export const donationSchema = z.object({
     })
     .nullable()
     .describe('null while the money has not gone out yet -- there is no status column'),
-});
+}).openapi({ ref: 'Donation' });
 
 export const getDonationResponseSchema = z.object({
   data: z.array(donationSchema),

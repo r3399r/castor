@@ -1,3 +1,15 @@
+/**
+ * For a side effect, and for the `.openapi({ ref })` calls below: it
+ * teaches zod the method, both at the type level and at runtime.
+ *
+ * Imported per file rather than once somewhere central because
+ * `.openapi()` runs while this module is being evaluated, so the patch
+ * has to be in place before that -- relying on another module importing
+ * it first would make the generated document depend on app.ts's import
+ * order. It costs 13 bytes in the Lambda bundle: zod-openapi is already
+ * there, pulled in by hono-openapi's resolver.
+ */
+import 'zod-openapi/extend';
 import { zValidator } from '@hono/zod-validator';
 import { and, eq, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
@@ -56,7 +68,7 @@ const guardianSchema = z.object({
   category: categorySchema
     .nullable()
     .describe('The public-interest category this species supports, or null for one tied to none'),
-});
+}).openapi({ ref: 'Guardian' });
 
 export const getGuardianResponseSchema = z.object({
   data: z.array(guardianSchema),

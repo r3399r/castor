@@ -1,3 +1,4 @@
+import 'zod-openapi/extend';
 import { zValidator } from '@hono/zod-validator';
 import { asc, count, desc, eq, inArray } from 'drizzle-orm';
 import { Hono } from 'hono';
@@ -43,7 +44,7 @@ export const categorySchema = z.object({
   id: z.number().int(),
   name: z.string(),
   createdAt: z.string().nullable().describe('ISO 8601'),
-});
+}).openapi({ ref: 'Category' });
 
 /**
  * Serialises a category row.

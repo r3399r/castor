@@ -1,3 +1,4 @@
+import 'zod-openapi/extend';
 import { z } from 'zod';
 
 /**
@@ -16,7 +17,7 @@ export const paginationSchema = z.object({
     .number()
     .int()
     .describe('At least 1, so an empty result reads as "page 1 of 1" rather than "of 0"'),
-});
+}).openapi({ ref: 'Pagination' });
 
 export type Pagination = z.infer<typeof paginationSchema>;
 

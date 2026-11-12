@@ -1,3 +1,4 @@
+import 'zod-openapi/extend';
 import { zValidator } from '@hono/zod-validator';
 import { desc, eq, count } from 'drizzle-orm';
 import { Hono } from 'hono';
@@ -35,7 +36,7 @@ export const pointTransactionSchema = z.object({
     .describe('The reply this came from, for anything earned by answering'),
   balanceAfter: z.number().int().describe('The running balance once this had been applied'),
   createdAt: z.string().nullable().describe('ISO 8601'),
-});
+}).openapi({ ref: 'PointTransaction' });
 
 export const getWalletResponseSchema = z.object({
   data: z.array(pointTransactionSchema),

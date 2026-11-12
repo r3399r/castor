@@ -1,3 +1,4 @@
+import 'zod-openapi/extend';
 import { zValidator } from '@hono/zod-validator';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
@@ -31,7 +32,7 @@ export const guardianSpeciesSchema = z.object({
     .describe(
       'How far this species has been grown, or null when not owned. The collection view needs the level and not just `owned`: it shows progress per species and sorts the started ones first.'
     ),
-});
+}).openapi({ ref: 'GuardianSpecies' });
 
 export const getStoreSpeciesResponseSchema = z.object({
   data: z.array(guardianSpeciesSchema),

@@ -1,3 +1,4 @@
+import 'zod-openapi/extend';
 import { zValidator } from '@hono/zod-validator';
 import { and, eq, gte, inArray, isNotNull } from 'drizzle-orm';
 import { Hono } from 'hono';
@@ -407,7 +408,7 @@ const categoriesSchema = z
 export const dailyMasterySchema = z.object({
   date: z.string().describe('YYYY-MM-DD, the calendar date stored in the row'),
   weightedMastery: z.number(),
-});
+}).openapi({ ref: 'DailyMastery' });
 
 export const forgettingRiskItemSchema = z.object({
   conceptId: z.number().int(),
@@ -427,7 +428,7 @@ export const forgettingRiskItemSchema = z.object({
   level: z
     .enum(['high', 'medium', 'low'])
     .describe('retention < 0.5 is high, < 0.75 is medium, otherwise low'),
-});
+}).openapi({ ref: 'ForgettingRiskItem' });
 
 export const speedComparisonSchema = z.object({
   subjectId: z.number().int(),
@@ -448,7 +449,7 @@ export const speedComparisonSchema = z.object({
     ),
   accuracy: z.number().describe('0-100. Reported beside speed, because fast is only good news if the answers were right'),
   sampleCount: z.number().int().describe('Timed answers the median was taken over'),
-});
+}).openapi({ ref: 'SpeedComparison' });
 
 export const getAnalysisOverviewResponseSchema = z.object({
   progress: z.object({

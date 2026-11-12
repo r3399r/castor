@@ -1,3 +1,4 @@
+import 'zod-openapi/extend';
 import { zValidator } from '@hono/zod-validator';
 import { asc, count, desc, eq, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
@@ -62,7 +63,7 @@ export const subjectSchema = z.object({
   name: z.string(),
   sortOrder: z.number().int().describe('Ascending; what the practice page orders subjects by'),
   createdAt: z.string().nullable().describe('ISO 8601'),
-});
+}).openapi({ ref: 'Subject' });
 
 /**
  * Serialises a subject row.

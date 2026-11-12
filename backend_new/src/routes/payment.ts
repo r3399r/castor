@@ -1,3 +1,4 @@
+import 'zod-openapi/extend';
 import { zValidator } from '@hono/zod-validator';
 import { desc, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
@@ -121,7 +122,7 @@ export const dayPassPurchaseSchema = z.object({
     .nullable()
     .describe('ISO 8601. What the subscription was extended to; null until paid'),
   createdAt: z.string().nullable().describe('ISO 8601'),
-});
+}).openapi({ ref: 'DayPassPurchase' });
 
 export const getPaymentPurchasesResponseSchema = z.object({
   data: z.array(dayPassPurchaseSchema),

@@ -1,3 +1,4 @@
+import 'zod-openapi/extend';
 import { zValidator } from '@hono/zod-validator';
 import { and, asc, count, desc, eq, inArray, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
@@ -179,7 +180,7 @@ const categoryRefSchema = z.object({
   id: z.number().int(),
   code: z.string(),
   name: z.string(),
-});
+}).openapi({ ref: 'CharityCategoryRef' });
 
 export const charityOrganizationSchema = z.object({
   id: z.number().int(),
@@ -197,7 +198,7 @@ export const charityOrganizationSchema = z.object({
     .describe('Ordered by the category sortOrder, then id. Never empty: at least one is required'),
   createdAt: z.string().nullable().describe('ISO 8601'),
   updatedAt: z.string().nullable().describe('ISO 8601'),
-});
+}).openapi({ ref: 'CharityOrganization' });
 
 export const getCharityOrganizationListResponseSchema = z.object({
   data: z.array(charityOrganizationSchema),

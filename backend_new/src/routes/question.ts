@@ -1,3 +1,4 @@
+import 'zod-openapi/extend';
 import { zValidator } from '@hono/zod-validator';
 import { and, asc, count, desc, eq, exists, gt, inArray, isNull, lte, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
@@ -427,7 +428,7 @@ export const questionDetailChildSchema = z.object({
   answer: z.string().nullable(),
   difficulty: z.number().int(),
   adjustedDifficulty: z.number(),
-});
+}).openapi({ ref: 'QuestionDetailChild' });
 
 /**
  * A question as every response that embeds one reports it.
@@ -468,7 +469,7 @@ export const questionDetailSchema = z.object({
   children: z
     .array(questionDetailChildSchema)
     .describe('Empty unless this is a 題組; the children of one carry the questions'),
-});
+}).openapi({ ref: 'QuestionDetail' });
 
 export type QuestionDetailChildDto = z.infer<typeof questionDetailChildSchema>;
 
@@ -773,7 +774,7 @@ export const questionRowSchema = z.object({
   adjustedDifficulty: z.number(),
   createdAt: z.string().nullable().describe('ISO 8601'),
   updatedAt: z.string().nullable().describe('ISO 8601'),
-});
+}).openapi({ ref: 'QuestionRow' });
 
 /**
  * Serialises a question row.
@@ -833,7 +834,7 @@ export const adminQuestionRowSchema = z.object({
     .describe(
       "The subject's category names. An array because subject-to-category is many-to-many, and empty for a subject filed under none"
     ),
-});
+}).openapi({ ref: 'AdminQuestionRow' });
 
 export const getQuestionListResponseSchema = z.object({
   data: z.array(adminQuestionRowSchema),

@@ -1,3 +1,4 @@
+import 'zod-openapi/extend';
 import { zValidator } from '@hono/zod-validator';
 import { asc, count, desc, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
@@ -43,7 +44,7 @@ export const tagSchema = z.object({
   name: z.string(),
   subjectId: z.number().int(),
   createdAt: z.string().nullable().describe('ISO 8601'),
-});
+}).openapi({ ref: 'Tag' });
 
 /**
  * Serialises a tag row.

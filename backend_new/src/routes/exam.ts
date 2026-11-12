@@ -1,3 +1,4 @@
+import 'zod-openapi/extend';
 import { zValidator } from '@hono/zod-validator';
 import { asc, count, desc, eq, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
@@ -48,7 +49,7 @@ export const examSchema = z.object({
   id: z.number().int(),
   name: z.string(),
   createdAt: z.string().nullable().describe('ISO 8601'),
-});
+}).openapi({ ref: 'Exam' });
 
 /**
  * Serialises an exam row.

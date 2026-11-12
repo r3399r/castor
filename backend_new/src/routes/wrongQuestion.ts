@@ -1,3 +1,4 @@
+import 'zod-openapi/extend';
 import { zValidator } from '@hono/zod-validator';
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
@@ -55,7 +56,7 @@ export const wrongQuestionEntrySchema = z.object({
   note: z.string().nullable(),
   createdAt: z.string().nullable().describe('ISO 8601'),
   updatedAt: z.string().nullable().describe('ISO 8601'),
-});
+}).openapi({ ref: 'WrongQuestionEntry' });
 
 export const wrongQuestionGroupSchema = z.object({
   id: z
@@ -73,7 +74,7 @@ export const wrongQuestionGroupSchema = z.object({
   entries: z
     .array(wrongQuestionEntrySchema)
     .describe('In the order the sub-questions appear in the paper, not by when each went wrong'),
-});
+}).openapi({ ref: 'WrongQuestionGroup' });
 
 export const getWrongQuestionResponseSchema = z.object({
   data: z.array(wrongQuestionGroupSchema),

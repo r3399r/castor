@@ -1,3 +1,4 @@
+import 'zod-openapi/extend';
 import { zValidator } from '@hono/zod-validator';
 import { asc, count, desc, eq, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
@@ -74,7 +75,7 @@ export const filterOptionSchema = z.object({
     .nullable()
     .describe('The option this one hangs under, or null for a top-level option'),
   name: z.string(),
-});
+}).openapi({ ref: 'FilterOption' });
 
 const toFilterOptionDto = (row: {
   id: number;

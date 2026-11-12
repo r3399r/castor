@@ -1,3 +1,4 @@
+import 'zod-openapi/extend';
 import { zValidator } from '@hono/zod-validator';
 import { asc, count, desc, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
@@ -55,7 +56,7 @@ export const conceptSchema = z.object({
     .int()
     .describe('Counted as questions are added; not editable through this API'),
   createdAt: z.string().nullable().describe('ISO 8601'),
-});
+}).openapi({ ref: 'Concept' });
 
 /**
  * Serialises a concept row.

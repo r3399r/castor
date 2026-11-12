@@ -1,3 +1,4 @@
+import 'zod-openapi/extend';
 import { zValidator } from '@hono/zod-validator';
 import { and, asc, count, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/mysql-core';
@@ -62,14 +63,14 @@ const recurringPlanSchema = z.object({
     .describe('NTD. The authoritative price: a client must render this, never a constant of its own'),
   periodType: z.enum(['D', 'M', 'Y']),
   frequency: z.number().int().describe('Charged once every `frequency` periodType, indefinitely'),
-});
+}).openapi({ ref: 'RecurringPlanInfo' });
 
 const dayPassPlanSchema = z.object({
   kind: z.literal('dayPass'),
   code: z.string(),
   amount: z.number().int().describe('NTD, charged once'),
   days: z.number().int().describe('Days of access, added to whatever the caller already has'),
-});
+}).openapi({ ref: 'DayPassPlanInfo' });
 
 /**
  * Discriminated on `kind` rather than one shape with optional fields:
@@ -100,13 +101,13 @@ const popularExamSchema = z.object({
     .int()
     .describe('How many times the questions were practised -- a 題組 answered once counts once'),
   questionCount: z.number().int().describe('Servable top-level questions, counted as in /stats'),
-});
+}).openapi({ ref: 'PopularExam' });
 
 const popularSubjectSchema = popularExamSchema.extend({
   exams: z
     .array(popularExamSchema)
     .describe('Ranked like the subjects themselves, and empty when none of them is filed under an exam'),
-});
+}).openapi({ ref: 'PopularSubject' });
 
 export const getInfoPopularResponseSchema = z.array(popularSubjectSchema);
 
@@ -115,7 +116,7 @@ const donationEvidenceSchema = z.object({
   kind: z.string().describe('TRANSFER_RECEIPT, ORG_RECEIPT, THANK_YOU_LETTER -- open-ended'),
   url: z.string(),
   caption: z.string().nullable(),
-});
+}).openapi({ ref: 'DonationEvidence' });
 
 const donationRecordOrganizationSchema = z.object({
   id: z.number().int(),
@@ -146,7 +147,7 @@ const donationRecordBatchSchema = z.object({
     .describe('transferredAmount - donationSubtotal. Signed: negative would mean the batch sent less than was promised'),
   transferredAmount: z.number().int(),
   evidence: z.array(donationEvidenceSchema),
-});
+}).openapi({ ref: 'DonationRecordBatch' });
 
 const donationRecordSummarySchema = z.object({
   maxedSpiritCount: z
@@ -176,7 +177,7 @@ const donationRecordSummarySchema = z.object({
     .number()
     .int()
     .describe("Today's figure, which prices pendingAmount and nothing else"),
-});
+}).openapi({ ref: 'DonationRecordSummary' });
 
 export const getInfoDonationResponseSchema = z.object({
   summary: donationRecordSummarySchema,
