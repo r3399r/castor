@@ -1,3 +1,12 @@
+/**
+ * First, and for a side effect: without it every `.describe()` in every
+ * schema is silently dropped from the output. The schemas keep the text
+ * either way, so nothing fails -- the document just comes out with no
+ * field documentation at all, which is how it was generated the first
+ * time until the output was actually read.
+ */
+import 'zod-openapi/extend';
+
 import { writeFile } from 'node:fs/promises';
 import { Hono } from 'hono';
 import { openAPIRouteHandler } from 'hono-openapi';

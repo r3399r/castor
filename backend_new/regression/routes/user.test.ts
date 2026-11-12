@@ -24,6 +24,7 @@ import {
   userTable,
 } from 'src/db/schema';
 import { ADMIN_EMAILS } from 'src/middleware/adminAuth';
+import { postUserSyncResponseSchema, userSchema } from 'src/routes/user';
 
 // The admin gate is exercised end-to-end in its own describe block below;
 // every other test just needs reads to succeed, so default the mocked
@@ -351,6 +352,51 @@ describe('user routes', () => {
       const rows = await getDb().select().from(userTable).where(eq(userTable.firebaseUid, 'returning-uid'));
       expect(rows).toHaveLength(1);
     });
+
+    /**
+     * What the OpenAPI document promises, against what is sent.
+     *
+     * The key check is separate because zod strips unknown keys instead
+     * of rejecting them: a column added to the user table and spread
+     * into the response would pass the parse while appearing in no
+     * document. That spread is gone -- the DTO lists its fields -- and
+     * this is what keeps it gone.
+     */
+    it('sends exactly what the OpenAPI document describes', async () => {
+      vi.mocked(verifyIdTokenFull).mockResolvedValue({
+        uid: 'contract-uid',
+        email: 'contract@example.com',
+        name: 'Contract',
+        picture: null,
+      });
+
+      const res = await postSync();
+      expect(res.status).toBe(201);
+      const body: unknown = await res.json();
+
+      const parsed = postUserSyncResponseSchema.safeParse(body);
+      expect(parsed.error?.issues ?? []).toEqual([]);
+      expect(parsed.success).toBe(true);
+      expect(Object.keys(body as object).sort()).toEqual([
+        'avatar',
+        'createdAt',
+        'email',
+        'firebaseUid',
+        'id',
+        'lastLoginAt',
+        'lifetimePoints',
+        'name',
+        'subscription',
+        'totalPoints',
+        'updatedAt',
+      ]);
+      expect(Object.keys((body as { subscription: object }).subscription).sort()).toEqual([
+        'active',
+        'entitled',
+        'expiresAt',
+        'plan',
+      ]);
+    });
   });
 
   describe('GET /stats', () => {
@@ -533,6 +579,29 @@ describe('user routes', () => {
         email: 'fixture-user@example.com',
         name: 'fixture user',
       });
+    });
+
+    it('sends exactly what the OpenAPI document describes', async () => {
+      await seedUser();
+      vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+
+      const body: unknown = await (await app.request('/api/user/me')).json();
+
+      const parsed = userSchema.safeParse(body);
+      expect(parsed.error?.issues ?? []).toEqual([]);
+      expect(parsed.success).toBe(true);
+      expect(Object.keys(body as object).sort()).toEqual([
+        'avatar',
+        'createdAt',
+        'email',
+        'firebaseUid',
+        'id',
+        'lastLoginAt',
+        'lifetimePoints',
+        'name',
+        'totalPoints',
+        'updatedAt',
+      ]);
     });
   });
 

@@ -13,6 +13,1113 @@
   ],
   "components": {},
   "paths": {
+    "/api/user": {
+      "get": {
+        "operationId": "getApiUser",
+        "summary": "List users (admin)",
+        "description": "One page of users with each one's billing state.",
+        "tags": [
+          "user",
+          "admin"
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of users",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "firebaseUid": {
+                            "type": "string"
+                          },
+                          "email": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "name": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "avatar": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "totalPoints": {
+                            "type": "integer",
+                            "description": "Spendable balance; decreases when spent"
+                          },
+                          "lifetimePoints": {
+                            "type": "integer",
+                            "description": "Only ever increases; the leaderboard ranks on this"
+                          },
+                          "lastLoginAt": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "ISO 8601"
+                          },
+                          "createdAt": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "ISO 8601"
+                          },
+                          "updatedAt": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "ISO 8601"
+                          },
+                          "subscription": {
+                            "type": "object",
+                            "properties": {
+                              "active": {
+                                "type": "boolean",
+                                "description": "Whether an agreement period is in status `active`. A billing fact, not an access one."
+                              },
+                              "plan": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "expiresAt": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ],
+                                "description": "ISO 8601 end of the active period, or null when there is none"
+                              }
+                            },
+                            "required": [
+                              "active",
+                              "plan",
+                              "expiresAt"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "firebaseUid",
+                          "email",
+                          "name",
+                          "avatar",
+                          "totalPoints",
+                          "lifetimePoints",
+                          "lastLoginAt",
+                          "createdAt",
+                          "updatedAt",
+                          "subscription"
+                        ]
+                      }
+                    },
+                    "paginate": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer"
+                        },
+                        "page": {
+                          "type": "integer"
+                        },
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "totalPages": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "total",
+                        "page",
+                        "limit",
+                        "totalPages"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "paginate"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not an admin"
+          }
+        }
+      }
+    },
+    "/api/user/sync": {
+      "post": {
+        "operationId": "postApiUserSync",
+        "summary": "Find or create the caller from their Firebase identity",
+        "description": "Called on every sign-in; the only thing that ever creates a user row, which is why it is the one route here not behind requireUser. Returns 201 when it created the row. Only lastLoginAt is refreshed for a returning user -- a changed name or avatar on the Firebase side is not written back. The caller's subscription comes with it so sign-in needs one authenticated request rather than two.",
+        "tags": [
+          "user"
+        ],
+        "responses": {
+          "200": {
+            "description": "The existing user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "firebaseUid": {
+                      "type": "string"
+                    },
+                    "email": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "name": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "avatar": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "totalPoints": {
+                      "type": "integer",
+                      "description": "Spendable balance; decreases when spent"
+                    },
+                    "lifetimePoints": {
+                      "type": "integer",
+                      "description": "Only ever increases; the leaderboard ranks on this"
+                    },
+                    "lastLoginAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601"
+                    },
+                    "createdAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601"
+                    },
+                    "updatedAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601"
+                    },
+                    "subscription": {
+                      "type": "object",
+                      "properties": {
+                        "active": {
+                          "type": "boolean",
+                          "description": "Whether an agreement period is in status `active`. A billing fact, not an access one."
+                        },
+                        "plan": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "expiresAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "ISO 8601 end of the active period, or null when there is none"
+                        },
+                        "entitled": {
+                          "type": "boolean",
+                          "description": "Whether paid features are available right now. The field to gate subscriber-only UI on: a cancelled agreement inside the period it already paid for reports active:false and entitled:true."
+                        }
+                      },
+                      "required": [
+                        "active",
+                        "plan",
+                        "expiresAt",
+                        "entitled"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "firebaseUid",
+                    "email",
+                    "name",
+                    "avatar",
+                    "totalPoints",
+                    "lifetimePoints",
+                    "lastLoginAt",
+                    "createdAt",
+                    "updatedAt",
+                    "subscription"
+                  ]
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "The user that was just created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "firebaseUid": {
+                      "type": "string"
+                    },
+                    "email": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "name": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "avatar": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "totalPoints": {
+                      "type": "integer",
+                      "description": "Spendable balance; decreases when spent"
+                    },
+                    "lifetimePoints": {
+                      "type": "integer",
+                      "description": "Only ever increases; the leaderboard ranks on this"
+                    },
+                    "lastLoginAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601"
+                    },
+                    "createdAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601"
+                    },
+                    "updatedAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601"
+                    },
+                    "subscription": {
+                      "type": "object",
+                      "properties": {
+                        "active": {
+                          "type": "boolean",
+                          "description": "Whether an agreement period is in status `active`. A billing fact, not an access one."
+                        },
+                        "plan": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "expiresAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "ISO 8601 end of the active period, or null when there is none"
+                        },
+                        "entitled": {
+                          "type": "boolean",
+                          "description": "Whether paid features are available right now. The field to gate subscriber-only UI on: a cancelled agreement inside the period it already paid for reports active:false and entitled:true."
+                        }
+                      },
+                      "required": [
+                        "active",
+                        "plan",
+                        "expiresAt",
+                        "entitled"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "firebaseUid",
+                    "email",
+                    "name",
+                    "avatar",
+                    "totalPoints",
+                    "lifetimePoints",
+                    "lastLoginAt",
+                    "createdAt",
+                    "updatedAt",
+                    "subscription"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid Firebase identity"
+          }
+        }
+      }
+    },
+    "/api/user/stats": {
+      "get": {
+        "operationId": "getApiUserStats",
+        "summary": "The caller's mastery per concept group",
+        "description": "Grouped by subject. A subject appears once the user has a stat row for any of its concepts -- and then every concept group in that subject is included, untouched ones at mastery 0.",
+        "tags": [
+          "user"
+        ],
+        "responses": {
+          "200": {
+            "description": "Subjects, each with its concept groups",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "category": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "integer"
+                            },
+                            "name": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name"
+                          ]
+                        }
+                      },
+                      "conceptGroup": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "integer"
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "mastery": {
+                              "type": "number",
+                              "description": "Question-weighted mean mastery across the group, 0 when untouched"
+                            },
+                            "numberOfQuestions": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name",
+                            "mastery",
+                            "numberOfQuestions"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "category",
+                      "conceptGroup"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/user/history": {
+      "get": {
+        "operationId": "getApiUserHistory",
+        "summary": "The caller's totals, streak and activity heatmap",
+        "description": "The mastery-over-time series this used to carry is subscriber-only and lives in GET /api/analysis/overview -- dropped from this payload rather than hidden in the UI, so the paywall is not merely decorative.",
+        "tags": [
+          "user"
+        ],
+        "responses": {
+          "200": {
+            "description": "Totals and the per-day attempt counts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "totalAttempts": {
+                      "type": "integer"
+                    },
+                    "overallAccuracy": {
+                      "type": "number",
+                      "description": "Percentage, 0 when nothing has been attempted"
+                    },
+                    "streakDays": {
+                      "type": "integer",
+                      "description": "Consecutive days up to today or yesterday; missing a day resets it"
+                    },
+                    "activityMap": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "date": {
+                            "type": "string",
+                            "description": "YYYY-MM-DD"
+                          },
+                          "count": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "date",
+                          "count"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "totalAttempts",
+                    "overallAccuracy",
+                    "streakDays",
+                    "activityMap"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/user/{id}/subscription": {
+      "put": {
+        "operationId": "putApiUserByIdSubscription",
+        "summary": "Grant or revoke a user's subscription (admin)",
+        "description": "Exists because a granted subscription has no payment behind it: without this the only way to exercise anything behind the paywall is to write to the database by hand. Idempotent in both directions.",
+        "tags": [
+          "user",
+          "admin"
+        ],
+        "responses": {
+          "200": {
+            "description": "The billing state afterwards",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "active": {
+                      "type": "boolean",
+                      "description": "Whether an agreement period is in status `active`. A billing fact, not an access one."
+                    },
+                    "plan": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "expiresAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601 end of the active period, or null when there is none"
+                    }
+                  },
+                  "required": [
+                    "active",
+                    "plan",
+                    "expiresAt"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed body"
+          },
+          "403": {
+            "description": "Not an admin"
+          },
+          "404": {
+            "description": "No such user"
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ]
+      }
+    },
+    "/api/user/{id}/points": {
+      "put": {
+        "operationId": "putApiUserByIdPoints",
+        "summary": "Adjust a user's point balance by hand (admin)",
+        "description": "Writes a real ledger row as well as moving the balance, so SUM(point_transaction.amount) still reconciles. Earning raises both balances and spending lowers only totalPoints, so +100 then -100 leaves lifetimePoints 100 higher -- correct, not a leak.",
+        "tags": [
+          "user",
+          "admin"
+        ],
+        "responses": {
+          "200": {
+            "description": "The balances afterwards",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "totalPoints": {
+                      "type": "integer"
+                    },
+                    "lifetimePoints": {
+                      "type": "integer"
+                    },
+                    "delta": {
+                      "type": "integer",
+                      "description": "The adjustment that was applied, echoed back"
+                    }
+                  },
+                  "required": [
+                    "totalPoints",
+                    "lifetimePoints",
+                    "delta"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed body, or a delta of 0"
+          },
+          "403": {
+            "description": "Not an admin"
+          },
+          "404": {
+            "description": "No such user"
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ]
+      }
+    },
+    "/api/user/me": {
+      "get": {
+        "operationId": "getApiUserMe",
+        "summary": "The caller's own profile",
+        "tags": [
+          "user"
+        ],
+        "responses": {
+          "200": {
+            "description": "The user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "firebaseUid": {
+                      "type": "string"
+                    },
+                    "email": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "name": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "avatar": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "totalPoints": {
+                      "type": "integer",
+                      "description": "Spendable balance; decreases when spent"
+                    },
+                    "lifetimePoints": {
+                      "type": "integer",
+                      "description": "Only ever increases; the leaderboard ranks on this"
+                    },
+                    "lastLoginAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601"
+                    },
+                    "createdAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601"
+                    },
+                    "updatedAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "firebaseUid",
+                    "email",
+                    "name",
+                    "avatar",
+                    "totalPoints",
+                    "lifetimePoints",
+                    "lastLoginAt",
+                    "createdAt",
+                    "updatedAt"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "putApiUserMe",
+        "summary": "Rename the caller",
+        "description": "Name is the only self-editable field: email, avatar and firebaseUid stay whatever the last sign-in set them to.",
+        "tags": [
+          "user"
+        ],
+        "responses": {
+          "200": {
+            "description": "The updated user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "firebaseUid": {
+                      "type": "string"
+                    },
+                    "email": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "name": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "avatar": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "totalPoints": {
+                      "type": "integer",
+                      "description": "Spendable balance; decreases when spent"
+                    },
+                    "lifetimePoints": {
+                      "type": "integer",
+                      "description": "Only ever increases; the leaderboard ranks on this"
+                    },
+                    "lastLoginAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601"
+                    },
+                    "createdAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601"
+                    },
+                    "updatedAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "firebaseUid",
+                    "email",
+                    "name",
+                    "avatar",
+                    "totalPoints",
+                    "lifetimePoints",
+                    "lastLoginAt",
+                    "createdAt",
+                    "updatedAt"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Empty or over-long name"
+          }
+        }
+      }
+    },
+    "/api/user/{id}": {
+      "get": {
+        "operationId": "getApiUserById",
+        "summary": "Read any user (admin)",
+        "tags": [
+          "user",
+          "admin"
+        ],
+        "responses": {
+          "200": {
+            "description": "The user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "firebaseUid": {
+                      "type": "string"
+                    },
+                    "email": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "name": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "avatar": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "totalPoints": {
+                      "type": "integer",
+                      "description": "Spendable balance; decreases when spent"
+                    },
+                    "lifetimePoints": {
+                      "type": "integer",
+                      "description": "Only ever increases; the leaderboard ranks on this"
+                    },
+                    "lastLoginAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601"
+                    },
+                    "createdAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601"
+                    },
+                    "updatedAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "firebaseUid",
+                    "email",
+                    "name",
+                    "avatar",
+                    "totalPoints",
+                    "lifetimePoints",
+                    "lastLoginAt",
+                    "createdAt",
+                    "updatedAt"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not an admin"
+          },
+          "404": {
+            "description": "No such user"
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ]
+      }
+    },
+    "/api/subscription/me": {
+      "get": {
+        "operationId": "getApiSubscriptionMe",
+        "summary": "The caller's own subscription",
+        "description": "Answers with 200 and active:false rather than 403 -- \"you are not subscribed\" is the successful answer to this question, and the page asking it has an upgrade prompt to render.",
+        "tags": [
+          "subscription"
+        ],
+        "responses": {
+          "200": {
+            "description": "Access, billing and renewal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "active": {
+                      "type": "boolean",
+                      "description": "Whether an agreement period is in status `active`. A billing fact, not an access one."
+                    },
+                    "plan": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "expiresAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601 end of the active period, or null when there is none"
+                    },
+                    "entitled": {
+                      "type": "boolean",
+                      "description": "Whether paid features are available right now. The field to gate subscriber-only UI on: a cancelled agreement inside the period it already paid for reports active:false and entitled:true."
+                    },
+                    "autoRenew": {
+                      "type": "boolean",
+                      "description": "Whether anything will charge the card again. Not derivable from entitlement -- a day pass grants access with no agreement behind it."
+                    }
+                  },
+                  "required": [
+                    "active",
+                    "plan",
+                    "expiresAt",
+                    "entitled",
+                    "autoRenew"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/subscription/history": {
+      "get": {
+        "operationId": "getApiSubscriptionHistory",
+        "summary": "Every period the caller has had",
+        "description": "Newest first. Renewals, lapses and cancellations are each their own row, so this is where a client derives \"cancelled but still usable\" from.",
+        "tags": [
+          "subscription"
+        ],
+        "responses": {
+          "200": {
+            "description": "The periods, newest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer"
+                      },
+                      "plan": {
+                        "type": "string"
+                      },
+                      "status": {
+                        "type": "string",
+                        "description": "active, cancelled, expired or past_due"
+                      },
+                      "currentPeriodStart": {
+                        "type": "string",
+                        "description": "ISO 8601"
+                      },
+                      "currentPeriodEnd": {
+                        "type": "string",
+                        "description": "ISO 8601"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "plan",
+                      "status",
+                      "currentPeriodStart",
+                      "currentPeriodEnd"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/subscription/cancel": {
+      "post": {
+        "operationId": "postApiSubscriptionCancel",
+        "summary": "Turn auto-renew off",
+        "description": "Entitlement is not revoked: the period already paid for runs to its end, so the response normally reports active:false with entitled:true. One-way -- resubscribing means a new agreement, whose first charge is immediate.",
+        "tags": [
+          "subscription"
+        ],
+        "responses": {
+          "200": {
+            "description": "The status after cancelling, with autoRenew false by definition",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "active": {
+                      "type": "boolean",
+                      "description": "Whether an agreement period is in status `active`. A billing fact, not an access one."
+                    },
+                    "plan": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "expiresAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601 end of the active period, or null when there is none"
+                    },
+                    "entitled": {
+                      "type": "boolean",
+                      "description": "Whether paid features are available right now. The field to gate subscriber-only UI on: a cancelled agreement inside the period it already paid for reports active:false and entitled:true."
+                    },
+                    "autoRenew": {
+                      "type": "boolean",
+                      "description": "Whether anything will charge the card again. Not derivable from entitlement -- a day pass grants access with no agreement behind it."
+                    }
+                  },
+                  "required": [
+                    "active",
+                    "plan",
+                    "expiresAt",
+                    "entitled",
+                    "autoRenew"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/guardian": {
       "get": {
         "operationId": "getApiGuardian",
@@ -59,7 +1166,8 @@
                             "type": [
                               "integer",
                               "null"
-                            ]
+                            ],
+                            "description": "XP this spirit still needs for its next level, or null at the maximum"
                           },
                           "category": {
                             "type": [
@@ -77,7 +1185,8 @@
                             "required": [
                               "id",
                               "name"
-                            ]
+                            ],
+                            "description": "The public-interest category this species supports, or null for one tied to none"
                           }
                         },
                         "required": [
@@ -152,7 +1261,8 @@
                           "type": [
                             "integer",
                             "null"
-                          ]
+                          ],
+                          "description": "XP this spirit still needs for its next level, or null at the maximum"
                         },
                         "category": {
                           "type": [
@@ -170,7 +1280,8 @@
                           "required": [
                             "id",
                             "name"
-                          ]
+                          ],
+                          "description": "The public-interest category this species supports, or null for one tied to none"
                         }
                       },
                       "required": [
@@ -189,7 +1300,8 @@
                       "type": "integer"
                     },
                     "xpGained": {
-                      "type": "integer"
+                      "type": "integer",
+                      "description": "XP actually granted, growth bonus included"
                     }
                   },
                   "required": [

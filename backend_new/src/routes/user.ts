@@ -1,6 +1,7 @@
 import { zValidator } from '@hono/zod-validator';
 import { asc, count, desc, eq, inArray, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
+import { describeRoute, resolver } from 'hono-openapi';
 import { z } from 'zod';
 import {
   categoryTable,
@@ -24,6 +25,7 @@ import { verifyIdTokenFull } from 'src/lib/firebaseAdmin';
 import { requireAdmin } from 'src/middleware/adminAuth';
 import { requireUser, UserEnv } from 'src/middleware/requireUser';
 import { BadRequestError, NotFoundError, UnauthorizedError } from 'src/model/error';
+import { subscriptionStatusSchema } from 'src/routes/subscription';
 
 const USER_SORT_COLUMNS = {
   id: userTable.id,
@@ -65,6 +67,262 @@ export const userSubscriptionBodySchema = z.object({
   days: z.number().int().positive().max(3650).optional(),
 });
 
+/**
+ * A user as this API reports them.
+ *
+ * The date columns are `Date` objects in the row and ISO strings on the
+ * wire -- `c.json` calls toISOString for you -- so the DTO below does it
+ * explicitly instead. Same bytes, but the type now says what is actually
+ * sent, which is what the generated document and its clients describe.
+ */
+export const userSchema = z.object({
+  id: z.number().int(),
+  firebaseUid: z.string(),
+  email: z.string().nullable(),
+  name: z.string().nullable(),
+  avatar: z.string().nullable(),
+  totalPoints: z.number().int().describe('Spendable balance; decreases when spent'),
+  lifetimePoints: z.number().int().describe('Only ever increases; the leaderboard ranks on this'),
+  lastLoginAt: z.string().nullable().describe('ISO 8601'),
+  createdAt: z.string().nullable().describe('ISO 8601'),
+  updatedAt: z.string().nullable().describe('ISO 8601'),
+});
+
+/**
+ * Listed field by field rather than spread, so a column added to the
+ * user table cannot reach a response without being described first.
+ */
+const toUserDto = (row: {
+  id: number;
+  firebaseUid: string;
+  email: string | null;
+  name: string | null;
+  avatar: string | null;
+  totalPoints: number;
+  lifetimePoints: number;
+  lastLoginAt: Date | null;
+  createdAt: Date | null;
+  updatedAt: Date | null;
+}): z.infer<typeof userSchema> => ({
+  id: row.id,
+  firebaseUid: row.firebaseUid,
+  email: row.email,
+  name: row.name,
+  avatar: row.avatar,
+  totalPoints: row.totalPoints,
+  lifetimePoints: row.lifetimePoints,
+  lastLoginAt: row.lastLoginAt?.toISOString() ?? null,
+  createdAt: row.createdAt?.toISOString() ?? null,
+  updatedAt: row.updatedAt?.toISOString() ?? null,
+});
+
+/**
+ * Billing only -- three of the five fields GET /subscription/me answers
+ * with, picked from that schema so the shared fields cannot drift apart.
+ *
+ * `entitled` and `autoRenew` are missing because each would be another
+ * query per row, and the admin list only needs to show and toggle
+ * billing. packages/shared types these responses as the full
+ * SubscriptionStatus, which has been wrong since they were written: this
+ * is what they actually send.
+ */
+const subscriptionBillingSchema = subscriptionStatusSchema.pick({
+  active: true,
+  plan: true,
+  expiresAt: true,
+});
+
+/**
+ * What sign-in reports: billing plus entitlement, but still no
+ * autoRenew.
+ *
+ * Nothing reads autoRenew off a sync response today -- the only caller,
+ * deriveSubscriptionView in the webapp, is fed from GET
+ * /subscription/me -- so this is a type that overstates rather than a
+ * bug. Adding the field would cost one findActiveOrder per sign-in; see
+ * AGENTS.md.
+ */
+const syncSubscriptionSchema = subscriptionBillingSchema.extend({
+  entitled: subscriptionStatusSchema.shape.entitled,
+});
+
+const paginateSchema = z.object({
+  total: z.number().int(),
+  page: z.number().int(),
+  limit: z.number().int(),
+  totalPages: z.number().int(),
+});
+
+export const getUserListResponseSchema = z.object({
+  data: z.array(userSchema.extend({ subscription: subscriptionBillingSchema })),
+  paginate: paginateSchema,
+});
+
+export const postUserSyncResponseSchema = userSchema.extend({
+  subscription: syncSubscriptionSchema,
+});
+
+export const getUserStatsResponseSchema = z.array(
+  z.object({
+    id: z.number().int(),
+    name: z.string(),
+    /**
+     * Only the id and name, although packages/shared types this as the
+     * full Category (which carries createdAt too). What is sent is this.
+     */
+    category: z.array(z.object({ id: z.number().int(), name: z.string() })),
+    conceptGroup: z.array(
+      z.object({
+        id: z.number().int(),
+        name: z.string(),
+        mastery: z
+          .number()
+          .describe('Question-weighted mean mastery across the group, 0 when untouched'),
+        numberOfQuestions: z.number().int(),
+      })
+    ),
+  })
+);
+
+export const getUserHistoryResponseSchema = z.object({
+  totalAttempts: z.number().int(),
+  overallAccuracy: z.number().describe('Percentage, 0 when nothing has been attempted'),
+  streakDays: z
+    .number()
+    .int()
+    .describe('Consecutive days up to today or yesterday; missing a day resets it'),
+  activityMap: z.array(z.object({ date: z.string().describe('YYYY-MM-DD'), count: z.number().int() })),
+});
+
+export const putUserSubscriptionResponseSchema = subscriptionBillingSchema;
+
+export const putUserPointsResponseSchema = z.object({
+  totalPoints: z.number().int(),
+  lifetimePoints: z.number().int(),
+  delta: z.number().int().describe('The adjustment that was applied, echoed back'),
+});
+
+const listDoc = describeRoute({
+  summary: 'List users (admin)',
+  description: "One page of users with each one's billing state.",
+  tags: ['user', 'admin'],
+  responses: {
+    200: {
+      description: 'A page of users',
+      content: { 'application/json': { schema: resolver(getUserListResponseSchema) } },
+    },
+    403: { description: 'Not an admin' },
+  },
+});
+
+const syncDoc = describeRoute({
+  summary: 'Find or create the caller from their Firebase identity',
+  description:
+    "Called on every sign-in; the only thing that ever creates a user row, which is why it is the one route here not behind requireUser. Returns 201 when it created the row. Only lastLoginAt is refreshed for a returning user -- a changed name or avatar on the Firebase side is not written back. The caller's subscription comes with it so sign-in needs one authenticated request rather than two.",
+  tags: ['user'],
+  responses: {
+    200: {
+      description: 'The existing user',
+      content: { 'application/json': { schema: resolver(postUserSyncResponseSchema) } },
+    },
+    201: {
+      description: 'The user that was just created',
+      content: { 'application/json': { schema: resolver(postUserSyncResponseSchema) } },
+    },
+    401: { description: 'No valid Firebase identity' },
+  },
+});
+
+const statsDoc = describeRoute({
+  summary: "The caller's mastery per concept group",
+  description:
+    'Grouped by subject. A subject appears once the user has a stat row for any of its concepts -- and then every concept group in that subject is included, untouched ones at mastery 0.',
+  tags: ['user'],
+  responses: {
+    200: {
+      description: 'Subjects, each with its concept groups',
+      content: { 'application/json': { schema: resolver(getUserStatsResponseSchema) } },
+    },
+  },
+});
+
+const historyDoc = describeRoute({
+  summary: "The caller's totals, streak and activity heatmap",
+  description:
+    'The mastery-over-time series this used to carry is subscriber-only and lives in GET /api/analysis/overview -- dropped from this payload rather than hidden in the UI, so the paywall is not merely decorative.',
+  tags: ['user'],
+  responses: {
+    200: {
+      description: 'Totals and the per-day attempt counts',
+      content: { 'application/json': { schema: resolver(getUserHistoryResponseSchema) } },
+    },
+  },
+});
+
+const putSubscriptionDoc = describeRoute({
+  summary: "Grant or revoke a user's subscription (admin)",
+  description:
+    'Exists because a granted subscription has no payment behind it: without this the only way to exercise anything behind the paywall is to write to the database by hand. Idempotent in both directions.',
+  tags: ['user', 'admin'],
+  responses: {
+    200: {
+      description: 'The billing state afterwards',
+      content: { 'application/json': { schema: resolver(putUserSubscriptionResponseSchema) } },
+    },
+    400: { description: 'Malformed body' },
+    403: { description: 'Not an admin' },
+    404: { description: 'No such user' },
+  },
+});
+
+const putPointsDoc = describeRoute({
+  summary: "Adjust a user's point balance by hand (admin)",
+  description:
+    'Writes a real ledger row as well as moving the balance, so SUM(point_transaction.amount) still reconciles. Earning raises both balances and spending lowers only totalPoints, so +100 then -100 leaves lifetimePoints 100 higher -- correct, not a leak.',
+  tags: ['user', 'admin'],
+  responses: {
+    200: {
+      description: 'The balances afterwards',
+      content: { 'application/json': { schema: resolver(putUserPointsResponseSchema) } },
+    },
+    400: { description: 'Malformed body, or a delta of 0' },
+    403: { description: 'Not an admin' },
+    404: { description: 'No such user' },
+  },
+});
+
+const meDoc = describeRoute({
+  summary: "The caller's own profile",
+  tags: ['user'],
+  responses: {
+    200: { description: 'The user', content: { 'application/json': { schema: resolver(userSchema) } } },
+  },
+});
+
+const putMeDoc = describeRoute({
+  summary: "Rename the caller",
+  description:
+    'Name is the only self-editable field: email, avatar and firebaseUid stay whatever the last sign-in set them to.',
+  tags: ['user'],
+  responses: {
+    200: {
+      description: 'The updated user',
+      content: { 'application/json': { schema: resolver(userSchema) } },
+    },
+    400: { description: 'Empty or over-long name' },
+  },
+});
+
+const getByIdDoc = describeRoute({
+  summary: 'Read any user (admin)',
+  tags: ['user', 'admin'],
+  responses: {
+    200: { description: 'The user', content: { 'application/json': { schema: resolver(userSchema) } } },
+    403: { description: 'Not an admin' },
+    404: { description: 'No such user' },
+  },
+});
+
 // A user's current streak, counted back from the most recent recorded
 // day -- zero unless that day is today or yesterday (missing a day
 // resets it), then +1 for every immediately-preceding consecutive day.
@@ -92,7 +350,7 @@ const computeStreak = (sortedDatesDesc: string[]): number => {
 // thing that ever creates their user row in the first place, so it can't
 // itself depend on that row already existing.
 export const user = new Hono<UserEnv>()
-  .get('/', requireAdmin, zValidator('query', userListQuerySchema), async (c) => {
+  .get('/', requireAdmin, listDoc, zValidator('query', userListQuerySchema), async (c) => {
     const { limit, offset, sort, order } = c.req.valid('query');
     console.log(
       `GET /api/user limit=${limit} offset=${offset} sort=${sort} order=${order}`
@@ -118,16 +376,19 @@ export const user = new Hono<UserEnv>()
     const data = rows.map((row) => {
       const active = subscriptions.get(row.id);
       return {
-        ...row,
+        ...toUserDto(row),
         subscription: {
           active: active !== undefined,
           plan: active?.plan ?? null,
-          expiresAt: active?.currentPeriodEnd ?? null,
+          expiresAt: active?.currentPeriodEnd.toISOString() ?? null,
         },
       };
     });
 
-    return c.json({ data, paginate: genPagination(total, limit, offset) });
+    return c.json({
+      data,
+      paginate: genPagination(total, limit, offset),
+    } satisfies z.infer<typeof getUserListResponseSchema>);
   })
   // Find-or-create by firebase_uid, called on every sign-in. Only
   // lastLoginAt is refreshed for a returning user -- matching the legacy
@@ -138,7 +399,7 @@ export const user = new Hono<UserEnv>()
   // here saves a second authenticated round trip before the UI can
   // decide what the user is entitled to see. GET /subscription/me stays
   // for refreshing it mid-session without a full sync.
-  .post('/sync', async (c) => {
+  .post('/sync', syncDoc, async (c) => {
     const identity = await verifyIdTokenFull(c.req.header('Authorization'));
     if (identity === null) throw new UnauthorizedError('Sign-in required');
     console.log(`POST /api/user/sync uid=${identity.uid}`);
@@ -161,14 +422,14 @@ export const user = new Hono<UserEnv>()
         findEntitledSubscription(db, existing.id),
       ]);
       return c.json({
-        ...updated,
+        ...toUserDto(updated),
         subscription: {
           active: active !== undefined,
           plan: active?.plan ?? null,
-          expiresAt: active?.currentPeriodEnd ?? null,
+          expiresAt: active?.currentPeriodEnd.toISOString() ?? null,
           entitled: entitled !== undefined,
         },
-      });
+      } satisfies z.infer<typeof postUserSyncResponseSchema>);
     }
 
     const [{ insertId }] = await db.insert(userTable).values({
@@ -185,7 +446,10 @@ export const user = new Hono<UserEnv>()
     // cannot have a subscription yet. Still reported, so the client never
     // has to branch on the status code to find the field.
     return c.json(
-      { ...created, subscription: { active: false, plan: null, expiresAt: null, entitled: false } },
+      {
+        ...toUserDto(created),
+        subscription: { active: false, plan: null, expiresAt: null, entitled: false },
+      } satisfies z.infer<typeof postUserSyncResponseSchema>,
       201
     );
   })
@@ -194,7 +458,7 @@ export const user = new Hono<UserEnv>()
   // at least one of its concepts -- but once it does, every concept group
   // in that subject is included (untouched groups show mastery 0), not
   // just the ones actually attempted.
-  .get('/stats', requireUser, async (c) => {
+  .get('/stats', requireUser, statsDoc, async (c) => {
     const user = c.get('user');
     console.log(`GET /api/user/stats userId=${user.id}`);
     const db = c.get('db');
@@ -209,7 +473,7 @@ export const user = new Hono<UserEnv>()
       .innerJoin(conceptTable, eq(conceptTable.id, userConceptStatTable.conceptId))
       .innerJoin(conceptGroupTable, eq(conceptGroupTable.id, conceptTable.conceptGroupId))
       .where(eq(userConceptStatTable.userId, user.id));
-    if (stats.length === 0) return c.json([]);
+    if (stats.length === 0) return c.json([] satisfies z.infer<typeof getUserStatsResponseSchema>);
 
     const masteryByConcept = new Map(stats.map((s) => [s.conceptId, s.mastery ?? 0]));
     const subjectIds = [...new Set(stats.map((s) => s.subjectId))];
@@ -273,7 +537,7 @@ export const user = new Hono<UserEnv>()
       });
     }
 
-    return c.json([...subjectMap.values()]);
+    return c.json([...subjectMap.values()] satisfies z.infer<typeof getUserStatsResponseSchema>);
   })
   // Daily activity/mastery history, aggregated from the per-(user,
   // subject, day) rollups POST /reply upserts. userStatHistoryTable.date
@@ -291,7 +555,7 @@ export const user = new Hono<UserEnv>()
   // would make the paywall decorative for anyone opening the network
   // tab. Losing it also means this route no longer needs the subject
   // and concept joins that only ever fed the weighting.
-  .get('/history', requireUser, async (c) => {
+  .get('/history', requireUser, historyDoc, async (c) => {
     const user = c.get('user');
     console.log(`GET /api/user/history userId=${user.id}`);
     const db = c.get('db');
@@ -304,7 +568,7 @@ export const user = new Hono<UserEnv>()
         overallAccuracy: 0,
         streakDays: 0,
         activityMap: [],
-      });
+      } satisfies z.infer<typeof getUserHistoryResponseSchema>);
 
     let totalAttempts = 0;
     let totalCorrect = 0;
@@ -326,7 +590,12 @@ export const user = new Hono<UserEnv>()
 
     const overallAccuracy = totalAttempts > 0 ? (totalCorrect / totalAttempts / 10) * 100 : 0;
 
-    return c.json({ totalAttempts, overallAccuracy, streakDays, activityMap });
+    return c.json({
+      totalAttempts,
+      overallAccuracy,
+      streakDays,
+      activityMap,
+    } satisfies z.infer<typeof getUserHistoryResponseSchema>);
   })
   /**
    * Grants or revokes a user's subscription. Admin only.
@@ -343,6 +612,7 @@ export const user = new Hono<UserEnv>()
   .put(
     '/:id/subscription',
     requireAdmin,
+    putSubscriptionDoc,
     zValidator('json', userSubscriptionBodySchema),
     async (c) => {
       const db = c.get('db');
@@ -358,8 +628,8 @@ export const user = new Hono<UserEnv>()
       return c.json({
         active: result !== undefined,
         plan: result?.plan ?? null,
-        expiresAt: result?.currentPeriodEnd ?? null,
-      });
+        expiresAt: result?.currentPeriodEnd.toISOString() ?? null,
+      } satisfies z.infer<typeof putUserSubscriptionResponseSchema>);
     }
   )
   /**
@@ -380,7 +650,7 @@ export const user = new Hono<UserEnv>()
    * leaderboard and never decreases. So a +100 followed by -100 leaves
    * lifetimePoints 100 higher, which is correct, not a leak.
    */
-  .put('/:id/points', requireAdmin, zValidator('json', userPointsBodySchema), async (c) => {
+  .put('/:id/points', requireAdmin, putPointsDoc, zValidator('json', userPointsBodySchema), async (c) => {
     const db = c.get('db');
     const id = Number(c.req.param('id'));
     const { delta } = c.req.valid('json');
@@ -428,18 +698,18 @@ export const user = new Hono<UserEnv>()
       totalPoints: newTotalPoints,
       lifetimePoints: credit ? found.lifetimePoints + delta : found.lifetimePoints,
       delta,
-    });
+    } satisfies z.infer<typeof putUserPointsResponseSchema>);
   })
   // The signed-in user's own profile -- unlike GET /:id below, this needs
   // no admin check since it can only ever read the caller's own row.
-  .get('/me', requireUser, async (c) => {
+  .get('/me', requireUser, meDoc, async (c) => {
     const user = c.get('user');
     console.log(`GET /api/user/me userId=${user.id}`);
-    return c.json(user);
+    return c.json(toUserDto(user) satisfies z.infer<typeof userSchema>);
   })
   // Name is the only self-editable field -- email/avatar/firebaseUid stay
   // whatever POST /sync last set them to from the Firebase identity.
-  .put('/me', requireUser, zValidator('json', userUpdateMeBodySchema), async (c) => {
+  .put('/me', requireUser, putMeDoc, zValidator('json', userUpdateMeBodySchema), async (c) => {
     const user = c.get('user');
     const { name } = c.req.valid('json');
     console.log(`PUT /api/user/me userId=${user.id}`);
@@ -447,12 +717,12 @@ export const user = new Hono<UserEnv>()
 
     await db.update(userTable).set({ name, updatedAt: new Date() }).where(eq(userTable.id, user.id));
     const [updated] = await db.select().from(userTable).where(eq(userTable.id, user.id));
-    return c.json(updated);
+    return c.json(toUserDto(updated) satisfies z.infer<typeof userSchema>);
   })
   // Registered after the other static routes (/sync, /stats, /history, /me)
   // -- as a dynamic segment, this would otherwise swallow requests to any
   // of them (Hono matches routes in registration order, not by specificity).
-  .get('/:id', requireAdmin, async (c) => {
+  .get('/:id', requireAdmin, getByIdDoc, async (c) => {
     const id = c.req.param('id');
     console.log(`GET /api/user/${id}`);
     const [found] = await c
@@ -462,5 +732,5 @@ export const user = new Hono<UserEnv>()
       .where(eq(userTable.id, Number(id)));
     if (found === undefined) throw new NotFoundError(`user ${id} not found`);
 
-    return c.json(found);
+    return c.json(toUserDto(found) satisfies z.infer<typeof userSchema>);
   });

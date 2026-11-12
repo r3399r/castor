@@ -5,6 +5,10 @@ import { closeDb, getDb } from 'src/db/client';
 import { userSubscriptionTable, userTable } from 'src/db/schema';
 import { toErrorResponse } from 'src/lib/errorResponse';
 import { requireSubscription } from 'src/middleware/requireSubscription';
+import {
+  getSubscriptionHistoryResponseSchema,
+  subscriptionStatusSchema,
+} from 'src/routes/subscription';
 import { requireUser } from 'src/middleware/requireUser';
 import { transaction } from 'src/middleware/transaction';
 
@@ -151,6 +155,32 @@ describe('subscription', () => {
       const res = await app.request('/api/subscription/me');
       expect(await res.json()).toMatchObject({ active: true, entitled: true });
     });
+
+    /**
+     * What the OpenAPI document promises, against what is sent.
+     *
+     * The key check is separate because zod strips unknown keys instead
+     * of rejecting them, so a field added to the response would pass the
+     * parse while appearing in no document.
+     */
+    it('sends exactly what the OpenAPI document describes', async () => {
+      const userId = await seedUser();
+      await grant(userId, {});
+      vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
+
+      const body: unknown = await (await app.request('/api/subscription/me')).json();
+
+      const parsed = subscriptionStatusSchema.safeParse(body);
+      expect(parsed.error?.issues ?? []).toEqual([]);
+      expect(parsed.success).toBe(true);
+      expect(Object.keys(body as object).sort()).toEqual([
+        'active',
+        'autoRenew',
+        'entitled',
+        'expiresAt',
+        'plan',
+      ]);
+    });
   });
 
   describe('GET /api/subscription/history', () => {
@@ -193,6 +223,25 @@ describe('subscription', () => {
       const body = (await res.json()) as { plan: string }[];
       expect(body).toHaveLength(1);
       expect(body[0].plan).toBe('monthly');
+    });
+
+    it('sends exactly what the OpenAPI document describes', async () => {
+      const userId = await seedUser();
+      await grant(userId);
+      vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
+
+      const body: unknown = await (await app.request('/api/subscription/history')).json();
+
+      const parsed = getSubscriptionHistoryResponseSchema.safeParse(body);
+      expect(parsed.error?.issues ?? []).toEqual([]);
+      expect(parsed.success).toBe(true);
+      expect(Object.keys((body as object[])[0]).sort()).toEqual([
+        'currentPeriodEnd',
+        'currentPeriodStart',
+        'id',
+        'plan',
+        'status',
+      ]);
     });
   });
 

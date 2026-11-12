@@ -21,6 +21,7 @@ vi.mock('src/lib/ecpay', async (importOriginal) => ({
   cancelPeriodOrder: vi.fn(),
 }));
 import { cancelPeriodOrder, genCheckMacValue } from 'src/lib/ecpay';
+import { subscriptionStatusSchema } from 'src/routes/subscription';
 
 const FIXTURE_UID = 'payment-fixture-uid';
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -597,6 +598,32 @@ describe('payment', () => {
       expect(res.status).toBe(200);
       expect(vi.mocked(cancelPeriodOrder)).not.toHaveBeenCalled();
       expect((await subscriptionsOf(userId))[0].status).toBe('cancelled');
+    });
+
+    /**
+     * The same schema GET /me answers with, checked on this route too:
+     * the two reporting the same shape differently is exactly what one
+     * description per response is for.
+     */
+    it('sends exactly what the OpenAPI document describes', async () => {
+      const userId = await seedUser();
+      await seedOrder(userId, { status: 'active' });
+      vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
+
+      const body: unknown = await (
+        await app.request('/api/subscription/cancel', { method: 'POST' })
+      ).json();
+
+      const parsed = subscriptionStatusSchema.safeParse(body);
+      expect(parsed.error?.issues ?? []).toEqual([]);
+      expect(parsed.success).toBe(true);
+      expect(Object.keys(body as object).sort()).toEqual([
+        'active',
+        'autoRenew',
+        'entitled',
+        'expiresAt',
+        'plan',
+      ]);
     });
   });
 
