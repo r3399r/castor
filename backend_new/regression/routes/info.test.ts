@@ -10,6 +10,11 @@ import {
   userTable,
 } from 'src/db/schema';
 import type { GetInfoPopularResponse, GetInfoStatsResponse } from '@castor/shared';
+import {
+  getInfoPopularResponseSchema,
+  getInfoResponseSchema,
+  getInfoStatsResponseSchema,
+} from 'src/routes/info';
 
 const clearTables = async () => {
   const db = getDb();
@@ -240,10 +245,58 @@ describe('info routes', () => {
     expect((await getPopular()).map((s) => s.name)).toEqual(['sub 1', 'sub 2', 'sub 3']);
   });
 
+  /**
+   * What the OpenAPI document promises, against what is sent.
+   *
+   * The key check is separate from the parse because zod strips unknown
+   * keys instead of rejecting them: a count added to a query and spread
+   * into one of these responses would pass the parse while appearing in
+   * no document.
+   */
+  it('sends exactly what the OpenAPI document describes', async () => {
+    const subjectId = await addSubject('sub');
+    const questionId = await addQuestion(subjectId, { attempCount: 4 });
+    await fileUnderExam(questionId, await addExam('exam'));
+    await getDb().insert(userTable).values({ firebaseUid: 'uid-1' });
+
+    const stats: unknown = await (await app.request('/api/info/stats')).json();
+    const statsParsed = getInfoStatsResponseSchema.safeParse(stats);
+    expect(statsParsed.error?.issues ?? []).toEqual([]);
+    expect(Object.keys(stats as object).sort()).toEqual([
+      'categoryCount',
+      'examCount',
+      'questionCount',
+      'subjectCount',
+      'userCount',
+    ]);
+
+    const popular: unknown = await (await app.request('/api/info/popular')).json();
+    const popularParsed = getInfoPopularResponseSchema.safeParse(popular);
+    expect(popularParsed.error?.issues ?? []).toEqual([]);
+    const [subject] = popular as { exams: object[] }[];
+    expect(Object.keys(subject).sort()).toEqual([
+      'attemptCount',
+      'exams',
+      'id',
+      'name',
+      'questionCount',
+    ]);
+    expect(Object.keys(subject.exams[0]).sort()).toEqual([
+      'attemptCount',
+      'id',
+      'name',
+      'questionCount',
+    ]);
+  });
+
   it('leaves the health check free of the database', async () => {
     const res = await app.request('/api/info');
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { status: string };
-    expect(body.status).toBe('ok');
+    const body: unknown = await res.json();
+    expect((body as { status: string }).status).toBe('ok');
+
+    const parsed = getInfoResponseSchema.safeParse(body);
+    expect(parsed.error?.issues ?? []).toEqual([]);
+    expect(Object.keys(body as object).sort()).toEqual(['status', 'time']);
   });
 });

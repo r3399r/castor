@@ -1,9 +1,24 @@
-export type Pagination = {
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-};
+import { z } from 'zod';
+
+/**
+ * The pagination block every paginated response carries.
+ *
+ * A schema rather than a hand-written type: it is part of several
+ * OpenAPI responses, and it belongs beside the function that builds it
+ * rather than being re-declared in each route file that returns one.
+ * The type is inferred from it, so the two cannot drift.
+ */
+export const paginationSchema = z.object({
+  total: z.number().int().describe('Rows matching the query, ignoring limit and offset'),
+  page: z.number().int().describe('1-indexed, derived from offset and limit'),
+  limit: z.number().int(),
+  totalPages: z
+    .number()
+    .int()
+    .describe('At least 1, so an empty result reads as "page 1 of 1" rather than "of 0"'),
+});
+
+export type Pagination = z.infer<typeof paginationSchema>;
 
 export const DEFAULT_LIMIT = 20;
 // High enough that "fetch everything for a dropdown" (categories for the

@@ -21,6 +21,7 @@ vi.mock('src/lib/ecpay', async (importOriginal) => ({
   cancelPeriodOrder: vi.fn(),
 }));
 import { cancelPeriodOrder, genCheckMacValue } from 'src/lib/ecpay';
+import { getInfoPlansResponseSchema } from 'src/routes/info';
 import { subscriptionStatusSchema } from 'src/routes/subscription';
 
 const FIXTURE_UID = 'payment-fixture-uid';
@@ -669,6 +670,31 @@ describe('payment', () => {
       const pass = plans.find((p) => p.code === 'days90')!;
       expect(pass).toMatchObject({ kind: 'dayPass', days: 90 });
       expect(pass.periodType).toBeUndefined();
+    });
+
+    it('sends exactly what the OpenAPI document describes', async () => {
+      const body: unknown = await (await app.request('/api/info/plans')).json();
+
+      const parsed = getInfoPlansResponseSchema.safeParse(body);
+      expect(parsed.error?.issues ?? []).toEqual([]);
+      expect(parsed.success).toBe(true);
+
+      // Per kind, because the document describes the two separately:
+      // a discriminated union, not one shape with optional fields.
+      const byCode = new Map((body as { code: string }[]).map((plan) => [plan.code, plan]));
+      expect(Object.keys(byCode.get('monthly')!).sort()).toEqual([
+        'amount',
+        'code',
+        'frequency',
+        'kind',
+        'periodType',
+      ]);
+      expect(Object.keys(byCode.get('days90')!).sort()).toEqual([
+        'amount',
+        'code',
+        'days',
+        'kind',
+      ]);
     });
   });
 });

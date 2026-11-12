@@ -13,6 +13,478 @@
   ],
   "components": {},
   "paths": {
+    "/api/info": {
+      "get": {
+        "operationId": "getApiInfo",
+        "summary": "Health check",
+        "description": "Touches no table, so it keeps answering 200 while the database is unreachable. This is what the load balancer reads.",
+        "tags": [
+          "info"
+        ],
+        "responses": {
+          "200": {
+            "description": "The instance is up",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "const": "ok"
+                    },
+                    "time": {
+                      "type": "string",
+                      "description": "When this instance answered, ISO 8601"
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "time"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/info/plans": {
+      "get": {
+        "operationId": "getApiInfoPlans",
+        "summary": "List the subscription plans and their prices",
+        "description": "Public and unauthenticated, because the pricing page is read before signing in. These are the authoritative amounts: the figure shown has to be the figure signed into the ECPay order, so a client must not hold prices of its own.",
+        "tags": [
+          "info"
+        ],
+        "responses": {
+          "200": {
+            "description": "Every plan on sale",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "const": "recurring"
+                          },
+                          "code": {
+                            "type": "string"
+                          },
+                          "amount": {
+                            "type": "integer",
+                            "description": "NTD. The authoritative price: a client must render this, never a constant of its own"
+                          },
+                          "periodType": {
+                            "type": "string",
+                            "enum": [
+                              "D",
+                              "M",
+                              "Y"
+                            ]
+                          },
+                          "frequency": {
+                            "type": "integer",
+                            "description": "Charged once every `frequency` periodType, indefinitely"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "code",
+                          "amount",
+                          "periodType",
+                          "frequency"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "const": "dayPass"
+                          },
+                          "code": {
+                            "type": "string"
+                          },
+                          "amount": {
+                            "type": "integer",
+                            "description": "NTD, charged once"
+                          },
+                          "days": {
+                            "type": "integer",
+                            "description": "Days of access, added to whatever the caller already has"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "code",
+                          "amount",
+                          "days"
+                        ]
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/info/donation": {
+      "get": {
+        "operationId": "getApiInfoDonation",
+        "summary": "The public donation record",
+        "description": "Every published payout, with the arithmetic a reader needs to check it against the receipt linked from its evidence: donationCount x donationUnitAmount + platformTopUp equals transferredAmount. Public and unauthenticated on purpose -- being readable by anyone is the whole of its value as proof. It names no user; a batch is the smallest unit shown.",
+        "tags": [
+          "info"
+        ],
+        "responses": {
+          "200": {
+            "description": "The running totals, and one page of published batches",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "summary": {
+                      "type": "object",
+                      "properties": {
+                        "maxedSpiritCount": {
+                          "type": "integer",
+                          "description": "Spirits grown to max level -- every one of them is owed"
+                        },
+                        "confirmedCount": {
+                          "type": "integer"
+                        },
+                        "confirmedAmount": {
+                          "type": "integer",
+                          "description": "Summed from the frozen per-donation amounts"
+                        },
+                        "pendingCount": {
+                          "type": "integer",
+                          "description": "Maxed, but the owner has not picked an organisation yet"
+                        },
+                        "pendingAmount": {
+                          "type": "integer",
+                          "description": "pendingCount x donationAmount -- the only figure here priced at today's rate"
+                        },
+                        "promisedAmount": {
+                          "type": "integer",
+                          "description": "confirmedAmount + pendingAmount, so a reader can check it"
+                        },
+                        "transferredAmount": {
+                          "type": "integer",
+                          "description": "Over published batches only, so the listed batches add up to it"
+                        },
+                        "publishedBatchCount": {
+                          "type": "integer"
+                        },
+                        "donationAmount": {
+                          "type": "integer",
+                          "description": "Today's figure, which prices pendingAmount and nothing else"
+                        }
+                      },
+                      "required": [
+                        "maxedSpiritCount",
+                        "confirmedCount",
+                        "confirmedAmount",
+                        "pendingCount",
+                        "pendingAmount",
+                        "promisedAmount",
+                        "transferredAmount",
+                        "publishedBatchCount",
+                        "donationAmount"
+                      ]
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "transferredAt": {
+                            "type": "string",
+                            "description": "ISO 8601"
+                          },
+                          "reference": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "Bank transaction number, or the last digits of the account"
+                          },
+                          "organization": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "integer"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "introduction": {
+                                "type": "string"
+                              },
+                              "websiteUrl": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "logoUrl": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name",
+                              "introduction",
+                              "websiteUrl",
+                              "logoUrl"
+                            ]
+                          },
+                          "donationCount": {
+                            "type": "integer"
+                          },
+                          "donationSubtotal": {
+                            "type": "integer"
+                          },
+                          "donationUnitAmount": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ],
+                            "description": "The one frozen amount every member shares, or null when they differ; null means the multiplication must not be printed"
+                          },
+                          "platformTopUp": {
+                            "type": "integer",
+                            "description": "transferredAmount - donationSubtotal. Signed: negative would mean the batch sent less than was promised"
+                          },
+                          "transferredAmount": {
+                            "type": "integer"
+                          },
+                          "evidence": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "integer"
+                                },
+                                "kind": {
+                                  "type": "string",
+                                  "description": "TRANSFER_RECEIPT, ORG_RECEIPT, THANK_YOU_LETTER -- open-ended"
+                                },
+                                "url": {
+                                  "type": "string"
+                                },
+                                "caption": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "kind",
+                                "url",
+                                "caption"
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "transferredAt",
+                          "reference",
+                          "organization",
+                          "donationCount",
+                          "donationSubtotal",
+                          "donationUnitAmount",
+                          "platformTopUp",
+                          "transferredAmount",
+                          "evidence"
+                        ]
+                      }
+                    },
+                    "paginate": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer",
+                          "description": "Rows matching the query, ignoring limit and offset"
+                        },
+                        "page": {
+                          "type": "integer",
+                          "description": "1-indexed, derived from offset and limit"
+                        },
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "totalPages": {
+                          "type": "integer",
+                          "description": "At least 1, so an empty result reads as \"page 1 of 1\" rather than \"of 0\""
+                        }
+                      },
+                      "required": [
+                        "total",
+                        "page",
+                        "limit",
+                        "totalPages"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "summary",
+                    "data",
+                    "paginate"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "limit beyond the cap, or a malformed offset or order"
+          }
+        }
+      }
+    },
+    "/api/info/stats": {
+      "get": {
+        "operationId": "getApiInfoStats",
+        "summary": "Catalog sizes",
+        "description": "The landing page's counter bar. Public and unauthenticated: it reports catalog totals and nothing per-user.",
+        "tags": [
+          "info"
+        ],
+        "responses": {
+          "200": {
+            "description": "How much there is to practise",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "categoryCount": {
+                      "type": "integer"
+                    },
+                    "subjectCount": {
+                      "type": "integer"
+                    },
+                    "examCount": {
+                      "type": "integer"
+                    },
+                    "questionCount": {
+                      "type": "integer",
+                      "description": "Servable top-level questions: a 題組 counts once, however many sub-questions it holds"
+                    },
+                    "userCount": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "categoryCount",
+                    "subjectCount",
+                    "examCount",
+                    "questionCount",
+                    "userCount"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/info/popular": {
+      "get": {
+        "operationId": "getApiInfoPopular",
+        "summary": "The most-practised subjects, with their most-practised exams",
+        "description": "At most three subjects, each with at most five exams. Public and unauthenticated, and it reports only catalog-wide totals -- never who did the practising.",
+        "tags": [
+          "info"
+        ],
+        "responses": {
+          "200": {
+            "description": "The ranked subjects, newest counts first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "attemptCount": {
+                        "type": "integer",
+                        "description": "How many times the questions were practised -- a 題組 answered once counts once"
+                      },
+                      "questionCount": {
+                        "type": "integer",
+                        "description": "Servable top-level questions, counted as in /stats"
+                      },
+                      "exams": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "integer"
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "attemptCount": {
+                              "type": "integer",
+                              "description": "How many times the questions were practised -- a 題組 answered once counts once"
+                            },
+                            "questionCount": {
+                              "type": "integer",
+                              "description": "Servable top-level questions, counted as in /stats"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name",
+                            "attemptCount",
+                            "questionCount"
+                          ]
+                        },
+                        "description": "Ranked like the subjects themselves, and empty when none of them is filed under an exam"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "attemptCount",
+                      "questionCount",
+                      "exams"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/user": {
       "get": {
         "operationId": "getApiUser",
@@ -135,16 +607,19 @@
                       "type": "object",
                       "properties": {
                         "total": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Rows matching the query, ignoring limit and offset"
                         },
                         "page": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "1-indexed, derived from offset and limit"
                         },
                         "limit": {
                           "type": "integer"
                         },
                         "totalPages": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "At least 1, so an empty result reads as \"page 1 of 1\" rather than \"of 0\""
                         }
                       },
                       "required": [

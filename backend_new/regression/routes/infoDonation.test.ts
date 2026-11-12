@@ -15,6 +15,7 @@ import {
 import { DONATION_AMOUNT } from 'src/lib/donationAmount';
 import { MAX_LEVEL } from 'src/lib/guardianLevel';
 import type { GetInfoDonationResponse } from '@castor/shared';
+import { getInfoDonationResponseSchema } from 'src/routes/info';
 
 // Deliberately no firebaseAdmin mock: this endpoint takes no token, and
 // mocking the verifier would hide it if that ever changed.
@@ -479,6 +480,74 @@ describe('info donation record', () => {
 
     it('rejects a limit beyond the cap', async () => {
       expect((await app.request('/api/info/donation?limit=1001')).status).toBe(400);
+    });
+
+    /**
+     * What the OpenAPI document promises, against what is sent -- with a
+     * batch that has members and evidence, so every nested shape is
+     * covered rather than only the empty case.
+     *
+     * The key checks are separate from the parse because zod strips
+     * unknown keys instead of rejecting them: a column added to one of
+     * these queries and spread into the response would pass the parse
+     * while appearing in no document.
+     */
+    it('sends exactly what the OpenAPI document describes', async () => {
+      const categoryId = await seedCategory();
+      const organizationId = await seedOrganization('OO 基金會');
+      const batchId = await seedBatch(organizationId, { transferredAmount: 5000 });
+      await seedDonation({ categoryId, organizationId, batchId });
+      await seedEvidence(batchId, 'TRANSFER_RECEIPT', { caption: '轉帳證明' });
+
+      const body: unknown = await (await app.request('/api/info/donation')).json();
+
+      const parsed = getInfoDonationResponseSchema.safeParse(body);
+      expect(parsed.error?.issues ?? []).toEqual([]);
+      expect(parsed.success).toBe(true);
+      expect(Object.keys(body as object).sort()).toEqual(['data', 'paginate', 'summary']);
+
+      const record = body as {
+        summary: object;
+        data: { organization: object; evidence: object[] }[];
+      };
+      expect(Object.keys(record.summary).sort()).toEqual([
+        'confirmedAmount',
+        'confirmedCount',
+        'donationAmount',
+        'maxedSpiritCount',
+        'pendingAmount',
+        'pendingCount',
+        'promisedAmount',
+        'publishedBatchCount',
+        'transferredAmount',
+      ]);
+      expect(Object.keys(record.data[0]).sort()).toEqual([
+        'donationCount',
+        'donationSubtotal',
+        'donationUnitAmount',
+        'evidence',
+        'id',
+        'organization',
+        'platformTopUp',
+        'reference',
+        'transferredAmount',
+        'transferredAt',
+      ]);
+      // Five of the organisation's columns, deliberately: the taxId and
+      // the internal note are not on the public record.
+      expect(Object.keys(record.data[0].organization).sort()).toEqual([
+        'id',
+        'introduction',
+        'logoUrl',
+        'name',
+        'websiteUrl',
+      ]);
+      expect(Object.keys(record.data[0].evidence[0]).sort()).toEqual([
+        'caption',
+        'id',
+        'kind',
+        'url',
+      ]);
     });
   });
 });

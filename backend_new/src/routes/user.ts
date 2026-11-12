@@ -14,7 +14,7 @@ import {
   userTable,
 } from 'src/db/schema';
 import { buildDateSubjectMap, loadMasteryHistoryRows } from 'src/lib/masteryHistory';
-import { DEFAULT_LIMIT, genPagination, MAX_LIMIT } from 'src/lib/paginator';
+import { DEFAULT_LIMIT, genPagination, MAX_LIMIT, paginationSchema } from 'src/lib/paginator';
 import {
   findActiveSubscription,
   findActiveSubscriptions,
@@ -146,16 +146,9 @@ const syncSubscriptionSchema = subscriptionBillingSchema.extend({
   entitled: subscriptionStatusSchema.shape.entitled,
 });
 
-const paginateSchema = z.object({
-  total: z.number().int(),
-  page: z.number().int(),
-  limit: z.number().int(),
-  totalPages: z.number().int(),
-});
-
 export const getUserListResponseSchema = z.object({
   data: z.array(userSchema.extend({ subscription: subscriptionBillingSchema })),
-  paginate: paginateSchema,
+  paginate: paginationSchema,
 });
 
 export const postUserSyncResponseSchema = userSchema.extend({

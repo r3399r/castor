@@ -2,6 +2,7 @@ import { zValidator } from '@hono/zod-validator';
 import { and, asc, count, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/mysql-core';
 import { Hono } from 'hono';
+import { describeRoute, resolver } from 'hono-openapi';
 import { z } from 'zod';
 import {
   categoryTable,
@@ -18,7 +19,7 @@ import {
 } from 'src/db/schema';
 import { DONATION_AMOUNT } from 'src/lib/donationAmount';
 import { MAX_LEVEL } from 'src/lib/guardianLevel';
-import { DEFAULT_LIMIT, genPagination, MAX_LIMIT } from 'src/lib/paginator';
+import { DEFAULT_LIMIT, genPagination, MAX_LIMIT, paginationSchema } from 'src/lib/paginator';
 import { PLANS } from 'src/lib/subscriptionPlan';
 import { TransactionEnv } from 'src/middleware/transaction';
 
@@ -35,18 +36,250 @@ export const donationRecordQuerySchema = z.object({
   order: z.enum(['asc', 'desc']).optional().default('desc'),
 });
 
+/**
+ * What this API reports, one schema per response.
+ *
+ * Schemas rather than hand-written types, because they are the single
+ * description of each response: the handler's return is checked against
+ * one, and the OpenAPI document is generated from it. A type beside a
+ * separately written document is two things that drift -- which is
+ * exactly what packages/shared turned out to be.
+ *
+ * `.describe()` is not a comment: it reaches the generated document, and
+ * so reaches whoever writes a client against it.
+ */
+export const getInfoResponseSchema = z.object({
+  status: z.literal('ok'),
+  time: z.string().describe('When this instance answered, ISO 8601'),
+});
+
+const recurringPlanSchema = z.object({
+  kind: z.literal('recurring'),
+  code: z.string(),
+  amount: z
+    .number()
+    .int()
+    .describe('NTD. The authoritative price: a client must render this, never a constant of its own'),
+  periodType: z.enum(['D', 'M', 'Y']),
+  frequency: z.number().int().describe('Charged once every `frequency` periodType, indefinitely'),
+});
+
+const dayPassPlanSchema = z.object({
+  kind: z.literal('dayPass'),
+  code: z.string(),
+  amount: z.number().int().describe('NTD, charged once'),
+  days: z.number().int().describe('Days of access, added to whatever the caller already has'),
+});
+
+/**
+ * Discriminated on `kind` rather than one shape with optional fields:
+ * the two answer different questions, and no periodType honestly
+ * describes a day pass -- 'D' with frequency 30 reads as "charged every
+ * 30 days", which is exactly what it is not.
+ */
+export const getInfoPlansResponseSchema = z.array(
+  z.discriminatedUnion('kind', [recurringPlanSchema, dayPassPlanSchema])
+);
+
+export const getInfoStatsResponseSchema = z.object({
+  categoryCount: z.number().int(),
+  subjectCount: z.number().int(),
+  examCount: z.number().int(),
+  questionCount: z
+    .number()
+    .int()
+    .describe('Servable top-level questions: a 題組 counts once, however many sub-questions it holds'),
+  userCount: z.number().int(),
+});
+
+const popularExamSchema = z.object({
+  id: z.number().int(),
+  name: z.string(),
+  attemptCount: z
+    .number()
+    .int()
+    .describe('How many times the questions were practised -- a 題組 answered once counts once'),
+  questionCount: z.number().int().describe('Servable top-level questions, counted as in /stats'),
+});
+
+const popularSubjectSchema = popularExamSchema.extend({
+  exams: z
+    .array(popularExamSchema)
+    .describe('Ranked like the subjects themselves, and empty when none of them is filed under an exam'),
+});
+
+export const getInfoPopularResponseSchema = z.array(popularSubjectSchema);
+
+const donationEvidenceSchema = z.object({
+  id: z.number().int(),
+  kind: z.string().describe('TRANSFER_RECEIPT, ORG_RECEIPT, THANK_YOU_LETTER -- open-ended'),
+  url: z.string(),
+  caption: z.string().nullable(),
+});
+
+const donationRecordOrganizationSchema = z.object({
+  id: z.number().int(),
+  name: z.string(),
+  introduction: z.string(),
+  websiteUrl: z.string().nullable(),
+  logoUrl: z.string().nullable(),
+});
+
+const donationRecordBatchSchema = z.object({
+  id: z.number().int(),
+  transferredAt: z.string().describe('ISO 8601'),
+  reference: z
+    .string()
+    .nullable()
+    .describe('Bank transaction number, or the last digits of the account'),
+  organization: donationRecordOrganizationSchema,
+  donationCount: z.number().int(),
+  donationSubtotal: z.number().int(),
+  donationUnitAmount: z
+    .number()
+    .int()
+    .nullable()
+    .describe('The one frozen amount every member shares, or null when they differ; null means the multiplication must not be printed'),
+  platformTopUp: z
+    .number()
+    .int()
+    .describe('transferredAmount - donationSubtotal. Signed: negative would mean the batch sent less than was promised'),
+  transferredAmount: z.number().int(),
+  evidence: z.array(donationEvidenceSchema),
+});
+
+const donationRecordSummarySchema = z.object({
+  maxedSpiritCount: z
+    .number()
+    .int()
+    .describe('Spirits grown to max level -- every one of them is owed'),
+  confirmedCount: z.number().int(),
+  confirmedAmount: z.number().int().describe('Summed from the frozen per-donation amounts'),
+  pendingCount: z
+    .number()
+    .int()
+    .describe('Maxed, but the owner has not picked an organisation yet'),
+  pendingAmount: z
+    .number()
+    .int()
+    .describe("pendingCount x donationAmount -- the only figure here priced at today's rate"),
+  promisedAmount: z
+    .number()
+    .int()
+    .describe('confirmedAmount + pendingAmount, so a reader can check it'),
+  transferredAmount: z
+    .number()
+    .int()
+    .describe('Over published batches only, so the listed batches add up to it'),
+  publishedBatchCount: z.number().int(),
+  donationAmount: z
+    .number()
+    .int()
+    .describe("Today's figure, which prices pendingAmount and nothing else"),
+});
+
+export const getInfoDonationResponseSchema = z.object({
+  summary: donationRecordSummarySchema,
+  data: z.array(donationRecordBatchSchema),
+  paginate: paginationSchema,
+});
+
 // mysql2 hands back a bare SUM() over an INT column as a *string*, which
 // would survive JSON.stringify and reach the page as "57000". Every
 // aggregate below is therefore cast to signed in SQL, the same way
 // /popular's attempt counter is; a new one added here needs the same cast
 // or it will quietly start returning text.
 
+/**
+ * The OpenAPI entries for the routes below.
+ *
+ * Hoisted out of the route definitions so the handlers keep their own
+ * indentation and each route line stays one line; `describeRoute` is
+ * middleware, so where it is constructed makes no difference.
+ *
+ * Requests are not described here. The query parameters of /donation are
+ * validated by `@hono/zod-validator`, which hono-openapi cannot read --
+ * documenting them means moving all 65 validator call sites in this
+ * workspace onto hono-openapi's own `validator`, which also changes the
+ * 400 body. See AGENTS.md.
+ */
+const healthDoc = describeRoute({
+  summary: 'Health check',
+  description:
+    'Touches no table, so it keeps answering 200 while the database is unreachable. This is what the load balancer reads.',
+  tags: ['info'],
+  responses: {
+    200: {
+      description: 'The instance is up',
+      content: { 'application/json': { schema: resolver(getInfoResponseSchema) } },
+    },
+  },
+});
+
+const plansDoc = describeRoute({
+  summary: 'List the subscription plans and their prices',
+  description:
+    'Public and unauthenticated, because the pricing page is read before signing in. These are the authoritative amounts: the figure shown has to be the figure signed into the ECPay order, so a client must not hold prices of its own.',
+  tags: ['info'],
+  responses: {
+    200: {
+      description: 'Every plan on sale',
+      content: { 'application/json': { schema: resolver(getInfoPlansResponseSchema) } },
+    },
+  },
+});
+
+const donationDoc = describeRoute({
+  summary: 'The public donation record',
+  description:
+    'Every published payout, with the arithmetic a reader needs to check it against the receipt linked from its evidence: donationCount x donationUnitAmount + platformTopUp equals transferredAmount. Public and unauthenticated on purpose -- being readable by anyone is the whole of its value as proof. It names no user; a batch is the smallest unit shown.',
+  tags: ['info'],
+  responses: {
+    200: {
+      description: 'The running totals, and one page of published batches',
+      content: { 'application/json': { schema: resolver(getInfoDonationResponseSchema) } },
+    },
+    400: { description: 'limit beyond the cap, or a malformed offset or order' },
+  },
+});
+
+const statsDoc = describeRoute({
+  summary: 'Catalog sizes',
+  description:
+    "The landing page's counter bar. Public and unauthenticated: it reports catalog totals and nothing per-user.",
+  tags: ['info'],
+  responses: {
+    200: {
+      description: 'How much there is to practise',
+      content: { 'application/json': { schema: resolver(getInfoStatsResponseSchema) } },
+    },
+  },
+});
+
+const popularDoc = describeRoute({
+  summary: 'The most-practised subjects, with their most-practised exams',
+  description:
+    'At most three subjects, each with at most five exams. Public and unauthenticated, and it reports only catalog-wide totals -- never who did the practising.',
+  tags: ['info'],
+  responses: {
+    200: {
+      description: 'The ranked subjects, newest counts first',
+      content: { 'application/json': { schema: resolver(getInfoPopularResponseSchema) } },
+    },
+  },
+});
+
 export const info = new Hono<TransactionEnv>()
   // Deliberately touches no table: this is the health check, and it has to
   // keep answering 200 while the database is unreachable. The transaction
   // middleware is therefore bound to /api/info/stats alone in app.ts, not
   // to /api/info/*, which would also catch this path.
-  .get('/', (c) => c.json({ status: 'ok', time: new Date().toISOString() }))
+  .get('/', healthDoc, (c) =>
+    c.json({
+      status: 'ok',
+      time: new Date().toISOString(),
+    } satisfies z.infer<typeof getInfoResponseSchema>)
+  )
   // The authoritative prices, and the reason the webapp holds no price
   // constants of its own: the amount shown on the pricing page has to be
   // the amount that gets signed into the ECPay order, and a visitor sees
@@ -56,7 +289,7 @@ export const info = new Hono<TransactionEnv>()
   //
   // No database access, so it stays outside the transaction middleware
   // bound to /api/info/stats.
-  .get('/plans', (c) => {
+  .get('/plans', plansDoc, (c) => {
     console.log('GET /api/info/plans');
 
     return c.json(
@@ -81,7 +314,7 @@ export const info = new Hono<TransactionEnv>()
               amount: plan.amount,
               days: plan.days,
             }
-      )
+      ) satisfies z.infer<typeof getInfoPlansResponseSchema>
     );
   })
   /**
@@ -96,7 +329,7 @@ export const info = new Hono<TransactionEnv>()
    * is not attached yet, and the summary's transferredAmount is taken over
    * the same filter so that adding up the listed batches reproduces it.
    */
-  .get('/donation', zValidator('query', donationRecordQuerySchema), async (c) => {
+  .get('/donation', donationDoc, zValidator('query', donationRecordQuerySchema), async (c) => {
     const { limit, offset, order } = c.req.valid('query');
     console.log(`GET /api/info/donation limit=${limit} offset=${offset} order=${order}`);
     const db = c.get('db');
@@ -229,21 +462,19 @@ export const info = new Hono<TransactionEnv>()
     const confirmedAmount = confirmed.confirmedAmount;
     const pendingAmount = pendingCount * DONATION_AMOUNT;
 
+    // Every field below is described once, in the schemas above, which
+    // is where the generated document reads them from; repeating those
+    // sentences here would only give them somewhere to drift.
     return c.json({
       summary: {
-        /** Spirits grown to max level -- every one of them is owed. */
         maxedSpiritCount,
         confirmedCount: confirmed.confirmedCount,
         confirmedAmount,
-        /** Maxed, but the owner has not picked an organisation yet. */
         pendingCount,
         pendingAmount,
-        /** confirmedAmount + pendingAmount, so a reader can check it. */
         promisedAmount: confirmedAmount + pendingAmount,
-        /** Over published batches only, matching the list below. */
         transferredAmount: transferred.transferredAmount,
         publishedBatchCount: total,
-        /** Today's figure, which prices pendingAmount and nothing else. */
         donationAmount: DONATION_AMOUNT,
       },
       data: batches.map((batch) => {
@@ -253,7 +484,10 @@ export const info = new Hono<TransactionEnv>()
         const donationSubtotal = member?.subtotal ?? 0;
         return {
           id: batch.id,
-          transferredAt: batch.transferredAt,
+          // Serialised here rather than left to c.json: the column is a
+          // Date, every type in the repo calls this field a string, and
+          // JSON.stringify happening to agree is not a contract.
+          transferredAt: batch.transferredAt.toISOString(),
           reference: batch.reference,
           organization: {
             id: batch.organizationId,
@@ -285,11 +519,11 @@ export const info = new Hono<TransactionEnv>()
         };
       }),
       paginate: genPagination(total, limit, offset),
-    });
+    } satisfies z.infer<typeof getInfoDonationResponseSchema>);
   })
   // Public and unauthenticated -- it only feeds the landing page's counter
   // bar, so it reports catalog sizes and nothing per-user.
-  .get('/stats', async (c) => {
+  .get('/stats', statsDoc, async (c) => {
     console.log('GET /api/info/stats');
     const db = c.get('db');
 
@@ -326,7 +560,7 @@ export const info = new Hono<TransactionEnv>()
       examCount,
       questionCount,
       userCount,
-    });
+    } satisfies z.infer<typeof getInfoStatsResponseSchema>);
   })
   // The most-attempted subjects, each with its most-attempted exams --
   // public and unauthenticated for the same reason as /stats: it feeds a
@@ -357,7 +591,7 @@ export const info = new Hono<TransactionEnv>()
   // practise, and adaptive selection will not serve them -- so counting
   // them could put a subject at the top of the page that has nothing left
   // to answer.
-  .get('/popular', async (c) => {
+  .get('/popular', popularDoc, async (c) => {
     console.log('GET /api/info/popular');
     const db = c.get('db');
 
@@ -408,7 +642,9 @@ export const info = new Hono<TransactionEnv>()
       )
       .limit(POPULAR_SUBJECT_LIMIT);
 
-    if (subjects.length === 0) return c.json([]);
+    if (subjects.length === 0) {
+      return c.json([] satisfies z.infer<typeof getInfoPopularResponseSchema>);
+    }
 
     // Exams are attributed through the top-level question's own subject
     // rather than through exam_subject: an exam can be linked to several
@@ -457,6 +693,6 @@ export const info = new Hono<TransactionEnv>()
           attemptCount: Number(exam.attemptCount),
           questionCount: Number(exam.questionCount),
         })),
-      }))
+      })) satisfies z.infer<typeof getInfoPopularResponseSchema>
     );
   });
