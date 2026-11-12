@@ -12,6 +12,11 @@ import { app } from 'src/app';
 import { closeDb, getDb } from 'src/db/client';
 import { examSubjectTable, examTable, subjectTable } from 'src/db/schema';
 import { ADMIN_EMAILS } from 'src/middleware/adminAuth';
+import {
+  examSchema,
+  examSubjectResponseSchema,
+  getExamListResponseSchema,
+} from 'src/routes/exam';
 
 // The admin gate is exercised end-to-end in its own describe block below;
 // every other test just needs writes to succeed, so default the mocked
@@ -330,6 +335,58 @@ describe('exam routes', () => {
     it('rejects an invalid sort column with 400', async () => {
       const res = await app.request('/api/exam?sort=bogus');
       expect(res.status).toBe(400);
+    });
+  });
+
+  /**
+   * What the OpenAPI document promises, against what is sent.
+   *
+   * The key checks are separate from the parse because zod strips
+   * unknown keys instead of rejecting them: a column added to `exam` and
+   * returned with the row would pass the parse while appearing in no
+   * document. The handlers list their fields now, and this is what keeps
+   * them listing them.
+   */
+  describe('the OpenAPI document', () => {
+    it('describes exactly what the list and the writes send', async () => {
+      const created = (await (await postExam({ name: 'documented' })).json()) as ExamDto;
+
+      expect(Object.keys(created).sort()).toEqual(['createdAt', 'id', 'name']);
+      expect(examSchema.safeParse(created).error?.issues ?? []).toEqual([]);
+
+      const one: unknown = await (await app.request(`/api/exam/${created.id}`)).json();
+      expect(examSchema.safeParse(one).error?.issues ?? []).toEqual([]);
+      expect(Object.keys(one as object).sort()).toEqual(['createdAt', 'id', 'name']);
+
+      const list: unknown = await (await app.request('/api/exam')).json();
+      const listParsed = getExamListResponseSchema.safeParse(list);
+      expect(listParsed.error?.issues ?? []).toEqual([]);
+      expect(Object.keys(list as object).sort()).toEqual(['data', 'paginate']);
+      // The list adds its own `subjects` aggregate, which the exam row
+      // has no column for.
+      expect(Object.keys((list as { data: object[] }).data[0]).sort()).toEqual([
+        'createdAt',
+        'id',
+        'name',
+        'subjects',
+      ]);
+    });
+
+    it('describes exactly what the subject links send', async () => {
+      const created = (await (await postExam({ name: 'documented links' })).json()) as ExamDto;
+      const [{ insertId: subjectId }] = await getDb()
+        .insert(subjectTable)
+        .values({ name: 'a subject', createdAt: new Date() });
+
+      const saved: unknown = await (
+        await putExamSubject(created.id, { subjectIds: [subjectId] })
+      ).json();
+      expect(examSubjectResponseSchema.safeParse(saved).error?.issues ?? []).toEqual([]);
+      expect(Object.keys(saved as object).sort()).toEqual(['subjectIds']);
+
+      const read: unknown = await (await getExamSubject(created.id)).json();
+      expect(examSubjectResponseSchema.safeParse(read).error?.issues ?? []).toEqual([]);
+      expect(Object.keys(read as object).sort()).toEqual(['subjectIds']);
     });
   });
 

@@ -21,6 +21,12 @@ import {
   tagTable,
 } from 'src/db/schema';
 import { ADMIN_EMAILS } from 'src/middleware/adminAuth';
+import {
+  getSubjectByIdResponseSchema,
+  getSubjectListResponseSchema,
+  subjectCategoryResponseSchema,
+  subjectSchema,
+} from 'src/routes/subject';
 
 // The admin gate is exercised end-to-end in its own describe block below;
 // every other test just needs writes to succeed, so default the mocked
@@ -459,6 +465,115 @@ describe('subject routes', () => {
     it('rejects an invalid sort column with 400', async () => {
       const res = await app.request('/api/subject?sort=bogus');
       expect(res.status).toBe(400);
+    });
+  });
+
+  /**
+   * What the OpenAPI document promises, against what is sent.
+   *
+   * The key checks carry the weight here, and not only because zod
+   * strips unknown keys rather than rejecting them: `subject` also has a
+   * `duration_median_ms` column, an internal statistic the points
+   * time-weight reads, and every one of these handlers used to return it
+   * because it returned the row. These assertions are what keep it out
+   * of a response described nowhere.
+   */
+  describe('the OpenAPI document', () => {
+    it('describes exactly what the list and the writes send', async () => {
+      const created = (await (
+        await postSubject({ name: 'documented', sortOrder: 3 })
+      ).json()) as SubjectDto;
+
+      expect(Object.keys(created).sort()).toEqual(['createdAt', 'id', 'name', 'sortOrder']);
+      expect(subjectSchema.safeParse(created).error?.issues ?? []).toEqual([]);
+
+      const updated: unknown = await (
+        await putSubject(created.id, { name: 'documented still', sortOrder: 4 })
+      ).json();
+      expect(subjectSchema.safeParse(updated).error?.issues ?? []).toEqual([]);
+      expect(Object.keys(updated as object).sort()).toEqual([
+        'createdAt',
+        'id',
+        'name',
+        'sortOrder',
+      ]);
+
+      const list: unknown = await (await app.request('/api/subject')).json();
+      const listParsed = getSubjectListResponseSchema.safeParse(list);
+      expect(listParsed.error?.issues ?? []).toEqual([]);
+      expect(Object.keys(list as object).sort()).toEqual(['data', 'paginate']);
+      // The list adds its own `categories` aggregate, and still no median.
+      expect(Object.keys((list as { data: object[] }).data[0]).sort()).toEqual([
+        'categories',
+        'createdAt',
+        'id',
+        'name',
+        'sortOrder',
+      ]);
+    });
+
+    it('describes exactly what the single read sends, relations and all', async () => {
+      const created = (await (
+        await postSubject({ name: 'documented bundle' })
+      ).json()) as SubjectDto;
+      const db = getDb();
+      const [{ insertId: examId }] = await db
+        .insert(examTable)
+        .values({ name: 'an exam', createdAt: new Date() });
+      await db.insert(examSubjectTable).values({ examId, subjectId: created.id });
+      await db
+        .insert(tagTable)
+        .values({ subjectId: created.id, name: 'a tag', createdAt: new Date() });
+      const [{ insertId: groupId }] = await db
+        .insert(conceptGroupTable)
+        .values({ subjectId: created.id, name: 'a group', createdAt: new Date() });
+      await db
+        .insert(conceptTable)
+        .values({ conceptGroupId: groupId, name: 'a concept', createdAt: new Date() });
+
+      const body: unknown = await (await app.request(`/api/subject/${created.id}`)).json();
+
+      const parsed = getSubjectByIdResponseSchema.safeParse(body);
+      expect(parsed.error?.issues ?? []).toEqual([]);
+      expect(parsed.success).toBe(true);
+      expect(Object.keys(body as object).sort()).toEqual([
+        'conceptGroups',
+        'createdAt',
+        'exams',
+        'id',
+        'name',
+        'sortOrder',
+        'tags',
+      ]);
+
+      const record = body as {
+        exams: object[];
+        tags: object[];
+        conceptGroups: { concepts: object[] }[];
+      };
+      expect(Object.keys(record.exams[0]).sort()).toEqual(['id', 'name']);
+      expect(Object.keys(record.tags[0]).sort()).toEqual(['id', 'name']);
+      expect(Object.keys(record.conceptGroups[0]).sort()).toEqual(['concepts', 'id', 'name']);
+      expect(Object.keys(record.conceptGroups[0].concepts[0]).sort()).toEqual(['id', 'name']);
+    });
+
+    it('describes exactly what the category links send', async () => {
+      const created = (await (
+        await postSubject({ name: 'documented links' })
+      ).json()) as SubjectDto;
+      const [{ insertId: categoryId }] = await getDb()
+        .insert(categoryTable)
+        .values({ name: 'a category', createdAt: new Date() });
+
+      const saved: unknown = await (
+        await putSubjectCategory(created.id, { categoryIds: [categoryId] })
+      ).json();
+      expect(subjectCategoryResponseSchema.safeParse(saved).error?.issues ?? []).toEqual([]);
+      expect(Object.keys(saved as object).sort()).toEqual(['categoryIds']);
+
+      const read: unknown = await (await getSubjectCategory(created.id)).json();
+      expect(subjectCategoryResponseSchema.safeParse(read).error?.issues ?? []).toEqual([]);
+      expect(Object.keys(read as object).sort()).toEqual(['categoryIds']);
     });
   });
 

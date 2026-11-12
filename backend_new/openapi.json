@@ -485,6 +485,1279 @@
         }
       }
     },
+    "/api/category": {
+      "get": {
+        "operationId": "getApiCategory",
+        "summary": "List categories",
+        "description": "Reads here need no credentials: `adminAuth` gates POST/PUT/DELETE only. Paginated, sortable by id or name.",
+        "tags": [
+          "category"
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of categories",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "createdAt": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "ISO 8601"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "createdAt"
+                        ]
+                      }
+                    },
+                    "paginate": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer",
+                          "description": "Rows matching the query, ignoring limit and offset"
+                        },
+                        "page": {
+                          "type": "integer",
+                          "description": "1-indexed, derived from offset and limit"
+                        },
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "totalPages": {
+                          "type": "integer",
+                          "description": "At least 1, so an empty result reads as \"page 1 of 1\" rather than \"of 0\""
+                        }
+                      },
+                      "required": [
+                        "total",
+                        "page",
+                        "limit",
+                        "totalPages"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "paginate"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "limit beyond the cap, or a malformed sort or order"
+          }
+        }
+      },
+      "post": {
+        "operationId": "postApiCategory",
+        "summary": "Create a category",
+        "description": "Admin only.",
+        "tags": [
+          "category"
+        ],
+        "responses": {
+          "201": {
+            "description": "The category as saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "createdAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "createdAt"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "An empty name"
+          },
+          "401": {
+            "description": "No valid identity"
+          },
+          "403": {
+            "description": "Not an admin"
+          }
+        }
+      }
+    },
+    "/api/category/{id}": {
+      "get": {
+        "operationId": "getApiCategoryById",
+        "summary": "Read one category",
+        "description": "Reads here need no credentials: `adminAuth` gates POST/PUT/DELETE only.",
+        "tags": [
+          "category"
+        ],
+        "responses": {
+          "200": {
+            "description": "The category",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "createdAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "createdAt"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such category"
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ]
+      },
+      "put": {
+        "operationId": "putApiCategoryById",
+        "summary": "Rename a category",
+        "description": "Admin only.",
+        "tags": [
+          "category"
+        ],
+        "responses": {
+          "200": {
+            "description": "The category as saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "createdAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "createdAt"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "An empty name"
+          },
+          "401": {
+            "description": "No valid identity"
+          },
+          "403": {
+            "description": "Not an admin"
+          },
+          "404": {
+            "description": "No such category"
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "deleteApiCategoryById",
+        "summary": "Delete a category",
+        "description": "Admin only. Clears the category's subject links first, so a category still linked to a subject can be deleted; the subjects themselves are left alone.",
+        "tags": [
+          "category"
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "401": {
+            "description": "No valid identity"
+          },
+          "403": {
+            "description": "Not an admin"
+          },
+          "404": {
+            "description": "No such category"
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ]
+      }
+    },
+    "/api/category/{id}/subject": {
+      "get": {
+        "operationId": "getApiCategoryByIdSubject",
+        "summary": "A category's subjects and its filter surface",
+        "description": "Reads here need no credentials: `adminAuth` gates POST/PUT/DELETE only. Both lists come in one response, because the practice-page filter flow needs both the moment a category is picked. Unpaginated: neither list grows anywhere near pagination territory.",
+        "tags": [
+          "category"
+        ],
+        "responses": {
+          "200": {
+            "description": "The subjects, and the filter dimensions with their options",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "subjects": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "sortOrder": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "sortOrder"
+                        ]
+                      }
+                    },
+                    "filterDimensions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "sortOrder": {
+                            "type": "integer"
+                          },
+                          "options": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "integer"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "parentId": {
+                                  "type": [
+                                    "integer",
+                                    "null"
+                                  ],
+                                  "description": "The option this one hangs under, or null for a top-level option"
+                                },
+                                "subjectIds": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "integer"
+                                  },
+                                  "description": "Subjects this option selects"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "name",
+                                "parentId",
+                                "subjectIds"
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "sortOrder",
+                          "options"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "subjects",
+                    "filterDimensions"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such category"
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ]
+      }
+    },
+    "/api/subject": {
+      "get": {
+        "operationId": "getApiSubject",
+        "summary": "List subjects",
+        "description": "Reads here need no credentials: `adminAuth` gates POST/PUT/DELETE only. Paginated, sortable by id, name, sortOrder or category names.",
+        "tags": [
+          "subject"
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of subjects",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "sortOrder": {
+                            "type": "integer",
+                            "description": "Ascending; what the practice page orders subjects by"
+                          },
+                          "createdAt": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "ISO 8601"
+                          },
+                          "categories": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "The subject's category names, comma-separated, or null when it has none. A read-only summary for the admin list -- categories are edited through /api/subject/{id}/category."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "sortOrder",
+                          "createdAt",
+                          "categories"
+                        ]
+                      }
+                    },
+                    "paginate": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer",
+                          "description": "Rows matching the query, ignoring limit and offset"
+                        },
+                        "page": {
+                          "type": "integer",
+                          "description": "1-indexed, derived from offset and limit"
+                        },
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "totalPages": {
+                          "type": "integer",
+                          "description": "At least 1, so an empty result reads as \"page 1 of 1\" rather than \"of 0\""
+                        }
+                      },
+                      "required": [
+                        "total",
+                        "page",
+                        "limit",
+                        "totalPages"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "paginate"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "limit beyond the cap, or a malformed sort or order"
+          }
+        }
+      },
+      "post": {
+        "operationId": "postApiSubject",
+        "summary": "Create a subject",
+        "description": "Admin only. No categories, exams or tags are attached; those are separate saves.",
+        "tags": [
+          "subject"
+        ],
+        "responses": {
+          "201": {
+            "description": "The subject as saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "sortOrder": {
+                      "type": "integer",
+                      "description": "Ascending; what the practice page orders subjects by"
+                    },
+                    "createdAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "sortOrder",
+                    "createdAt"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "An empty name, or a sortOrder outside 0-255"
+          },
+          "401": {
+            "description": "No valid identity"
+          },
+          "403": {
+            "description": "Not an admin"
+          }
+        }
+      }
+    },
+    "/api/subject/{id}": {
+      "get": {
+        "operationId": "getApiSubjectById",
+        "summary": "Read one subject, with its exams, tags and concept groups",
+        "description": "Reads here need no credentials: `adminAuth` gates POST/PUT/DELETE only. All three lists come with it because the \"add questions\" flow needs them for this one subject up front.",
+        "tags": [
+          "subject"
+        ],
+        "responses": {
+          "200": {
+            "description": "The subject and its three lists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "sortOrder": {
+                      "type": "integer",
+                      "description": "Ascending; what the practice page orders subjects by"
+                    },
+                    "createdAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601"
+                    },
+                    "exams": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name"
+                        ]
+                      }
+                    },
+                    "tags": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name"
+                        ]
+                      }
+                    },
+                    "conceptGroups": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "concepts": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "integer"
+                                },
+                                "name": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "name"
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "concepts"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "sortOrder",
+                    "createdAt",
+                    "exams",
+                    "tags",
+                    "conceptGroups"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such subject"
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ]
+      },
+      "put": {
+        "operationId": "putApiSubjectById",
+        "summary": "Change a subject's name or sort order",
+        "description": "Admin only.",
+        "tags": [
+          "subject"
+        ],
+        "responses": {
+          "200": {
+            "description": "The subject as saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "sortOrder": {
+                      "type": "integer",
+                      "description": "Ascending; what the practice page orders subjects by"
+                    },
+                    "createdAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "sortOrder",
+                    "createdAt"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "An empty name, or a sortOrder outside 0-255"
+          },
+          "401": {
+            "description": "No valid identity"
+          },
+          "403": {
+            "description": "Not an admin"
+          },
+          "404": {
+            "description": "No such subject"
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "deleteApiSubjectById",
+        "summary": "Delete a subject",
+        "description": "Admin only. Clears the subject's category and exam links first, so one that is still linked can be deleted; the categories and exams themselves are left alone.",
+        "tags": [
+          "subject"
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "401": {
+            "description": "No valid identity"
+          },
+          "403": {
+            "description": "Not an admin"
+          },
+          "404": {
+            "description": "No such subject"
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ]
+      }
+    },
+    "/api/subject/{id}/category": {
+      "get": {
+        "operationId": "getApiSubjectByIdCategory",
+        "summary": "The categories a subject is filed under",
+        "description": "Reads here need no credentials: `adminAuth` gates POST/PUT/DELETE only. Ids alone: the names come from GET /api/category.",
+        "tags": [
+          "subject"
+        ],
+        "responses": {
+          "200": {
+            "description": "The category ids",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "categoryIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "integer"
+                      }
+                    }
+                  },
+                  "required": [
+                    "categoryIds"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such subject"
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ]
+      },
+      "put": {
+        "operationId": "putApiSubjectByIdCategory",
+        "summary": "Replace the categories a subject is filed under",
+        "description": "Admin only. A full-set replace, not a merge: the ids sent are the categories afterwards, and an empty array files it under none.",
+        "tags": [
+          "subject"
+        ],
+        "responses": {
+          "200": {
+            "description": "The category ids as saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "categoryIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "integer"
+                      }
+                    }
+                  },
+                  "required": [
+                    "categoryIds"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "categoryIds missing, or not an array of positive integers"
+          },
+          "401": {
+            "description": "No valid identity"
+          },
+          "403": {
+            "description": "Not an admin"
+          },
+          "404": {
+            "description": "No such subject"
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ]
+      }
+    },
+    "/api/exam": {
+      "get": {
+        "operationId": "getApiExam",
+        "summary": "List exams",
+        "description": "Reads here need no credentials: `adminAuth` gates POST/PUT/DELETE only. Paginated, sortable by id, name or subject names.",
+        "tags": [
+          "exam"
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of exams",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "createdAt": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "ISO 8601"
+                          },
+                          "subjects": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "The exam's subject names, comma-separated, or null when it has none. A read-only summary for the admin list -- subjects are edited through /api/exam/{id}/subject."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "createdAt",
+                          "subjects"
+                        ]
+                      }
+                    },
+                    "paginate": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer",
+                          "description": "Rows matching the query, ignoring limit and offset"
+                        },
+                        "page": {
+                          "type": "integer",
+                          "description": "1-indexed, derived from offset and limit"
+                        },
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "totalPages": {
+                          "type": "integer",
+                          "description": "At least 1, so an empty result reads as \"page 1 of 1\" rather than \"of 0\""
+                        }
+                      },
+                      "required": [
+                        "total",
+                        "page",
+                        "limit",
+                        "totalPages"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "paginate"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "limit beyond the cap, or a malformed sort or order"
+          }
+        }
+      },
+      "post": {
+        "operationId": "postApiExam",
+        "summary": "Create an exam",
+        "description": "Admin only. No subjects are attached; that is a separate save.",
+        "tags": [
+          "exam"
+        ],
+        "responses": {
+          "201": {
+            "description": "The exam as saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "createdAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "createdAt"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "An empty name"
+          },
+          "401": {
+            "description": "No valid identity"
+          },
+          "403": {
+            "description": "Not an admin"
+          }
+        }
+      }
+    },
+    "/api/exam/{id}": {
+      "get": {
+        "operationId": "getApiExamById",
+        "summary": "Read one exam",
+        "description": "Reads here need no credentials: `adminAuth` gates POST/PUT/DELETE only. The exam alone; its subjects are GET /api/exam/{id}/subject.",
+        "tags": [
+          "exam"
+        ],
+        "responses": {
+          "200": {
+            "description": "The exam",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "createdAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "createdAt"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such exam"
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ]
+      },
+      "put": {
+        "operationId": "putApiExamById",
+        "summary": "Rename an exam",
+        "description": "Admin only.",
+        "tags": [
+          "exam"
+        ],
+        "responses": {
+          "200": {
+            "description": "The exam as saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "createdAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "createdAt"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "An empty name"
+          },
+          "401": {
+            "description": "No valid identity"
+          },
+          "403": {
+            "description": "Not an admin"
+          },
+          "404": {
+            "description": "No such exam"
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "deleteApiExamById",
+        "summary": "Delete an exam",
+        "description": "Admin only. Clears the exam's subject links first, so one that is still linked can be deleted; the subjects themselves are left alone.",
+        "tags": [
+          "exam"
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "401": {
+            "description": "No valid identity"
+          },
+          "403": {
+            "description": "Not an admin"
+          },
+          "404": {
+            "description": "No such exam"
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ]
+      }
+    },
+    "/api/exam/{id}/subject": {
+      "get": {
+        "operationId": "getApiExamByIdSubject",
+        "summary": "The subjects an exam covers",
+        "description": "Reads here need no credentials: `adminAuth` gates POST/PUT/DELETE only. Ids alone: the names come from GET /api/subject.",
+        "tags": [
+          "exam"
+        ],
+        "responses": {
+          "200": {
+            "description": "The subject ids",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "subjectIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "integer"
+                      }
+                    }
+                  },
+                  "required": [
+                    "subjectIds"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such exam"
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ]
+      },
+      "put": {
+        "operationId": "putApiExamByIdSubject",
+        "summary": "Replace the subjects an exam covers",
+        "description": "Admin only. A full-set replace, not a merge: the ids sent are the subjects afterwards, and an empty array leaves it covering none.",
+        "tags": [
+          "exam"
+        ],
+        "responses": {
+          "200": {
+            "description": "The subject ids as saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "subjectIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "integer"
+                      }
+                    }
+                  },
+                  "required": [
+                    "subjectIds"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "subjectIds missing, or not an array of positive integers"
+          },
+          "401": {
+            "description": "No valid identity"
+          },
+          "403": {
+            "description": "Not an admin"
+          },
+          "404": {
+            "description": "No such exam"
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ]
+      }
+    },
     "/api/user": {
       "get": {
         "operationId": "getApiUser",

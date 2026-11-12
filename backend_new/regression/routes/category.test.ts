@@ -19,6 +19,11 @@ import {
   subjectTable,
 } from 'src/db/schema';
 import { ADMIN_EMAILS } from 'src/middleware/adminAuth';
+import {
+  categorySchema,
+  getCategoryListResponseSchema,
+  getCategorySubjectResponseSchema,
+} from 'src/routes/category';
 
 // The admin gate is exercised end-to-end in its own describe block below;
 // every other test just needs writes to succeed, so default the mocked
@@ -385,6 +390,83 @@ describe('category routes', () => {
     it('404s for an unknown category id', async () => {
       const res = await app.request('/api/category/999999/subject');
       expect(res.status).toBe(404);
+    });
+  });
+
+  /**
+   * What the OpenAPI document promises, against what is sent.
+   *
+   * The key checks are separate from the parse because zod strips
+   * unknown keys instead of rejecting them: a column added to `category`
+   * and returned with the row would pass the parse while appearing in no
+   * document. The handlers list their fields now, and this is what keeps
+   * them listing them.
+   */
+  describe('the OpenAPI document', () => {
+    it('describes exactly what the list and the single read send', async () => {
+      const created = (await (
+        await postCategory({ name: 'documented' })
+      ).json()) as CategoryDto;
+
+      const list: unknown = await (await app.request('/api/category')).json();
+      const listParsed = getCategoryListResponseSchema.safeParse(list);
+      expect(listParsed.error?.issues ?? []).toEqual([]);
+      expect(Object.keys(list as object).sort()).toEqual(['data', 'paginate']);
+      expect(Object.keys((list as { data: object[] }).data[0]).sort()).toEqual([
+        'createdAt',
+        'id',
+        'name',
+      ]);
+
+      const one: unknown = await (await app.request(`/api/category/${created.id}`)).json();
+      const oneParsed = categorySchema.safeParse(one);
+      expect(oneParsed.error?.issues ?? []).toEqual([]);
+      expect(Object.keys(one as object).sort()).toEqual(['createdAt', 'id', 'name']);
+    });
+
+    it("describes exactly what a category's subjects and filters send", async () => {
+      const created = (await (
+        await postCategory({ name: 'documented filters' })
+      ).json()) as CategoryDto;
+      const db = getDb();
+      const [{ insertId: subjectId }] = await db
+        .insert(subjectTable)
+        .values({ name: 'a subject', sortOrder: 1, createdAt: new Date() });
+      await db.insert(subjectCategoryTable).values({ subjectId, categoryId: created.id });
+      const [{ insertId: dimensionId }] = await db
+        .insert(filterDimensionTable)
+        .values({ categoryId: created.id, name: '類科分組', sortOrder: 1 });
+      const [{ insertId: optionId }] = await db
+        .insert(filterOptionTable)
+        .values({ dimensionId, name: '行政類' });
+      await db.insert(filterSubjectOptionTable).values({ subjectId, optionId });
+
+      const body: unknown = await (
+        await app.request(`/api/category/${created.id}/subject`)
+      ).json();
+
+      const parsed = getCategorySubjectResponseSchema.safeParse(body);
+      expect(parsed.error?.issues ?? []).toEqual([]);
+      expect(parsed.success).toBe(true);
+      expect(Object.keys(body as object).sort()).toEqual(['filterDimensions', 'subjects']);
+
+      const record = body as {
+        subjects: object[];
+        filterDimensions: { options: object[] }[];
+      };
+      expect(Object.keys(record.subjects[0]).sort()).toEqual(['id', 'name', 'sortOrder']);
+      expect(Object.keys(record.filterDimensions[0]).sort()).toEqual([
+        'id',
+        'name',
+        'options',
+        'sortOrder',
+      ]);
+      expect(Object.keys(record.filterDimensions[0].options[0]).sort()).toEqual([
+        'id',
+        'name',
+        'parentId',
+        'subjectIds',
+      ]);
     });
   });
 
