@@ -1758,6 +1758,1618 @@
         ]
       }
     },
+    "/api/tag": {
+      "get": {
+        "operationId": "getApiTag",
+        "summary": "List tags",
+        "description": "Reads here need no credentials: `adminAuth` gates POST/PUT/DELETE only. Paginated, sortable by id, name or the subject name.",
+        "tags": [
+          "tag"
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of tags",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "subjectId": {
+                            "type": "integer"
+                          },
+                          "createdAt": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "ISO 8601"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "subjectId",
+                          "createdAt"
+                        ]
+                      }
+                    },
+                    "paginate": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer",
+                          "description": "Rows matching the query, ignoring limit and offset"
+                        },
+                        "page": {
+                          "type": "integer",
+                          "description": "1-indexed, derived from offset and limit"
+                        },
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "totalPages": {
+                          "type": "integer",
+                          "description": "At least 1, so an empty result reads as \"page 1 of 1\" rather than \"of 0\""
+                        }
+                      },
+                      "required": [
+                        "total",
+                        "page",
+                        "limit",
+                        "totalPages"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "paginate"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "limit beyond the cap, or a malformed sort or order"
+          }
+        }
+      },
+      "post": {
+        "operationId": "postApiTag",
+        "summary": "Create a tag",
+        "description": "Admin only.",
+        "tags": [
+          "tag"
+        ],
+        "responses": {
+          "201": {
+            "description": "The tag as saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "subjectId": {
+                      "type": "integer"
+                    },
+                    "createdAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "subjectId",
+                    "createdAt"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "An empty name, or a missing or non-positive subjectId"
+          },
+          "401": {
+            "description": "No valid identity"
+          },
+          "403": {
+            "description": "Not an admin"
+          }
+        }
+      }
+    },
+    "/api/tag/{id}": {
+      "get": {
+        "operationId": "getApiTagById",
+        "summary": "Read one tag",
+        "description": "Reads here need no credentials: `adminAuth` gates POST/PUT/DELETE only.",
+        "tags": [
+          "tag"
+        ],
+        "responses": {
+          "200": {
+            "description": "The tag",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "subjectId": {
+                      "type": "integer"
+                    },
+                    "createdAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "subjectId",
+                    "createdAt"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such tag"
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ]
+      },
+      "put": {
+        "operationId": "putApiTagById",
+        "summary": "Update a tag",
+        "description": "Admin only. Every field in the body is required -- this is a replace, not a patch.",
+        "tags": [
+          "tag"
+        ],
+        "responses": {
+          "200": {
+            "description": "The tag as saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "subjectId": {
+                      "type": "integer"
+                    },
+                    "createdAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "subjectId",
+                    "createdAt"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "An empty name, or a missing or non-positive subjectId"
+          },
+          "401": {
+            "description": "No valid identity"
+          },
+          "403": {
+            "description": "Not an admin"
+          },
+          "404": {
+            "description": "No such tag"
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "deleteApiTagById",
+        "summary": "Delete a tag",
+        "description": "Admin only. Nothing is cleared first.",
+        "tags": [
+          "tag"
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "401": {
+            "description": "No valid identity"
+          },
+          "403": {
+            "description": "Not an admin"
+          },
+          "404": {
+            "description": "No such tag"
+          },
+          "500": {
+            "description": "Something still references it. The database rejects the delete rather than cascading -- see the handler -- and an unmapped driver error is a 500 today, where a 409 would be the honest answer."
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ]
+      }
+    },
+    "/api/concept-group": {
+      "get": {
+        "operationId": "getApiConceptGroup",
+        "summary": "List concept groups",
+        "description": "Reads here need no credentials: `adminAuth` gates POST/PUT/DELETE only. Paginated, sortable by id, name or the subject name.",
+        "tags": [
+          "concept-group"
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of concept groups",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "subjectId": {
+                            "type": "integer"
+                          },
+                          "createdAt": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "ISO 8601"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "subjectId",
+                          "createdAt"
+                        ]
+                      }
+                    },
+                    "paginate": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer",
+                          "description": "Rows matching the query, ignoring limit and offset"
+                        },
+                        "page": {
+                          "type": "integer",
+                          "description": "1-indexed, derived from offset and limit"
+                        },
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "totalPages": {
+                          "type": "integer",
+                          "description": "At least 1, so an empty result reads as \"page 1 of 1\" rather than \"of 0\""
+                        }
+                      },
+                      "required": [
+                        "total",
+                        "page",
+                        "limit",
+                        "totalPages"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "paginate"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "limit beyond the cap, or a malformed sort or order"
+          }
+        }
+      },
+      "post": {
+        "operationId": "postApiConceptGroup",
+        "summary": "Create a concept group",
+        "description": "Admin only.",
+        "tags": [
+          "concept-group"
+        ],
+        "responses": {
+          "201": {
+            "description": "The concept group as saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "subjectId": {
+                      "type": "integer"
+                    },
+                    "createdAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "subjectId",
+                    "createdAt"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "An empty name, or a missing or non-positive subjectId"
+          },
+          "401": {
+            "description": "No valid identity"
+          },
+          "403": {
+            "description": "Not an admin"
+          }
+        }
+      }
+    },
+    "/api/concept-group/{id}": {
+      "get": {
+        "operationId": "getApiConceptGroupById",
+        "summary": "Read one concept group",
+        "description": "Reads here need no credentials: `adminAuth` gates POST/PUT/DELETE only.",
+        "tags": [
+          "concept-group"
+        ],
+        "responses": {
+          "200": {
+            "description": "The concept group",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "subjectId": {
+                      "type": "integer"
+                    },
+                    "createdAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "subjectId",
+                    "createdAt"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such concept group"
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ]
+      },
+      "put": {
+        "operationId": "putApiConceptGroupById",
+        "summary": "Update a concept group",
+        "description": "Admin only. Every field in the body is required -- this is a replace, not a patch.",
+        "tags": [
+          "concept-group"
+        ],
+        "responses": {
+          "200": {
+            "description": "The concept group as saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "subjectId": {
+                      "type": "integer"
+                    },
+                    "createdAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "subjectId",
+                    "createdAt"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "An empty name, or a missing or non-positive subjectId"
+          },
+          "401": {
+            "description": "No valid identity"
+          },
+          "403": {
+            "description": "Not an admin"
+          },
+          "404": {
+            "description": "No such concept group"
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "deleteApiConceptGroupById",
+        "summary": "Delete a concept group",
+        "description": "Admin only. Nothing is cleared first: the concepts under a group have a required group id, so a group that still holds any is not deletable -- deliberately, rather than orphaning or destroying them.",
+        "tags": [
+          "concept-group"
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "401": {
+            "description": "No valid identity"
+          },
+          "403": {
+            "description": "Not an admin"
+          },
+          "404": {
+            "description": "No such concept group"
+          },
+          "500": {
+            "description": "Something still references it. The database rejects the delete rather than cascading -- see the handler -- and an unmapped driver error is a 500 today, where a 409 would be the honest answer."
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ]
+      }
+    },
+    "/api/concept": {
+      "get": {
+        "operationId": "getApiConcept",
+        "summary": "List concepts",
+        "description": "Reads here need no credentials: `adminAuth` gates POST/PUT/DELETE only. Paginated, sortable by id, name, the concept group name or the question count.",
+        "tags": [
+          "concept"
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of concepts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "conceptGroupId": {
+                            "type": "integer"
+                          },
+                          "numberOfQuestions": {
+                            "type": "integer",
+                            "description": "Counted as questions are added; not editable through this API"
+                          },
+                          "createdAt": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "ISO 8601"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "conceptGroupId",
+                          "numberOfQuestions",
+                          "createdAt"
+                        ]
+                      }
+                    },
+                    "paginate": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer",
+                          "description": "Rows matching the query, ignoring limit and offset"
+                        },
+                        "page": {
+                          "type": "integer",
+                          "description": "1-indexed, derived from offset and limit"
+                        },
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "totalPages": {
+                          "type": "integer",
+                          "description": "At least 1, so an empty result reads as \"page 1 of 1\" rather than \"of 0\""
+                        }
+                      },
+                      "required": [
+                        "total",
+                        "page",
+                        "limit",
+                        "totalPages"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "paginate"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "limit beyond the cap, or a malformed sort or order"
+          }
+        }
+      },
+      "post": {
+        "operationId": "postApiConcept",
+        "summary": "Create a concept",
+        "description": "Admin only.",
+        "tags": [
+          "concept"
+        ],
+        "responses": {
+          "201": {
+            "description": "The concept as saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "conceptGroupId": {
+                      "type": "integer"
+                    },
+                    "numberOfQuestions": {
+                      "type": "integer",
+                      "description": "Counted as questions are added; not editable through this API"
+                    },
+                    "createdAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "conceptGroupId",
+                    "numberOfQuestions",
+                    "createdAt"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "An empty name, or a missing or non-positive conceptGroupId"
+          },
+          "401": {
+            "description": "No valid identity"
+          },
+          "403": {
+            "description": "Not an admin"
+          }
+        }
+      }
+    },
+    "/api/concept/{id}": {
+      "get": {
+        "operationId": "getApiConceptById",
+        "summary": "Read one concept",
+        "description": "Reads here need no credentials: `adminAuth` gates POST/PUT/DELETE only.",
+        "tags": [
+          "concept"
+        ],
+        "responses": {
+          "200": {
+            "description": "The concept",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "conceptGroupId": {
+                      "type": "integer"
+                    },
+                    "numberOfQuestions": {
+                      "type": "integer",
+                      "description": "Counted as questions are added; not editable through this API"
+                    },
+                    "createdAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "conceptGroupId",
+                    "numberOfQuestions",
+                    "createdAt"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such concept"
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ]
+      },
+      "put": {
+        "operationId": "putApiConceptById",
+        "summary": "Update a concept",
+        "description": "Admin only. Every field in the body is required -- this is a replace, not a patch.",
+        "tags": [
+          "concept"
+        ],
+        "responses": {
+          "200": {
+            "description": "The concept as saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "conceptGroupId": {
+                      "type": "integer"
+                    },
+                    "numberOfQuestions": {
+                      "type": "integer",
+                      "description": "Counted as questions are added; not editable through this API"
+                    },
+                    "createdAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "conceptGroupId",
+                    "numberOfQuestions",
+                    "createdAt"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "An empty name, or a missing or non-positive conceptGroupId"
+          },
+          "401": {
+            "description": "No valid identity"
+          },
+          "403": {
+            "description": "Not an admin"
+          },
+          "404": {
+            "description": "No such concept"
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "deleteApiConceptById",
+        "summary": "Delete a concept",
+        "description": "Admin only. Nothing is cleared first.",
+        "tags": [
+          "concept"
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "401": {
+            "description": "No valid identity"
+          },
+          "403": {
+            "description": "Not an admin"
+          },
+          "404": {
+            "description": "No such concept"
+          },
+          "500": {
+            "description": "Something still references it. The database rejects the delete rather than cascading -- see the handler -- and an unmapped driver error is a 500 today, where a 409 would be the honest answer."
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ]
+      }
+    },
+    "/api/filter-dimension": {
+      "get": {
+        "operationId": "getApiFilterDimension",
+        "summary": "List filter dimensions",
+        "description": "Reads here need no credentials: `adminAuth` gates POST/PUT/DELETE only. Paginated, sortable by id, name, sortOrder or the category name.",
+        "tags": [
+          "filter-dimension"
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of filter dimensions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "categoryId": {
+                            "type": "integer"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "sortOrder": {
+                            "type": "integer",
+                            "description": "Ascending; the order the filter rows are shown in"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "categoryId",
+                          "name",
+                          "sortOrder"
+                        ]
+                      }
+                    },
+                    "paginate": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer",
+                          "description": "Rows matching the query, ignoring limit and offset"
+                        },
+                        "page": {
+                          "type": "integer",
+                          "description": "1-indexed, derived from offset and limit"
+                        },
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "totalPages": {
+                          "type": "integer",
+                          "description": "At least 1, so an empty result reads as \"page 1 of 1\" rather than \"of 0\""
+                        }
+                      },
+                      "required": [
+                        "total",
+                        "page",
+                        "limit",
+                        "totalPages"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "paginate"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "limit beyond the cap, or a malformed sort or order"
+          }
+        }
+      },
+      "post": {
+        "operationId": "postApiFilterDimension",
+        "summary": "Create a filter dimension",
+        "description": "Admin only.",
+        "tags": [
+          "filter-dimension"
+        ],
+        "responses": {
+          "201": {
+            "description": "The filter dimension as saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "categoryId": {
+                      "type": "integer"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "sortOrder": {
+                      "type": "integer",
+                      "description": "Ascending; the order the filter rows are shown in"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "categoryId",
+                    "name",
+                    "sortOrder"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "An empty name, a missing or non-positive categoryId, or a sortOrder outside 0-255"
+          },
+          "401": {
+            "description": "No valid identity"
+          },
+          "403": {
+            "description": "Not an admin"
+          }
+        }
+      }
+    },
+    "/api/filter-dimension/{id}": {
+      "get": {
+        "operationId": "getApiFilterDimensionById",
+        "summary": "Read one filter dimension",
+        "description": "Reads here need no credentials: `adminAuth` gates POST/PUT/DELETE only.",
+        "tags": [
+          "filter-dimension"
+        ],
+        "responses": {
+          "200": {
+            "description": "The filter dimension",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "categoryId": {
+                      "type": "integer"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "sortOrder": {
+                      "type": "integer",
+                      "description": "Ascending; the order the filter rows are shown in"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "categoryId",
+                    "name",
+                    "sortOrder"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such filter dimension"
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ]
+      },
+      "put": {
+        "operationId": "putApiFilterDimensionById",
+        "summary": "Update a filter dimension",
+        "description": "Admin only. Every field in the body is required -- this is a replace, not a patch.",
+        "tags": [
+          "filter-dimension"
+        ],
+        "responses": {
+          "200": {
+            "description": "The filter dimension as saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "categoryId": {
+                      "type": "integer"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "sortOrder": {
+                      "type": "integer",
+                      "description": "Ascending; the order the filter rows are shown in"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "categoryId",
+                    "name",
+                    "sortOrder"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "An empty name, a missing or non-positive categoryId, or a sortOrder outside 0-255"
+          },
+          "401": {
+            "description": "No valid identity"
+          },
+          "403": {
+            "description": "Not an admin"
+          },
+          "404": {
+            "description": "No such filter dimension"
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "deleteApiFilterDimensionById",
+        "summary": "Delete a filter dimension",
+        "description": "Admin only. Nothing is cleared first: a filter option has a required dimension id, so a dimension that still has options under it is not deletable -- deliberately, rather than orphaning or destroying them.",
+        "tags": [
+          "filter-dimension"
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "401": {
+            "description": "No valid identity"
+          },
+          "403": {
+            "description": "Not an admin"
+          },
+          "404": {
+            "description": "No such filter dimension"
+          },
+          "500": {
+            "description": "Something still references it. The database rejects the delete rather than cascading -- see the handler -- and an unmapped driver error is a 500 today, where a 409 would be the honest answer."
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ]
+      }
+    },
+    "/api/filter-option": {
+      "get": {
+        "operationId": "getApiFilterOption",
+        "summary": "List filter options",
+        "description": "Reads here need no credentials: `adminAuth` gates POST/PUT/DELETE only. Paginated, sortable by id, name, the dimension name or the subject names.",
+        "tags": [
+          "filter-option"
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of filter options",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "dimensionId": {
+                            "type": "integer"
+                          },
+                          "parentId": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ],
+                            "description": "The option this one hangs under, or null for a top-level option"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "subjects": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "The names of the subjects this option selects, comma-separated, or null when it selects none. A read-only summary for the admin list -- the links are edited through /api/filter-option/{id}/subject."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "dimensionId",
+                          "parentId",
+                          "name",
+                          "subjects"
+                        ]
+                      }
+                    },
+                    "paginate": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer",
+                          "description": "Rows matching the query, ignoring limit and offset"
+                        },
+                        "page": {
+                          "type": "integer",
+                          "description": "1-indexed, derived from offset and limit"
+                        },
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "totalPages": {
+                          "type": "integer",
+                          "description": "At least 1, so an empty result reads as \"page 1 of 1\" rather than \"of 0\""
+                        }
+                      },
+                      "required": [
+                        "total",
+                        "page",
+                        "limit",
+                        "totalPages"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "paginate"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "limit beyond the cap, or a malformed sort or order"
+          }
+        }
+      },
+      "post": {
+        "operationId": "postApiFilterOption",
+        "summary": "Create a filter option",
+        "description": "Admin only.",
+        "tags": [
+          "filter-option"
+        ],
+        "responses": {
+          "201": {
+            "description": "The filter option as saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "dimensionId": {
+                      "type": "integer"
+                    },
+                    "parentId": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "description": "The option this one hangs under, or null for a top-level option"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "dimensionId",
+                    "parentId",
+                    "name"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "An empty name, a missing or non-positive dimensionId, or a non-positive parentId"
+          },
+          "401": {
+            "description": "No valid identity"
+          },
+          "403": {
+            "description": "Not an admin"
+          }
+        }
+      }
+    },
+    "/api/filter-option/{id}": {
+      "get": {
+        "operationId": "getApiFilterOptionById",
+        "summary": "Read one filter option",
+        "description": "Reads here need no credentials: `adminAuth` gates POST/PUT/DELETE only.",
+        "tags": [
+          "filter-option"
+        ],
+        "responses": {
+          "200": {
+            "description": "The filter option",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "dimensionId": {
+                      "type": "integer"
+                    },
+                    "parentId": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "description": "The option this one hangs under, or null for a top-level option"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "dimensionId",
+                    "parentId",
+                    "name"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such filter option"
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ]
+      },
+      "put": {
+        "operationId": "putApiFilterOptionById",
+        "summary": "Update a filter option",
+        "description": "Admin only. Every field in the body is required -- this is a replace, not a patch.",
+        "tags": [
+          "filter-option"
+        ],
+        "responses": {
+          "200": {
+            "description": "The filter option as saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "dimensionId": {
+                      "type": "integer"
+                    },
+                    "parentId": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "description": "The option this one hangs under, or null for a top-level option"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "dimensionId",
+                    "parentId",
+                    "name"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "An empty name, a missing or non-positive dimensionId, or a non-positive parentId"
+          },
+          "401": {
+            "description": "No valid identity"
+          },
+          "403": {
+            "description": "Not an admin"
+          },
+          "404": {
+            "description": "No such filter option"
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "deleteApiFilterOptionById",
+        "summary": "Delete a filter option",
+        "description": "Admin only. Admin only. A child option pointing at this one is made top-level rather than deleted, and the subject links go -- a join row has no meaning once a side of it is gone.",
+        "tags": [
+          "filter-option"
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "401": {
+            "description": "No valid identity"
+          },
+          "403": {
+            "description": "Not an admin"
+          },
+          "404": {
+            "description": "No such filter option"
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ]
+      }
+    },
+    "/api/filter-option/{id}/subject": {
+      "get": {
+        "operationId": "getApiFilterOptionByIdSubject",
+        "summary": "The subjects a filter option selects",
+        "description": "Reads here need no credentials: `adminAuth` gates POST/PUT/DELETE only. Ids alone: the names come from GET /api/subject.",
+        "tags": [
+          "filter-option"
+        ],
+        "responses": {
+          "200": {
+            "description": "The subject ids",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "subjectIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "integer"
+                      }
+                    }
+                  },
+                  "required": [
+                    "subjectIds"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such filter option"
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ]
+      },
+      "put": {
+        "operationId": "putApiFilterOptionByIdSubject",
+        "summary": "Replace the subjects a filter option selects",
+        "description": "Admin only. A full-set replace, not a merge: the ids sent are the subjects afterwards, and an empty array leaves the option selecting none.",
+        "tags": [
+          "filter-option"
+        ],
+        "responses": {
+          "200": {
+            "description": "The subject ids as saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "subjectIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "integer"
+                      }
+                    }
+                  },
+                  "required": [
+                    "subjectIds"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "subjectIds missing, or not an array of positive integers"
+          },
+          "401": {
+            "description": "No valid identity"
+          },
+          "403": {
+            "description": "Not an admin"
+          },
+          "404": {
+            "description": "No such filter option"
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ]
+      }
+    },
     "/api/user": {
       "get": {
         "operationId": "getApiUser",

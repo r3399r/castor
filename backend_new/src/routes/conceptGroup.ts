@@ -1,9 +1,10 @@
 import { zValidator } from '@hono/zod-validator';
 import { asc, count, desc, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
+import { describeRoute, resolver } from 'hono-openapi';
 import { z } from 'zod';
 import { conceptGroupTable, subjectTable } from 'src/db/schema';
-import { DEFAULT_LIMIT, genPagination, MAX_LIMIT } from 'src/lib/paginator';
+import { DEFAULT_LIMIT, genPagination, MAX_LIMIT, paginationSchema } from 'src/lib/paginator';
 import { TransactionEnv } from 'src/middleware/transaction';
 import { NotFoundError } from 'src/model/error';
 
@@ -29,8 +30,137 @@ export const conceptGroupListQuerySchema = z.object({
   order: z.enum(['asc', 'desc']).optional().default('asc'),
 });
 
+/**
+ * A concept group as this API reports it.
+ *
+ * A schema rather than `db.select()` reaching the client unexamined: it
+ * is the single description of the response, the handlers' returns are
+ * checked against it, and the OpenAPI document is generated from it.
+ * See "The OpenAPI document" in AGENTS.md.
+ */
+export const conceptGroupSchema = z.object({
+  id: z.number().int(),
+  name: z.string(),
+  subjectId: z.number().int(),
+  createdAt: z.string().nullable().describe('ISO 8601'),
+});
+
+/**
+ * Serialises a concept group row.
+ *
+ * `createdAt` is converted here rather than left to `c.json`: the column
+ * is a Date, every type in the repo calls this field a string, and
+ * JSON.stringify happening to agree is not a contract. Field by field,
+ * not a spread, so a column added to `concept_group` cannot reach a
+ * client without being described first -- `satisfies` would not catch
+ * that on its own, since a row with extra properties is still
+ * assignable.
+ */
+const toConceptGroupDto = (row: {
+  id: number;
+  name: string;
+  subjectId: number;
+  createdAt: Date | null;
+}): z.infer<typeof conceptGroupSchema> => ({
+  id: row.id,
+  name: row.name,
+  subjectId: row.subjectId,
+  createdAt: row.createdAt?.toISOString() ?? null,
+});
+
+export const getConceptGroupListResponseSchema = z.object({
+  data: z.array(conceptGroupSchema),
+  paginate: paginationSchema,
+});
+
+/**
+ * The OpenAPI entries for the routes below.
+ *
+ * Hoisted out of the route definitions so the handlers keep their own
+ * indentation and each route line stays one line; `describeRoute` is
+ * middleware, so where it is constructed makes no difference.
+ *
+ * The gate is stated per route because it is not uniform: `adminAuth`
+ * checks POST/PUT/DELETE only, so every read in this group answers with
+ * no credentials while every write is admin-only.
+ */
+const listDoc = describeRoute({
+  summary: 'List concept groups',
+  description:
+    'Reads here need no credentials: `adminAuth` gates POST/PUT/DELETE only. Paginated, sortable by id, name or the subject name.',
+  tags: ['concept-group'],
+  responses: {
+    200: {
+      description: 'One page of concept groups',
+      content: { 'application/json': { schema: resolver(getConceptGroupListResponseSchema) } },
+    },
+    400: { description: 'limit beyond the cap, or a malformed sort or order' },
+  },
+});
+
+const getDoc = describeRoute({
+  summary: 'Read one concept group',
+  description: 'Reads here need no credentials: `adminAuth` gates POST/PUT/DELETE only.',
+  tags: ['concept-group'],
+  responses: {
+    200: {
+      description: 'The concept group',
+      content: { 'application/json': { schema: resolver(conceptGroupSchema) } },
+    },
+    404: { description: 'No such concept group' },
+  },
+});
+
+const createDoc = describeRoute({
+  summary: 'Create a concept group',
+  description: 'Admin only.',
+  tags: ['concept-group'],
+  responses: {
+    201: {
+      description: 'The concept group as saved',
+      content: { 'application/json': { schema: resolver(conceptGroupSchema) } },
+    },
+    400: { description: 'An empty name, or a missing or non-positive subjectId' },
+    401: { description: 'No valid identity' },
+    403: { description: 'Not an admin' },
+  },
+});
+
+const updateDoc = describeRoute({
+  summary: 'Update a concept group',
+  description: 'Admin only. Every field in the body is required -- this is a replace, not a patch.',
+  tags: ['concept-group'],
+  responses: {
+    200: {
+      description: 'The concept group as saved',
+      content: { 'application/json': { schema: resolver(conceptGroupSchema) } },
+    },
+    400: { description: 'An empty name, or a missing or non-positive subjectId' },
+    401: { description: 'No valid identity' },
+    403: { description: 'Not an admin' },
+    404: { description: 'No such concept group' },
+  },
+});
+
+const deleteDoc = describeRoute({
+  summary: 'Delete a concept group',
+  description:
+    'Admin only. Nothing is cleared first: the concepts under a group have a required group id, so a group that still holds any is not deletable -- deliberately, rather than orphaning or destroying them.',
+  tags: ['concept-group'],
+  responses: {
+    204: { description: 'Deleted' },
+    401: { description: 'No valid identity' },
+    403: { description: 'Not an admin' },
+    404: { description: 'No such concept group' },
+    500: {
+      description:
+        'Something still references it. The database rejects the delete rather than cascading -- see the handler -- and an unmapped driver error is a 500 today, where a 409 would be the honest answer.',
+    },
+  },
+});
+
 export const conceptGroup = new Hono<TransactionEnv>()
-  .get('/', zValidator('query', conceptGroupListQuerySchema), async (c) => {
+  .get('/', listDoc, zValidator('query', conceptGroupListQuerySchema), async (c) => {
     const { limit, offset, sort, order } = c.req.valid('query');
     console.log(
       `GET /api/concept-group limit=${limit} offset=${offset} sort=${sort} order=${order}`
@@ -54,9 +184,12 @@ export const conceptGroup = new Hono<TransactionEnv>()
       .limit(limit)
       .offset(offset);
 
-    return c.json({ data, paginate: genPagination(total, limit, offset) });
+    return c.json({
+      data: data.map(toConceptGroupDto),
+      paginate: genPagination(total, limit, offset),
+    } satisfies z.infer<typeof getConceptGroupListResponseSchema>);
   })
-  .get('/:id', async (c) => {
+  .get('/:id', getDoc, async (c) => {
     const id = c.req.param('id');
     console.log(`GET /api/concept-group/${id}`);
     const [found] = await c
@@ -67,9 +200,9 @@ export const conceptGroup = new Hono<TransactionEnv>()
     if (found === undefined)
       throw new NotFoundError(`concept group ${id} not found`);
 
-    return c.json(found);
+    return c.json(toConceptGroupDto(found) satisfies z.infer<typeof conceptGroupSchema>);
   })
-  .post('/', zValidator('json', conceptGroupBodySchema), async (c) => {
+  .post('/', createDoc, zValidator('json', conceptGroupBodySchema), async (c) => {
     const { name, subjectId } = c.req.valid('json');
     console.log(`POST /api/concept-group name=${name} subjectId=${subjectId}`);
     const db = c.get('db');
@@ -82,9 +215,9 @@ export const conceptGroup = new Hono<TransactionEnv>()
       .from(conceptGroupTable)
       .where(eq(conceptGroupTable.id, insertId));
 
-    return c.json(saved, 201);
+    return c.json(toConceptGroupDto(saved) satisfies z.infer<typeof conceptGroupSchema>, 201);
   })
-  .put('/:id', zValidator('json', conceptGroupBodySchema), async (c) => {
+  .put('/:id', updateDoc, zValidator('json', conceptGroupBodySchema), async (c) => {
     const db = c.get('db');
     const id = Number(c.req.param('id'));
     const { name, subjectId } = c.req.valid('json');
@@ -104,9 +237,9 @@ export const conceptGroup = new Hono<TransactionEnv>()
       .from(conceptGroupTable)
       .where(eq(conceptGroupTable.id, id));
 
-    return c.json(updated);
+    return c.json(toConceptGroupDto(updated) satisfies z.infer<typeof conceptGroupSchema>);
   })
-  .delete('/:id', async (c) => {
+  .delete('/:id', deleteDoc, async (c) => {
     const db = c.get('db');
     const id = Number(c.req.param('id'));
     console.log(`DELETE /api/concept-group/${id}`);

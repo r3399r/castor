@@ -12,6 +12,7 @@ import { app } from 'src/app';
 import { closeDb, getDb } from 'src/db/client';
 import { subjectTable, tagTable } from 'src/db/schema';
 import { ADMIN_EMAILS } from 'src/middleware/adminAuth';
+import { getTagListResponseSchema, tagSchema } from 'src/routes/tag';
 
 // The admin gate is exercised end-to-end in its own describe block below;
 // every other test just needs writes to succeed, so default the mocked
@@ -280,6 +281,45 @@ describe('tag routes', () => {
     it('rejects an invalid sort column with 400', async () => {
       const res = await app.request('/api/tag?sort=bogus');
       expect(res.status).toBe(400);
+    });
+  });
+
+  /**
+   * What the OpenAPI document promises, against what is sent.
+   *
+   * The key checks are separate from the parse because zod strips
+   * unknown keys instead of rejecting them, and `satisfies` in the
+   * handler does not catch an extra one either: a row with properties
+   * the schema does not mention is still assignable to it. A column
+   * added to this table would therefore reach a client described
+   * nowhere, if it were not for the DTO the handlers go through and
+   * these assertions.
+   */
+  describe('the OpenAPI document', () => {
+    it('describes exactly what these responses send', async () => {
+      const subject = await postSubject('documented subject');
+      const created = (await (
+        await postTag({ name: 'documented', subjectId: subject.id })
+      ).json()) as TagDto;
+
+      const keys = ['createdAt', 'id', 'name', 'subjectId'];
+      expect(Object.keys(created).sort()).toEqual(keys);
+      expect(tagSchema.safeParse(created).error?.issues ?? []).toEqual([]);
+
+      const one: unknown = await (await app.request(`/api/tag/${created.id}`)).json();
+      expect(tagSchema.safeParse(one).error?.issues ?? []).toEqual([]);
+      expect(Object.keys(one as object).sort()).toEqual(keys);
+
+      const updated: unknown = await (
+        await putTag(created.id, { name: 'documented still', subjectId: subject.id })
+      ).json();
+      expect(tagSchema.safeParse(updated).error?.issues ?? []).toEqual([]);
+      expect(Object.keys(updated as object).sort()).toEqual(keys);
+
+      const list: unknown = await (await app.request('/api/tag')).json();
+      expect(getTagListResponseSchema.safeParse(list).error?.issues ?? []).toEqual([]);
+      expect(Object.keys(list as object).sort()).toEqual(['data', 'paginate']);
+      expect(Object.keys((list as { data: object[] }).data[0]).sort()).toEqual(keys);
     });
   });
 

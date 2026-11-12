@@ -12,6 +12,10 @@ import { app } from 'src/app';
 import { closeDb, getDb } from 'src/db/client';
 import { categoryTable, filterDimensionTable } from 'src/db/schema';
 import { ADMIN_EMAILS } from 'src/middleware/adminAuth';
+import {
+  filterDimensionSchema,
+  getFilterDimensionListResponseSchema,
+} from 'src/routes/filterDimension';
 
 // The admin gate is exercised end-to-end in its own describe block below;
 // every other test just needs writes to succeed, so default the mocked
@@ -196,6 +200,51 @@ describe('filter-dimension routes', () => {
     it('rejects an invalid sort column with 400', async () => {
       const res = await app.request('/api/filter-dimension?sort=bogus');
       expect(res.status).toBe(400);
+    });
+  });
+
+  /**
+   * What the OpenAPI document promises, against what is sent.
+   *
+   * The key checks are separate from the parse because zod strips
+   * unknown keys instead of rejecting them, and `satisfies` in the
+   * handler does not catch an extra one either: a row with properties
+   * the schema does not mention is still assignable to it. A column
+   * added to this table would therefore reach a client described
+   * nowhere, if it were not for the DTO the handlers go through and
+   * these assertions.
+   */
+  describe('the OpenAPI document', () => {
+    it('describes exactly what these responses send', async () => {
+      const categoryId = await seedCategory('documented category');
+      const created = (await (
+        await postDimension({ name: 'documented', categoryId, sortOrder: 2 })
+      ).json()) as FilterDimensionDto;
+
+      // No createdAt: filter_dimension has no such column, unlike every
+      // other table in this part of the schema.
+      const keys = ['categoryId', 'id', 'name', 'sortOrder'];
+      expect(Object.keys(created).sort()).toEqual(keys);
+      expect(filterDimensionSchema.safeParse(created).error?.issues ?? []).toEqual([]);
+
+      const one: unknown = await (
+        await app.request(`/api/filter-dimension/${created.id}`)
+      ).json();
+      expect(filterDimensionSchema.safeParse(one).error?.issues ?? []).toEqual([]);
+      expect(Object.keys(one as object).sort()).toEqual(keys);
+
+      const updated: unknown = await (
+        await putDimension(created.id, { name: 'documented still', categoryId, sortOrder: 3 })
+      ).json();
+      expect(filterDimensionSchema.safeParse(updated).error?.issues ?? []).toEqual([]);
+      expect(Object.keys(updated as object).sort()).toEqual(keys);
+
+      const list: unknown = await (await app.request('/api/filter-dimension')).json();
+      expect(
+        getFilterDimensionListResponseSchema.safeParse(list).error?.issues ?? []
+      ).toEqual([]);
+      expect(Object.keys(list as object).sort()).toEqual(['data', 'paginate']);
+      expect(Object.keys((list as { data: object[] }).data[0]).sort()).toEqual(keys);
     });
   });
 

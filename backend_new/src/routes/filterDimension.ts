@@ -1,9 +1,10 @@
 import { zValidator } from '@hono/zod-validator';
 import { asc, count, desc, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
+import { describeRoute, resolver } from 'hono-openapi';
 import { z } from 'zod';
 import { categoryTable, filterDimensionTable } from 'src/db/schema';
-import { DEFAULT_LIMIT, genPagination, MAX_LIMIT } from 'src/lib/paginator';
+import { DEFAULT_LIMIT, genPagination, MAX_LIMIT, paginationSchema } from 'src/lib/paginator';
 import { TransactionEnv } from 'src/middleware/transaction';
 import { NotFoundError } from 'src/model/error';
 
@@ -31,8 +32,129 @@ export const filterDimensionListQuerySchema = z.object({
   order: z.enum(['asc', 'desc']).optional().default('asc'),
 });
 
+/**
+ * A filter dimension as this API reports it.
+ *
+ * Four fields and no timestamp, because the table has none -- which is
+ * worth stating, since every other row in this part of the schema
+ * carries a `created_at`.
+ *
+ * Field by field in the DTO below, not a spread: `satisfies` alone would
+ * not catch a column added to `filter_dimension` reaching a client,
+ * since a row with extra properties is still assignable.
+ */
+export const filterDimensionSchema = z.object({
+  id: z.number().int(),
+  categoryId: z.number().int(),
+  name: z.string(),
+  sortOrder: z.number().int().describe('Ascending; the order the filter rows are shown in'),
+});
+
+const toFilterDimensionDto = (row: {
+  id: number;
+  categoryId: number;
+  name: string;
+  sortOrder: number;
+}): z.infer<typeof filterDimensionSchema> => ({
+  id: row.id,
+  categoryId: row.categoryId,
+  name: row.name,
+  sortOrder: row.sortOrder,
+});
+
+export const getFilterDimensionListResponseSchema = z.object({
+  data: z.array(filterDimensionSchema),
+  paginate: paginationSchema,
+});
+
+/**
+ * The OpenAPI entries for the routes below.
+ *
+ * Hoisted out of the route definitions so the handlers keep their own
+ * indentation and each route line stays one line; `describeRoute` is
+ * middleware, so where it is constructed makes no difference.
+ *
+ * The gate is stated per route because it is not uniform: `adminAuth`
+ * checks POST/PUT/DELETE only, so every read in this group answers with
+ * no credentials while every write is admin-only.
+ */
+const listDoc = describeRoute({
+  summary: 'List filter dimensions',
+  description:
+    'Reads here need no credentials: `adminAuth` gates POST/PUT/DELETE only. Paginated, sortable by id, name, sortOrder or the category name.',
+  tags: ['filter-dimension'],
+  responses: {
+    200: {
+      description: 'One page of filter dimensions',
+      content: { 'application/json': { schema: resolver(getFilterDimensionListResponseSchema) } },
+    },
+    400: { description: 'limit beyond the cap, or a malformed sort or order' },
+  },
+});
+
+const getDoc = describeRoute({
+  summary: 'Read one filter dimension',
+  description: 'Reads here need no credentials: `adminAuth` gates POST/PUT/DELETE only.',
+  tags: ['filter-dimension'],
+  responses: {
+    200: {
+      description: 'The filter dimension',
+      content: { 'application/json': { schema: resolver(filterDimensionSchema) } },
+    },
+    404: { description: 'No such filter dimension' },
+  },
+});
+
+const createDoc = describeRoute({
+  summary: 'Create a filter dimension',
+  description: 'Admin only.',
+  tags: ['filter-dimension'],
+  responses: {
+    201: {
+      description: 'The filter dimension as saved',
+      content: { 'application/json': { schema: resolver(filterDimensionSchema) } },
+    },
+    400: { description: 'An empty name, a missing or non-positive categoryId, or a sortOrder outside 0-255' },
+    401: { description: 'No valid identity' },
+    403: { description: 'Not an admin' },
+  },
+});
+
+const updateDoc = describeRoute({
+  summary: 'Update a filter dimension',
+  description: 'Admin only. Every field in the body is required -- this is a replace, not a patch.',
+  tags: ['filter-dimension'],
+  responses: {
+    200: {
+      description: 'The filter dimension as saved',
+      content: { 'application/json': { schema: resolver(filterDimensionSchema) } },
+    },
+    400: { description: 'An empty name, a missing or non-positive categoryId, or a sortOrder outside 0-255' },
+    401: { description: 'No valid identity' },
+    403: { description: 'Not an admin' },
+    404: { description: 'No such filter dimension' },
+  },
+});
+
+const deleteDoc = describeRoute({
+  summary: 'Delete a filter dimension',
+  description:
+    'Admin only. Nothing is cleared first: a filter option has a required dimension id, so a dimension that still has options under it is not deletable -- deliberately, rather than orphaning or destroying them.',
+  tags: ['filter-dimension'],
+  responses: {
+    204: { description: 'Deleted' },
+    401: { description: 'No valid identity' },
+    403: { description: 'Not an admin' },
+    404: { description: 'No such filter dimension' },
+    500: {
+      description:
+        'Something still references it. The database rejects the delete rather than cascading -- see the handler -- and an unmapped driver error is a 500 today, where a 409 would be the honest answer.',
+    },
+  },
+});
+
 export const filterDimension = new Hono<TransactionEnv>()
-  .get('/', zValidator('query', filterDimensionListQuerySchema), async (c) => {
+  .get('/', listDoc, zValidator('query', filterDimensionListQuerySchema), async (c) => {
     const { limit, offset, sort, order } = c.req.valid('query');
     console.log(
       `GET /api/filter-dimension limit=${limit} offset=${offset} sort=${sort} order=${order}`
@@ -59,9 +181,12 @@ export const filterDimension = new Hono<TransactionEnv>()
       .limit(limit)
       .offset(offset);
 
-    return c.json({ data, paginate: genPagination(total, limit, offset) });
+    return c.json({
+      data: data.map(toFilterDimensionDto),
+      paginate: genPagination(total, limit, offset),
+    } satisfies z.infer<typeof getFilterDimensionListResponseSchema>);
   })
-  .get('/:id', async (c) => {
+  .get('/:id', getDoc, async (c) => {
     const id = c.req.param('id');
     console.log(`GET /api/filter-dimension/${id}`);
     const [found] = await c
@@ -72,9 +197,9 @@ export const filterDimension = new Hono<TransactionEnv>()
     if (found === undefined)
       throw new NotFoundError(`filter dimension ${id} not found`);
 
-    return c.json(found);
+    return c.json(toFilterDimensionDto(found) satisfies z.infer<typeof filterDimensionSchema>);
   })
-  .post('/', zValidator('json', filterDimensionBodySchema), async (c) => {
+  .post('/', createDoc, zValidator('json', filterDimensionBodySchema), async (c) => {
     const { name, categoryId, sortOrder } = c.req.valid('json');
     console.log(
       `POST /api/filter-dimension name=${name} categoryId=${categoryId} sortOrder=${sortOrder}`
@@ -89,10 +214,11 @@ export const filterDimension = new Hono<TransactionEnv>()
       .from(filterDimensionTable)
       .where(eq(filterDimensionTable.id, insertId));
 
-    return c.json(saved, 201);
+    return c.json(toFilterDimensionDto(saved) satisfies z.infer<typeof filterDimensionSchema>, 201);
   })
   .put(
     '/:id',
+    updateDoc,
     zValidator('json', filterDimensionBodySchema),
     async (c) => {
       const db = c.get('db');
@@ -114,10 +240,10 @@ export const filterDimension = new Hono<TransactionEnv>()
         .from(filterDimensionTable)
         .where(eq(filterDimensionTable.id, id));
 
-      return c.json(updated);
+      return c.json(toFilterDimensionDto(updated) satisfies z.infer<typeof filterDimensionSchema>);
     }
   )
-  .delete('/:id', async (c) => {
+  .delete('/:id', deleteDoc, async (c) => {
     const db = c.get('db');
     const id = Number(c.req.param('id'));
     console.log(`DELETE /api/filter-dimension/${id}`);

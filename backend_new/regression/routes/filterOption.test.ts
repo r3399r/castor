@@ -18,6 +18,11 @@ import {
   subjectTable,
 } from 'src/db/schema';
 import { ADMIN_EMAILS } from 'src/middleware/adminAuth';
+import {
+  filterOptionSchema,
+  filterOptionSubjectResponseSchema,
+  getFilterOptionListResponseSchema,
+} from 'src/routes/filterOption';
 
 // The admin gate is exercised end-to-end in its own describe block below;
 // every other test just needs writes to succeed, so default the mocked
@@ -372,6 +377,79 @@ describe('filter-option routes', () => {
     it('rejects an invalid sort column with 400', async () => {
       const res = await app.request('/api/filter-option?sort=bogus');
       expect(res.status).toBe(400);
+    });
+  });
+
+  /**
+   * What the OpenAPI document promises, against what is sent.
+   *
+   * The key checks are separate from the parse because zod strips
+   * unknown keys instead of rejecting them, and `satisfies` in the
+   * handler does not catch an extra one either: a row with properties
+   * the schema does not mention is still assignable to it. A column
+   * added to this table would therefore reach a client described
+   * nowhere, if it were not for the DTO the handlers go through and
+   * these assertions.
+   */
+  describe('the OpenAPI document', () => {
+    it('describes exactly what these responses send', async () => {
+      const dimensionId = await seedDimension('documented dim');
+      const created = (await (
+        await postOption({ name: 'documented', dimensionId })
+      ).json()) as FilterOptionDto;
+
+      const keys = ['dimensionId', 'id', 'name', 'parentId'];
+      expect(Object.keys(created).sort()).toEqual(keys);
+      expect(filterOptionSchema.safeParse(created).error?.issues ?? []).toEqual([]);
+
+      const one: unknown = await (
+        await app.request(`/api/filter-option/${created.id}`)
+      ).json();
+      expect(filterOptionSchema.safeParse(one).error?.issues ?? []).toEqual([]);
+      expect(Object.keys(one as object).sort()).toEqual(keys);
+
+      const updated: unknown = await (
+        await putOption(created.id, { name: 'documented still', dimensionId })
+      ).json();
+      expect(filterOptionSchema.safeParse(updated).error?.issues ?? []).toEqual([]);
+      expect(Object.keys(updated as object).sort()).toEqual(keys);
+
+      const list: unknown = await (await app.request('/api/filter-option')).json();
+      expect(getFilterOptionListResponseSchema.safeParse(list).error?.issues ?? []).toEqual(
+        []
+      );
+      expect(Object.keys(list as object).sort()).toEqual(['data', 'paginate']);
+      // The list adds its own `subjects` aggregate, which filter_option
+      // has no column for.
+      expect(Object.keys((list as { data: object[] }).data[0]).sort()).toEqual([
+        'dimensionId',
+        'id',
+        'name',
+        'parentId',
+        'subjects',
+      ]);
+    });
+
+    it('describes exactly what the subject links send', async () => {
+      const dimensionId = await seedDimension('linked dim');
+      const subjectId = await seedSubject('linked subject');
+      const created = (await (
+        await postOption({ name: 'linked', dimensionId })
+      ).json()) as FilterOptionDto;
+
+      const saved: unknown = await (
+        await putOptionSubject(created.id, { subjectIds: [subjectId] })
+      ).json();
+      expect(filterOptionSubjectResponseSchema.safeParse(saved).error?.issues ?? []).toEqual(
+        []
+      );
+      expect(Object.keys(saved as object).sort()).toEqual(['subjectIds']);
+
+      const read: unknown = await (await getOptionSubject(created.id)).json();
+      expect(filterOptionSubjectResponseSchema.safeParse(read).error?.issues ?? []).toEqual(
+        []
+      );
+      expect(Object.keys(read as object).sort()).toEqual(['subjectIds']);
     });
   });
 

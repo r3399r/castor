@@ -1,9 +1,10 @@
 import { zValidator } from '@hono/zod-validator';
 import { asc, count, desc, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
+import { describeRoute, resolver } from 'hono-openapi';
 import { z } from 'zod';
 import { subjectTable, tagTable } from 'src/db/schema';
-import { DEFAULT_LIMIT, genPagination, MAX_LIMIT } from 'src/lib/paginator';
+import { DEFAULT_LIMIT, genPagination, MAX_LIMIT, paginationSchema } from 'src/lib/paginator';
 import { TransactionEnv } from 'src/middleware/transaction';
 import { NotFoundError } from 'src/model/error';
 
@@ -29,8 +30,135 @@ export const tagListQuerySchema = z.object({
   order: z.enum(['asc', 'desc']).optional().default('asc'),
 });
 
+/**
+ * A tag as this API reports it.
+ *
+ * A schema rather than `db.select()` reaching the client unexamined: it
+ * is the single description of the response, the handlers' returns are
+ * checked against it, and the OpenAPI document is generated from it.
+ * See "The OpenAPI document" in AGENTS.md.
+ */
+export const tagSchema = z.object({
+  id: z.number().int(),
+  name: z.string(),
+  subjectId: z.number().int(),
+  createdAt: z.string().nullable().describe('ISO 8601'),
+});
+
+/**
+ * Serialises a tag row.
+ *
+ * `createdAt` is converted here rather than left to `c.json`: the column
+ * is a Date, every type in the repo calls this field a string, and
+ * JSON.stringify happening to agree is not a contract. Field by field,
+ * not a spread, so a column added to `tag` cannot reach a client without
+ * being described first -- `satisfies` would not catch that on its own,
+ * since a row with extra properties is still assignable.
+ */
+const toTagDto = (row: {
+  id: number;
+  name: string;
+  subjectId: number;
+  createdAt: Date | null;
+}): z.infer<typeof tagSchema> => ({
+  id: row.id,
+  name: row.name,
+  subjectId: row.subjectId,
+  createdAt: row.createdAt?.toISOString() ?? null,
+});
+
+export const getTagListResponseSchema = z.object({
+  data: z.array(tagSchema),
+  paginate: paginationSchema,
+});
+
+/**
+ * The OpenAPI entries for the routes below.
+ *
+ * Hoisted out of the route definitions so the handlers keep their own
+ * indentation and each route line stays one line; `describeRoute` is
+ * middleware, so where it is constructed makes no difference.
+ *
+ * The gate is stated per route because it is not uniform: `adminAuth`
+ * checks POST/PUT/DELETE only, so every read in this group answers with
+ * no credentials while every write is admin-only.
+ */
+const listDoc = describeRoute({
+  summary: 'List tags',
+  description:
+    'Reads here need no credentials: `adminAuth` gates POST/PUT/DELETE only. Paginated, sortable by id, name or the subject name.',
+  tags: ['tag'],
+  responses: {
+    200: {
+      description: 'One page of tags',
+      content: { 'application/json': { schema: resolver(getTagListResponseSchema) } },
+    },
+    400: { description: 'limit beyond the cap, or a malformed sort or order' },
+  },
+});
+
+const getDoc = describeRoute({
+  summary: 'Read one tag',
+  description: 'Reads here need no credentials: `adminAuth` gates POST/PUT/DELETE only.',
+  tags: ['tag'],
+  responses: {
+    200: {
+      description: 'The tag',
+      content: { 'application/json': { schema: resolver(tagSchema) } },
+    },
+    404: { description: 'No such tag' },
+  },
+});
+
+const createDoc = describeRoute({
+  summary: 'Create a tag',
+  description: 'Admin only.',
+  tags: ['tag'],
+  responses: {
+    201: {
+      description: 'The tag as saved',
+      content: { 'application/json': { schema: resolver(tagSchema) } },
+    },
+    400: { description: 'An empty name, or a missing or non-positive subjectId' },
+    401: { description: 'No valid identity' },
+    403: { description: 'Not an admin' },
+  },
+});
+
+const updateDoc = describeRoute({
+  summary: 'Update a tag',
+  description: 'Admin only. Every field in the body is required -- this is a replace, not a patch.',
+  tags: ['tag'],
+  responses: {
+    200: {
+      description: 'The tag as saved',
+      content: { 'application/json': { schema: resolver(tagSchema) } },
+    },
+    400: { description: 'An empty name, or a missing or non-positive subjectId' },
+    401: { description: 'No valid identity' },
+    403: { description: 'Not an admin' },
+    404: { description: 'No such tag' },
+  },
+});
+
+const deleteDoc = describeRoute({
+  summary: 'Delete a tag',
+  description: 'Admin only. Nothing is cleared first.',
+  tags: ['tag'],
+  responses: {
+    204: { description: 'Deleted' },
+    401: { description: 'No valid identity' },
+    403: { description: 'Not an admin' },
+    404: { description: 'No such tag' },
+    500: {
+      description:
+        'Something still references it. The database rejects the delete rather than cascading -- see the handler -- and an unmapped driver error is a 500 today, where a 409 would be the honest answer.',
+    },
+  },
+});
+
 export const tag = new Hono<TransactionEnv>()
-  .get('/', zValidator('query', tagListQuerySchema), async (c) => {
+  .get('/', listDoc, zValidator('query', tagListQuerySchema), async (c) => {
     const { limit, offset, sort, order } = c.req.valid('query');
     console.log(
       `GET /api/tag limit=${limit} offset=${offset} sort=${sort} order=${order}`
@@ -52,9 +180,12 @@ export const tag = new Hono<TransactionEnv>()
       .limit(limit)
       .offset(offset);
 
-    return c.json({ data, paginate: genPagination(total, limit, offset) });
+    return c.json({
+      data: data.map(toTagDto),
+      paginate: genPagination(total, limit, offset),
+    } satisfies z.infer<typeof getTagListResponseSchema>);
   })
-  .get('/:id', async (c) => {
+  .get('/:id', getDoc, async (c) => {
     const id = c.req.param('id');
     console.log(`GET /api/tag/${id}`);
     const [found] = await c
@@ -64,9 +195,9 @@ export const tag = new Hono<TransactionEnv>()
       .where(eq(tagTable.id, Number(id)));
     if (found === undefined) throw new NotFoundError(`tag ${id} not found`);
 
-    return c.json(found);
+    return c.json(toTagDto(found) satisfies z.infer<typeof tagSchema>);
   })
-  .post('/', zValidator('json', tagBodySchema), async (c) => {
+  .post('/', createDoc, zValidator('json', tagBodySchema), async (c) => {
     const { name, subjectId } = c.req.valid('json');
     console.log(`POST /api/tag name=${name} subjectId=${subjectId}`);
     const db = c.get('db');
@@ -79,9 +210,9 @@ export const tag = new Hono<TransactionEnv>()
       .from(tagTable)
       .where(eq(tagTable.id, insertId));
 
-    return c.json(saved, 201);
+    return c.json(toTagDto(saved) satisfies z.infer<typeof tagSchema>, 201);
   })
-  .put('/:id', zValidator('json', tagBodySchema), async (c) => {
+  .put('/:id', updateDoc, zValidator('json', tagBodySchema), async (c) => {
     const db = c.get('db');
     const id = Number(c.req.param('id'));
     const { name, subjectId } = c.req.valid('json');
@@ -98,9 +229,9 @@ export const tag = new Hono<TransactionEnv>()
       .from(tagTable)
       .where(eq(tagTable.id, id));
 
-    return c.json(updated);
+    return c.json(toTagDto(updated) satisfies z.infer<typeof tagSchema>);
   })
-  .delete('/:id', async (c) => {
+  .delete('/:id', deleteDoc, async (c) => {
     const db = c.get('db');
     const id = Number(c.req.param('id'));
     console.log(`DELETE /api/tag/${id}`);
