@@ -1,6 +1,7 @@
 import { zValidator } from '@hono/zod-validator';
 import { desc, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
+import { describeRoute, resolver } from 'hono-openapi';
 import { z } from 'zod';
 import { paymentOrderTable, paymentPurchaseTable } from 'src/db/schema';
 import {
@@ -43,6 +44,133 @@ export const checkoutBodySchema = z.object({
  * this one is a signed-in person asking to be charged, that one is
  * ECPay's server reporting a charge.
  */
+/**
+ * What this route reports.
+ *
+ * Schemas rather than hand-written types: each is the single
+ * description of its response, the handlers' returns are checked
+ * against it, and the OpenAPI document is generated from it. See "The
+ * OpenAPI document" in AGENTS.md.
+ *
+ * Nothing secret is described here, because nothing secret is sent.
+ * `params` carries the form fields ECPay itself expects, `CheckMacValue`
+ * among them -- that value is a signature *over* those fields, computed
+ * server-side; the HashKey and HashIV it is computed with never leave
+ * the server and must never appear in a schema, a description or the
+ * generated document.
+ */
+export const postPaymentCheckoutResponseSchema = z.object({
+  action: z.string().describe("ECPay's checkout URL. POST the form here"),
+  params: z
+    .record(z.string())
+    .describe(
+      "The signed form fields, named as ECPay names them. POST every one of them verbatim: CheckMacValue signs the rest, so adding, dropping or editing a field invalidates it and ECPay rejects the order. Nothing is charged by reading this -- the cardholder has to reach ECPay's own page, and until its webhook arrives the order is only `created`"
+    ),
+});
+
+/**
+ * One day-pass purchase as this API reports it.
+ *
+ * `choosePayment` and `status` are strings, not the closed sets
+ * packages/shared declares, and this is the second place in the API
+ * where that distinction bites (see `question.type`). Both columns are
+ * varchars. The set really is closed in practice -- `payment_purchase`
+ * is written by this backend alone, always through the exported
+ * constants -- but the database does not hold it, so a `z.enum` here
+ * would be a promise the handler cannot keep: `satisfies` rejected it
+ * outright, which is the guard working rather than an inconvenience.
+ *
+ * The values are in the descriptions, so a client author knows what to
+ * switch on without being told the column guarantees it.
+ */
+export const dayPassPurchaseSchema = z.object({
+  id: z.number().int(),
+  plan: z.string(),
+  amount: z.number().int().describe('Frozen at checkout, so a re-priced plan never rewrites it'),
+  days: z.number().int().describe('Days of access this buys'),
+  choosePayment: z
+    .string()
+    .describe(`One of ${ONE_TIME_PAYMENT_METHODS.join(', ')}`),
+  status: z
+    .string()
+    .describe(
+      'One of created, awaiting, paid, expired, failed. `created` is a form handed to the browser with nothing reserved; `awaiting` means ECPay issued a code or virtual account and **the money has not arrived** -- where an ATM, CVS or BARCODE row spends most of its life; `paid`, `expired` and `failed` are terminal'
+    ),
+  paymentType: z
+    .string()
+    .nullable()
+    .describe("ECPay's expanded value, e.g. ATM_TAISHIN. Null until paid"),
+  bankCode: z.string().nullable().describe('ATM only. Null for every other method'),
+  vAccount: z.string().nullable().describe('ATM only -- the virtual account to transfer to'),
+  paymentNo: z.string().nullable().describe('Convenience-store code. Null for every other method'),
+  barcode1: z
+    .string()
+    .nullable()
+    .describe(
+      'Store barcode, first of three segments. ECPay returns the digits only -- rendering them as a scannable Code39 barcode is the client job'
+    ),
+  barcode2: z.string().nullable(),
+  barcode3: z.string().nullable(),
+  expireAt: z
+    .string()
+    .nullable()
+    .describe('ISO 8601. When the code stops being payable; null before one is issued'),
+  paidAt: z.string().nullable().describe('ISO 8601'),
+  grantedUntil: z
+    .string()
+    .nullable()
+    .describe('ISO 8601. What the subscription was extended to; null until paid'),
+  createdAt: z.string().nullable().describe('ISO 8601'),
+});
+
+export const getPaymentPurchasesResponseSchema = z.object({
+  data: z.array(dayPassPurchaseSchema),
+});
+
+/**
+ * The OpenAPI entries for the two routes below.
+ *
+ * Hoisted out of the route definitions so the handlers keep their own
+ * indentation; `describeRoute` is middleware, so where it is
+ * constructed makes no difference.
+ */
+const checkoutDoc = describeRoute({
+  summary: 'Start a payment',
+  description:
+    "Behind requireUser. **Charges nothing.** It answers with a signed form the browser has to POST to `action`, because the cardholder has to reach ECPay's own page to enter a card -- the amount and the callback URLs are signed server-side so they cannot be tampered with, and the submit happens client-side. Until ECPay's webhook arrives the order is only `created`, and the user may simply close the tab.\n\nA day pass requires `method`; the recurring plan refuses one, since ECPay's 定期定額 is credit-card only -- which is the reason the day passes exist at all. Changing recurring plan replaces the agreement, because ECPay cannot amend one: the old agreement is stopped by this call, so abandoning the payment page leaves the caller with no auto-renew. The UI has to say so before calling this.",
+  tags: ['payment'],
+  responses: {
+    200: {
+      description: 'The form to POST. Nothing has been charged',
+      content: {
+        'application/json': { schema: resolver(postPaymentCheckoutResponseSchema) },
+      },
+    },
+    400: {
+      description:
+        'A day pass with no method (PAYMENT_METHOD_REQUIRED), or the recurring plan the caller is already on (ALREADY_SUBSCRIBED) -- the code in the body says which',
+    },
+    401: { description: 'No valid identity' },
+    404: { description: 'No such plan (UNKNOWN_PLAN)' },
+  },
+});
+
+const purchasesDoc = describeRoute({
+  summary: "The caller's own day-pass purchases, newest first",
+  description:
+    'Behind requireUser, and scoped to the caller by the query rather than by an id in the path -- there is no id to guess at. It exists because an ATM or convenience-store payer has to be able to come back for the number: they leave the site to pay, possibly days later and from another device, and the virtual account was shown once on a page they have long closed. At most 20; nobody plausibly has more.',
+  tags: ['payment'],
+  responses: {
+    200: {
+      description: 'Up to 20 purchases, newest first',
+      content: {
+        'application/json': { schema: resolver(getPaymentPurchasesResponseSchema) },
+      },
+    },
+    401: { description: 'No valid identity' },
+  },
+});
+
 export const payment = new Hono<UserEnv>()
   /**
    * Hands the browser a signed ECPay form to POST.
@@ -55,7 +183,7 @@ export const payment = new Hono<UserEnv>()
    * Nothing is charged by this call. Until ECPay's webhook arrives the
    * order is only `created`, and the user may simply close the tab.
    */
-  .post('/checkout', zValidator('json', checkoutBodySchema), async (c) => {
+  .post('/checkout', checkoutDoc, zValidator('json', checkoutBodySchema), async (c) => {
     const { plan: planCode } = c.req.valid('json');
     const user = c.get('user');
     const db = c.get('db');
@@ -106,7 +234,7 @@ export const payment = new Hono<UserEnv>()
           amount: plan.amount,
           method,
         }),
-      });
+      } satisfies z.infer<typeof postPaymentCheckoutResponseSchema>);
     }
 
     const live = await findActiveOrder(db, user.id);
@@ -168,7 +296,7 @@ export const payment = new Hono<UserEnv>()
         frequency: plan.frequency,
         execTimes: plan.execTimes,
       }),
-    });
+    } satisfies z.infer<typeof postPaymentCheckoutResponseSchema>);
   })
   /**
    * The caller's own day-pass purchases, newest first.
@@ -182,7 +310,7 @@ export const payment = new Hono<UserEnv>()
    * Scoped to the signed-in user by the query, not by an id in the path,
    * so there is no id to guess at and nothing to get wrong.
    */
-  .get('/purchases', async (c) => {
+  .get('/purchases', purchasesDoc, async (c) => {
     const user = c.get('user');
     const db = c.get('db');
     console.log(`GET /api/payment/purchases userId=${user.id}`);
@@ -216,5 +344,31 @@ export const payment = new Hono<UserEnv>()
       // screen shows the open one plus a short history.
       .limit(20);
 
-    return c.json({ data: rows });
+    // Field by field rather than returning the rows: the four date
+    // columns are Dates and every type in the repo calls these fields
+    // strings, and a `rows` straight from the query would carry any
+    // column added to payment_purchase into the response. That table
+    // holds the provider's own identifiers, so that is not a shape to
+    // leave to chance.
+    return c.json({
+      data: rows.map((row) => ({
+        id: row.id,
+        plan: row.plan,
+        amount: row.amount,
+        days: row.days,
+        choosePayment: row.choosePayment,
+        status: row.status,
+        paymentType: row.paymentType,
+        bankCode: row.bankCode,
+        vAccount: row.vAccount,
+        paymentNo: row.paymentNo,
+        barcode1: row.barcode1,
+        barcode2: row.barcode2,
+        barcode3: row.barcode3,
+        expireAt: row.expireAt?.toISOString() ?? null,
+        paidAt: row.paidAt?.toISOString() ?? null,
+        grantedUntil: row.grantedUntil?.toISOString() ?? null,
+        createdAt: row.createdAt?.toISOString() ?? null,
+      })),
+    } satisfies z.infer<typeof getPaymentPurchasesResponseSchema>);
   });

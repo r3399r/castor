@@ -5329,6 +5329,208 @@
         }
       }
     },
+    "/api/payment/checkout": {
+      "post": {
+        "operationId": "postApiPaymentCheckout",
+        "summary": "Start a payment",
+        "description": "Behind requireUser. **Charges nothing.** It answers with a signed form the browser has to POST to `action`, because the cardholder has to reach ECPay's own page to enter a card -- the amount and the callback URLs are signed server-side so they cannot be tampered with, and the submit happens client-side. Until ECPay's webhook arrives the order is only `created`, and the user may simply close the tab.\n\nA day pass requires `method`; the recurring plan refuses one, since ECPay's 定期定額 is credit-card only -- which is the reason the day passes exist at all. Changing recurring plan replaces the agreement, because ECPay cannot amend one: the old agreement is stopped by this call, so abandoning the payment page leaves the caller with no auto-renew. The UI has to say so before calling this.",
+        "tags": [
+          "payment"
+        ],
+        "responses": {
+          "200": {
+            "description": "The form to POST. Nothing has been charged",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "action": {
+                      "type": "string",
+                      "description": "ECPay's checkout URL. POST the form here"
+                    },
+                    "params": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "The signed form fields, named as ECPay names them. POST every one of them verbatim: CheckMacValue signs the rest, so adding, dropping or editing a field invalidates it and ECPay rejects the order. Nothing is charged by reading this -- the cardholder has to reach ECPay's own page, and until its webhook arrives the order is only `created`"
+                    }
+                  },
+                  "required": [
+                    "action",
+                    "params"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A day pass with no method (PAYMENT_METHOD_REQUIRED), or the recurring plan the caller is already on (ALREADY_SUBSCRIBED) -- the code in the body says which"
+          },
+          "401": {
+            "description": "No valid identity"
+          },
+          "404": {
+            "description": "No such plan (UNKNOWN_PLAN)"
+          }
+        }
+      }
+    },
+    "/api/payment/purchases": {
+      "get": {
+        "operationId": "getApiPaymentPurchases",
+        "summary": "The caller's own day-pass purchases, newest first",
+        "description": "Behind requireUser, and scoped to the caller by the query rather than by an id in the path -- there is no id to guess at. It exists because an ATM or convenience-store payer has to be able to come back for the number: they leave the site to pay, possibly days later and from another device, and the virtual account was shown once on a page they have long closed. At most 20; nobody plausibly has more.",
+        "tags": [
+          "payment"
+        ],
+        "responses": {
+          "200": {
+            "description": "Up to 20 purchases, newest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "plan": {
+                            "type": "string"
+                          },
+                          "amount": {
+                            "type": "integer",
+                            "description": "Frozen at checkout, so a re-priced plan never rewrites it"
+                          },
+                          "days": {
+                            "type": "integer",
+                            "description": "Days of access this buys"
+                          },
+                          "choosePayment": {
+                            "type": "string",
+                            "description": "One of Credit, ATM, CVS, BARCODE"
+                          },
+                          "status": {
+                            "type": "string",
+                            "description": "One of created, awaiting, paid, expired, failed. `created` is a form handed to the browser with nothing reserved; `awaiting` means ECPay issued a code or virtual account and **the money has not arrived** -- where an ATM, CVS or BARCODE row spends most of its life; `paid`, `expired` and `failed` are terminal"
+                          },
+                          "paymentType": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "ECPay's expanded value, e.g. ATM_TAISHIN. Null until paid"
+                          },
+                          "bankCode": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "ATM only. Null for every other method"
+                          },
+                          "vAccount": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "ATM only -- the virtual account to transfer to"
+                          },
+                          "paymentNo": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "Convenience-store code. Null for every other method"
+                          },
+                          "barcode1": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "Store barcode, first of three segments. ECPay returns the digits only -- rendering them as a scannable Code39 barcode is the client job"
+                          },
+                          "barcode2": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "barcode3": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "expireAt": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "ISO 8601. When the code stops being payable; null before one is issued"
+                          },
+                          "paidAt": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "ISO 8601"
+                          },
+                          "grantedUntil": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "ISO 8601. What the subscription was extended to; null until paid"
+                          },
+                          "createdAt": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "ISO 8601"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "plan",
+                          "amount",
+                          "days",
+                          "choosePayment",
+                          "status",
+                          "paymentType",
+                          "bankCode",
+                          "vAccount",
+                          "paymentNo",
+                          "barcode1",
+                          "barcode2",
+                          "barcode3",
+                          "expireAt",
+                          "paidAt",
+                          "grantedUntil",
+                          "createdAt"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid identity"
+          }
+        }
+      }
+    },
     "/api/analysis/overview": {
       "get": {
         "operationId": "getApiAnalysisOverview",

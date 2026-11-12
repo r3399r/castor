@@ -85,6 +85,11 @@ const postWebhook = (path: string, body: string) =>
     body,
   });
 
+import {
+  getPaymentPurchasesResponseSchema,
+  postPaymentCheckoutResponseSchema,
+} from 'src/routes/payment';
+
 const checkout = (body: unknown) =>
   app.request('/api/payment/checkout', {
     method: 'POST',
@@ -851,6 +856,65 @@ it('sends the browser back by GET only, never by a POST we cannot answer', async
       expect(await cancelOrdersSupersededByDayPass(getDb())).toBe(1);
       expect(await cancelOrdersSupersededByDayPass(getDb())).toBe(0);
       expect(vi.mocked(cancelPeriodOrder)).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  /**
+   * What the OpenAPI document promises, against what is sent.
+   *
+   * The key checks are separate from the parse because zod strips
+   * unknown keys instead of rejecting them, and the handler's
+   * `satisfies` does not catch an extra one either. It matters here
+   * because `payment_purchase` holds the provider's own identifiers: a
+   * column added to that table is not a shape to leave to chance.
+   */
+  describe('the OpenAPI document', () => {
+    it('describes exactly what checkout and the purchase list send', async () => {
+      await seedUser();
+      vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
+
+      const form: unknown = await (await checkout({ plan: 'days90', method: 'ATM' })).json();
+      const formParsed = postPaymentCheckoutResponseSchema.safeParse(form);
+      expect(formParsed.error?.issues ?? []).toEqual([]);
+      expect(Object.keys(form as object).sort()).toEqual(['action', 'params']);
+      // The signed form, and nothing else: no secret is in this response,
+      // and CheckMacValue is a signature over the other fields rather
+      // than anything the HashKey can be recovered from.
+      const params = (form as { params: Record<string, string> }).params;
+      expect(params.CheckMacValue).toEqual(expect.any(String));
+      expect(Object.keys(params)).not.toContain('HashKey');
+      expect(Object.keys(params)).not.toContain('HashIV');
+
+      const merchantTradeNo = params.MerchantTradeNo;
+      await postWebhook('/api/webhook/ecpay/payment-info', infoBody(merchantTradeNo));
+
+      const body: unknown = await (await app.request('/api/payment/purchases')).json();
+      const parsed = getPaymentPurchasesResponseSchema.safeParse(body);
+      expect(parsed.error?.issues ?? []).toEqual([]);
+      expect(parsed.success).toBe(true);
+      expect(Object.keys(body as object).sort()).toEqual(['data']);
+      // No userId and no merchantTradeNo: the list is already scoped to
+      // the caller, and the provider's trade number is ours to send to
+      // ECPay, not the client's to hold.
+      expect(Object.keys((body as { data: object[] }).data[0]).sort()).toEqual([
+        'amount',
+        'bankCode',
+        'barcode1',
+        'barcode2',
+        'barcode3',
+        'choosePayment',
+        'createdAt',
+        'days',
+        'expireAt',
+        'grantedUntil',
+        'id',
+        'paidAt',
+        'paymentNo',
+        'paymentType',
+        'plan',
+        'status',
+        'vAccount',
+      ]);
     });
   });
 });
