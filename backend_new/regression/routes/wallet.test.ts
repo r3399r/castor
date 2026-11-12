@@ -19,6 +19,7 @@ import {
   userWrongQuestionTable,
 } from 'src/db/schema';
 import { ADMIN_EMAILS } from 'src/middleware/adminAuth';
+import { getWalletResponseSchema } from 'src/routes/wallet';
 
 // Two separate identities: verifyIdToken backs the admin-only POST
 // /api/question used to seed fixture questions, verifyIdTokenUid backs
@@ -236,5 +237,42 @@ describe('wallet routes', () => {
       expect(body.data).toHaveLength(2);
       expect(body.paginate).toMatchObject({ total: 3, page: 1, totalPages: 2 });
     });
+  });
+
+  /**
+   * What the OpenAPI document promises, against what is sent.
+   *
+   * The key checks are separate from the parse because zod strips
+   * unknown keys instead of rejecting them, and the handler's
+   * `satisfies` does not catch an extra one either: a row with
+   * properties the schema does not mention is still assignable to it.
+   */
+  it('sends exactly what the OpenAPI document describes', async () => {
+    const userId = await seedUser();
+    vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+    await getDb().insert(pointTransactionTable).values({
+      userId,
+      type: 'EARN_REPLY',
+      amount: 5,
+      balanceAfter: 5,
+      createdAt: new Date(),
+    });
+
+    const body: unknown = await (await getWallet()).json();
+
+    const parsed = getWalletResponseSchema.safeParse(body);
+    expect(parsed.error?.issues ?? []).toEqual([]);
+    expect(parsed.success).toBe(true);
+    expect(Object.keys(body as object).sort()).toEqual(['data', 'paginate']);
+    // No userId: the ledger is already scoped to the caller, and saying
+    // whose it is would only invite a client to pass someone else's.
+    expect(Object.keys((body as { data: object[] }).data[0]).sort()).toEqual([
+      'amount',
+      'balanceAfter',
+      'createdAt',
+      'id',
+      'replyId',
+      'type',
+    ]);
   });
 });

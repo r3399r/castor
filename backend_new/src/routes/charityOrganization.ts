@@ -1,6 +1,7 @@
 import { zValidator } from '@hono/zod-validator';
 import { and, asc, count, desc, eq, inArray, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
+import { describeRoute, resolver } from 'hono-openapi';
 import { z } from 'zod';
 import {
   charityCategoryTable,
@@ -9,7 +10,7 @@ import {
   donationBatchTable,
   donationTable,
 } from 'src/db/schema';
-import { DEFAULT_LIMIT, genPagination, MAX_LIMIT } from 'src/lib/paginator';
+import { DEFAULT_LIMIT, genPagination, MAX_LIMIT, paginationSchema } from 'src/lib/paginator';
 import { TransactionEnv } from 'src/middleware/transaction';
 import { BadRequestError, NotFoundError } from 'src/model/error';
 
@@ -77,7 +78,6 @@ export const charityOrganizationListQuerySchema = z.object({
   isActive: z.enum(['true', 'false']).optional(),
 });
 
-type CategoryDto = { id: number; code: string; name: string };
 
 /**
  * Checks the categories an organisation is being filed under.
@@ -122,7 +122,7 @@ const assertTaxIdFree = async (db: Db, taxId: string | null | undefined, exclude
 
 /** The category rows for a set of organisations, keyed by organisation. */
 const categoriesByOrganization = async (db: Db, organizationIds: number[]) => {
-  const byOrganization = new Map<number, CategoryDto[]>();
+  const byOrganization = new Map<number, z.infer<typeof categoryRefSchema>[]>();
   if (organizationIds.length === 0) return byOrganization;
 
   const links = await db
@@ -166,7 +166,65 @@ const findOrganization = async (db: Db, id: number) => {
   return found;
 };
 
-const buildDto = (row: typeof charityOrganizationTable.$inferSelect, categories: CategoryDto[]) => ({
+
+/**
+ * An organisation as this API reports it.
+ *
+ * A schema rather than a hand-written type: it is the single description
+ * of the response, every handler's return is checked against it, and the
+ * OpenAPI document is generated from it. See "The OpenAPI document" in
+ * AGENTS.md.
+ */
+const categoryRefSchema = z.object({
+  id: z.number().int(),
+  code: z.string(),
+  name: z.string(),
+});
+
+export const charityOrganizationSchema = z.object({
+  id: z.number().int(),
+  name: z.string(),
+  taxId: z.string().nullable().describe('The 統編. Null for associations that do not publish one'),
+  introduction: z.string(),
+  websiteUrl: z.string().nullable(),
+  logoUrl: z.string().nullable(),
+  sortOrder: z.number().int().describe('Ascending; ties are broken by id'),
+  isActive: z
+    .boolean()
+    .describe('false takes it out of the picker; existing donations keep pointing at it'),
+  categories: z
+    .array(categoryRefSchema)
+    .describe('Ordered by the category sortOrder, then id. Never empty: at least one is required'),
+  createdAt: z.string().nullable().describe('ISO 8601'),
+  updatedAt: z.string().nullable().describe('ISO 8601'),
+});
+
+export const getCharityOrganizationListResponseSchema = z.object({
+  data: z.array(charityOrganizationSchema),
+  paginate: paginationSchema,
+});
+
+export const putCharityOrganizationCategoryResponseSchema = z.object({
+  categories: z.array(categoryRefSchema),
+});
+
+/**
+ * Serialises an organisation row with its categories.
+ *
+ * The dates are converted here rather than left to `c.json`: the columns
+ * are Dates, every type in the repo calls these fields strings, and
+ * JSON.stringify happening to agree is not a contract. The bytes on the
+ * wire are identical.
+ *
+ * Field by field, not a spread, so a column added to
+ * `charity_organization` cannot reach a client without being described
+ * first -- `satisfies` would not catch that on its own, since a row with
+ * extra properties is still assignable.
+ */
+const buildDto = (
+  row: typeof charityOrganizationTable.$inferSelect,
+  categories: z.infer<typeof categoryRefSchema>[]
+): z.infer<typeof charityOrganizationSchema> => ({
   id: row.id,
   name: row.name,
   taxId: row.taxId,
@@ -176,12 +234,144 @@ const buildDto = (row: typeof charityOrganizationTable.$inferSelect, categories:
   sortOrder: row.sortOrder,
   isActive: row.isActive,
   categories,
-  createdAt: row.createdAt,
-  updatedAt: row.updatedAt,
+  createdAt: row.createdAt?.toISOString() ?? null,
+  updatedAt: row.updatedAt?.toISOString() ?? null,
+});
+
+/**
+ * The OpenAPI entries for the routes below.
+ *
+ * Hoisted out of the route definitions so the handlers keep their own
+ * indentation and each route line stays one line; `describeRoute` is
+ * middleware, so where it is constructed makes no difference.
+ *
+ * The gate is stated per route because it is not uniform: `adminAuth`
+ * checks POST/PUT/DELETE only, so every read here answers with no
+ * credentials while every write is admin-only.
+ */
+const listDoc = describeRoute({
+  summary: 'List the charity organisations',
+  description:
+    'Reads here need no credentials: the name, blurb and website of a foundation are what the public transparency page exists to show. `adminAuth` gates POST/PUT/DELETE only. Filterable by category and by isActive; an organisation filed under two categories still counts once, because the category filter resolves to a list of ids rather than joining.',
+  tags: ['charity-organization'],
+  responses: {
+    200: {
+      description: 'One page of organisations, each with its categories',
+      content: {
+        'application/json': { schema: resolver(getCharityOrganizationListResponseSchema) },
+      },
+    },
+    400: { description: 'limit beyond the cap, or a malformed sort, order, categoryId or isActive' },
+  },
+});
+
+const suggestDoc = describeRoute({
+  summary: 'Suggest an organisation in a category',
+  description:
+    'Reads here need no credentials: the name, blurb and website of a foundation are what the public transparency page exists to show. `adminAuth` gates POST/PUT/DELETE only. Answers with the **least-supported** active organisation in the category -- least by summed donation amount, with sortOrder then id breaking ties, so an untouched category answers the same for everyone. It exists because the choice is the emotional payoff of the LV5 donation and therefore a wall for anyone without an opinion; it is a suggestion, not a hidden choice inside POST /api/donation, because the public record names the organisation and the user has to see who it is before confirming.',
+  tags: ['charity-organization'],
+  responses: {
+    200: {
+      description: 'The suggested organisation',
+      content: { 'application/json': { schema: resolver(charityOrganizationSchema) } },
+    },
+    400: { description: 'categoryId missing or not a positive integer' },
+    404: {
+      description:
+        'No such category, or no active organisation is filed under it (NO_ORGANIZATION_AVAILABLE)',
+    },
+  },
+});
+
+const getDoc = describeRoute({
+  summary: 'Read one organisation',
+  description: 'Reads here need no credentials: the name, blurb and website of a foundation are what the public transparency page exists to show. `adminAuth` gates POST/PUT/DELETE only.',
+  tags: ['charity-organization'],
+  responses: {
+    200: {
+      description: 'The organisation, with its categories',
+      content: { 'application/json': { schema: resolver(charityOrganizationSchema) } },
+    },
+    404: { description: 'No such organisation' },
+  },
+});
+
+const createDoc = describeRoute({
+  summary: 'Create an organisation',
+  description:
+    'Admin only. At least one category is required: an organisation under none is offered to nobody.',
+  tags: ['charity-organization'],
+  responses: {
+    201: {
+      description: 'The organisation as saved',
+      content: { 'application/json': { schema: resolver(charityOrganizationSchema) } },
+    },
+    400: {
+      description:
+        'A malformed body, a URL not starting with http:// or https://, a taxId that is not 8 digits or already belongs to another organisation, an empty categoryIds, a category that does not exist, or one that is no longer accepting organisations',
+    },
+    401: { description: 'No valid identity' },
+    403: { description: 'Not an admin' },
+  },
+});
+
+const updateDoc = describeRoute({
+  summary: 'Update an organisation',
+  description:
+    'Admin only. Every field in the body is required -- this is a replace, not a patch -- and the category links are replaced wholesale with the ids sent.',
+  tags: ['charity-organization'],
+  responses: {
+    200: {
+      description: 'The organisation as saved',
+      content: { 'application/json': { schema: resolver(charityOrganizationSchema) } },
+    },
+    400: { description: 'The same cases as the create, with the taxId check ignoring this row' },
+    401: { description: 'No valid identity' },
+    403: { description: 'Not an admin' },
+    404: { description: 'No such organisation' },
+  },
+});
+
+const putCategoryDoc = describeRoute({
+  summary: "Replace an organisation's categories",
+  description:
+    'Admin only. A full-set replace, not a merge, and at least one id is required. An inactive category is refused: it still exists, because past donations point at it, but nothing should be newly filed under one.',
+  tags: ['charity-organization'],
+  responses: {
+    200: {
+      description: 'The categories as saved',
+      content: {
+        'application/json': {
+          schema: resolver(putCharityOrganizationCategoryResponseSchema),
+        },
+      },
+    },
+    400: {
+      description:
+        'An empty categoryIds, a category that does not exist, or one that is not accepting organisations',
+    },
+    401: { description: 'No valid identity' },
+    403: { description: 'Not an admin' },
+    404: { description: 'No such organisation' },
+  },
+});
+
+const deleteDoc = describeRoute({
+  summary: 'Delete an organisation',
+  description:
+    'Admin only, and only one that has taken no money: an organisation named on the public record has to keep being nameable, and the agreed handling for a foundation that folds is to repoint its donations at another, never to erase it. Use isActive to take one out of circulation.',
+  tags: ['charity-organization'],
+  responses: {
+    204: { description: 'Deleted' },
+    400: { description: 'It has donations or payout batches; deactivate it instead' },
+    401: { description: 'No valid identity' },
+    403: { description: 'Not an admin' },
+    404: { description: 'No such organisation' },
+  },
 });
 
 export const charityOrganization = new Hono<TransactionEnv>()
-  .get('/', zValidator('query', charityOrganizationListQuerySchema), async (c) => {
+  .get('/', listDoc, zValidator('query', charityOrganizationListQuerySchema), async (c) => {
     const { limit, offset, sort, order, categoryId, isActive } = c.req.valid('query');
     console.log(
       `GET /api/charity-organization limit=${limit} offset=${offset} sort=${sort} order=${order} categoryId=${categoryId ?? ''} isActive=${isActive ?? ''}`
@@ -203,7 +393,10 @@ export const charityOrganization = new Hono<TransactionEnv>()
       // No organisation is in this category: answer an empty page rather
       // than build an `IN ()`, which is not valid SQL.
       if (ids.length === 0)
-        return c.json({ data: [], paginate: genPagination(0, limit, offset) });
+        return c.json({
+          data: [],
+          paginate: genPagination(0, limit, offset),
+        } satisfies z.infer<typeof getCharityOrganizationListResponseSchema>);
       conditions.push(inArray(charityOrganizationTable.id, ids));
     }
     const where = conditions.length > 0 ? and(...conditions) : undefined;
@@ -233,7 +426,10 @@ export const charityOrganization = new Hono<TransactionEnv>()
     );
     const data = rows.map((row) => buildDto(row, categories.get(row.id) ?? []));
 
-    return c.json({ data, paginate: genPagination(total, limit, offset) });
+    return c.json({
+      data,
+      paginate: genPagination(total, limit, offset),
+    } satisfies z.infer<typeof getCharityOrganizationListResponseSchema>);
   })
   /**
    * One organisation for a user who has no preference of their own.
@@ -260,7 +456,7 @@ export const charityOrganization = new Hono<TransactionEnv>()
    * the two swapped this path would hit the id handler as Number('suggest')
    * = NaN. There is a test pinning that.
    */
-  .get('/suggest', zValidator('query', charityOrganizationSuggestQuerySchema), async (c) => {
+  .get('/suggest', suggestDoc, zValidator('query', charityOrganizationSuggestQuerySchema), async (c) => {
     const db = c.get('db');
     const { categoryId } = c.req.valid('query');
     console.log(`GET /api/charity-organization/suggest categoryId=${categoryId}`);
@@ -321,9 +517,13 @@ export const charityOrganization = new Hono<TransactionEnv>()
     const found = await findOrganization(db, suggestion.id);
     const categories = await categoriesByOrganization(db, [suggestion.id]);
 
-    return c.json(buildDto(found, categories.get(suggestion.id) ?? []));
+    return c.json(
+      buildDto(found, categories.get(suggestion.id) ?? []) satisfies z.infer<
+        typeof charityOrganizationSchema
+      >
+    );
   })
-  .get('/:id', async (c) => {
+  .get('/:id', getDoc, async (c) => {
     const db = c.get('db');
     const id = Number(c.req.param('id'));
     console.log(`GET /api/charity-organization/${id}`);
@@ -331,9 +531,13 @@ export const charityOrganization = new Hono<TransactionEnv>()
     const found = await findOrganization(db, id);
     const categories = await categoriesByOrganization(db, [id]);
 
-    return c.json(buildDto(found, categories.get(id) ?? []));
+    return c.json(
+      buildDto(found, categories.get(id) ?? []) satisfies z.infer<
+        typeof charityOrganizationSchema
+      >
+    );
   })
-  .post('/', zValidator('json', charityOrganizationBodySchema), async (c) => {
+  .post('/', createDoc, zValidator('json', charityOrganizationBodySchema), async (c) => {
     const db = c.get('db');
     const data = c.req.valid('json');
     console.log(
@@ -360,9 +564,14 @@ export const charityOrganization = new Hono<TransactionEnv>()
     const saved = await findOrganization(db, insertId);
     const categories = await categoriesByOrganization(db, [insertId]);
 
-    return c.json(buildDto(saved, categories.get(insertId) ?? []), 201);
+    return c.json(
+      buildDto(saved, categories.get(insertId) ?? []) satisfies z.infer<
+        typeof charityOrganizationSchema
+      >,
+      201
+    );
   })
-  .put('/:id', zValidator('json', charityOrganizationBodySchema), async (c) => {
+  .put('/:id', updateDoc, zValidator('json', charityOrganizationBodySchema), async (c) => {
     const db = c.get('db');
     const id = Number(c.req.param('id'));
     const data = c.req.valid('json');
@@ -390,9 +599,13 @@ export const charityOrganization = new Hono<TransactionEnv>()
     const updated = await findOrganization(db, id);
     const categories = await categoriesByOrganization(db, [id]);
 
-    return c.json(buildDto(updated, categories.get(id) ?? []));
+    return c.json(
+      buildDto(updated, categories.get(id) ?? []) satisfies z.infer<
+        typeof charityOrganizationSchema
+      >
+    );
   })
-  .put('/:id/category', zValidator('json', charityOrganizationCategoryBodySchema), async (c) => {
+  .put('/:id/category', putCategoryDoc, zValidator('json', charityOrganizationCategoryBodySchema), async (c) => {
     const db = c.get('db');
     const id = Number(c.req.param('id'));
     const { categoryIds } = c.req.valid('json');
@@ -406,9 +619,11 @@ export const charityOrganization = new Hono<TransactionEnv>()
 
     const categories = await categoriesByOrganization(db, [id]);
 
-    return c.json({ categories: categories.get(id) ?? [] });
+    return c.json({
+      categories: categories.get(id) ?? [],
+    } satisfies z.infer<typeof putCharityOrganizationCategoryResponseSchema>);
   })
-  .delete('/:id', async (c) => {
+  .delete('/:id', deleteDoc, async (c) => {
     const db = c.get('db');
     const id = Number(c.req.param('id'));
     console.log(`DELETE /api/charity-organization/${id}`);

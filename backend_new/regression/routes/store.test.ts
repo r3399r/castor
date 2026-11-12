@@ -6,6 +6,10 @@ import { guardianTable, pointTransactionTable, userGuardianTable, userTable } fr
 
 vi.mock('src/lib/firebaseAdmin', () => ({ verifyIdTokenUid: vi.fn() }));
 import { verifyIdTokenUid } from 'src/lib/firebaseAdmin';
+import {
+  getStoreSpeciesResponseSchema,
+  postStoreRedeemResponseSchema,
+} from 'src/routes/store';
 
 type GuardianSpeciesDto = { id: number; code: string; name: string; theme: string; cost: number; owned: boolean; level: number | null };
 type GetStoreSpeciesResponse = { data: GuardianSpeciesDto[]; totalPoints: number };
@@ -213,5 +217,42 @@ describe('store routes', () => {
       const guardians = await db.select().from(userGuardianTable).where(eq(userGuardianTable.userId, userId));
       expect(guardians).toHaveLength(0);
     });
+  });
+
+  /**
+   * What the OpenAPI document promises, against what is sent.
+   *
+   * The key checks are separate from the parse because zod strips
+   * unknown keys instead of rejecting them, and the handler's
+   * `satisfies` does not catch an extra one either: a row with
+   * properties the schema does not mention is still assignable to it.
+   */
+  it('sends exactly what the OpenAPI document describes', async () => {
+    await seedUser(100);
+    const speciesId = await seedSpecies({ cost: 20 });
+
+    const shelf: unknown = await (await getSpecies()).json();
+    const shelfParsed = getStoreSpeciesResponseSchema.safeParse(shelf);
+    expect(shelfParsed.error?.issues ?? []).toEqual([]);
+    expect(Object.keys(shelf as object).sort()).toEqual(['data', 'totalPoints']);
+    expect(Object.keys((shelf as { data: object[] }).data[0]).sort()).toEqual([
+      'code',
+      'cost',
+      'id',
+      'level',
+      'name',
+      'owned',
+      'theme',
+    ]);
+
+    const redeemed: unknown = await (await postRedeem({ speciesId })).json();
+    expect(postStoreRedeemResponseSchema.safeParse(redeemed).error?.issues ?? []).toEqual([]);
+    expect(Object.keys(redeemed as object).sort()).toEqual(['guardian', 'totalPoints']);
+    expect(Object.keys((redeemed as { guardian: object }).guardian).sort()).toEqual([
+      'id',
+      'level',
+      'speciesId',
+      'xp',
+    ]);
   });
 });

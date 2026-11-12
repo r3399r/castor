@@ -1,5 +1,7 @@
 import { asc, eq, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
+import { describeRoute, resolver } from 'hono-openapi';
+import { z } from 'zod';
 import { charityCategoryTable, guardianTable, userGuardianTable } from 'src/db/schema';
 import { TransactionEnv } from 'src/middleware/transaction';
 
@@ -16,7 +18,54 @@ import { TransactionEnv } from 'src/middleware/transaction';
  * POST/PUT/DELETE and would let every GET through, which on a GET-only
  * resource is no protection at all.
  */
-export const species = new Hono<TransactionEnv>().get('/', async (c) => {
+/**
+ * A species in the admin catalog, as this API reports it.
+ *
+ * A schema rather than a hand-written type: it is the single description
+ * of the response, the handler's return is checked against it, and the
+ * OpenAPI document is generated from it. Nothing in packages/shared
+ * describes this response at all -- the admin page that reads it
+ * declares its own shape. See "The OpenAPI document" in AGENTS.md.
+ */
+export const adminSpeciesSchema = z.object({
+  id: z.number().int(),
+  code: z.string().describe("What the frontend keys this species' artwork by"),
+  name: z.string(),
+  theme: z.string().describe("The egg's own label, which is not the category link below"),
+  cost: z.number().int().describe('Points to redeem one'),
+  sortOrder: z.number().int(),
+  isActive: z.boolean().describe('Whether it is still on sale; owners of a retired one keep it'),
+  category: z
+    .object({ id: z.number().int(), name: z.string() })
+    .nullable()
+    .describe(
+      'The donation category this species supports, or null for one tied to none. null is both what the planned VIP spirit is and what a seeded egg looks like when its category_id was forgotten -- indistinguishable from here, which is why the admin page says it out loud.'
+    ),
+  ownersByLevel: z
+    .record(z.number().int())
+    .describe(
+      'Owners keyed by the level they have grown to. An absent level has no owners; the caller decides which levels to show. Keys are strings because JSON object keys are.'
+    ),
+});
+
+export const getSpeciesResponseSchema = z.array(adminSpeciesSchema);
+
+const listDoc = describeRoute({
+  summary: 'The guardian catalog, with owner counts per level',
+  description:
+    'Behind requireAdmin -- every method, GET included. `adminAuth` would have been no protection at all here, since it only gates POST/PUT/DELETE and this resource has none. GET-only on purpose: a species is half a row and half a set of artwork files keyed by `code`, so creating one through an API would only ever produce a row with no pictures.',
+  tags: ['species'],
+  responses: {
+    200: {
+      description: 'Every species, retired ones included, ordered by sortOrder then id',
+      content: { 'application/json': { schema: resolver(getSpeciesResponseSchema) } },
+    },
+    401: { description: 'No valid identity' },
+    403: { description: 'Not an admin' },
+  },
+});
+
+export const species = new Hono<TransactionEnv>().get('/', listDoc, async (c) => {
   console.log('GET /api/species');
   const db = c.get('db');
 
@@ -59,7 +108,10 @@ export const species = new Hono<TransactionEnv>().get('/', async (c) => {
     .from(userGuardianTable)
     .groupBy(userGuardianTable.guardianId, userGuardianTable.level);
 
-  const ownersByLevelById = new Map<number, Record<number, number>>();
+  // String-keyed, because that is what these become in JSON: typing
+  // the map as Record<number, number> described a response shape that
+  // never existed on the wire.
+  const ownersByLevelById = new Map<number, Record<string, number>>();
   for (const row of owners) {
     const byLevel = ownersByLevelById.get(row.guardianId) ?? {};
     byLevel[row.level] = Number(row.ownerCount);
@@ -89,6 +141,6 @@ export const species = new Hono<TransactionEnv>().get('/', async (c) => {
       // Keyed by level. Absent levels simply have no owners; the caller
       // decides which levels to display.
       ownersByLevel: ownersByLevelById.get(row.id) ?? {},
-    }))
+    })) satisfies z.infer<typeof getSpeciesResponseSchema>
   );
 });

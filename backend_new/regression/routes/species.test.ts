@@ -8,6 +8,7 @@ import {
   userTable,
 } from 'src/db/schema';
 import { ADMIN_EMAILS } from 'src/middleware/adminAuth';
+import { getSpeciesResponseSchema } from 'src/routes/species';
 
 vi.mock('src/lib/firebaseAdmin', () => ({ verifyIdToken: vi.fn(), verifyIdTokenUid: vi.fn() }));
 import { verifyIdToken } from 'src/lib/firebaseAdmin';
@@ -191,5 +192,38 @@ describe('species', () => {
       });
       expect(post.status).toBe(404);
     });
+  });
+
+  /**
+   * What the OpenAPI document promises, against what is sent.
+   *
+   * The key checks are separate from the parse because zod strips
+   * unknown keys instead of rejecting them, and the handler's
+   * `satisfies` does not catch an extra one either: a row with
+   * properties the schema does not mention is still assignable to it.
+   */
+  it('sends exactly what the OpenAPI document describes', async () => {
+    vi.mocked(verifyIdToken).mockResolvedValue(ADMIN_EMAILS[0]);
+    const categoryId = await seedCategory('forest');
+    await seedSpecies('forest', { categoryId });
+
+    const body: unknown = await (await getSpecies()).json();
+
+    const parsed = getSpeciesResponseSchema.safeParse(body);
+    expect(parsed.error?.issues ?? []).toEqual([]);
+    expect(parsed.success).toBe(true);
+    const [row] = body as { category: object }[];
+    expect(Object.keys(row).sort()).toEqual([
+      'category',
+      'code',
+      'cost',
+      'id',
+      'isActive',
+      'name',
+      'ownersByLevel',
+      'sortOrder',
+      'theme',
+    ]);
+    expect(Object.keys(row.category).sort()).toEqual(['id', 'name']);
   });
 });

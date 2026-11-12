@@ -13,6 +13,11 @@ import {
   userTable,
 } from 'src/db/schema';
 import { ADMIN_EMAILS } from 'src/middleware/adminAuth';
+import {
+  charityOrganizationSchema,
+  getCharityOrganizationListResponseSchema,
+  putCharityOrganizationCategoryResponseSchema,
+} from 'src/routes/charityOrganization';
 
 // The admin gate has its own describe block; every other test only needs
 // writes to succeed, so the mocked verification defaults to an admin.
@@ -699,6 +704,91 @@ describe('charity organization routes', () => {
       vi.mocked(verifyIdToken).mockResolvedValue(null);
 
       expect((await getSuggest(`?categoryId=${cat}`)).status).toBe(200);
+    });
+  });
+
+  /**
+   * What the OpenAPI document promises, against what is sent.
+   *
+   * The key checks are separate from the parse because zod strips
+   * unknown keys instead of rejecting them, and the handler's
+   * `satisfies` does not catch an extra one either: a row with
+   * properties the schema does not mention is still assignable to it.
+   */
+  describe('the OpenAPI document', () => {
+    const organizationKeys = [
+      'categories',
+      'createdAt',
+      'id',
+      'introduction',
+      'isActive',
+      'logoUrl',
+      'name',
+      'sortOrder',
+      'taxId',
+      'updatedAt',
+      'websiteUrl',
+    ];
+
+    it('describes exactly what the reads and the writes send', async () => {
+      const categoryId = await seedCategory();
+      const created: unknown = await (
+        await postOrganization(validBody([categoryId]))
+      ).json();
+
+      expect(charityOrganizationSchema.safeParse(created).error?.issues ?? []).toEqual([]);
+      expect(Object.keys(created as object).sort()).toEqual(organizationKeys);
+      // Five of the category's columns are not here: the public record
+      // names an organisation and its categories, not their timestamps.
+      expect(
+        Object.keys((created as { categories: object[] }).categories[0]).sort()
+      ).toEqual(['code', 'id', 'name']);
+
+      const id = (created as { id: number }).id;
+
+      const one: unknown = await (await getOne(id)).json();
+      expect(charityOrganizationSchema.safeParse(one).error?.issues ?? []).toEqual([]);
+      expect(Object.keys(one as object).sort()).toEqual(organizationKeys);
+
+      const updated: unknown = await (
+        await putOrganization(id, validBody([categoryId], { name: '財團法人改名基金會' }))
+      ).json();
+      expect(charityOrganizationSchema.safeParse(updated).error?.issues ?? []).toEqual([]);
+      expect(Object.keys(updated as object).sort()).toEqual(organizationKeys);
+
+      const list: unknown = await (await getList()).json();
+      const listParsed = getCharityOrganizationListResponseSchema.safeParse(list);
+      expect(listParsed.error?.issues ?? []).toEqual([]);
+      expect(Object.keys(list as object).sort()).toEqual(['data', 'paginate']);
+      expect(Object.keys((list as { data: object[] }).data[0]).sort()).toEqual(
+        organizationKeys
+      );
+
+      const suggestion: unknown = await (await getSuggest(`?categoryId=${categoryId}`)).json();
+      expect(charityOrganizationSchema.safeParse(suggestion).error?.issues ?? []).toEqual([]);
+      expect(Object.keys(suggestion as object).sort()).toEqual(organizationKeys);
+    });
+
+    it('describes exactly what the category replace sends', async () => {
+      const categoryId = await seedCategory();
+      const other = await seedCategory({ code: 'other', name: '其他' });
+      const created: unknown = await (
+        await postOrganization(validBody([categoryId]))
+      ).json();
+
+      const saved: unknown = await (
+        await putCategories((created as { id: number }).id, { categoryIds: [other] })
+      ).json();
+
+      expect(
+        putCharityOrganizationCategoryResponseSchema.safeParse(saved).error?.issues ?? []
+      ).toEqual([]);
+      expect(Object.keys(saved as object).sort()).toEqual(['categories']);
+      expect(Object.keys((saved as { categories: object[] }).categories[0]).sort()).toEqual([
+        'code',
+        'id',
+        'name',
+      ]);
     });
   });
 });

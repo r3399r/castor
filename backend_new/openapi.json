@@ -3370,6 +3370,855 @@
         ]
       }
     },
+    "/api/charity-category": {
+      "get": {
+        "operationId": "getApiCharityCategory",
+        "summary": "List the public-interest categories",
+        "description": "Open to anyone: these names are printed on the public transparency page. GET-only, and the group is mounted behind `adminAuth`, which gates POST/PUT/DELETE -- so on a resource with none it gates nothing. That is intended here, not an oversight; the rows are seeded by SQL because they are tied to the spirit species by `code`.",
+        "tags": [
+          "charity-category"
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of categories, ordered by sortOrder then id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "code": {
+                            "type": "string",
+                            "description": "Stable identifier, and what ties a spirit species to this category"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "sortOrder": {
+                            "type": "integer",
+                            "description": "Ascending, hand-assigned; ties are broken by id"
+                          },
+                          "isActive": {
+                            "type": "boolean",
+                            "description": "Inactive categories stay listed -- past donations point at them and the public record keeps naming them. They drop out of the picker only."
+                          },
+                          "createdAt": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "ISO 8601"
+                          },
+                          "updatedAt": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "ISO 8601"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "code",
+                          "name",
+                          "sortOrder",
+                          "isActive",
+                          "createdAt",
+                          "updatedAt"
+                        ]
+                      }
+                    },
+                    "paginate": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer",
+                          "description": "Rows matching the query, ignoring limit and offset"
+                        },
+                        "page": {
+                          "type": "integer",
+                          "description": "1-indexed, derived from offset and limit"
+                        },
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "totalPages": {
+                          "type": "integer",
+                          "description": "At least 1, so an empty result reads as \"page 1 of 1\" rather than \"of 0\""
+                        }
+                      },
+                      "required": [
+                        "total",
+                        "page",
+                        "limit",
+                        "totalPages"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "paginate"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "limit beyond the cap, or an isActive that is not \"true\" or \"false\""
+          }
+        }
+      }
+    },
+    "/api/charity-organization": {
+      "get": {
+        "operationId": "getApiCharityOrganization",
+        "summary": "List the charity organisations",
+        "description": "Reads here need no credentials: the name, blurb and website of a foundation are what the public transparency page exists to show. `adminAuth` gates POST/PUT/DELETE only. Filterable by category and by isActive; an organisation filed under two categories still counts once, because the category filter resolves to a list of ids rather than joining.",
+        "tags": [
+          "charity-organization"
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of organisations, each with its categories",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "taxId": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "The 統編. Null for associations that do not publish one"
+                          },
+                          "introduction": {
+                            "type": "string"
+                          },
+                          "websiteUrl": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "logoUrl": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "sortOrder": {
+                            "type": "integer",
+                            "description": "Ascending; ties are broken by id"
+                          },
+                          "isActive": {
+                            "type": "boolean",
+                            "description": "false takes it out of the picker; existing donations keep pointing at it"
+                          },
+                          "categories": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "integer"
+                                },
+                                "code": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "code",
+                                "name"
+                              ]
+                            },
+                            "description": "Ordered by the category sortOrder, then id. Never empty: at least one is required"
+                          },
+                          "createdAt": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "ISO 8601"
+                          },
+                          "updatedAt": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "ISO 8601"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "taxId",
+                          "introduction",
+                          "websiteUrl",
+                          "logoUrl",
+                          "sortOrder",
+                          "isActive",
+                          "categories",
+                          "createdAt",
+                          "updatedAt"
+                        ]
+                      }
+                    },
+                    "paginate": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer",
+                          "description": "Rows matching the query, ignoring limit and offset"
+                        },
+                        "page": {
+                          "type": "integer",
+                          "description": "1-indexed, derived from offset and limit"
+                        },
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "totalPages": {
+                          "type": "integer",
+                          "description": "At least 1, so an empty result reads as \"page 1 of 1\" rather than \"of 0\""
+                        }
+                      },
+                      "required": [
+                        "total",
+                        "page",
+                        "limit",
+                        "totalPages"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "paginate"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "limit beyond the cap, or a malformed sort, order, categoryId or isActive"
+          }
+        }
+      },
+      "post": {
+        "operationId": "postApiCharityOrganization",
+        "summary": "Create an organisation",
+        "description": "Admin only. At least one category is required: an organisation under none is offered to nobody.",
+        "tags": [
+          "charity-organization"
+        ],
+        "responses": {
+          "201": {
+            "description": "The organisation as saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "taxId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "The 統編. Null for associations that do not publish one"
+                    },
+                    "introduction": {
+                      "type": "string"
+                    },
+                    "websiteUrl": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "logoUrl": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "sortOrder": {
+                      "type": "integer",
+                      "description": "Ascending; ties are broken by id"
+                    },
+                    "isActive": {
+                      "type": "boolean",
+                      "description": "false takes it out of the picker; existing donations keep pointing at it"
+                    },
+                    "categories": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "code": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "code",
+                          "name"
+                        ]
+                      },
+                      "description": "Ordered by the category sortOrder, then id. Never empty: at least one is required"
+                    },
+                    "createdAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601"
+                    },
+                    "updatedAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "taxId",
+                    "introduction",
+                    "websiteUrl",
+                    "logoUrl",
+                    "sortOrder",
+                    "isActive",
+                    "categories",
+                    "createdAt",
+                    "updatedAt"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A malformed body, a URL not starting with http:// or https://, a taxId that is not 8 digits or already belongs to another organisation, an empty categoryIds, a category that does not exist, or one that is no longer accepting organisations"
+          },
+          "401": {
+            "description": "No valid identity"
+          },
+          "403": {
+            "description": "Not an admin"
+          }
+        }
+      }
+    },
+    "/api/charity-organization/suggest": {
+      "get": {
+        "operationId": "getApiCharityOrganizationSuggest",
+        "summary": "Suggest an organisation in a category",
+        "description": "Reads here need no credentials: the name, blurb and website of a foundation are what the public transparency page exists to show. `adminAuth` gates POST/PUT/DELETE only. Answers with the **least-supported** active organisation in the category -- least by summed donation amount, with sortOrder then id breaking ties, so an untouched category answers the same for everyone. It exists because the choice is the emotional payoff of the LV5 donation and therefore a wall for anyone without an opinion; it is a suggestion, not a hidden choice inside POST /api/donation, because the public record names the organisation and the user has to see who it is before confirming.",
+        "tags": [
+          "charity-organization"
+        ],
+        "responses": {
+          "200": {
+            "description": "The suggested organisation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "taxId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "The 統編. Null for associations that do not publish one"
+                    },
+                    "introduction": {
+                      "type": "string"
+                    },
+                    "websiteUrl": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "logoUrl": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "sortOrder": {
+                      "type": "integer",
+                      "description": "Ascending; ties are broken by id"
+                    },
+                    "isActive": {
+                      "type": "boolean",
+                      "description": "false takes it out of the picker; existing donations keep pointing at it"
+                    },
+                    "categories": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "code": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "code",
+                          "name"
+                        ]
+                      },
+                      "description": "Ordered by the category sortOrder, then id. Never empty: at least one is required"
+                    },
+                    "createdAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601"
+                    },
+                    "updatedAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "taxId",
+                    "introduction",
+                    "websiteUrl",
+                    "logoUrl",
+                    "sortOrder",
+                    "isActive",
+                    "categories",
+                    "createdAt",
+                    "updatedAt"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "categoryId missing or not a positive integer"
+          },
+          "404": {
+            "description": "No such category, or no active organisation is filed under it (NO_ORGANIZATION_AVAILABLE)"
+          }
+        }
+      }
+    },
+    "/api/charity-organization/{id}": {
+      "get": {
+        "operationId": "getApiCharityOrganizationById",
+        "summary": "Read one organisation",
+        "description": "Reads here need no credentials: the name, blurb and website of a foundation are what the public transparency page exists to show. `adminAuth` gates POST/PUT/DELETE only.",
+        "tags": [
+          "charity-organization"
+        ],
+        "responses": {
+          "200": {
+            "description": "The organisation, with its categories",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "taxId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "The 統編. Null for associations that do not publish one"
+                    },
+                    "introduction": {
+                      "type": "string"
+                    },
+                    "websiteUrl": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "logoUrl": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "sortOrder": {
+                      "type": "integer",
+                      "description": "Ascending; ties are broken by id"
+                    },
+                    "isActive": {
+                      "type": "boolean",
+                      "description": "false takes it out of the picker; existing donations keep pointing at it"
+                    },
+                    "categories": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "code": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "code",
+                          "name"
+                        ]
+                      },
+                      "description": "Ordered by the category sortOrder, then id. Never empty: at least one is required"
+                    },
+                    "createdAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601"
+                    },
+                    "updatedAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "taxId",
+                    "introduction",
+                    "websiteUrl",
+                    "logoUrl",
+                    "sortOrder",
+                    "isActive",
+                    "categories",
+                    "createdAt",
+                    "updatedAt"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such organisation"
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ]
+      },
+      "put": {
+        "operationId": "putApiCharityOrganizationById",
+        "summary": "Update an organisation",
+        "description": "Admin only. Every field in the body is required -- this is a replace, not a patch -- and the category links are replaced wholesale with the ids sent.",
+        "tags": [
+          "charity-organization"
+        ],
+        "responses": {
+          "200": {
+            "description": "The organisation as saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "taxId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "The 統編. Null for associations that do not publish one"
+                    },
+                    "introduction": {
+                      "type": "string"
+                    },
+                    "websiteUrl": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "logoUrl": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "sortOrder": {
+                      "type": "integer",
+                      "description": "Ascending; ties are broken by id"
+                    },
+                    "isActive": {
+                      "type": "boolean",
+                      "description": "false takes it out of the picker; existing donations keep pointing at it"
+                    },
+                    "categories": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "code": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "code",
+                          "name"
+                        ]
+                      },
+                      "description": "Ordered by the category sortOrder, then id. Never empty: at least one is required"
+                    },
+                    "createdAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601"
+                    },
+                    "updatedAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "taxId",
+                    "introduction",
+                    "websiteUrl",
+                    "logoUrl",
+                    "sortOrder",
+                    "isActive",
+                    "categories",
+                    "createdAt",
+                    "updatedAt"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The same cases as the create, with the taxId check ignoring this row"
+          },
+          "401": {
+            "description": "No valid identity"
+          },
+          "403": {
+            "description": "Not an admin"
+          },
+          "404": {
+            "description": "No such organisation"
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "deleteApiCharityOrganizationById",
+        "summary": "Delete an organisation",
+        "description": "Admin only, and only one that has taken no money: an organisation named on the public record has to keep being nameable, and the agreed handling for a foundation that folds is to repoint its donations at another, never to erase it. Use isActive to take one out of circulation.",
+        "tags": [
+          "charity-organization"
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "400": {
+            "description": "It has donations or payout batches; deactivate it instead"
+          },
+          "401": {
+            "description": "No valid identity"
+          },
+          "403": {
+            "description": "Not an admin"
+          },
+          "404": {
+            "description": "No such organisation"
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ]
+      }
+    },
+    "/api/charity-organization/{id}/category": {
+      "put": {
+        "operationId": "putApiCharityOrganizationByIdCategory",
+        "summary": "Replace an organisation's categories",
+        "description": "Admin only. A full-set replace, not a merge, and at least one id is required. An inactive category is refused: it still exists, because past donations point at it, but nothing should be newly filed under one.",
+        "tags": [
+          "charity-organization"
+        ],
+        "responses": {
+          "200": {
+            "description": "The categories as saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "categories": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "code": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "code",
+                          "name"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "categories"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "An empty categoryIds, a category that does not exist, or one that is not accepting organisations"
+          },
+          "401": {
+            "description": "No valid identity"
+          },
+          "403": {
+            "description": "Not an admin"
+          },
+          "404": {
+            "description": "No such organisation"
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ]
+      }
+    },
     "/api/user": {
       "get": {
         "operationId": "getApiUser",
@@ -4476,6 +5325,350 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/wallet": {
+      "get": {
+        "operationId": "getApiWallet",
+        "summary": "The caller's point history",
+        "description": "Behind requireUser, and scoped to the caller: there is no way to read anyone else's. Newest first, ordered by id rather than createdAt -- a POST /reply batch writes several rows sharing one timestamp, so id is the only column that keeps their order.",
+        "tags": [
+          "wallet"
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of movements, newest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "type": {
+                            "type": "string",
+                            "description": "EARN_REPLY, SPEND_EGG_REDEEM and the rest -- a varchar rather than an enum, so a new kind of movement needs no schema change"
+                          },
+                          "amount": {
+                            "type": "integer",
+                            "description": "Signed: negative is a spend"
+                          },
+                          "replyId": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ],
+                            "description": "The reply this came from, for anything earned by answering"
+                          },
+                          "balanceAfter": {
+                            "type": "integer",
+                            "description": "The running balance once this had been applied"
+                          },
+                          "createdAt": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "ISO 8601"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "type",
+                          "amount",
+                          "replyId",
+                          "balanceAfter",
+                          "createdAt"
+                        ]
+                      }
+                    },
+                    "paginate": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer",
+                          "description": "Rows matching the query, ignoring limit and offset"
+                        },
+                        "page": {
+                          "type": "integer",
+                          "description": "1-indexed, derived from offset and limit"
+                        },
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "totalPages": {
+                          "type": "integer",
+                          "description": "At least 1, so an empty result reads as \"page 1 of 1\" rather than \"of 0\""
+                        }
+                      },
+                      "required": [
+                        "total",
+                        "page",
+                        "limit",
+                        "totalPages"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "paginate"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "limit beyond the cap, or a malformed offset"
+          },
+          "401": {
+            "description": "No valid identity"
+          }
+        }
+      }
+    },
+    "/api/species": {
+      "get": {
+        "operationId": "getApiSpecies",
+        "summary": "The guardian catalog, with owner counts per level",
+        "description": "Behind requireAdmin -- every method, GET included. `adminAuth` would have been no protection at all here, since it only gates POST/PUT/DELETE and this resource has none. GET-only on purpose: a species is half a row and half a set of artwork files keyed by `code`, so creating one through an API would only ever produce a row with no pictures.",
+        "tags": [
+          "species"
+        ],
+        "responses": {
+          "200": {
+            "description": "Every species, retired ones included, ordered by sortOrder then id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer"
+                      },
+                      "code": {
+                        "type": "string",
+                        "description": "What the frontend keys this species' artwork by"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "theme": {
+                        "type": "string",
+                        "description": "The egg's own label, which is not the category link below"
+                      },
+                      "cost": {
+                        "type": "integer",
+                        "description": "Points to redeem one"
+                      },
+                      "sortOrder": {
+                        "type": "integer"
+                      },
+                      "isActive": {
+                        "type": "boolean",
+                        "description": "Whether it is still on sale; owners of a retired one keep it"
+                      },
+                      "category": {
+                        "type": [
+                          "object",
+                          "null"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name"
+                        ],
+                        "description": "The donation category this species supports, or null for one tied to none. null is both what the planned VIP spirit is and what a seeded egg looks like when its category_id was forgotten -- indistinguishable from here, which is why the admin page says it out loud."
+                      },
+                      "ownersByLevel": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "type": "integer"
+                        },
+                        "description": "Owners keyed by the level they have grown to. An absent level has no owners; the caller decides which levels to show. Keys are strings because JSON object keys are."
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "code",
+                      "name",
+                      "theme",
+                      "cost",
+                      "sortOrder",
+                      "isActive",
+                      "category",
+                      "ownersByLevel"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid identity"
+          },
+          "403": {
+            "description": "Not an admin"
+          }
+        }
+      }
+    },
+    "/api/store/species": {
+      "get": {
+        "operationId": "getApiStoreSpecies",
+        "summary": "The species on sale, and which of them the caller owns",
+        "description": "Behind requireUser. Active species only, unlike the admin catalog at GET /api/species: a retired one still exists for whoever owns it, but it is not on sale.",
+        "tags": [
+          "store"
+        ],
+        "responses": {
+          "200": {
+            "description": "The shelf, and the balance to spend on it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "code": {
+                            "type": "string",
+                            "description": "What the frontend keys this species' artwork by"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "theme": {
+                            "type": "string"
+                          },
+                          "cost": {
+                            "type": "integer",
+                            "description": "Points to redeem one"
+                          },
+                          "owned": {
+                            "type": "boolean"
+                          },
+                          "level": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ],
+                            "description": "How far this species has been grown, or null when not owned. The collection view needs the level and not just `owned`: it shows progress per species and sorts the started ones first."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "code",
+                          "name",
+                          "theme",
+                          "cost",
+                          "owned",
+                          "level"
+                        ]
+                      }
+                    },
+                    "totalPoints": {
+                      "type": "integer",
+                      "description": "The caller's balance, so the shelf needs no second call"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "totalPoints"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid identity"
+          }
+        }
+      }
+    },
+    "/api/store/redeem": {
+      "post": {
+        "operationId": "postApiStoreRedeem",
+        "summary": "Redeem a species",
+        "description": "Behind requireUser. Spends `cost` points and hatches the egg at level 1. Only `totalPoints` is decremented, never `lifetimePoints`, so redeeming never costs leaderboard rank.",
+        "tags": [
+          "store"
+        ],
+        "responses": {
+          "200": {
+            "description": "The new spirit and the balance left",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "guardian": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer",
+                          "description": "The new user_guardian row, not the species"
+                        },
+                        "speciesId": {
+                          "type": "integer"
+                        },
+                        "level": {
+                          "type": "integer"
+                        },
+                        "xp": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "speciesId",
+                        "level",
+                        "xp"
+                      ]
+                    },
+                    "totalPoints": {
+                      "type": "integer",
+                      "description": "The balance after the cost was taken"
+                    }
+                  },
+                  "required": [
+                    "guardian",
+                    "totalPoints"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Already owned (ALREADY_OWNED) or not enough points (INSUFFICIENT_POINTS) -- the code in the body says which"
+          },
+          "401": {
+            "description": "No valid identity"
+          },
+          "404": {
+            "description": "No such species, or it is not on sale"
           }
         }
       }

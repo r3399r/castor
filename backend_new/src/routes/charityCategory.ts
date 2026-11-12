@@ -1,9 +1,10 @@
 import { zValidator } from '@hono/zod-validator';
 import { asc, count, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
+import { describeRoute, resolver } from 'hono-openapi';
 import { z } from 'zod';
 import { charityCategoryTable } from 'src/db/schema';
-import { DEFAULT_LIMIT, genPagination, MAX_LIMIT } from 'src/lib/paginator';
+import { DEFAULT_LIMIT, genPagination, MAX_LIMIT, paginationSchema } from 'src/lib/paginator';
 import { TransactionEnv } from 'src/middleware/transaction';
 
 /**
@@ -30,8 +31,54 @@ export const charityCategoryListQuerySchema = z.object({
   isActive: z.enum(['true', 'false']).optional(),
 });
 
+/**
+ * A public-interest category as this API reports it.
+ *
+ * A schema rather than a hand-written type: it is the single description
+ * of the response, the handler's return is checked against it, and the
+ * OpenAPI document is generated from it. See "The OpenAPI document" in
+ * AGENTS.md.
+ */
+export const charityCategoryRowSchema = z.object({
+  id: z.number().int(),
+  code: z
+    .string()
+    .describe('Stable identifier, and what ties a spirit species to this category'),
+  name: z.string(),
+  sortOrder: z.number().int().describe('Ascending, hand-assigned; ties are broken by id'),
+  isActive: z
+    .boolean()
+    .describe(
+      'Inactive categories stay listed -- past donations point at them and the public record keeps naming them. They drop out of the picker only.'
+    ),
+  createdAt: z.string().nullable().describe('ISO 8601'),
+  updatedAt: z.string().nullable().describe('ISO 8601'),
+});
+
+export const getCharityCategoryListResponseSchema = z.object({
+  data: z.array(charityCategoryRowSchema),
+  paginate: paginationSchema,
+});
+
+const listDoc = describeRoute({
+  summary: 'List the public-interest categories',
+  description:
+    'Open to anyone: these names are printed on the public transparency page. GET-only, and the group is mounted behind `adminAuth`, which gates POST/PUT/DELETE -- so on a resource with none it gates nothing. That is intended here, not an oversight; the rows are seeded by SQL because they are tied to the spirit species by `code`.',
+  tags: ['charity-category'],
+  responses: {
+    200: {
+      description: 'One page of categories, ordered by sortOrder then id',
+      content: {
+        'application/json': { schema: resolver(getCharityCategoryListResponseSchema) },
+      },
+    },
+    400: { description: 'limit beyond the cap, or an isActive that is not "true" or "false"' },
+  },
+});
+
 export const charityCategory = new Hono<TransactionEnv>().get(
   '/',
+  listDoc,
   zValidator('query', charityCategoryListQuerySchema),
   async (c) => {
     const { limit, offset, isActive } = c.req.valid('query');
@@ -67,10 +114,13 @@ export const charityCategory = new Hono<TransactionEnv>().get(
         name: row.name,
         sortOrder: row.sortOrder,
         isActive: row.isActive,
-        createdAt: row.createdAt,
-        updatedAt: row.updatedAt,
+        // Serialised here rather than left to c.json: the columns are
+        // Dates, every type in the repo calls these fields strings, and
+        // JSON.stringify happening to agree is not a contract.
+        createdAt: row.createdAt?.toISOString() ?? null,
+        updatedAt: row.updatedAt?.toISOString() ?? null,
       })),
       paginate: genPagination(total, limit, offset),
-    });
+    } satisfies z.infer<typeof getCharityCategoryListResponseSchema>);
   }
 );

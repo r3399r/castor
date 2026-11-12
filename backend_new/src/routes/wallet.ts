@@ -1,9 +1,10 @@
 import { zValidator } from '@hono/zod-validator';
 import { desc, eq, count } from 'drizzle-orm';
 import { Hono } from 'hono';
+import { describeRoute, resolver } from 'hono-openapi';
 import { z } from 'zod';
 import { pointTransactionTable } from 'src/db/schema';
-import { DEFAULT_LIMIT, genPagination, MAX_LIMIT } from 'src/lib/paginator';
+import { DEFAULT_LIMIT, genPagination, MAX_LIMIT, paginationSchema } from 'src/lib/paginator';
 import { UserEnv } from 'src/middleware/requireUser';
 
 export const walletListQuerySchema = z.object({
@@ -11,17 +12,54 @@ export const walletListQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).optional().default(0),
 });
 
-type PointTransactionDto = {
-  id: number;
-  type: string;
-  amount: number;
-  replyId: number | null;
-  balanceAfter: number;
-  createdAt: string | null;
-};
+/**
+ * One movement of points, as this API reports it.
+ *
+ * A schema rather than the hand-written DTO that used to sit here: it is
+ * the single description of the response, the handler's return is
+ * checked against it, and the OpenAPI document is generated from it.
+ * See "The OpenAPI document" in AGENTS.md.
+ */
+export const pointTransactionSchema = z.object({
+  id: z.number().int(),
+  type: z
+    .string()
+    .describe(
+      'EARN_REPLY, SPEND_EGG_REDEEM and the rest -- a varchar rather than an enum, so a new kind of movement needs no schema change'
+    ),
+  amount: z.number().int().describe('Signed: negative is a spend'),
+  replyId: z
+    .number()
+    .int()
+    .nullable()
+    .describe('The reply this came from, for anything earned by answering'),
+  balanceAfter: z.number().int().describe('The running balance once this had been applied'),
+  createdAt: z.string().nullable().describe('ISO 8601'),
+});
+
+export const getWalletResponseSchema = z.object({
+  data: z.array(pointTransactionSchema),
+  paginate: paginationSchema,
+});
+
+const listDoc = describeRoute({
+  summary: "The caller's point history",
+  description:
+    "Behind requireUser, and scoped to the caller: there is no way to read anyone else's. Newest first, ordered by id rather than createdAt -- a POST /reply batch writes several rows sharing one timestamp, so id is the only column that keeps their order.",
+  tags: ['wallet'],
+  responses: {
+    200: {
+      description: 'One page of movements, newest first',
+      content: { 'application/json': { schema: resolver(getWalletResponseSchema) } },
+    },
+    400: { description: 'limit beyond the cap, or a malformed offset' },
+    401: { description: 'No valid identity' },
+  },
+});
 
 export const wallet = new Hono<UserEnv>().get(
   '/',
+  listDoc,
   zValidator('query', walletListQuerySchema),
   async (c) => {
     const { limit, offset } = c.req.valid('query');
@@ -45,7 +83,7 @@ export const wallet = new Hono<UserEnv>().get(
       .limit(limit)
       .offset(offset);
 
-    const data: PointTransactionDto[] = rows.map((row) => ({
+    const data: z.infer<typeof pointTransactionSchema>[] = rows.map((row) => ({
       id: row.id,
       type: row.type,
       amount: row.amount,
@@ -54,6 +92,9 @@ export const wallet = new Hono<UserEnv>().get(
       createdAt: row.createdAt?.toISOString() ?? null,
     }));
 
-    return c.json({ data, paginate: genPagination(total, limit, offset) });
+    return c.json({
+      data,
+      paginate: genPagination(total, limit, offset),
+    } satisfies z.infer<typeof getWalletResponseSchema>);
   }
 );

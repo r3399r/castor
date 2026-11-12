@@ -2,6 +2,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { app } from 'src/app';
 import { closeDb, getDb } from 'src/db/client';
 import { charityCategoryTable } from 'src/db/schema';
+import { getCharityCategoryListResponseSchema } from 'src/routes/charityCategory';
 
 // No firebaseAdmin mock: this route is read-only and its reads are
 // deliberately open, so mocking the verifier would hide it if that ever
@@ -102,5 +103,33 @@ describe('charity category routes', () => {
 
   it('rejects a limit above the maximum', async () => {
     expect((await getCategories('?limit=99999')).status).toBe(400);
+  });
+
+  /**
+   * What the OpenAPI document promises, against what is sent.
+   *
+   * The key checks are separate from the parse because zod strips
+   * unknown keys instead of rejecting them, and the handler's
+   * `satisfies` does not catch an extra one either: a row with
+   * properties the schema does not mention is still assignable to it.
+   */
+  it('sends exactly what the OpenAPI document describes', async () => {
+    await seedCategory({ name: '兒少、家庭與婦幼' });
+
+    const body: unknown = await (await getCategories()).json();
+
+    const parsed = getCharityCategoryListResponseSchema.safeParse(body);
+    expect(parsed.error?.issues ?? []).toEqual([]);
+    expect(parsed.success).toBe(true);
+    expect(Object.keys(body as object).sort()).toEqual(['data', 'paginate']);
+    expect(Object.keys((body as { data: object[] }).data[0]).sort()).toEqual([
+      'code',
+      'createdAt',
+      'id',
+      'isActive',
+      'name',
+      'sortOrder',
+      'updatedAt',
+    ]);
   });
 });
