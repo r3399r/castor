@@ -23,6 +23,39 @@ jobs:
         with:
           node-version: '22.21.1'
 
+      # Everything from here to the deploy needs no AWS credentials and no
+      # database, and it all runs before them on purpose: a release should
+      # stop before it starts rather than halfway through.
+      #
+      # deploy.sh runs `npm install` itself, so this is that install moved
+      # earlier rather than a second one.
+      - name: Install dependencies
+        run: npm install
+
+      # Nine seconds, no database and no secrets: backend_new/test is pure
+      # logic plus the compile-time contract tests, and regression/setup.ts
+      # loading a .env.local that does not exist here is a no-op.
+      #
+      # The 788 regression tests are deliberately not here. They need a
+      # MySQL service container and a schema to be loaded into it, which is
+      # its own change -- so what this gate proves is narrower than "the
+      # tests pass".
+      - name: Run the unit tests
+        run: npm run test:unit -w backend_new
+
+      # The generated API document, regenerated here and compared with the
+      # committed one. It is what clients are typed from, so a stale one
+      # is a wrong type that compiles -- which is exactly what the
+      # hand-written types in packages/shared turned out to be, and
+      # nothing else in this pipeline would notice.
+      - name: Check the OpenAPI document matches the routes
+        run: |
+          npm run openapi -w backend_new
+          if ! git diff --exit-code -- backend_new/openapi.json; then
+            echo "::error file=backend_new/openapi.json::Out of date. Run 'npm run openapi' in backend_new and commit the result."
+            exit 1
+          fi
+
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:

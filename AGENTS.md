@@ -347,7 +347,9 @@ The two guards catch different things: `satisfies` catches a handler returning s
 
 **Requests are not in the document yet** — only responses. Query parameters and request bodies are validated by `@hono/zod-validator`, which `hono-openapi` cannot see: documenting them means moving all 65 `zValidator` call sites onto `hono-openapi`'s own `validator`, and that also changes the 400 body an invalid request gets. Worth doing, but as its own change rather than inside a route-group migration.
 
-Still to do: a CI check that regenerating the document produces no diff. Without it, the generated file rots exactly like the hand-written types it replaces.
+**CI regenerates it and fails on a diff** (`dev.yml` and `prod.yml`, the step before the AWS credentials are configured). Without that, the generated file would rot exactly like the hand-written types it replaces -- a stale document is a wrong type that compiles. The step needs no secrets and no database: `getDb()` is lazy, so importing the app composes the routes without connecting, and `deploy.sh` runs its own `npm install` afterwards, so the install is moved earlier rather than duplicated.
+
+It gates the deploy because it is in the same job, ahead of `sh deploy.sh`, alongside `npm run test:unit -w backend_new` — 214 tests in nine seconds, needing no database and no secrets. **The 788 regression tests do not run in CI**: they need a MySQL service container with the schema loaded, which is its own change. So a release is blocked by a type error (`pre:deploy` runs `typecheck`, which is also what enforces the `*.contract.test.ts` assertions), by a failing unit test, and by a stale document — and by nothing else. Anything that only the regression suite covers reaches production unchecked.
 
 ## Testing
 
