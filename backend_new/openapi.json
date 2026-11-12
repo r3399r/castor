@@ -5764,6 +5764,1430 @@
         }
       }
     },
+    "/api/question": {
+      "get": {
+        "operationId": "getApiQuestion",
+        "summary": "List questions for the admin catalogue",
+        "description": "Reads in this group need no credentials: `adminAuth` gates POST/PUT/DELETE only. Top-level questions only -- a 題組's children have no meaning without their parent, and `childCount` is how the admin sees there is more to one than its stem. Paginated and filterable by category, subject, exam, concept or tag.",
+        "tags": [
+          "question"
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of questions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "subjectId": {
+                            "type": "integer"
+                          },
+                          "subject": {
+                            "type": "string",
+                            "description": "The subject's name"
+                          },
+                          "type": {
+                            "type": "string",
+                            "description": "GROUP, SINGLE, MULTIPLE, TRUE_FALSE, FILL or CLOZE. Every write validates against those six; the column is a varchar, so a reader should not assume it"
+                          },
+                          "content": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "options": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "answer": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "difficulty": {
+                            "type": "integer"
+                          },
+                          "isGroup": {
+                            "type": "boolean"
+                          },
+                          "enabled": {
+                            "type": "boolean"
+                          },
+                          "childCount": {
+                            "type": "integer",
+                            "description": "Sub-questions under this one -- how the admin sees a 題組 holds more than its stem"
+                          },
+                          "categories": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "The subject's category names. An array because subject-to-category is many-to-many, and empty for a subject filed under none"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "subjectId",
+                          "subject",
+                          "type",
+                          "content",
+                          "options",
+                          "answer",
+                          "difficulty",
+                          "isGroup",
+                          "enabled",
+                          "childCount",
+                          "categories"
+                        ]
+                      }
+                    },
+                    "paginate": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer",
+                          "description": "Rows matching the query, ignoring limit and offset"
+                        },
+                        "page": {
+                          "type": "integer",
+                          "description": "1-indexed, derived from offset and limit"
+                        },
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "totalPages": {
+                          "type": "integer",
+                          "description": "At least 1, so an empty result reads as \"page 1 of 1\" rather than \"of 0\""
+                        }
+                      },
+                      "required": [
+                        "total",
+                        "page",
+                        "limit",
+                        "totalPages"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "paginate"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "limit beyond the cap, or a malformed sort, order or filter"
+          }
+        }
+      },
+      "post": {
+        "operationId": "postApiQuestion",
+        "summary": "Create a batch of questions",
+        "description": "Admin only. One batch shares a subject and an exam, and commits or fails as a whole -- this route runs inside the transaction middleware, so a rejection on question N rolls back 0..N-1. Questions are created **disabled**: enabling them is PUT /{id}/enabled.",
+        "tags": [
+          "question"
+        ],
+        "responses": {
+          "201": {
+            "description": "One array per submitted question, each with its children after it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer"
+                        },
+                        "uuid": {
+                          "type": "string"
+                        },
+                        "subjectId": {
+                          "type": "integer"
+                        },
+                        "parentId": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        },
+                        "fbPostId": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "Only ever set on a top-level question -- a child reads its parent"
+                        },
+                        "isGroup": {
+                          "type": "boolean"
+                        },
+                        "enabled": {
+                          "type": "boolean",
+                          "description": "The admin review gate. Only enabled questions are ever served by GET /adaptive, so anything the practice UI sees has this true; the admin list shows both"
+                        },
+                        "type": {
+                          "type": "string",
+                          "description": "GROUP, SINGLE, MULTIPLE, TRUE_FALSE, FILL or CLOZE. Every write validates against those six; the column is a varchar, so a reader should not assume it"
+                        },
+                        "sortOrder": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        },
+                        "content": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "options": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "answer": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "difficulty": {
+                          "type": "integer",
+                          "description": "1-10, as authored"
+                        },
+                        "attempCount": {
+                          "type": "integer",
+                          "description": "Misspelled to match the column. How many times this was practised"
+                        },
+                        "scoringTotal": {
+                          "type": "integer"
+                        },
+                        "adjustedDifficulty": {
+                          "type": "number"
+                        },
+                        "createdAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "ISO 8601"
+                        },
+                        "updatedAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "ISO 8601"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "uuid",
+                        "subjectId",
+                        "parentId",
+                        "fbPostId",
+                        "isGroup",
+                        "enabled",
+                        "type",
+                        "sortOrder",
+                        "content",
+                        "options",
+                        "answer",
+                        "difficulty",
+                        "attempCount",
+                        "scoringTotal",
+                        "adjustedDifficulty",
+                        "createdAt",
+                        "updatedAt"
+                      ]
+                    }
+                  },
+                  "description": "One array per submitted question, each holding the question itself followed by its children. Nested, not flat: a 題組 and its sub-questions are one submission"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A malformed body, an img-placeholder left in the content, CLOZE blanks that do not match the answer, an exam not linked to the subject, or a tag or concept belonging to another subject"
+          },
+          "401": {
+            "description": "No valid identity"
+          },
+          "403": {
+            "description": "Not an admin"
+          },
+          "404": {
+            "description": "No such subject"
+          }
+        }
+      }
+    },
+    "/api/question/count": {
+      "get": {
+        "operationId": "getApiQuestionCount",
+        "summary": "How many questions match a filter",
+        "description": "Reads in this group need no credentials: `adminAuth` gates POST/PUT/DELETE only. What the practice page shows as \"questions available\", so it counts only what GET /adaptive would actually serve: enabled, top-level, and a 題組 once.",
+        "tags": [
+          "question"
+        ],
+        "responses": {
+          "200": {
+            "description": "The count",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "total": {
+                      "type": "integer",
+                      "description": "Servable top-level questions matching the filters: enabled only, and a 題組 counts once. The same definition GET /api/info/stats uses"
+                    }
+                  },
+                  "required": [
+                    "total"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "subjectId missing, or a malformed id list"
+          }
+        }
+      }
+    },
+    "/api/question/adaptive": {
+      "get": {
+        "operationId": "getApiQuestionAdaptive",
+        "summary": "Questions to practise next",
+        "description": "Behind requireUser, on top of the group's adminAuth. Chooses by the caller's per-concept mastery, avoids what they have just seen, and marks each one pending so a second fetch before the answer lands does not hand out different work. **Every answer comes back masked** -- bullets of the same length -- because the caller has not answered yet; the history and review endpoints send the real key, this one must not.",
+        "tags": [
+          "question"
+        ],
+        "responses": {
+          "200": {
+            "description": "Up to `count` questions, answers masked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer"
+                      },
+                      "uuid": {
+                        "type": "string"
+                      },
+                      "subjectId": {
+                        "type": "integer"
+                      },
+                      "parentId": {
+                        "type": [
+                          "integer",
+                          "null"
+                        ]
+                      },
+                      "fbPostId": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "description": "The Facebook post this was published as, which is what the 討論區 link is built from. Only ever set on a top-level question: facebookPoster renders a group and its children into one image and writes the id back to the parent, so a child reads its parent"
+                      },
+                      "isGroup": {
+                        "type": "boolean"
+                      },
+                      "type": {
+                        "type": "string",
+                        "description": "GROUP, SINGLE, MULTIPLE, TRUE_FALSE, FILL or CLOZE. Every write validates against those six; the column is a varchar, so a reader should not assume it"
+                      },
+                      "sortOrder": {
+                        "type": [
+                          "integer",
+                          "null"
+                        ]
+                      },
+                      "content": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "options": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "answer": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "description": "The answer key. Present on every read of this shape -- see AGENTS.md"
+                      },
+                      "difficulty": {
+                        "type": "integer",
+                        "description": "1-10, as authored"
+                      },
+                      "adjustedDifficulty": {
+                        "type": "number",
+                        "description": "Moves with how people actually score; a group averages its children"
+                      },
+                      "exam": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "integer"
+                            },
+                            "name": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name"
+                          ]
+                        }
+                      },
+                      "tag": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "integer"
+                            },
+                            "name": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name"
+                          ]
+                        }
+                      },
+                      "concept": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "integer"
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "conceptGroup": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "integer"
+                                },
+                                "name": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "name"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name",
+                            "conceptGroup"
+                          ]
+                        }
+                      },
+                      "children": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "integer"
+                            },
+                            "type": {
+                              "type": "string",
+                              "description": "GROUP, SINGLE, MULTIPLE, TRUE_FALSE, FILL or CLOZE. Every write validates against those six; the column is a varchar, so a reader should not assume it"
+                            },
+                            "sortOrder": {
+                              "type": [
+                                "integer",
+                                "null"
+                              ]
+                            },
+                            "content": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "options": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "answer": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "difficulty": {
+                              "type": "integer"
+                            },
+                            "adjustedDifficulty": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "type",
+                            "sortOrder",
+                            "content",
+                            "options",
+                            "answer",
+                            "difficulty",
+                            "adjustedDifficulty"
+                          ]
+                        },
+                        "description": "Empty unless this is a 題組; the children of one carry the questions"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "uuid",
+                      "subjectId",
+                      "parentId",
+                      "fbPostId",
+                      "isGroup",
+                      "type",
+                      "sortOrder",
+                      "content",
+                      "options",
+                      "answer",
+                      "difficulty",
+                      "adjustedDifficulty",
+                      "exam",
+                      "tag",
+                      "concept",
+                      "children"
+                    ]
+                  },
+                  "description": "The chosen questions, **with every answer masked**: each is replaced by bullets of the same length, so a client can still tell whether to render an answer input and how many blanks a FILL question has, without being handed the key"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "subjectId missing, a malformed id list, or a count beyond 50"
+          },
+          "401": {
+            "description": "No valid identity"
+          }
+        }
+      }
+    },
+    "/api/question/{id}": {
+      "get": {
+        "operationId": "getApiQuestionById",
+        "summary": "Read one question, with its links and sub-questions",
+        "description": "Reads in this group need no credentials: `adminAuth` gates POST/PUT/DELETE only. The answer key is in this response -- see AGENTS.md, where that is recorded as a known, accepted consequence of the reads here being open.",
+        "tags": [
+          "question"
+        ],
+        "responses": {
+          "200": {
+            "description": "The question, its exam, tag and concept ids, and its children",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "uuid": {
+                      "type": "string"
+                    },
+                    "subjectId": {
+                      "type": "integer"
+                    },
+                    "parentId": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "fbPostId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Only ever set on a top-level question -- a child reads its parent"
+                    },
+                    "isGroup": {
+                      "type": "boolean"
+                    },
+                    "enabled": {
+                      "type": "boolean",
+                      "description": "The admin review gate. Only enabled questions are ever served by GET /adaptive, so anything the practice UI sees has this true; the admin list shows both"
+                    },
+                    "type": {
+                      "type": "string",
+                      "description": "GROUP, SINGLE, MULTIPLE, TRUE_FALSE, FILL or CLOZE. Every write validates against those six; the column is a varchar, so a reader should not assume it"
+                    },
+                    "sortOrder": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "content": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "options": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "answer": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "difficulty": {
+                      "type": "integer",
+                      "description": "1-10, as authored"
+                    },
+                    "attempCount": {
+                      "type": "integer",
+                      "description": "Misspelled to match the column. How many times this was practised"
+                    },
+                    "scoringTotal": {
+                      "type": "integer"
+                    },
+                    "adjustedDifficulty": {
+                      "type": "number"
+                    },
+                    "createdAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601"
+                    },
+                    "updatedAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601"
+                    },
+                    "examId": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "description": "A question only ever has one exam in practice, despite the M:N schema"
+                    },
+                    "tagIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "integer"
+                      }
+                    },
+                    "conceptIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "integer"
+                      }
+                    },
+                    "children": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "type": {
+                            "type": "string",
+                            "description": "GROUP, SINGLE, MULTIPLE, TRUE_FALSE, FILL or CLOZE. Every write validates against those six; the column is a varchar, so a reader should not assume it"
+                          },
+                          "sortOrder": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ]
+                          },
+                          "content": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "options": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "answer": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "difficulty": {
+                            "type": "integer"
+                          },
+                          "adjustedDifficulty": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "type",
+                          "sortOrder",
+                          "content",
+                          "options",
+                          "answer",
+                          "difficulty",
+                          "adjustedDifficulty"
+                        ]
+                      },
+                      "description": "A 題組's sub-questions, so an admin preview shows what a user is actually given. Empty for a standalone question; children carry no exam, tag or concept links of their own"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "uuid",
+                    "subjectId",
+                    "parentId",
+                    "fbPostId",
+                    "isGroup",
+                    "enabled",
+                    "type",
+                    "sortOrder",
+                    "content",
+                    "options",
+                    "answer",
+                    "difficulty",
+                    "attempCount",
+                    "scoringTotal",
+                    "adjustedDifficulty",
+                    "createdAt",
+                    "updatedAt",
+                    "examId",
+                    "tagIds",
+                    "conceptIds",
+                    "children"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such question"
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ]
+      },
+      "put": {
+        "operationId": "putApiQuestionById",
+        "summary": "Update one question",
+        "description": "Admin only. Scalar fields plus the exam. `subjectId` is deliberately not editable: tag and concept links are validated against it, and changing it would orphan them silently. Those links have their own endpoints, and so does `enabled`.",
+        "tags": [
+          "question"
+        ],
+        "responses": {
+          "200": {
+            "description": "The question as saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "uuid": {
+                      "type": "string"
+                    },
+                    "subjectId": {
+                      "type": "integer"
+                    },
+                    "parentId": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "fbPostId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Only ever set on a top-level question -- a child reads its parent"
+                    },
+                    "isGroup": {
+                      "type": "boolean"
+                    },
+                    "enabled": {
+                      "type": "boolean",
+                      "description": "The admin review gate. Only enabled questions are ever served by GET /adaptive, so anything the practice UI sees has this true; the admin list shows both"
+                    },
+                    "type": {
+                      "type": "string",
+                      "description": "GROUP, SINGLE, MULTIPLE, TRUE_FALSE, FILL or CLOZE. Every write validates against those six; the column is a varchar, so a reader should not assume it"
+                    },
+                    "sortOrder": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "content": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "options": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "answer": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "difficulty": {
+                      "type": "integer",
+                      "description": "1-10, as authored"
+                    },
+                    "attempCount": {
+                      "type": "integer",
+                      "description": "Misspelled to match the column. How many times this was practised"
+                    },
+                    "scoringTotal": {
+                      "type": "integer"
+                    },
+                    "adjustedDifficulty": {
+                      "type": "number"
+                    },
+                    "createdAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601"
+                    },
+                    "updatedAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "ISO 8601"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "uuid",
+                    "subjectId",
+                    "parentId",
+                    "fbPostId",
+                    "isGroup",
+                    "enabled",
+                    "type",
+                    "sortOrder",
+                    "content",
+                    "options",
+                    "answer",
+                    "difficulty",
+                    "attempCount",
+                    "scoringTotal",
+                    "adjustedDifficulty",
+                    "createdAt",
+                    "updatedAt"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A malformed body, an img-placeholder left in the content, CLOZE blanks that do not match the answer, or an exam not linked to the subject"
+          },
+          "401": {
+            "description": "No valid identity"
+          },
+          "403": {
+            "description": "Not an admin"
+          },
+          "404": {
+            "description": "No such question"
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "deleteApiQuestionById",
+        "summary": "Delete one question",
+        "description": "Admin only. A 題組's children, and every link row pointing at it, go with it.",
+        "tags": [
+          "question"
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "401": {
+            "description": "No valid identity"
+          },
+          "403": {
+            "description": "Not an admin"
+          },
+          "404": {
+            "description": "No such question"
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ]
+      }
+    },
+    "/api/question/image/figure": {
+      "post": {
+        "operationId": "postApiQuestionImageFigure",
+        "summary": "Store one figure cropped out of a paper",
+        "description": "Admin only. Returns the URL to put in the question's HTML in place of an img-placeholder-N. Nothing is written to the database, so a figure uploaded for a question that is then abandoned is an orphaned object rather than a broken row.",
+        "tags": [
+          "question"
+        ],
+        "responses": {
+          "200": {
+            "description": "The stored URL",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "url": {
+                      "type": "string",
+                      "description": "The stored figure's URL, to drop into the question's HTML in place of an img-placeholder-N. Nothing is written to the database: the URL only becomes part of a question when the reviewed JSON is POSTed to /api/question"
+                    }
+                  },
+                  "required": [
+                    "url"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "An unsupported mimeType, or data that is not base64 or is oversize"
+          },
+          "401": {
+            "description": "No valid identity"
+          },
+          "403": {
+            "description": "Not an admin"
+          }
+        }
+      }
+    },
+    "/api/question/image/prompt": {
+      "get": {
+        "operationId": "getApiQuestionImagePrompt",
+        "summary": "The prompt POST /image would have sent",
+        "description": "Behind requireAdmin -- every method, not the group's adminAuth, which would let this GET through: it returns the subject's whole concept list and the full instruction text. A manual escape hatch for when the model quota is gone: paste both halves into a chat GUI with the screenshot, and the JSON that comes back drops into the same preview box the automatic path fills.",
+        "tags": [
+          "question"
+        ],
+        "responses": {
+          "200": {
+            "description": "The two halves of the prompt, unjoined",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "subjectId": {
+                      "type": "integer"
+                    },
+                    "subjectName": {
+                      "type": "string"
+                    },
+                    "imageCount": {
+                      "type": "integer"
+                    },
+                    "systemInstruction": {
+                      "type": "string"
+                    },
+                    "userPrompt": {
+                      "type": "string",
+                      "description": "Returned as two parts rather than pre-joined: a GUI with its own system-instruction field reproduces the automatic path exactly when each half goes in its own box"
+                    }
+                  },
+                  "required": [
+                    "subjectId",
+                    "subjectName",
+                    "imageCount",
+                    "systemInstruction",
+                    "userPrompt"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "subjectId missing, or an imageCount out of range"
+          },
+          "401": {
+            "description": "No valid identity"
+          },
+          "403": {
+            "description": "Not an admin"
+          },
+          "404": {
+            "description": "No such subject, or it has no concepts to assign questions to"
+          }
+        }
+      }
+    },
+    "/api/question/image": {
+      "post": {
+        "operationId": "postApiQuestionImage",
+        "summary": "Draft questions from a screenshot",
+        "description": "Admin only, and **nothing is written** -- which is why it answers 200 with no ids: the same screenshot can be re-run as many times as it takes to get a usable draft, and a human reviews and edits the result before POSTing it to /api/question. Still an array, because a 題組 plus its children is one element.",
+        "tags": [
+          "question"
+        ],
+        "responses": {
+          "200": {
+            "description": "The draft, shaped for POST /api/question",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "subjectId": {
+                      "type": "integer"
+                    },
+                    "questions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string"
+                          },
+                          "content": {
+                            "type": "string"
+                          },
+                          "options": {
+                            "type": "string"
+                          },
+                          "answer": {
+                            "type": "string"
+                          },
+                          "difficulty": {
+                            "type": "integer"
+                          },
+                          "conceptIds": {
+                            "type": "array",
+                            "items": {
+                              "type": "integer"
+                            },
+                            "description": "Ids the model invented are dropped, not rejected -- the admin re-picks anyway"
+                          },
+                          "childQuestions": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "type": {
+                                  "type": "string"
+                                },
+                                "sortOrder": {
+                                  "type": "integer"
+                                },
+                                "content": {
+                                  "type": "string"
+                                },
+                                "options": {
+                                  "type": "string"
+                                },
+                                "answer": {
+                                  "type": "string"
+                                },
+                                "difficulty": {
+                                  "type": "integer"
+                                }
+                              },
+                              "required": [
+                                "type",
+                                "sortOrder",
+                                "content",
+                                "options",
+                                "answer",
+                                "difficulty"
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "type",
+                          "content",
+                          "difficulty",
+                          "conceptIds"
+                        ]
+                      },
+                      "description": "A draft for a human to review and edit, shaped to drop straight into POST /api/question's `questions` field. Nothing is written, which is why this is a 200 with no ids"
+                    }
+                  },
+                  "required": [
+                    "subjectId",
+                    "questions"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No images, or one that is not base64 or is oversize"
+          },
+          "401": {
+            "description": "No valid identity"
+          },
+          "403": {
+            "description": "Not an admin"
+          },
+          "404": {
+            "description": "No such subject, or it has no concepts to assign questions to"
+          },
+          "502": {
+            "description": "The model answered with something that is not JSON (AI_INVALID_JSON) or does not match the expected question shape (AI_INVALID_SHAPE)"
+          }
+        }
+      }
+    },
+    "/api/question/{id}/tag": {
+      "get": {
+        "operationId": "getApiQuestionByIdTag",
+        "summary": "One question's tags",
+        "description": "Reads in this group need no credentials: `adminAuth` gates POST/PUT/DELETE only. Ids alone: the names come from GET /api/tag.",
+        "tags": [
+          "question"
+        ],
+        "responses": {
+          "200": {
+            "description": "The tag ids",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "tagIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "integer"
+                      }
+                    }
+                  },
+                  "required": [
+                    "tagIds"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such question"
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ]
+      },
+      "put": {
+        "operationId": "putApiQuestionByIdTag",
+        "summary": "Replace one question's tags",
+        "description": "Admin only. A full-set replace, and every tag has to belong to the question own subject.",
+        "tags": [
+          "question"
+        ],
+        "responses": {
+          "200": {
+            "description": "The tag ids as saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "tagIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "integer"
+                      }
+                    }
+                  },
+                  "required": [
+                    "tagIds"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A malformed body, or a tag belonging to another subject"
+          },
+          "401": {
+            "description": "No valid identity"
+          },
+          "403": {
+            "description": "Not an admin"
+          },
+          "404": {
+            "description": "No such question"
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ]
+      }
+    },
+    "/api/question/{id}/enabled": {
+      "put": {
+        "operationId": "putApiQuestionByIdEnabled",
+        "summary": "Enable or disable one question",
+        "description": "Admin only. Its own endpoint rather than a field on PUT /{id}, because the admin list toggles this on a row without having the rest of the question loaded to send back.",
+        "tags": [
+          "question"
+        ],
+        "responses": {
+          "200": {
+            "description": "The id and its new state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "enabled": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "enabled"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "enabled missing or not a boolean"
+          },
+          "401": {
+            "description": "No valid identity"
+          },
+          "403": {
+            "description": "Not an admin"
+          },
+          "404": {
+            "description": "No such question"
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ]
+      }
+    },
+    "/api/question/{id}/concept": {
+      "get": {
+        "operationId": "getApiQuestionByIdConcept",
+        "summary": "One question's concepts",
+        "description": "Reads in this group need no credentials: `adminAuth` gates POST/PUT/DELETE only. Ids alone: the names come from GET /api/concept.",
+        "tags": [
+          "question"
+        ],
+        "responses": {
+          "200": {
+            "description": "The concept ids",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "conceptIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "integer"
+                      }
+                    }
+                  },
+                  "required": [
+                    "conceptIds"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such question"
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ]
+      },
+      "put": {
+        "operationId": "putApiQuestionByIdConcept",
+        "summary": "Replace one question's concepts",
+        "description": "Admin only. A full-set replace, at least one id, and every concept has to belong to the question own subject. Each concept's `numberOfQuestions` is adjusted as links are added and removed.",
+        "tags": [
+          "question"
+        ],
+        "responses": {
+          "200": {
+            "description": "The concept ids as saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "conceptIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "integer"
+                      }
+                    }
+                  },
+                  "required": [
+                    "conceptIds"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "An empty list, or a concept belonging to another subject"
+          },
+          "401": {
+            "description": "No valid identity"
+          },
+          "403": {
+            "description": "Not an admin"
+          },
+          "404": {
+            "description": "No such question"
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ]
+      }
+    },
     "/api/reply": {
       "post": {
         "operationId": "postApiReply",

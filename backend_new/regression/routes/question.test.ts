@@ -83,6 +83,18 @@ const postQuestions = (body: unknown) =>
     body: JSON.stringify(body),
   });
 
+import {
+  getQuestionAdaptiveResponseSchema,
+  getQuestionByIdResponseSchema,
+  getQuestionCountResponseSchema,
+  getQuestionListResponseSchema,
+  postQuestionResponseSchema,
+  putQuestionEnabledResponseSchema,
+  questionConceptResponseSchema,
+  questionRowSchema,
+  questionTagResponseSchema,
+} from 'src/routes/question';
+
 const getQuestionList = (query = '') => app.request(`/api/question${query}`);
 
 const getQuestionCount = (query: string) => app.request(`/api/question/count${query}`);
@@ -2365,6 +2377,184 @@ describe('question routes', () => {
         images: [{ mimeType: 'image/png', data: PNG_BASE64 }],
       });
       expect(res.status).toBe(401);
+    });
+  });
+
+  /**
+   * What the OpenAPI document promises, against what is sent.
+   *
+   * The key checks carry the weight here. `question` has a
+   * `duration_median_ms` column -- the per-question median reply time
+   * the points time-weight reads -- and three of these handlers used to
+   * send it, because they returned the row. `satisfies` alone would not
+   * have caught that: excess-property checking does not reach a
+   * property arriving through a spread, and never reaches a bare
+   * variable. These assertions do.
+   */
+  describe('the OpenAPI document', () => {
+    const rowKeys = [
+      'adjustedDifficulty',
+      'answer',
+      'attempCount',
+      'content',
+      'createdAt',
+      'difficulty',
+      'enabled',
+      'fbPostId',
+      'id',
+      'isGroup',
+      'options',
+      'parentId',
+      'scoringTotal',
+      'sortOrder',
+      'subjectId',
+      'type',
+      'updatedAt',
+      'uuid',
+    ];
+
+    it('describes exactly what creating, reading and updating send', async () => {
+      const { subjectId, examId, conceptId } = await seedFixture();
+
+      const created: unknown = await (
+        await postQuestions({
+          subjectId,
+          examId,
+          questions: [
+            {
+              type: 'SINGLE',
+              content: 'documented',
+              options: 'A|B',
+              answer: 'A',
+              difficulty: 5,
+              conceptIds: [conceptId],
+            },
+          ],
+        })
+      ).json();
+
+      expect(postQuestionResponseSchema.safeParse(created).error?.issues ?? []).toEqual([]);
+      // Nested: one array per submitted question, holding the question
+      // and then its children. PostQuestionResponse says Question[].
+      const rows = (created as object[][])[0];
+      expect(Object.keys(rows[0]).sort()).toEqual(rowKeys);
+      const id = (rows[0] as { id: number }).id;
+
+      const one: unknown = await (await getQuestion(id)).json();
+      expect(getQuestionByIdResponseSchema.safeParse(one).error?.issues ?? []).toEqual([]);
+      expect(Object.keys(one as object).sort()).toEqual(
+        [...rowKeys, 'examId', 'tagIds', 'conceptIds', 'children'].sort()
+      );
+
+      const updated: unknown = await (
+        await putQuestion(id, {
+          type: 'SINGLE',
+          content: 'documented still',
+          options: 'A|B',
+          answer: 'A',
+          difficulty: 6,
+          examId,
+        })
+      ).json();
+      expect(questionRowSchema.safeParse(updated).error?.issues ?? []).toEqual([]);
+      expect(Object.keys(updated as object).sort()).toEqual(rowKeys);
+
+      const list: unknown = await (await getQuestionList()).json();
+      expect(getQuestionListResponseSchema.safeParse(list).error?.issues ?? []).toEqual([]);
+      expect(Object.keys(list as object).sort()).toEqual(['data', 'paginate']);
+      // Twelve fields, and `subject` is a name rather than the object
+      // packages/shared declares on Question.
+      expect(Object.keys((list as { data: object[] }).data[0]).sort()).toEqual([
+        'answer',
+        'categories',
+        'childCount',
+        'content',
+        'difficulty',
+        'enabled',
+        'id',
+        'isGroup',
+        'options',
+        'subject',
+        'subjectId',
+        'type',
+      ]);
+      expect((list as { data: { subject: unknown }[] }).data[0].subject).toEqual(
+        expect.any(String)
+      );
+
+      const count: unknown = await (await getQuestionCount(`?subjectId=${subjectId}`)).json();
+      expect(getQuestionCountResponseSchema.safeParse(count).error?.issues ?? []).toEqual([]);
+      expect(Object.keys(count as object).sort()).toEqual(['total']);
+    });
+
+    it('describes exactly what the link and enabled writes send', async () => {
+      const { subjectId, examId, tagId, conceptId } = await seedFixture();
+      const question = await createQuestion(subjectId, examId, { conceptIds: [conceptId] });
+
+      const tags: unknown = await (await putQuestionTag(question.id, { tagIds: [tagId] })).json();
+      expect(questionTagResponseSchema.safeParse(tags).error?.issues ?? []).toEqual([]);
+      expect(Object.keys(tags as object).sort()).toEqual(['tagIds']);
+      expect(
+        questionTagResponseSchema.safeParse(await (await getQuestionTag(question.id)).json()).error
+          ?.issues ?? []
+      ).toEqual([]);
+
+      const concepts: unknown = await (
+        await putQuestionConcept(question.id, { conceptIds: [conceptId] })
+      ).json();
+      expect(questionConceptResponseSchema.safeParse(concepts).error?.issues ?? []).toEqual([]);
+      expect(Object.keys(concepts as object).sort()).toEqual(['conceptIds']);
+      expect(
+        questionConceptResponseSchema.safeParse(
+          await (await getQuestionConcept(question.id)).json()
+        ).error?.issues ?? []
+      ).toEqual([]);
+
+      const enabled: unknown = await (
+        await putQuestionEnabled(question.id, { enabled: false })
+      ).json();
+      expect(putQuestionEnabledResponseSchema.safeParse(enabled).error?.issues ?? []).toEqual([]);
+      expect(Object.keys(enabled as object).sort()).toEqual(['enabled', 'id']);
+    });
+
+    it('describes exactly what the adaptive selection sends, answers masked', async () => {
+      const { subjectId, examId, conceptId } = await seedFixture();
+      await createQuestion(subjectId, examId, { conceptIds: [conceptId], answer: 'A' });
+      await seedUser();
+      vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+
+      const body: unknown = await (await getAdaptive(`?subjectId=${subjectId}`)).json();
+
+      const parsed = getQuestionAdaptiveResponseSchema.safeParse(body);
+      expect(parsed.error?.issues ?? []).toEqual([]);
+      expect(parsed.success).toBe(true);
+      const [question] = body as { answer: string; children: object[] }[];
+      expect(Object.keys(question).sort()).toEqual([
+        'adjustedDifficulty',
+        'answer',
+        'children',
+        'concept',
+        'content',
+        'difficulty',
+        'exam',
+        'fbPostId',
+        'id',
+        'isGroup',
+        'options',
+        'parentId',
+        'sortOrder',
+        'subjectId',
+        'tag',
+        'type',
+        'uuid',
+      ]);
+      // Masked, not omitted: same length, no key. The history and review
+      // endpoints send the real one; this caller has not answered yet.
+      expect(question.answer).toBe('\u2022');
+      // And no attempCount, scoringTotal, enabled or timestamps here --
+      // this is the practice shape, not the admin row.
+      expect(Object.keys(question)).not.toContain('attempCount');
+      expect(Object.keys(question)).not.toContain('enabled');
     });
   });
 });

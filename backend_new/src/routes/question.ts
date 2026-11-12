@@ -1,6 +1,7 @@
 import { zValidator } from '@hono/zod-validator';
 import { and, asc, count, desc, eq, exists, gt, inArray, isNull, lte, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
+import { describeRoute, resolver } from 'hono-openapi';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import {
@@ -23,7 +24,7 @@ import {
 import { enableFacebookEventBridge } from 'src/lib/facebookEventBridge';
 import { generateJsonFromImages } from 'src/lib/genai';
 import { uploadToS3 } from 'src/lib/s3';
-import { DEFAULT_LIMIT, genPagination, MAX_LIMIT } from 'src/lib/paginator';
+import { DEFAULT_LIMIT, genPagination, MAX_LIMIT, paginationSchema } from 'src/lib/paginator';
 import {
   buildQuestionExtractPrompt,
   QUESTION_EXTRACT_INSTRUCTION,
@@ -733,8 +734,470 @@ const createOneQuestion = async (
   return [questionId, ...childIds].map((id) => rowById.get(id)!);
 };
 
+/**
+ * A question row as this API reports it.
+ *
+ * Eighteen fields, which is one fewer than the table has: `question`
+ * also carries `duration_median_ms`, the per-question median reply time
+ * the points time-weight reads (see questionStat.ts). Three handlers
+ * used to send it, because they returned `db.select()` unexamined --
+ * described by no type, read by no client, and publicly readable, since
+ * `adminAuth` lets GET through. The same leak `subject` had.
+ */
+export const questionRowSchema = z.object({
+  id: z.number().int(),
+  uuid: z.string(),
+  subjectId: z.number().int(),
+  parentId: z.number().int().nullable(),
+  fbPostId: z
+    .string()
+    .nullable()
+    .describe('Only ever set on a top-level question -- a child reads its parent'),
+  isGroup: z.boolean(),
+  enabled: z
+    .boolean()
+    .describe(
+      'The admin review gate. Only enabled questions are ever served by GET /adaptive, so anything the practice UI sees has this true; the admin list shows both'
+    ),
+  type: questionTypeSchema,
+  sortOrder: z.number().int().nullable(),
+  content: z.string().nullable(),
+  options: z.string().nullable(),
+  answer: z.string().nullable(),
+  difficulty: z.number().int().describe('1-10, as authored'),
+  attempCount: z
+    .number()
+    .int()
+    .describe('Misspelled to match the column. How many times this was practised'),
+  scoringTotal: z.number().int(),
+  adjustedDifficulty: z.number(),
+  createdAt: z.string().nullable().describe('ISO 8601'),
+  updatedAt: z.string().nullable().describe('ISO 8601'),
+});
+
+/**
+ * Serialises a question row.
+ *
+ * The dates are converted here rather than left to `c.json`, and the
+ * fields are listed rather than spread: `satisfies` would not catch an
+ * extra column on its own, since a row with extra properties is still
+ * assignable. That is how the median got out.
+ */
+const toQuestionRowDto = (
+  row: typeof questionTable.$inferSelect
+): z.infer<typeof questionRowSchema> => ({
+  id: row.id,
+  uuid: row.uuid,
+  subjectId: row.subjectId,
+  parentId: row.parentId,
+  fbPostId: row.fbPostId,
+  isGroup: row.isGroup,
+  enabled: row.enabled,
+  type: row.type,
+  sortOrder: row.sortOrder,
+  content: row.content,
+  options: row.options,
+  answer: row.answer,
+  difficulty: row.difficulty,
+  attempCount: row.attempCount,
+  scoringTotal: row.scoringTotal,
+  adjustedDifficulty: row.adjustedDifficulty,
+  createdAt: row.createdAt?.toISOString() ?? null,
+  updatedAt: row.updatedAt?.toISOString() ?? null,
+});
+
+/**
+ * One row of the admin list.
+ *
+ * Note `subject`: a **name**, not the `Subject` object packages/shared
+ * declares on `Question`. A client reading `question.subject.name` here
+ * would get undefined.
+ */
+export const adminQuestionRowSchema = z.object({
+  id: z.number().int(),
+  subjectId: z.number().int(),
+  subject: z.string().describe("The subject's name"),
+  type: questionTypeSchema,
+  content: z.string().nullable(),
+  options: z.string().nullable(),
+  answer: z.string().nullable(),
+  difficulty: z.number().int(),
+  isGroup: z.boolean(),
+  enabled: z.boolean(),
+  childCount: z
+    .number()
+    .int()
+    .describe('Sub-questions under this one -- how the admin sees a 題組 holds more than its stem'),
+  categories: z
+    .array(z.string())
+    .describe(
+      "The subject's category names. An array because subject-to-category is many-to-many, and empty for a subject filed under none"
+    ),
+});
+
+export const getQuestionListResponseSchema = z.object({
+  data: z.array(adminQuestionRowSchema),
+  paginate: paginationSchema,
+});
+
+export const getQuestionCountResponseSchema = z.object({
+  total: z
+    .number()
+    .int()
+    .describe(
+      'Servable top-level questions matching the filters: enabled only, and a 題組 counts once. The same definition GET /api/info/stats uses'
+    ),
+});
+
+export const getQuestionAdaptiveResponseSchema = z
+  .array(questionDetailSchema)
+  .describe(
+    'The chosen questions, **with every answer masked**: each is replaced by bullets of the same length, so a client can still tell whether to render an answer input and how many blanks a FILL question has, without being handed the key'
+  );
+
+export const getQuestionByIdResponseSchema = questionRowSchema.extend({
+  examId: z
+    .number()
+    .int()
+    .nullable()
+    .describe('A question only ever has one exam in practice, despite the M:N schema'),
+  tagIds: z.array(z.number().int()),
+  conceptIds: z.array(z.number().int()),
+  children: z
+    .array(questionDetailChildSchema)
+    .describe(
+      "A 題組's sub-questions, so an admin preview shows what a user is actually given. Empty for a standalone question; children carry no exam, tag or concept links of their own"
+    ),
+});
+
+export const postQuestionResponseSchema = z
+  .array(z.array(questionRowSchema))
+  .describe(
+    'One array per submitted question, each holding the question itself followed by its children. Nested, not flat: a 題組 and its sub-questions are one submission'
+  );
+
+export const postQuestionFigureResponseSchema = z.object({
+  url: z
+    .string()
+    .describe(
+      "The stored figure's URL, to drop into the question's HTML in place of an img-placeholder-N. Nothing is written to the database: the URL only becomes part of a question when the reviewed JSON is POSTed to /api/question"
+    ),
+});
+
+export const getQuestionImagePromptResponseSchema = z.object({
+  subjectId: z.number().int(),
+  subjectName: z.string(),
+  imageCount: z.number().int(),
+  systemInstruction: z.string(),
+  userPrompt: z
+    .string()
+    .describe(
+      'Returned as two parts rather than pre-joined: a GUI with its own system-instruction field reproduces the automatic path exactly when each half goes in its own box'
+    ),
+});
+
+export const postQuestionImageResponseSchema = z.object({
+  subjectId: z.number().int(),
+  questions: z
+    .array(
+      z.object({
+        type: z.string(),
+        content: z.string(),
+        options: z.string().optional(),
+        answer: z.string().optional(),
+        difficulty: z.number().int(),
+        conceptIds: z
+          .array(z.number().int())
+          .describe('Ids the model invented are dropped, not rejected -- the admin re-picks anyway'),
+        childQuestions: z
+          .array(
+            z.object({
+              type: z.string(),
+              sortOrder: z.number().int(),
+              content: z.string(),
+              options: z.string(),
+              answer: z.string(),
+              difficulty: z.number().int(),
+            })
+          )
+          .optional(),
+      })
+    )
+    .describe(
+      "A draft for a human to review and edit, shaped to drop straight into POST /api/question's `questions` field. Nothing is written, which is why this is a 200 with no ids"
+    ),
+});
+
+export const putQuestionEnabledResponseSchema = z.object({
+  id: z.number().int(),
+  enabled: z.boolean(),
+});
+
+export const questionTagResponseSchema = z.object({ tagIds: z.array(z.number().int()) });
+
+export const questionConceptResponseSchema = z.object({
+  conceptIds: z.array(z.number().int()),
+});
+
+/**
+ * The OpenAPI entries for the routes below.
+ *
+ * Hoisted out of the route definitions so the handlers keep their own
+ * indentation; `describeRoute` is middleware, so where it is
+ * constructed makes no difference.
+ *
+ * Three different gates in one group, and each route says which:
+ * `adminAuth` covers the group and checks POST/PUT/DELETE only, so the
+ * reads here answer without credentials; `/adaptive` adds requireUser;
+ * `/image/prompt` is behind requireAdmin, because it would otherwise be
+ * an open GET handing out a subject's whole concept list and the full
+ * model instruction.
+ */
+const READ_OPEN =
+  'Reads in this group need no credentials: `adminAuth` gates POST/PUT/DELETE only.';
+
+const listDoc = describeRoute({
+  summary: 'List questions for the admin catalogue',
+  description: `${READ_OPEN} Top-level questions only -- a 題組's children have no meaning without their parent, and \`childCount\` is how the admin sees there is more to one than its stem. Paginated and filterable by category, subject, exam, concept or tag.`,
+  tags: ['question'],
+  responses: {
+    200: {
+      description: 'One page of questions',
+      content: { 'application/json': { schema: resolver(getQuestionListResponseSchema) } },
+    },
+    400: { description: 'limit beyond the cap, or a malformed sort, order or filter' },
+  },
+});
+
+const countDoc = describeRoute({
+  summary: 'How many questions match a filter',
+  description: `${READ_OPEN} What the practice page shows as "questions available", so it counts only what GET /adaptive would actually serve: enabled, top-level, and a 題組 once.`,
+  tags: ['question'],
+  responses: {
+    200: {
+      description: 'The count',
+      content: { 'application/json': { schema: resolver(getQuestionCountResponseSchema) } },
+    },
+    400: { description: 'subjectId missing, or a malformed id list' },
+  },
+});
+
+const adaptiveDoc = describeRoute({
+  summary: 'Questions to practise next',
+  description:
+    "Behind requireUser, on top of the group's adminAuth. Chooses by the caller's per-concept mastery, avoids what they have just seen, and marks each one pending so a second fetch before the answer lands does not hand out different work. **Every answer comes back masked** -- bullets of the same length -- because the caller has not answered yet; the history and review endpoints send the real key, this one must not.",
+  tags: ['question'],
+  responses: {
+    200: {
+      description: 'Up to `count` questions, answers masked',
+      content: { 'application/json': { schema: resolver(getQuestionAdaptiveResponseSchema) } },
+    },
+    400: { description: 'subjectId missing, a malformed id list, or a count beyond 50' },
+    401: { description: 'No valid identity' },
+  },
+});
+
+const getDoc = describeRoute({
+  summary: 'Read one question, with its links and sub-questions',
+  description: `${READ_OPEN} The answer key is in this response -- see AGENTS.md, where that is recorded as a known, accepted consequence of the reads here being open.`,
+  tags: ['question'],
+  responses: {
+    200: {
+      description: 'The question, its exam, tag and concept ids, and its children',
+      content: { 'application/json': { schema: resolver(getQuestionByIdResponseSchema) } },
+    },
+    404: { description: 'No such question' },
+  },
+});
+
+const createDoc = describeRoute({
+  summary: 'Create a batch of questions',
+  description:
+    'Admin only. One batch shares a subject and an exam, and commits or fails as a whole -- this route runs inside the transaction middleware, so a rejection on question N rolls back 0..N-1. Questions are created **disabled**: enabling them is PUT /{id}/enabled.',
+  tags: ['question'],
+  responses: {
+    201: {
+      description: 'One array per submitted question, each with its children after it',
+      content: { 'application/json': { schema: resolver(postQuestionResponseSchema) } },
+    },
+    400: {
+      description:
+        'A malformed body, an img-placeholder left in the content, CLOZE blanks that do not match the answer, an exam not linked to the subject, or a tag or concept belonging to another subject',
+    },
+    401: { description: 'No valid identity' },
+    403: { description: 'Not an admin' },
+    404: { description: 'No such subject' },
+  },
+});
+
+const figureDoc = describeRoute({
+  summary: 'Store one figure cropped out of a paper',
+  description:
+    "Admin only. Returns the URL to put in the question's HTML in place of an img-placeholder-N. Nothing is written to the database, so a figure uploaded for a question that is then abandoned is an orphaned object rather than a broken row.",
+  tags: ['question'],
+  responses: {
+    200: {
+      description: 'The stored URL',
+      content: { 'application/json': { schema: resolver(postQuestionFigureResponseSchema) } },
+    },
+    400: { description: 'An unsupported mimeType, or data that is not base64 or is oversize' },
+    401: { description: 'No valid identity' },
+    403: { description: 'Not an admin' },
+  },
+});
+
+const promptDoc = describeRoute({
+  summary: 'The prompt POST /image would have sent',
+  description:
+    "Behind requireAdmin -- every method, not the group's adminAuth, which would let this GET through: it returns the subject's whole concept list and the full instruction text. A manual escape hatch for when the model quota is gone: paste both halves into a chat GUI with the screenshot, and the JSON that comes back drops into the same preview box the automatic path fills.",
+  tags: ['question'],
+  responses: {
+    200: {
+      description: 'The two halves of the prompt, unjoined',
+      content: {
+        'application/json': { schema: resolver(getQuestionImagePromptResponseSchema) },
+      },
+    },
+    400: { description: 'subjectId missing, or an imageCount out of range' },
+    401: { description: 'No valid identity' },
+    403: { description: 'Not an admin' },
+    404: { description: 'No such subject, or it has no concepts to assign questions to' },
+  },
+});
+
+const imageDoc = describeRoute({
+  summary: 'Draft questions from a screenshot',
+  description:
+    "Admin only, and **nothing is written** -- which is why it answers 200 with no ids: the same screenshot can be re-run as many times as it takes to get a usable draft, and a human reviews and edits the result before POSTing it to /api/question. Still an array, because a 題組 plus its children is one element.",
+  tags: ['question'],
+  responses: {
+    200: {
+      description: 'The draft, shaped for POST /api/question',
+      content: { 'application/json': { schema: resolver(postQuestionImageResponseSchema) } },
+    },
+    400: { description: 'No images, or one that is not base64 or is oversize' },
+    401: { description: 'No valid identity' },
+    403: { description: 'Not an admin' },
+    404: { description: 'No such subject, or it has no concepts to assign questions to' },
+    502: {
+      description:
+        'The model answered with something that is not JSON (AI_INVALID_JSON) or does not match the expected question shape (AI_INVALID_SHAPE)',
+    },
+  },
+});
+
+const updateDoc = describeRoute({
+  summary: 'Update one question',
+  description:
+    "Admin only. Scalar fields plus the exam. `subjectId` is deliberately not editable: tag and concept links are validated against it, and changing it would orphan them silently. Those links have their own endpoints, and so does `enabled`.",
+  tags: ['question'],
+  responses: {
+    200: {
+      description: 'The question as saved',
+      content: { 'application/json': { schema: resolver(questionRowSchema) } },
+    },
+    400: {
+      description:
+        'A malformed body, an img-placeholder left in the content, CLOZE blanks that do not match the answer, or an exam not linked to the subject',
+    },
+    401: { description: 'No valid identity' },
+    403: { description: 'Not an admin' },
+    404: { description: 'No such question' },
+  },
+});
+
+const deleteDoc = describeRoute({
+  summary: 'Delete one question',
+  description:
+    "Admin only. A 題組's children, and every link row pointing at it, go with it.",
+  tags: ['question'],
+  responses: {
+    204: { description: 'Deleted' },
+    401: { description: 'No valid identity' },
+    403: { description: 'Not an admin' },
+    404: { description: 'No such question' },
+  },
+});
+
+const getTagDoc = describeRoute({
+  summary: "One question's tags",
+  description: `${READ_OPEN} Ids alone: the names come from GET /api/tag.`,
+  tags: ['question'],
+  responses: {
+    200: {
+      description: 'The tag ids',
+      content: { 'application/json': { schema: resolver(questionTagResponseSchema) } },
+    },
+    404: { description: 'No such question' },
+  },
+});
+
+const enabledDoc = describeRoute({
+  summary: 'Enable or disable one question',
+  description:
+    'Admin only. Its own endpoint rather than a field on PUT /{id}, because the admin list toggles this on a row without having the rest of the question loaded to send back.',
+  tags: ['question'],
+  responses: {
+    200: {
+      description: 'The id and its new state',
+      content: { 'application/json': { schema: resolver(putQuestionEnabledResponseSchema) } },
+    },
+    400: { description: 'enabled missing or not a boolean' },
+    401: { description: 'No valid identity' },
+    403: { description: 'Not an admin' },
+    404: { description: 'No such question' },
+  },
+});
+
+const putTagDoc = describeRoute({
+  summary: "Replace one question's tags",
+  description:
+    'Admin only. A full-set replace, and every tag has to belong to the question own subject.',
+  tags: ['question'],
+  responses: {
+    200: {
+      description: 'The tag ids as saved',
+      content: { 'application/json': { schema: resolver(questionTagResponseSchema) } },
+    },
+    400: { description: 'A malformed body, or a tag belonging to another subject' },
+    401: { description: 'No valid identity' },
+    403: { description: 'Not an admin' },
+    404: { description: 'No such question' },
+  },
+});
+
+const getConceptDoc = describeRoute({
+  summary: "One question's concepts",
+  description: `${READ_OPEN} Ids alone: the names come from GET /api/concept.`,
+  tags: ['question'],
+  responses: {
+    200: {
+      description: 'The concept ids',
+      content: { 'application/json': { schema: resolver(questionConceptResponseSchema) } },
+    },
+    404: { description: 'No such question' },
+  },
+});
+
+const putConceptDoc = describeRoute({
+  summary: "Replace one question's concepts",
+  description:
+    "Admin only. A full-set replace, at least one id, and every concept has to belong to the question own subject. Each concept's `numberOfQuestions` is adjusted as links are added and removed.",
+  tags: ['question'],
+  responses: {
+    200: {
+      description: 'The concept ids as saved',
+      content: { 'application/json': { schema: resolver(questionConceptResponseSchema) } },
+    },
+    400: { description: 'An empty list, or a concept belonging to another subject' },
+    401: { description: 'No valid identity' },
+    403: { description: 'Not an admin' },
+    404: { description: 'No such question' },
+  },
+});
+
 export const question = new Hono<UserEnv>()
-  .get('/', zValidator('query', questionListQuerySchema), async (c) => {
+  .get('/', listDoc, zValidator('query', questionListQuerySchema), async (c) => {
     const { limit, offset, sort, order, categoryId, subjectId, examId, conceptId, tagId } =
       c.req.valid('query');
     console.log(
@@ -875,9 +1338,9 @@ export const question = new Hono<UserEnv>()
         categories: categoriesBySubject.get(row.subjectId) ?? [],
       })),
       paginate: genPagination(total, limit, offset),
-    });
+    } satisfies z.infer<typeof getQuestionListResponseSchema>);
   })
-  .get('/count', zValidator('query', questionCountQuerySchema), async (c) => {
+  .get('/count', countDoc, zValidator('query', questionCountQuerySchema), async (c) => {
     const { subjectId, examIds, conceptIds, tagIds } = c.req.valid('query');
     console.log(
       `GET /api/question/count subjectId=${subjectId} examIds=${examIds ?? ''} conceptIds=${conceptIds ?? ''} tagIds=${tagIds ?? ''}`
@@ -929,9 +1392,9 @@ export const question = new Hono<UserEnv>()
       .from(questionTable)
       .where(and(...conditions));
 
-    return c.json({ total });
+    return c.json({ total } satisfies z.infer<typeof getQuestionCountResponseSchema>);
   })
-  .get('/adaptive', zValidator('query', questionAdaptiveQuerySchema), async (c) => {
+  .get('/adaptive', adaptiveDoc, zValidator('query', questionAdaptiveQuerySchema), async (c) => {
     const { subjectId, examIds, conceptIds, tagIds, count: requiredCount } = c.req.valid('query');
     console.log(
       `GET /api/question/adaptive subjectId=${subjectId} examIds=${examIds ?? ''} conceptIds=${conceptIds ?? ''} tagIds=${tagIds ?? ''} count=${requiredCount}`
@@ -1207,10 +1670,10 @@ export const question = new Hono<UserEnv>()
           answer: maskAnswer(dto.answer),
           children: dto.children.map((child) => ({ ...child, answer: maskAnswer(child.answer) })),
         };
-      })
+      }) satisfies z.infer<typeof getQuestionAdaptiveResponseSchema>
     );
   })
-  .get('/:id', async (c) => {
+  .get('/:id', getDoc, async (c) => {
     const id = Number(c.req.param('id'));
     console.log(`GET /api/question/${id}`);
     const db = c.get('db');
@@ -1256,14 +1719,14 @@ export const question = new Hono<UserEnv>()
       .orderBy(asc(questionTable.sortOrder), asc(questionTable.id));
 
     return c.json({
-      ...found,
+      ...toQuestionRowDto(found),
       examId: examLink?.examId ?? null,
       tagIds: tagLinks.map((l) => l.tagId),
       conceptIds: conceptLinks.map((l) => l.conceptId),
       children,
-    });
+    } satisfies z.infer<typeof getQuestionByIdResponseSchema>);
   })
-  .post('/', zValidator('json', questionBodySchema), async (c) => {
+  .post('/', createDoc, zValidator('json', questionBodySchema), async (c) => {
     const data = c.req.valid('json');
     console.log(
       `POST /api/question subjectId=${data.subjectId} examId=${data.examId} count=${data.questions.length}`
@@ -1303,7 +1766,12 @@ export const question = new Hono<UserEnv>()
     // anyway.
     await enableFacebookEventBridge();
 
-    return c.json(results, 201);
+    return c.json(
+      results.map((rows) => rows.map(toQuestionRowDto)) satisfies z.infer<
+        typeof postQuestionResponseSchema
+      >,
+      201
+    );
   })
   // Stores one figure and returns the URL to put in the question's HTML,
   // replacing an img-placeholder-N the extraction left behind. The admin
@@ -1317,7 +1785,7 @@ export const question = new Hono<UserEnv>()
   // orphaned object, not a broken row.
   //
   // Gated by the group's adminAuth, which does cover POST.
-  .post('/image/figure', zValidator('json', questionFigureBodySchema), async (c) => {
+  .post('/image/figure', figureDoc, zValidator('json', questionFigureBodySchema), async (c) => {
     const { mimeType, data } = c.req.valid('json');
     const buffer = Buffer.from(data, 'base64');
     console.log(`POST /api/question/image/figure mimeType=${mimeType} bytes=${buffer.length}`);
@@ -1335,7 +1803,7 @@ export const question = new Hono<UserEnv>()
     const key = `questions/figures/${randomUUID()}.${FIGURE_EXTENSIONS[mimeType]}`;
     const { url } = await uploadToS3(buffer, mimeType, key);
 
-    return c.json({ url });
+    return c.json({ url } satisfies z.infer<typeof postQuestionFigureResponseSchema>);
   })
   // Manual escape hatch for when the Gemini quota is gone: hands back the
   // exact prompt POST /image would have sent, to paste into a chat GUI
@@ -1347,7 +1815,7 @@ export const question = new Hono<UserEnv>()
   // fiddling with the note. Gated by requireAdmin in app.ts rather than
   // the group's adminAuth, which lets GETs through: this returns the
   // subject's whole concept list and the full instruction text.
-  .get('/image/prompt', zValidator('query', questionImagePromptQuerySchema), async (c) => {
+  .get('/image/prompt', promptDoc, zValidator('query', questionImagePromptQuerySchema), async (c) => {
     const { subjectId, imageCount, note } = c.req.valid('query');
     console.log(`GET /api/question/image/prompt subjectId=${subjectId} imageCount=${imageCount}`);
     const db = c.get('db');
@@ -1367,7 +1835,7 @@ export const question = new Hono<UserEnv>()
       imageCount,
       systemInstruction: QUESTION_EXTRACT_INSTRUCTION.trim(),
       userPrompt,
-    });
+    } satisfies z.infer<typeof getQuestionImagePromptResponseSchema>);
   })
   // Draft-generation, not persistence: takes a screenshot of one question
   // and hands back the array an admin then reviews (and edits) in the
@@ -1377,7 +1845,7 @@ export const question = new Hono<UserEnv>()
   // which is why it returns 200 with no ids rather than 201 -- the same
   // screenshot can be re-run as many times as it takes to get a usable
   // draft.
-  .post('/image', zValidator('json', questionImageBodySchema), async (c) => {
+  .post('/image', imageDoc, zValidator('json', questionImageBodySchema), async (c) => {
     const { subjectId, images, note } = c.req.valid('json');
     console.log(`POST /api/question/image subjectId=${subjectId} images=${images.length}`);
     const db = c.get('db');
@@ -1426,9 +1894,12 @@ export const question = new Hono<UserEnv>()
       childQuestions: item.childQuestions ?? undefined,
     }));
 
-    return c.json({ subjectId, questions });
+    return c.json({
+      subjectId,
+      questions,
+    } satisfies z.infer<typeof postQuestionImageResponseSchema>);
   })
-  .put('/:id', zValidator('json', questionUpdateBodySchema), async (c) => {
+  .put('/:id', updateDoc, zValidator('json', questionUpdateBodySchema), async (c) => {
     const db = c.get('db');
     const id = Number(c.req.param('id'));
     const data = c.req.valid('json');
@@ -1461,9 +1932,9 @@ export const question = new Hono<UserEnv>()
     await db.insert(questionExamTable).values({ questionId: id, examId: data.examId });
 
     const [updated] = await db.select().from(questionTable).where(eq(questionTable.id, id));
-    return c.json(updated);
+    return c.json(toQuestionRowDto(updated) satisfies z.infer<typeof questionRowSchema>);
   })
-  .delete('/:id', async (c) => {
+  .delete('/:id', deleteDoc, async (c) => {
     const db = c.get('db');
     const id = Number(c.req.param('id'));
     console.log(`DELETE /api/question/${id}`);
@@ -1494,7 +1965,7 @@ export const question = new Hono<UserEnv>()
 
     return c.body(null, 204);
   })
-  .get('/:id/tag', async (c) => {
+  .get('/:id/tag', getTagDoc, async (c) => {
     const db = c.get('db');
     const id = Number(c.req.param('id'));
     console.log(`GET /api/question/${id}/tag`);
@@ -1512,7 +1983,7 @@ export const question = new Hono<UserEnv>()
   // Its own endpoint rather than a field on PUT /:id, for the same reason
   // tag/concept have theirs: the admin list toggles this on a row without
   // having the rest of the question loaded to send back.
-  .put('/:id/enabled', zValidator('json', questionEnabledBodySchema), async (c) => {
+  .put('/:id/enabled', enabledDoc, zValidator('json', questionEnabledBodySchema), async (c) => {
     const db = c.get('db');
     const id = Number(c.req.param('id'));
     const { enabled } = c.req.valid('json');
@@ -1543,9 +2014,12 @@ export const question = new Hono<UserEnv>()
     // that does. Best-effort, same as in POST /.
     if (enabled) await enableFacebookEventBridge();
 
-    return c.json({ id, enabled });
+    return c.json({
+      id,
+      enabled,
+    } satisfies z.infer<typeof putQuestionEnabledResponseSchema>);
   })
-  .put('/:id/tag', zValidator('json', questionTagBodySchema), async (c) => {
+  .put('/:id/tag', putTagDoc, zValidator('json', questionTagBodySchema), async (c) => {
     const db = c.get('db');
     const id = Number(c.req.param('id'));
     const { tagIds } = c.req.valid('json');
@@ -1568,7 +2042,7 @@ export const question = new Hono<UserEnv>()
       .where(eq(questionTagTable.questionId, id));
     return c.json({ tagIds: links.map((l) => l.tagId) });
   })
-  .get('/:id/concept', async (c) => {
+  .get('/:id/concept', getConceptDoc, async (c) => {
     const db = c.get('db');
     const id = Number(c.req.param('id'));
     console.log(`GET /api/question/${id}/concept`);
@@ -1581,10 +2055,13 @@ export const question = new Hono<UserEnv>()
       .from(questionConceptTable)
       .where(eq(questionConceptTable.questionId, id));
 
-    return c.json({ conceptIds: links.map((l) => l.conceptId) });
+    return c.json({
+      conceptIds: links.map((l) => l.conceptId),
+    } satisfies z.infer<typeof questionConceptResponseSchema>);
   })
   .put(
     '/:id/concept',
+    putConceptDoc,
     zValidator('json', questionConceptBodySchema),
     async (c) => {
       const db = c.get('db');
@@ -1631,6 +2108,8 @@ export const question = new Hono<UserEnv>()
         .select({ conceptId: questionConceptTable.conceptId })
         .from(questionConceptTable)
         .where(eq(questionConceptTable.questionId, id));
-      return c.json({ conceptIds: links.map((l) => l.conceptId) });
+      return c.json({
+        conceptIds: links.map((l) => l.conceptId),
+      } satisfies z.infer<typeof questionConceptResponseSchema>);
     }
   );
