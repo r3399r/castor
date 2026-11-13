@@ -12,3 +12,6 @@ next-env.d.ts
 # derives from is the committed artifact, so a copy here would be a second
 # thing that can go stale, and a 6800-line diff on every route change.
 /types/openapi.d.ts
+
+# Written by `npm run test:coverage`.
+/coverage
