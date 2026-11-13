@@ -56,6 +56,26 @@ jobs:
             exit 1
           fi
 
+      # The other half of the same gate: the webapp's types are generated
+      # from that document, so this is what proves the document and the
+      # code that consumes it still agree. `pretypecheck` regenerates
+      # webapp/types/openapi.d.ts first -- it is not in git -- so this
+      # also proves that hook works on a clean checkout.
+      #
+      # It runs before the AWS credentials because of the deploy ORDER:
+      # deploy.sh releases the backend first and builds the webapp second,
+      # so a type error that only `next build` catches leaves a released
+      # backend with no matching webapp. Catching it here costs nothing and
+      # stops the release before it starts.
+      #
+      # `next-env.d.ts` is absent on a fresh checkout (gitignored, written
+      # by `next dev` and `next build`). Nothing here needs it today --
+      # verified by running tsc without it -- but it is what types a static
+      # asset import, so the first `import x from './x.png'` would fail
+      # here while passing locally. Generating it means running next.
+      - name: Typecheck the webapp
+        run: npm run typecheck -w webapp
+
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
