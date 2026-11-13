@@ -34,6 +34,13 @@ const root = normalizePath(process.cwd()).replace(/^[a-z]:/, (drive) =>
 
 export default defineConfig({
   root,
+  // The `@/*` of tsconfig.json, which Next resolves for the app and
+  // nothing resolves here. Built from the same `root` above so the two
+  // spellings cannot diverge -- see that comment for what diverging
+  // costs.
+  resolve: {
+    alias: [{ find: /^@\//, replacement: `${root}/` }],
+  },
   test: {
     environment: 'node',
     include: ['lib/**/*.test.ts'],

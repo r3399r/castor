@@ -35,7 +35,10 @@ export const readableAnswer = (
     // the position number keeps this readable for a row whose options are
     // missing, rather than printing the mask.
     const picked = [...answer]
-      .map((flag, i) => (flag === 'O' ? labels[i] ?? `第 ${i + 1} 項` : null))
+      // `||`, not `??`: an options column holding the empty string
+      // splits to [''], so position 0 would otherwise render as nothing
+      // at all instead of falling back like the positions after it.
+      .map((flag, i) => (flag === 'O' ? labels[i] || `第 ${i + 1} 項` : null))
       .filter((label): label is string => label !== null)
     return picked.length > 0 ? picked.join('、') : '未選任何選項'
   }
