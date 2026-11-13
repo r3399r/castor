@@ -119,8 +119,11 @@ function ResultBox({
 }: {
   result: { correctAnswer: string; score: number; fbPostId?: string | null }
   // Only for reading the answer back: the reply response carries the
-  // correct answer but not the type or options it has to be read against.
-  question: Question
+  // correct answer but not the type or options it has to be read
+  // against. The fields it needs rather than a whole question, so a
+  // sub-question of a 題組 can be passed too -- those carry no uuid,
+  // subject, links or children of their own.
+  question: Pick<Question, 'type' | 'options'>
 }) {
   // Not a boolean: a partially-credited answer (MULTIPLE, CLOZE) is
   // neither. See lib/scoreOutcome for why the cut is at full marks.
@@ -189,7 +192,10 @@ function AnswerInput({
   disabled,
   correctAnswer,
 }: {
-  question: Question
+  // Five fields rather than a whole question, for the same reason as
+  // ResultBox above: this renders a 題組's sub-questions as well as
+  // standalone ones.
+  question: Pick<Question, 'id' | 'type' | 'content' | 'options' | 'answer'>
   answer: string
   onAnswer: (val: string) => void
   disabled: boolean

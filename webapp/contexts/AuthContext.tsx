@@ -17,8 +17,19 @@ type AuthContextType = {
    * "not known yet", which is not the same as "not subscribed": a gated
    * block should wait rather than flash its locked state while sync is
    * still in flight.
+   *
+   * Typed as sync's own shape rather than `SubscriptionStatus`, because
+   * the two sources of this value do not send the same fields: sync
+   * omits `autoRenew`, while `refreshSubscription` below reads
+   * GET /subscription/me, which carries it. Four fields is what a
+   * consumer can actually rely on. Nothing reads `autoRenew` from here
+   * -- the two screens that need it fetch /subscription/me themselves,
+   * because being charged again is a question about billing rather
+   * than about access. Derived rather than written out, so it widens by
+   * itself if sync ever starts sending the fifth field (see AGENTS.md
+   * for what that would cost).
    */
-  subscription: SubscriptionStatus | null
+  subscription: PostUserSyncResponse['subscription'] | null
   /**
    * Re-reads entitlement without signing in again.
    *
@@ -51,7 +62,9 @@ function isInAppBrowser(): boolean {
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
-  const [subscription, setSubscription] = useState<SubscriptionStatus | null>(null)
+  const [subscription, setSubscription] = useState<
+    PostUserSyncResponse['subscription'] | null
+  >(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {

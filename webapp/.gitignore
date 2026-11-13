@@ -5,3 +5,10 @@
 .env*.local
 *.tsbuildinfo
 next-env.d.ts
+
+# Generated from ../backend_new/openapi.json by `npm run api:types`, which
+# the postinstall, predev, prebuild and pretypecheck hooks run for you.
+# Out of git for the same reason next-env.d.ts above is: the document it
+# derives from is the committed artifact, so a copy here would be a second
+# thing that can go stale, and a 6800-line diff on every route change.
+/types/openapi.d.ts

@@ -5,7 +5,13 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "lint": "next lint"
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "api:types": "openapi-typescript ../backend_new/openapi.json -o types/openapi.d.ts",
+    "postinstall": "npm run api:types",
+    "predev": "npm run api:types",
+    "prebuild": "npm run api:types",
+    "pretypecheck": "npm run api:types"
   },
   "dependencies": {
     "@castor/shared": "*",
@@ -31,6 +37,7 @@
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "openapi-typescript": "^7.13.0",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.8.0"
   }
