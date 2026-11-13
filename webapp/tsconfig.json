@@ -15,9 +15,6 @@
     "incremental": true,
     "plugins": [{ "name": "next" }],
     "paths": {
-      "@castor/shared": [
-        "../packages/shared/src/index.ts"
-      ],
       "@/*": ["./*"]
     }
   },

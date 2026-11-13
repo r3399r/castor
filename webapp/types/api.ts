@@ -11,9 +11,9 @@
  * hand-written beside the API rather than derived from it, and the
  * migration that produced this document found that most of them were
  * wrong -- see "The OpenAPI document" in AGENTS.md for the list. The
- * package still carries two runtime values (the subscriber growth
- * bonus), which `app/box/BoxClient.tsx` imports from '@castor/shared'
- * directly; nothing imports types from it any more.
+ * webapp no longer depends on that package at all: the growth-bonus
+ * arithmetic it used to import lives in `lib/invest.ts` and takes the
+ * rate from GET /api/info/growth.
  *
  * Aliases rather than deep paths at the call sites, for two reasons:
  * the generated names (`operations['getApiReply']['responses'][200]
@@ -108,6 +108,7 @@ export type GetGuardianResponse = Ok<'getApiGuardian'>
 export type PostGuardianInvestResponse = Ok<'postApiGuardianByIdInvest'>
 
 export type GetInfoDonationResponse = Ok<'getApiInfoDonation'>
+export type GetInfoGrowthResponse = Ok<'getApiInfoGrowth'>
 export type GetInfoPlansResponse = Ok<'getApiInfoPlans'>
 export type GetInfoPopularResponse = Ok<'getApiInfoPopular'>
 export type GetInfoStatsResponse = Ok<'getApiInfoStats'>

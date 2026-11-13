@@ -74,6 +74,18 @@
           "days"
         ]
       },
+      "GrowthInfo": {
+        "type": "object",
+        "properties": {
+          "subscriberXpBonusPercent": {
+            "type": "integer",
+            "description": "Added to an investment made with paid access, floored: at 10, 100 points earn 110 XP and 5 points earn 5. Whether a given caller earns it is not here -- the server reads entitlement for itself on every invest."
+          }
+        },
+        "required": [
+          "subscriberXpBonusPercent"
+        ]
+      },
       "DonationRecordSummary": {
         "type": "object",
         "properties": {
@@ -2246,6 +2258,28 @@
                       }
                     }
                   }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/info/growth": {
+      "get": {
+        "operationId": "getApiInfoGrowth",
+        "summary": "The subscriber growth bonus rate",
+        "description": "Public and unauthenticated: it is a published benefit of subscribing, read by the box screen before an investment is confirmed, and it says nothing about the caller. The rate is the whole of it -- whether a particular user earns the bonus is decided by the server on each invest, from its own entitlement lookup, never from what a client sends.",
+        "tags": [
+          "info"
+        ],
+        "responses": {
+          "200": {
+            "description": "The rate, as a whole percentage",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GrowthInfo"
                 }
               }
             }

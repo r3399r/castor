@@ -14,6 +14,8 @@ import {
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { usePlanAmounts } from '@/hooks/usePlanAmounts'
+import { useGrowthBonus } from '@/hooks/useGrowthBonus'
+import { investmentXp } from '@/lib/invest'
 import { ApiError, apiFetch, apiPost } from '@/lib/api'
 import { submitCheckout } from '@/lib/checkout'
 import {
@@ -62,14 +64,33 @@ const analysisFeatures = [
   },
 ]
 
-const faqs = [
+/**
+ * Takes the rate rather than writing it down.
+ *
+ * The XP-bonus entry both asks about the rate and answers with a worked
+ * example, so it was two more places a number could advertise something
+ * the server does not grant. It is dropped entirely until the rate
+ * arrives: a question about a rate reads as nonsense with a placeholder
+ * in it, and unlike the benefit section, no part of this list is what the
+ * page is for.
+ */
+const faqsFor = (bonusPercent: number | null): [string, string][] => [
   ['訂閱後何時可以使用進階分析？', '刷卡完成、收到綠界的付款結果後就會開通，通常是幾秒內。若畫面尚未更新，重新整理即可。'],
   ['可以用什麼方式付款？', '目前只支援信用卡。自動續訂是透過綠界的信用卡定期定額，刷一次卡之後由綠界按週期扣款，不支援銀聯卡。'],
   ['原本的學習紀錄會保留嗎？', '會，訂閱不會影響既有的練習紀錄與學習資料。'],
   ['如何取消訂閱？', '到個人資料頁點「取消續訂」即可。取消後不再扣款，但已付費的這一期仍可使用到期末。'],
   ['取消後想再訂閱呢？', '可以，但會是一份全新的訂閱，需要重新刷卡且當下就會扣款。新的訂閱期間會接在原本已付費的期間之後開始，不會浪費你已付的天數。'],
   ['中途換方案會怎麼計費？', '會立即停止原本的自動續訂、重新刷卡，新方案當下就扣款；新的訂閱期間一樣接在目前期間結束後才開始。'],
-  ['10% XP 加成如何計算？', '例如投入 100 積分，訂閱期間精靈可獲得 110 XP。'],
+  ...(bonusPercent === null
+    ? []
+    : [
+        [
+          `${bonusPercent}% XP 加成如何計算？`,
+          `例如投入 100 積分，訂閱期間精靈可獲得 ${formatNumber(
+            investmentXp(100, bonusPercent)
+          )} XP。`,
+        ] as [string, string],
+      ]),
   ['公益類別可以更改嗎？', '限定精靈完成培養後的公益選擇規則仍待確認。'],
 ]
 
@@ -120,6 +141,7 @@ export default function SubscriptionPageClient() {
   const [submitting, setSubmitting] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const { amounts, failed: amountsFailed } = usePlanAmounts()
+  const { bonusPercent, failed: bonusFailed } = useGrowthBonus()
 
   const loadStatus = useCallback(async () => {
     if (!user) {
@@ -504,19 +526,42 @@ export default function SubscriptionPageClient() {
             height={1254}
           />
         </div>
+        {/*
+          The rate comes from the API, never from a constant here, for the
+          same reason the prices above do: this page advertises the
+          benefit, the box screen states the XP an investment will earn,
+          and the server grants it -- so a number written in here could
+          advertise one thing while another is granted, and the user sees
+          both. The worked example is derived from the same rate rather
+          than written out beside it.
+        */}
         <div className={styles.spiritBonus}>
           <div>
-            <h3>投入積分時，額外獲得 10% XP</h3>
-            <p>例如投入 100 積分，精靈可獲得 110 XP。加成不影響題目分數或學習統計。</p>
+            {bonusPercent === null ? (
+              <>
+                <h3>{bonusFailed ? '加成幅度暫時無法顯示' : '讀取加成幅度…'}</h3>
+                <p>加成不影響題目分數或學習統計。</p>
+              </>
+            ) : (
+              <>
+                <h3>投入積分時，額外獲得 {bonusPercent}% XP</h3>
+                <p>
+                  例如投入 100 積分，精靈可獲得{' '}
+                  {formatNumber(investmentXp(100, bonusPercent))} XP。加成不影響題目分數或學習統計。
+                </p>
+              </>
+            )}
           </div>
-          <strong className={styles.bonusValue}>+10%</strong>
+          <strong className={styles.bonusValue}>
+            {bonusPercent === null ? '—' : `+${bonusPercent}%`}
+          </strong>
         </div>
       </section>
 
       <section className={`${styles.section} ${styles.faqSection}`} aria-labelledby="faq-title">
         <div className={styles.sectionHeading}><h2 id="faq-title">關於訂閱方案</h2></div>
         <div className={styles.faqList}>
-          {faqs.map(([question, answer]) => (
+          {faqsFor(bonusPercent).map(([question, answer]) => (
             <details key={question} className={styles.faqItem}>
               <summary>{question}</summary><p>{answer}</p>
             </details>

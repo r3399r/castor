@@ -35,20 +35,13 @@ import {
 import { artworkByCode, spiritCatalog, type SpiritSpecies } from '@/lib/guardianArtwork'
 import { apiFetch, apiPost } from '@/lib/api'
 import { useAuth } from '@/contexts/AuthContext'
+import { useGrowthBonus } from '@/hooks/useGrowthBonus'
 import SupportNote from './SupportNote'
-/**
- * Runtime code comes straight from the shared package, never through
- * `@/types/api`.
- *
- * That barrel is `export * from '@castor/shared'`, so this would work
- * either way -- but it is the webapp's type barrel, used for types by
- * every other screen, and an import of a *function* from a file called
- * `types` reads like a type-only import that the compiler erases. The
- * growth bonus is the first runtime code the shared package has ever
- * carried; keeping its import path visibly different is what stops the
- * next reader from assuming otherwise.
- */
-import { investmentXp, pointsForXp } from '@castor/shared'
+// The screen's arithmetic -- what the slider caps at, and the XP an
+// investment is stated to earn. It holds no rate of its own; the rate
+// comes from GET /api/info/growth below, so that what this states before
+// an investment and what the server grants after it cannot drift apart.
+import { effectiveBonusPercent, investmentXp, pointsForXp } from '@/lib/invest'
 import type { Guardian, PostGuardianInvestResponse } from '@/types/api'
 import { DonationDemoBox } from './DonationDemo'
 import { DonationEntry } from './DonationFlow'
@@ -137,6 +130,22 @@ function RealBoxClient() {
     species?: SpiritSpecies
   } | null>(null)
   const [previewLevel, setPreviewLevel] = useState<number | null>(null)
+  /**
+   * The published growth-bonus rate, or null until the server answers.
+   *
+   * Shared with the subscription page, which advertises the same rate --
+   * one fetch of one endpoint rather than a constant each side could
+   * disagree about. null means "not known yet", which is not "no bonus";
+   * effectiveBonusPercent below is what collapses the two into the one
+   * state this screen can actually render.
+   *
+   * The failure flag is ignored here on purpose: this screen is correct
+   * without the rate -- no bonus is stated and the slider caps at the raw
+   * XP gap -- so a failed rate must not become an error that hides the
+   * spirits. The subscription page, whose whole subject is the benefit,
+   * does report it.
+   */
+  const { bonusPercent: publishedBonusPercent } = useGrowthBonus()
   // Both endpoints report totalPoints, and both are invalidated by either
   // action (redeeming changes the store and the balance; investing changes
   // the guardian and the balance), so they are always refreshed together.
@@ -180,13 +189,15 @@ function RealBoxClient() {
    * This is both the cap and the figure shown as the amount this stage
    * still needs, so it has to be what the user would actually spend --
    * 2,273 points for a 2,500 XP gap, not 2,500. If the entitlement flag
-   * here is stale the cap is merely 10% generous or 10% tight; the grant
-   * is the server's own, computed from its own lookup.
+   * here is stale, or the rate has not arrived yet, the cap is merely
+   * generous by the bonus; the grant is the server's own, computed from
+   * its own lookup of both.
    */
-  const pointsUntilNextLevel = pointsForXp(xpUntilNextLevel, hasMemberExperienceBonus)
+  const bonusPercent = effectiveBonusPercent(hasMemberExperienceBonus, publishedBonusPercent)
+  const pointsUntilNextLevel = pointsForXp(xpUntilNextLevel, bonusPercent)
   const maxInvestablePoints = Math.min(availablePoints, pointsUntilNextLevel)
   const shownLevel = previewLevel ?? level
-  const totalExperienceXp = investmentXp(pointsToUse, hasMemberExperienceBonus)
+  const totalExperienceXp = investmentXp(pointsToUse, bonusPercent)
   const memberBonusXp = totalExperienceXp - pointsToUse
 
   useEffect(() => {
@@ -279,11 +290,15 @@ function RealBoxClient() {
       <p className="sp-description">
         選擇要投入的積分，增加這隻精靈的成長經驗。
       </p>
-      {hasMemberExperienceBonus && (
+      {/* On `bonusPercent`, not `hasMemberExperienceBonus`: until the rate
+          arrives there is no honest number to put in this sentence, and
+          stating one this client made up is exactly what moving the rate
+          to the server was for. It renders a moment later instead. */}
+      {bonusPercent > 0 && (
         <div className="sp-member-bonus">
           <Badge tone="growth">訂閱會員</Badge>
           <div>
-            <strong>培育經驗額外 +10%</strong>
+            <strong>培育經驗額外 +{bonusPercent}%</strong>
             <span>
               會員加成試算：投入 {formatNumber(pointsToUse)} 點，預計獲得{' '}
               {formatNumber(totalExperienceXp)} XP（含 +{formatNumber(memberBonusXp)} XP）
@@ -879,8 +894,8 @@ function RealBoxClient() {
             amount={pointsToUse}
             label="本次投入"
           />
-          {hasMemberExperienceBonus && (
-            <MemberExperienceBonus amount={pointsToUse} />
+          {bonusPercent > 0 && (
+            <MemberExperienceBonus amount={pointsToUse} bonusPercent={bonusPercent} />
           )}
           {actionError && <p className="sp-inline-notice">{actionError}</p>}
           <div className="sp-dialog-actions">
@@ -982,12 +997,21 @@ function TransactionSummary({
   )
 }
 
-function MemberExperienceBonus({ amount }: { amount: number }) {
-  const total = investmentXp(amount, true)
+// Rendered only where the rate is known and non-zero, so it takes the
+// rate rather than re-deriving entitlement: there is no `true` to pass
+// any more, and no 10 to write into the badge.
+function MemberExperienceBonus({
+  amount,
+  bonusPercent,
+}: {
+  amount: number
+  bonusPercent: number
+}) {
+  const total = investmentXp(amount, bonusPercent)
   const bonus = total - amount
   return (
     <div className="sp-member-bonus sp-member-bonus--dialog">
-      <Badge tone="growth">訂閱會員 +10%</Badge>
+      <Badge tone="growth">訂閱會員 +{bonusPercent}%</Badge>
       <dl>
         <div>
           <dt>原始培育經驗</dt>

@@ -19,7 +19,7 @@ import {
   userTable,
 } from 'src/db/schema';
 import { DONATION_AMOUNT } from 'src/lib/donationAmount';
-import { MAX_LEVEL } from 'src/lib/guardianLevel';
+import { MAX_LEVEL, SUBSCRIBER_XP_BONUS_PERCENT } from 'src/lib/guardianLevel';
 import { DEFAULT_LIMIT, genPagination, MAX_LIMIT, paginationSchema } from 'src/lib/paginator';
 import { PLANS } from 'src/lib/subscriptionPlan';
 import { TransactionEnv } from 'src/middleware/transaction';
@@ -81,6 +81,33 @@ const dayPassPlanSchema = z.object({
 export const getInfoPlansResponseSchema = z.array(
   z.discriminatedUnion('kind', [recurringPlanSchema, dayPassPlanSchema])
 );
+
+/**
+ * The subscriber growth bonus rate.
+ *
+ * Published for the same reason the prices are: the box screen states the
+ * XP an investment will earn *before* the user confirms it, and the server
+ * decides what is actually granted. Two copies of the rate meant two
+ * numbers that nothing kept equal, and the user sees both.
+ *
+ * A whole percentage rather than a 0.1 multiplier, and that is not
+ * cosmetic: `points * 0.1` is not always what it looks like, because 0.1
+ * has no exact binary form. `3 * 0.1` is 0.30000000000000004 and the error
+ * has no fixed sign, so a value that should land exactly on an integer can
+ * come out just under it and lose a whole XP to the floor below.
+ * `(points * 10) / 100` keeps every step on integers until the single
+ * division, which IEEE-754 rounds correctly.
+ */
+export const getInfoGrowthResponseSchema = z
+  .object({
+    subscriberXpBonusPercent: z
+      .number()
+      .int()
+      .describe(
+        'Added to an investment made with paid access, floored: at 10, 100 points earn 110 XP and 5 points earn 5. Whether a given caller earns it is not here -- the server reads entitlement for itself on every invest.'
+      ),
+  })
+  .openapi({ ref: 'GrowthInfo' });
 
 export const getInfoStatsResponseSchema = z.object({
   categoryCount: z.number().int(),
@@ -230,6 +257,19 @@ const plansDoc = describeRoute({
   },
 });
 
+const growthDoc = describeRoute({
+  summary: 'The subscriber growth bonus rate',
+  description:
+    'Public and unauthenticated: it is a published benefit of subscribing, read by the box screen before an investment is confirmed, and it says nothing about the caller. The rate is the whole of it -- whether a particular user earns the bonus is decided by the server on each invest, from its own entitlement lookup, never from what a client sends.',
+  tags: ['info'],
+  responses: {
+    200: {
+      description: 'The rate, as a whole percentage',
+      content: { 'application/json': { schema: resolver(getInfoGrowthResponseSchema) } },
+    },
+  },
+});
+
 const donationDoc = describeRoute({
   summary: 'The public donation record',
   description:
@@ -317,6 +357,22 @@ export const info = new Hono<TransactionEnv>()
             }
       ) satisfies z.infer<typeof getInfoPlansResponseSchema>
     );
+  })
+  // The one rate, and the reason the webapp holds no copy of it: the box
+  // screen shows what an investment will earn before it is made, and this
+  // server grants it afterwards. When those two disagree the user is the
+  // one who notices.
+  //
+  // In the public group rather than under /api/subscription, like the
+  // prices above, because it is read while deciding whether to subscribe.
+  // No database access, so it stays outside the transaction middleware
+  // bound to /api/info/stats.
+  .get('/growth', growthDoc, (c) => {
+    console.log('GET /api/info/growth');
+
+    return c.json({
+      subscriberXpBonusPercent: SUBSCRIBER_XP_BONUS_PERCENT,
+    } satisfies z.infer<typeof getInfoGrowthResponseSchema>);
   })
   /**
    * The public donation record: every published payout, with the

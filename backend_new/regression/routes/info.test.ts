@@ -11,10 +11,12 @@ import {
 } from 'src/db/schema';
 import type { GetInfoPopularResponse, GetInfoStatsResponse } from '@castor/shared';
 import {
+  getInfoGrowthResponseSchema,
   getInfoPopularResponseSchema,
   getInfoResponseSchema,
   getInfoStatsResponseSchema,
 } from 'src/routes/info';
+import { SUBSCRIBER_XP_BONUS_PERCENT, investmentXp } from 'src/lib/guardianLevel';
 
 const clearTables = async () => {
   const db = getDb();
@@ -287,6 +289,26 @@ describe('info routes', () => {
       'name',
       'questionCount',
     ]);
+  });
+
+  it('publishes the growth rate the invest handler actually grants', async () => {
+    const res = await app.request('/api/info/growth');
+    expect(res.status).toBe(200);
+    const body: unknown = await res.json();
+
+    const parsed = getInfoGrowthResponseSchema.safeParse(body);
+    expect(parsed.error?.issues ?? []).toEqual([]);
+    expect(Object.keys(body as object).sort()).toEqual(['subscriberXpBonusPercent']);
+
+    // Not a restatement of the constant. The published number is checked
+    // against the arithmetic POST /api/guardian/{id}/invest runs, so
+    // changing either one alone fails here -- and those two disagreeing is
+    // the whole reason this endpoint exists, because the client states the
+    // XP before the investment and the server grants it afterwards.
+    const { subscriberXpBonusPercent: percent } = body as { subscriberXpBonusPercent: number };
+    expect(percent).toBe(SUBSCRIBER_XP_BONUS_PERCENT);
+    expect(investmentXp(1_000, true)).toBe(1_000 + (1_000 * percent) / 100);
+    expect(investmentXp(1_000, false)).toBe(1_000);
   });
 
   it('leaves the health check free of the database', async () => {

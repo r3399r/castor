@@ -14,7 +14,6 @@
     "pretypecheck": "npm run api:types"
   },
   "dependencies": {
-    "@castor/shared": "*",
     "@heroicons/react": "^2.2.0",
     "@phosphor-icons/react": "^2.1.10",
     "better-react-mathjax": "^3.0.1",
