@@ -1,4 +1,9 @@
 import { afterAll, afterEach, describe, expect, it } from 'vitest';
+// Cast from the schema rather than from a hand-written type: these
+// helpers describe what the endpoint sends, and the schema is the
+// description. @castor/shared used to supply them, which meant a test
+// could assert against a shape the server had never sent.
+import type { z } from 'zod';
 import { app } from 'src/app';
 import { closeDb, getDb } from 'src/db/client';
 import {
@@ -9,7 +14,6 @@ import {
   subjectTable,
   userTable,
 } from 'src/db/schema';
-import type { GetInfoPopularResponse, GetInfoStatsResponse } from '@castor/shared';
 import {
   getInfoGrowthResponseSchema,
   getInfoPopularResponseSchema,
@@ -35,14 +39,14 @@ const getStats = async () => {
   const res = await app.request('/api/info/stats');
   expect(res.status).toBe(200);
 
-  return (await res.json()) as GetInfoStatsResponse;
+  return (await res.json()) as z.infer<typeof getInfoStatsResponseSchema>;
 };
 
 const getPopular = async () => {
   const res = await app.request('/api/info/popular');
   expect(res.status).toBe(200);
 
-  return (await res.json()) as GetInfoPopularResponse;
+  return (await res.json()) as z.infer<typeof getInfoPopularResponseSchema>;
 };
 
 const addSubject = async (name: string, sortOrder = 0) => {

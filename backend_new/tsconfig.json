@@ -16,7 +16,6 @@
     "noImplicitReturns": true,
     "noEmit": true,
     "paths": {
-      "@castor/shared": ["../packages/shared/src/index.ts"],
       "src/*": ["./src/*"]
     }
   },

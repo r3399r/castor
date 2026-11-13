@@ -33,8 +33,8 @@ jobs:
         run: npm install
 
       # Nine seconds, no database and no secrets: backend_new/test is pure
-      # logic plus the compile-time contract tests, and regression/setup.ts
-      # loading a .env.local that does not exist here is a no-op.
+      # logic and zod schema shapes, and regression/setup.ts loading a
+      # .env.local that does not exist here is a no-op.
       #
       # The 788 regression tests are deliberately not here. They need a
       # MySQL service container and a schema to be loaded into it, which is
@@ -46,8 +46,8 @@ jobs:
       # The generated API document, regenerated here and compared with the
       # committed one. It is what clients are typed from, so a stale one
       # is a wrong type that compiles -- which is exactly what the
-      # hand-written types in packages/shared turned out to be, and
-      # nothing else in this pipeline would notice.
+      # hand-written types in the deleted packages/shared turned out to
+      # be, and nothing else in this pipeline would notice.
       - name: Check the OpenAPI document matches the routes
         run: |
           npm run openapi -w backend_new
@@ -55,6 +55,16 @@ jobs:
             echo "::error file=backend_new/openapi.json::Out of date. Run 'npm run openapi' in backend_new and commit the result."
             exit 1
           fi
+
+      # Fourteen tests, 200ms, no browser: the growth-bonus arithmetic the
+      # box screen states before an investment. It is written twice on
+      # purpose -- the server grants, the client states -- and the rate
+      # that used to be shared through a package now arrives from
+      # GET /api/info/growth, so what these pin is the rounding. The
+      # backend's own suite covers the granting half with the same worked
+      # examples.
+      - name: Run the webapp unit tests
+        run: npm run test -w webapp
 
       # The other half of the same gate: the webapp's types are generated
       # from that document, so this is what proves the document and the

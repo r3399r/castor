@@ -1400,8 +1400,8 @@ describe('reply routes', () => {
    * properties the schema does not mention is still assignable to it.
    *
    * The embedded question is the point of the key list below. It is the
-   * one shape three responses share, and packages/shared's `Question`
-   * claims six fields it has never carried -- `subject`, `enabled`,
+   * one shape three responses share, and the hand-written `Question`
+   * claimed six fields it had never carried -- `subject`, `enabled`,
    * `attempCount`, `scoringTotal` and both timestamps.
    */
   describe('the OpenAPI document', () => {

@@ -14,7 +14,9 @@ import {
 } from 'src/db/schema';
 import { DONATION_AMOUNT } from 'src/lib/donationAmount';
 import { MAX_LEVEL } from 'src/lib/guardianLevel';
-import type { GetInfoDonationResponse } from '@castor/shared';
+// Cast from the schema rather than from a hand-written type: this helper
+// describes what the endpoint sends, and the schema is the description.
+import type { z } from 'zod';
 import { getInfoDonationResponseSchema } from 'src/routes/info';
 
 // Deliberately no firebaseAdmin mock: this endpoint takes no token, and
@@ -24,7 +26,7 @@ const getRecord = async (query = '') => {
   const res = await app.request(`/api/info/donation${query}`);
   expect(res.status).toBe(200);
 
-  return (await res.json()) as GetInfoDonationResponse;
+  return (await res.json()) as z.infer<typeof getInfoDonationResponseSchema>;
 };
 
 // FK-safe order: evidence before batches, donations before both, and

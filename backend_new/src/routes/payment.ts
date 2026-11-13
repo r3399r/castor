@@ -72,8 +72,8 @@ export const postPaymentCheckoutResponseSchema = z.object({
 /**
  * One day-pass purchase as this API reports it.
  *
- * `choosePayment` and `status` are strings, not the closed sets
- * packages/shared declares, and this is the second place in the API
+ * `choosePayment` and `status` are strings, not the closed sets the
+ * hand-written types declared, and this is the second place in the API
  * where that distinction bites (see `question.type`). Both columns are
  * varchars. The set really is closed in practice -- `payment_purchase`
  * is written by this backend alone, always through the exported

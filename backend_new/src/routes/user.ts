@@ -123,9 +123,9 @@ const toUserDto = (row: {
  *
  * `entitled` and `autoRenew` are missing because each would be another
  * query per row, and the admin list only needs to show and toggle
- * billing. packages/shared types these responses as the full
- * SubscriptionStatus, which has been wrong since they were written: this
- * is what they actually send.
+ * billing. The hand-written type these responses used to be read
+ * against claimed the full SubscriptionStatus, which was wrong from the
+ * day it was written: this is what they actually send.
  */
 const subscriptionBillingSchema = subscriptionStatusSchema.pick({
   active: true,
@@ -161,7 +161,7 @@ export const getUserStatsResponseSchema = z.array(
     id: z.number().int(),
     name: z.string(),
     /**
-     * Only the id and name, although packages/shared types this as the
+     * Only the id and name, although the hand-written type claimed the
      * full Category (which carries createdAt too). What is sent is this.
      */
     category: z.array(z.object({ id: z.number().int(), name: z.string() })),

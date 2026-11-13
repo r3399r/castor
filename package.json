@@ -3,8 +3,7 @@
   "private": true,
   "workspaces": [
     "webapp",
-    "backend_new",
-    "packages/*"
+    "backend_new"
   ],
   "scripts": {
     "dev": "next dev webapp"

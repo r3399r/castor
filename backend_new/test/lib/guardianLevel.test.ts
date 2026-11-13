@@ -1,19 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import {
-  LEVEL_XP_THRESHOLDS,
-  SUBSCRIBER_XP_BONUS_PERCENT,
-  investmentXp,
-  pointsForXp,
-} from 'src/lib/guardianLevel';
+import { SUBSCRIBER_XP_BONUS_PERCENT, investmentXp } from 'src/lib/guardianLevel';
 
 /**
- * The subscriber growth bonus.
+ * The subscriber growth bonus -- the grant itself.
  *
  * Worth its own test for one reason: the number the user is promised
  * before they confirm is computed in the webapp, and the number they
  * actually get is computed here. Both have to produce the same integer
- * for the same input, so the exact rounding is the contract -- not an
+ * for the same input, so the exact rounding is the contract, not an
  * implementation detail.
+ *
+ * The rate can no longer differ -- the webapp reads it from
+ * GET /api/info/growth, which serves the constant below, and
+ * regression/routes/info.test.ts checks the published number against this
+ * function. What is still written twice is the rounding, so the worked
+ * examples here and in `webapp/lib/invest.test.ts` are deliberately the
+ * same: 100 -> 110, 5 -> 5, 2,273 -> 2,500.
  */
 describe('investmentXp', () => {
   it('adds nothing without paid access', () => {
@@ -48,59 +50,8 @@ describe('investmentXp', () => {
 
   it('states the rate as an integer percentage', () => {
     // The rate is a product decision, pinned so it cannot be nudged by
-    // accident. It is defined once, in @castor/shared, and the webapp
-    // imports the same value -- so this guards the number itself, not
-    // the two sides agreeing.
+    // accident. POINTS.md has the derivation and the fact that it is
+    // locked to the XP total and the donation amount.
     expect(SUBSCRIBER_XP_BONUS_PERCENT).toBe(10);
-  });
-});
-
-/**
- * The inverse, which caps the invest slider.
- *
- * Nothing on the server calls it -- the grant never needs it -- but it
- * decides how many points the box page lets a user spend, and that is
- * exactly why it is tested here rather than nowhere: the webapp has no
- * test setup, and an off-by-one makes the user either overspend or stop
- * one point short of a level.
- */
-describe('pointsForXp', () => {
-  it('asks for the full gap without the bonus', () => {
-    expect(pointsForXp(2_500, false)).toBe(2_500);
-    expect(pointsForXp(1, false)).toBe(1);
-  });
-
-  it('discounts the gap by the bonus for a subscriber', () => {
-    // The case the cap got wrong: a fresh spirit is 2,500 XP from LV2,
-    // and 2,273 points reach it once the 227 XP bonus is counted.
-    expect(pointsForXp(2_500, true)).toBe(2_273);
-    expect(investmentXp(2_273, true)).toBe(2_500);
-  });
-
-  it('is the smallest sufficient number of points', () => {
-    // The property, over every XP gap a level can present plus the
-    // small numbers where the floor bites hardest. One point fewer has
-    // to fall short; the answer itself must not.
-    const targets = [1, 2, 9, 10, 11, 12, 20, 21, 99, 100, ...LEVEL_XP_THRESHOLDS];
-    for (const target of targets) {
-      for (const entitled of [false, true]) {
-        const points = pointsForXp(target, entitled);
-        expect(investmentXp(points, entitled)).toBeGreaterThanOrEqual(target);
-        expect(investmentXp(points - 1, entitled)).toBeLessThan(target);
-      }
-    }
-  });
-
-  it('asks for nothing at or past the target', () => {
-    // A maxed spirit has no next level, which reaches here as a gap of
-    // zero; a negative gap would mean xp already past the threshold.
-    expect(pointsForXp(0, true)).toBe(0);
-    expect(pointsForXp(-5, true)).toBe(0);
-  });
-
-  it('returns whole points', () => {
-    for (const target of [7, 2_500, 7_500, 22_500, 67_500]) {
-      expect(Number.isInteger(pointsForXp(target, true))).toBe(true);
-    }
   });
 });

@@ -8,6 +8,7 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "api:types": "openapi-typescript ../backend_new/openapi.json -o types/openapi.d.ts",
+    "test": "vitest run",
     "postinstall": "npm run api:types",
     "predev": "npm run api:types",
     "prebuild": "npm run api:types",
@@ -38,6 +39,7 @@
     "@types/react-dom": "^19.0.0",
     "openapi-typescript": "^7.13.0",
     "tailwindcss": "^4.0.0",
-    "typescript": "^5.8.0"
+    "typescript": "^5.8.0",
+    "vitest": "^4.1.10"
   }
 }

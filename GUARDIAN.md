@@ -42,7 +42,7 @@ VALUES ('vip', 'VIP 星冠之蛋', '可任選公益類別', 10, NULL, 99, 1, now
 2. **VIP 和「漏填」在畫面上完全一樣。** `/admin/species` 的琥珀色「未綁定類別」badge
    對真 VIP 也會亮（刻意的）。所以 **`AGENTS.md` 那張表是唯一能分辨兩者的地方**。
 
-**不需要改**：`schema.ts`、任何後端路由、`packages/shared`、`docker-compose.yml`、
+**不需要改**：`schema.ts`、任何後端路由、`docker-compose.yml`、
 `webapp/lib/donationDemo.ts`。新增一顆蛋是加資料，不是加程式分支。
 
 **只要新增類別、不出新蛋**：看下面的「情境 C」，答案是只跑一條 INSERT，零程式碼變更。
@@ -268,7 +268,6 @@ VALUES ('mycat', '新類別名稱', 8, 1, now(3));
 | --- | --- |
 | `backend_new/src/db/schema.ts` | 新增一列資料不是 schema 變更 |
 | 任何後端路由 | 蛋是資料，不是程式分支 |
-| `packages/shared` 型別 | 同上 |
 | `backend_new/docker-compose.yml` | 種子檔已經掛好（`91_insert_guardian.sql`） |
 | `webapp/lib/donationDemo.ts` | 它從 `spiritCatalog` 推導，自動跟上 |
 | `webapp/app/box/DonationDemo.tsx` 的 `demoSpiritOptions` | 只影響 `?demo=donation` 的設計檢視清單。**可選**：想在 demo 裡看到新蛋才加 |

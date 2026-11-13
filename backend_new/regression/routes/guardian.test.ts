@@ -21,7 +21,7 @@ import { verifyIdTokenUid } from 'src/lib/firebaseAdmin';
  * Inferred from the route's own schemas, not written again here.
  *
  * This file used to carry a third hand-written copy of the guardian
- * shape -- after packages/shared's and the route's -- and a test that
+ * shape -- after the shared package's and the route's -- and a test that
  * describes the response for itself cannot notice the response changing.
  */
 type GetGuardianResponse = z.infer<typeof getGuardianResponseSchema>;

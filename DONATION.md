@@ -11,7 +11,7 @@
 | --- | --- |
 | 資料表 DDL | ✅ 完成，六支新表 ＋ `guardian` 一個新欄位 |
 | drizzle schema | ✅ 完成，對真實資料庫 smoke 測過 |
-| `packages/shared` 型別 | ✅ 完成（組織／捐款／公開紀錄／批次 admin） |
+| ~~`packages/shared` 型別~~ | 已作廃。該套件 2026-11-13 刪除，四組型別改由 `openapi.json` 生成（見 AGENTS.md） |
 | `/api/charity-organization` | ✅ 完成，31 個 regression test |
 | `/api/donation` | ✅ 完成，23 個 regression test |
 | `/api/info/donation` | ✅ 完成，19 個 regression test |
@@ -168,7 +168,7 @@ promisedAmount   = confirmedAmount + pendingAmount
 
 ## 接下來的順序
 
-1. ~~**`packages/shared` 型別**~~ — 改成跟著各自的路由加，見上
+1. ~~**`packages/shared` 型別**~~ — 改成跟著各自的路由加，見上。那個套件已於 2026-11-13 整個刪除
 2. ~~**`/api/charity-organization`**~~ ✅ — 公開讀（依類別列出），admin 寫
    - `GET /`（`categoryId`、`isActive` 篩選、分頁）、`GET /:id`、`POST /`、`PUT /:id`、`PUT /:id/category`、`DELETE /:id`
    - 讀端**刻意公開**（group 掛 `adminAuth`，只擋寫）。基金會的名稱／簡介／官網本來就是公開頁要印的東西，和 `/api/question` 那種「容忍」不一樣

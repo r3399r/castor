@@ -400,9 +400,10 @@ export const questionAdaptiveQuerySchema = z.object({
  * Every write path validates against `['GROUP', 'SINGLE', 'MULTIPLE',
  * 'TRUE_FALSE', 'FILL', 'CLOZE']`, but the column is a `varchar` and
  * these rows predate this backend, so a response cannot *promise* one of
- * the six. packages/shared types it as the union, which is a narrower
- * claim than the data supports -- a client narrowing on it would be
- * trusting a constraint the database does not hold.
+ * the six. The hand-written type this replaced declared the union,
+ * which was a narrower claim than the data supports -- a client
+ * narrowing on it would be trusting a constraint the database does not
+ * hold.
  */
 const questionTypeSchema = z
   .string()
@@ -810,9 +811,10 @@ const toQuestionRowDto = (
 /**
  * One row of the admin list.
  *
- * Note `subject`: a **name**, not the `Subject` object packages/shared
- * declares on `Question`. A client reading `question.subject.name` here
- * would get undefined.
+ * Note `subject`: a **name**, not the `Subject` object the hand-written
+ * `Question` declared. A client reading `question.subject.name` here
+ * would get undefined. `childCount` and `categories` were not on that
+ * type at all -- this row has never been a trimmed `Question`.
  */
 export const adminQuestionRowSchema = z.object({
   id: z.number().int(),

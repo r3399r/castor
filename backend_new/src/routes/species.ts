@@ -24,9 +24,9 @@ import { TransactionEnv } from 'src/middleware/transaction';
  *
  * A schema rather than a hand-written type: it is the single description
  * of the response, the handler's return is checked against it, and the
- * OpenAPI document is generated from it. Nothing in packages/shared
- * describes this response at all -- the admin page that reads it
- * declares its own shape. See "The OpenAPI document" in AGENTS.md.
+ * OpenAPI document is generated from it. No hand-written type ever
+ * described this response at all -- the admin page that reads it
+ * declared its own shape. See "The OpenAPI document" in AGENTS.md.
  */
 export const adminSpeciesSchema = z.object({
   id: z.number().int(),

@@ -2462,8 +2462,8 @@ describe('question routes', () => {
       const list: unknown = await (await getQuestionList()).json();
       expect(getQuestionListResponseSchema.safeParse(list).error?.issues ?? []).toEqual([]);
       expect(Object.keys(list as object).sort()).toEqual(['data', 'paginate']);
-      // Twelve fields, and `subject` is a name rather than the object
-      // packages/shared declares on Question.
+      // Twelve fields, and `subject` is a name rather than the object the
+      // old hand-written Question declared.
       expect(Object.keys((list as { data: object[] }).data[0]).sort()).toEqual([
         'answer',
         'categories',

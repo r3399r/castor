@@ -33,14 +33,47 @@ export const nextLevelXp = (level: number): number | null =>
   level < MAX_LEVEL ? LEVEL_XP_THRESHOLDS[level - 1] : null;
 
 /**
- * The subscriber growth bonus is defined once, in @castor/shared, and
- * re-exported here so this module stays the single place to look for a
- * spirit's arithmetic.
+ * The subscriber growth bonus.
  *
- * It lives in the shared package because the webapp computes the same sum
- * to show the user before they confirm. Do not add a second definition
- * here, however small -- the number on screen and the number granted have
- * to be the same integer, rounding included, and nothing but one
- * definition enforces that.
+ * This is the definition. It used to live in `@castor/shared` so the
+ * webapp could compute the same sum to show the user before confirming,
+ * which worked only because both halves were built from one checkout --
+ * a shared constant is not a contract, it is a build coincidence. The
+ * webapp now reads the rate from `GET /api/info/growth`, which serves
+ * this value, so there is one source and it travels over the wire.
+ *
+ * A whole percentage rather than a 0.1 multiplier, and that is not
+ * cosmetic: `points * 0.1` is not always what it looks like, because 0.1
+ * has no exact binary form. `3 * 0.1` is 0.30000000000000004 and the
+ * error has no fixed sign, so a value that should land exactly on an
+ * integer can come out just under it and lose a whole XP to the floor
+ * below. `(points * 10) / 100` keeps every step on integers until the
+ * single division, which IEEE-754 rounds correctly.
  */
-export { SUBSCRIBER_XP_BONUS_PERCENT, investmentXp, pointsForXp } from '@castor/shared';
+export const SUBSCRIBER_XP_BONUS_PERCENT = 10;
+
+/**
+ * What an investment of `points` becomes in XP -- the grant itself.
+ *
+ * Floored, because `user_guardian.xp` is an INT column: an investment of
+ * 5 earns 0 bonus XP rather than the 0.5 an earlier frontend estimate
+ * displayed and nothing could ever store.
+ *
+ * `entitled` means paid access, which is broader than "subscribed" -- see
+ * findEntitledSubscription. A cancelled agreement still inside its paid
+ * period earns the bonus, because the period is paid for, and so does a
+ * day pass, which has no agreement at all. This server reads that for
+ * itself on every invest; what a client sends is never consulted.
+ *
+ * The spend is always the full `points`: the bonus is growth, never a
+ * discount.
+ *
+ * `webapp/lib/invest.ts` runs the same arithmetic to state the sum before
+ * the investment, parameterised by the rate it fetched. The rate can no
+ * longer differ, but the rounding still could, so both sides are tested
+ * against the same worked examples -- 100 -> 110, 5 -> 5, 2,273 -> 2,500.
+ * Change the rounding here and `webapp/lib/invest.test.ts` is the other
+ * place to look.
+ */
+export const investmentXp = (points: number, entitled: boolean): number =>
+  points + (entitled ? Math.floor((points * SUBSCRIBER_XP_BONUS_PERCENT) / 100) : 0);
