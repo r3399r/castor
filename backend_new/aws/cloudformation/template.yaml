@@ -167,9 +167,9 @@ Resources:
           # merchant account. Renaming them later, with live agreements
           # already running against them, is the version of this change
           # nobody wants to do.
-          ECPAY_MERCHANT_ID: !Sub '{{resolve:ssm:${Project}-test-ecpay-merchant-id}}'
-          ECPAY_HASH_KEY: !Sub '{{resolve:ssm:${Project}-test-ecpay-hash-key}}'
-          ECPAY_HASH_IV: !Sub '{{resolve:ssm:${Project}-test-ecpay-hash-iv}}'
+          ECPAY_MERCHANT_ID: !Sub '{{resolve:ssm:${Project}-${TargetEnvr}-ecpay-merchant-id}}'
+          ECPAY_HASH_KEY: !Sub '{{resolve:ssm:${Project}-${TargetEnvr}-ecpay-hash-key}}'
+          ECPAY_HASH_IV: !Sub '{{resolve:ssm:${Project}-${TargetEnvr}-ecpay-hash-iv}}'
           # Which ECPay to talk to: 'stage' or 'production'. An SSM
           # parameter and not !If [IsProd, ...] on purpose. dev.yml
           # deploys to the prod *stack* deliberately (see AGENTS.md), so
@@ -181,7 +181,7 @@ Resources:
           # deliberate act with its own audit trail; src/lib/ecpay.ts
           # defaults to stage for anything that is not exactly
           # 'production'.
-          ECPAY_MODE: !Sub '{{resolve:ssm:${Project}-test-ecpay-mode}}'
+          ECPAY_MODE: !Sub '{{resolve:ssm:${Project}-${TargetEnvr}-ecpay-mode}}'
           # The origin a *browser* is sent back to. Derived from the same
           # parameters as the CloudFront alias below rather than
           # configured separately, so it cannot drift from the domain that

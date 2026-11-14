@@ -108,4 +108,4 @@ jobs:
       # Runs a single command using the runners shell
       - name: Deploy to dev environment
         run: |
-          sh deploy.sh prod
+          sh deploy.sh test
