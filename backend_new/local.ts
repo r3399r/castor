@@ -1,5 +1,8 @@
-import { config } from 'dotenv';
-config({ path: '.env.local' });
+// First, and for its side effects: it loads `.env.local` and applies the
+// local defaults, so this server starts against the docker-compose
+// database on a machine that has no `.env.local` at all. ECPay routes
+// still need real values -- they answer ECPAY_NOT_CONFIGURED without.
+import './localEnv';
 
 import { serve } from '@hono/node-server';
 import { app } from 'src/app';

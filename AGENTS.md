@@ -36,15 +36,16 @@ thing it describes has at least one failure mode that produces no error.
 - Do not introduce dependencies without explaining why.
 - Keep changes focused on the assigned task.
 - This is a workspaces monorepo: install dependencies from the repo root, not inside a workspace.
-- Do not commit secrets. `.env.local` / `webapp/.env.*` are local-only; `webapp/.env.example` is the template to update when a new variable is added.
+- Do not commit secrets. `.env.local` / `webapp/.env.*` are local-only; `backend_new/.env.example` and `webapp/.env.example` are the templates to update when a new variable appears, and neither may carry a real credential -- an ECPay HashKey/HashIV never goes into version control, whoever issued it.
 - When a change makes part of this file untrue, correct or delete that part **in the same change** — a stale rule is worse than no rule, because it gets followed. If a statement here contradicts the code, check `git log -S` before assuming which one is wrong: a deliberate removal means this file is stale, an accidental one means the code regressed, and the two need opposite fixes.
+- **What a fresh clone can do with no secrets at all**, measured rather than assumed: `npm run db:up` then both test suites (204 + 824), both typechecks, the webapp's 144 tests, and `npm run dev -w backend_new` serving DB-backed routes. What it cannot do: `npm run build -w webapp`, which prerenders `/subscription/result` and dies on `auth/invalid-api-key` without `webapp/.env`; and anything touching ECPay, which answers `ECPAY_NOT_CONFIGURED`. Both of those need real credentials, so both are correct failures -- the thing to preserve is that they fail by name rather than silently.
 - Keep this file to what the code cannot tell you: decisions and their rationale, couplings that fail silently, and actions needed outside the repo. Anything a single `grep` or `ls` would answer — file paths, exact pixel values, command lists — belongs in the code, which stays in sync on its own.
 
 ### Database
 
 - Schema changes must be made in `db/table/*.sql`, and the matching Drizzle definitions in `backend_new/src/db/schema.ts` must be updated in the same change — the two are hand-kept in sync and regression tests seed from `db/table/`.
 - Do not modify production database structure directly.
-- Data backfills/seeds belong in `db/script/<version>/`, not in application code. `docker-compose.yml` mounts them after the table DDL (`9x_` prefixes) so a fresh local DB is not empty.
+- Data backfills/seeds belong in `db/script/<version>/`, not in application code. `docker-compose.yml` mounts them after the table DDL (`9x_` prefixes) so a fresh local DB is not empty. **Seed a fixed catalogue the code refers to by `code`, not content an admin page owns.** Guardians and charity categories qualify: `webapp/lib/guardianArtwork.ts` and the LV5 donation flow look them up by code, so an environment without them is broken rather than empty. Exam categories, subjects, questions and tags do not: they are created through `/admin`, and a seed row would be a second copy of content those pages already own. `insert_category.sql` was dropped on 2026-11-15 for that reason -- a fresh local DB is meant to look empty there.
 - A seed containing non-ASCII text must start with `SET NAMES utf8mb4;`. The client that `docker-entrypoint-initdb.d` runs it with takes its charset from the container environment, which is latin1, so every Chinese character is silently double-encoded — 暖陽之蛋 lands as 12 characters, 29 bytes, nothing errors, and the rows read as mojibake forever after. `char_length()` is how you tell that apart from a terminal that simply cannot print CJK.
 - There is no migration tool. A new table in `db/table/*.sql` reaches a real environment only when someone runs the DDL by hand, and reaches the local test DB only on a fresh volume (`docker-entrypoint-initdb.d` does not re-run) — so also add the file to `backend_new/docker-compose.yml` and tell the user to run it against prod. Say so explicitly when a deploy would otherwise ship code that queries a table that is not there yet.
 
@@ -281,11 +282,11 @@ already.
 All backend_new commands run from `backend_new/`.
 
 ```
-npm run dev                  # local API server (tsx watch local.ts), reads .env.local
+npm run dev                  # local API server (tsx watch local.ts); .env.local optional, see localEnv.ts
 npm run db:up / db:down      # local MySQL via docker-compose, seeded from db/table/*.sql
 npm run typecheck            # tsc --noEmit on both src and tooling tsconfigs
 npm run test:unit            # vitest --dir test (no DB needed — mostly zod schema tests)
-npm run test:regression      # vitest --dir regression (needs db:up + .env.local first)
+npm run test:regression      # vitest --dir regression (needs db:up; env defaults in setup.ts)
 npm test                     # unit then regression
 npm run build                # esbuild bundle per-lambda into dist/
 npm run openapi              # regenerate openapi.json from the route definitions
@@ -421,7 +422,7 @@ It gates the deploy because it is in the same job, ahead of `sh deploy.sh`, alon
 ## Testing
 
 - `test/` — fast, no external deps (zod schema shape tests, error model, error-response mapping).
-- `regression/` — hits the real Hono app against local MySQL (seeded via `docker-compose.yml` from `db/table/*.sql`); requires `npm run db:up` and a `.env.local` with `DB_HOST`/`DB_PWD`/`PROJECT`/`PORT` set first.
+- `regression/` — hits the real Hono app against local MySQL (seeded via `docker-compose.yml` from `db/table/*.sql`); requires `npm run db:up` and nothing else. `localEnv.ts` loads `.env.local` if there is one and then defaults `PROJECT`, `DB_HOST` and `DB_PWD` to the docker-compose values; `regression/setup.ts` and `local.ts` both import it, so the suite and `npm run dev` agree and a fresh clone needs no file it has no way to obtain. Export a variable to point it elsewhere -- `DB_HOST=host.docker.internal npm run test:regression` from inside a container, whose own localhost has no MySQL. `.env.example` is the template for `npm run dev`, which does need the ECPay values; the suite does not, because the payment tests set their own.
 - Coverage excludes the `src/lambda/*` entrypoints on purpose — they're thin wiring, not branching logic worth measuring.
 
 ## Chromium Lambda layer

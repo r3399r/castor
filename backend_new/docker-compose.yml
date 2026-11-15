@@ -66,7 +66,16 @@ services:
       # an empty store on a fresh volume, which reads as a broken page
       # rather than as missing seed data. Regression tests clear these
       # tables before their first case, so the rows do not affect them.
-      - ../db/script/v1.0.0/insert_category.sql:/docker-entrypoint-initdb.d/90_insert_category.sql:ro
+      #
+      # Only these two. Exam categories, subjects, questions and tags are
+      # created through /admin and are not seeded: a seed row would be one
+      # more copy of content the admin pages already own, and the fresh
+      # volume is supposed to look empty there. Guardians and charity
+      # categories are different -- they are a fixed catalogue the code
+      # itself refers to by `code` (webapp/lib/guardianArtwork.ts, and the
+      # LV5 donation flow), so an environment without them is broken
+      # rather than empty. 90_insert_category.sql used to sit here and was
+      # dropped on 2026-11-15 for exactly that reason; do not add it back.
       - ../db/script/v1.0.0/insert_guardian.sql:/docker-entrypoint-initdb.d/91_insert_guardian.sql:ro
       # Last, because its UPDATE links each guardian to its category by
       # matching code -- it needs the guardian rows from 91 to exist.
