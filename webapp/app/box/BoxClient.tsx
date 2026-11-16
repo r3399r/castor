@@ -9,6 +9,7 @@ import {
   Check,
   ChevronDown,
   Coins,
+  Crown,
   LockKeyhole,
   ShoppingBag,
   Sparkles,
@@ -32,7 +33,12 @@ import {
   SpiritScene,
   SpiritStatusCard,
 } from '@/components/spirit'
-import { artworkByCode, spiritCatalog, type SpiritSpecies } from '@/lib/guardianArtwork'
+import {
+  artworkByCode,
+  spiritCatalog,
+  VIP_GUARDIAN_CODE,
+  type SpiritSpecies,
+} from '@/lib/guardianArtwork'
 import { apiFetch, apiPost } from '@/lib/api'
 import { useAuth } from '@/contexts/AuthContext'
 import { useGrowthBonus } from '@/hooks/useGrowthBonus'
@@ -60,6 +66,23 @@ type SpeciesDto = {
   cost: number
   owned: boolean
   level: number | null
+  previewOnly?: boolean
+}
+
+/**
+ * Keeps the announced VIP spirit visible until the catalog API has a real
+ * guardian row for it. A negative id can never be submitted: previewOnly
+ * disables the action, and a real `code: "vip"` row replaces this object.
+ */
+const VIP_PREVIEW: SpeciesDto = {
+  id: -1,
+  code: VIP_GUARDIAN_CODE,
+  name: 'VIP 星冠之蛋',
+  theme: '可任選公益類別',
+  cost: 0,
+  owned: false,
+  level: null,
+  previewOnly: true,
 }
 
 /** Levels in a complete collection series, matching the backend's MAX_LEVEL. */
@@ -200,6 +223,12 @@ function RealBoxClient() {
   const totalExperienceXp = investmentXp(pointsToUse, bonusPercent)
   const memberBonusXp = totalExperienceXp - pointsToUse
 
+  const displaySpecies = species.some(
+    (item) => item.code === VIP_GUARDIAN_CODE,
+  )
+    ? species
+    : [...species, VIP_PREVIEW]
+
   useEffect(() => {
     setPointsToUse((value) => {
       if (maxInvestablePoints === 0) return 0
@@ -209,7 +238,7 @@ function RealBoxClient() {
 
   // Started species first, so the collection opens on what the user has
   // actually been growing.
-  const collection = [...species].sort(
+  const collection = [...displaySpecies].sort(
     (a, b) => Number((b.level ?? 0) > 0) - Number((a.level ?? 0) > 0),
   )
 
@@ -229,6 +258,16 @@ function RealBoxClient() {
 
   const confirmRedeem = async () => {
     if (eggToExchange === null) return
+    // This is intentionally a frontend-only product gate. Keeping the
+    // check beside the mutation as well as on the card prevents a dialog
+    // opened under stale client state from submitting.
+    if (
+      eggToExchange.code === VIP_GUARDIAN_CODE &&
+      subscription?.entitled !== true
+    ) {
+      setActionError('這顆 VIP 蛋僅限訂閱會員兌換。')
+      return
+    }
     setBusy(true)
     setActionError(null)
     try {
@@ -653,10 +692,14 @@ function RealBoxClient() {
                 </RewardBanner>
               )}
               <div className="sp-store-grid">
-                {species.map((egg) => {
+                {displaySpecies.map((egg) => {
                   const pointsNeeded = Math.max(egg.cost - availablePoints, 0)
                   const canAfford = availablePoints >= egg.cost
                   const isOwned = egg.owned
+                  const isVip = egg.code === VIP_GUARDIAN_CODE
+                  const isPreviewOnly = egg.previewOnly === true
+                  const checkingVipAccess = isVip && subscription === null
+                  const vipLocked = isVip && subscription?.entitled === false
                   const art = artworkByCode[egg.code]
                   return (
                     <Card key={egg.id} className="sp-store-card">
@@ -676,27 +719,46 @@ function RealBoxClient() {
                         <p className="sp-eyebrow">{egg.theme}</p>
                         <div className="sp-store-title">
                           <h3>{egg.name}</h3>
-                          <Badge tone={isOwned ? 'complete' : 'neutral'}>
-                            {isOwned ? (
-                              <Check size={12} aria-hidden="true" />
-                            ) : (
-                              <LockKeyhole size={12} aria-hidden="true" />
-                            )}
-                            {isOwned ? '已擁有' : '未取得'}
-                          </Badge>
+                          <div className="sp-store-badges">
+                            {isVip && <Badge tone="growth">VIP</Badge>}
+                            <Badge tone={isOwned ? 'complete' : 'neutral'}>
+                              {isOwned ? (
+                                <Check size={12} aria-hidden="true" />
+                              ) : (
+                                <LockKeyhole size={12} aria-hidden="true" />
+                              )}
+                              {isOwned ? '已擁有' : '未取得'}
+                            </Badge>
+                          </div>
                         </div>
                         <p className="sp-description">
-                          孵化並培育這顆蛋，逐步解鎖精靈與牠的專屬棲地。
+                          {isVip
+                            ? '訂閱會員可取得的限定精靈；滿級後可任選公益類別支持。'
+                            : '孵化並培育這顆蛋，逐步解鎖精靈與牠的專屬棲地。'}
                         </p>
+                        {vipLocked && !isOwned && (
+                          <p className="sp-vip-lock-note">
+                            成為訂閱會員後即可兌換。
+                            <a href="/subscription" className="sp-text-link">
+                              查看訂閱方案 →
+                            </a>
+                          </p>
+                        )}
                         <div className="sp-store-purchase">
-                          <div className="sp-progress-heading">
-                            <span>兌換所需</span>
-                            <strong>
-                              <Coins size={16} aria-hidden="true" />
-                              {formatNumber(egg.cost)} 點
-                            </strong>
-                          </div>
-                          {!isOwned && !canAfford && (
+                          {isPreviewOnly ? (
+                            <p className="sp-caption">
+                              目前為圖鑑預覽，正式兌換開放後會在此顯示所需積分。
+                            </p>
+                          ) : (
+                            <div className="sp-progress-heading">
+                              <span>兌換所需</span>
+                              <strong>
+                                <Coins size={16} aria-hidden="true" />
+                                {formatNumber(egg.cost)} 點
+                              </strong>
+                            </div>
+                          )}
+                          {!isPreviewOnly && !isOwned && !canAfford && (
                             <>
                               <Progress
                                 value={availablePoints}
@@ -710,11 +772,23 @@ function RealBoxClient() {
                           )}
                           <Button
                             variant={isOwned ? 'secondary' : 'primary'}
-                            disabled={isOwned || !canAfford}
+                            disabled={
+                              isOwned ||
+                              isPreviewOnly ||
+                              !canAfford ||
+                              checkingVipAccess ||
+                              vipLocked
+                            }
                             onClick={() => setEggToExchange(egg)}
                           >
                             {isOwned
                               ? '已擁有'
+                              : isPreviewOnly
+                                ? '即將開放'
+                              : checkingVipAccess
+                                ? '確認會員狀態…'
+                                : vipLocked
+                                  ? '訂閱會員限定'
                               : canAfford
                                 ? '兌換'
                                 : '積分不足'}
@@ -759,17 +833,29 @@ function RealBoxClient() {
                 const unlockedLevel = series.level ?? 0
                 const art = artworkByCode[series.code]
                 const name = art ? spiritCatalog[art].name : series.name
+                const isVip = series.code === VIP_GUARDIAN_CODE
                 return (
                   <ContentPanel
                     key={series.id}
-                    className="sp-collection-series"
+                    className={`sp-collection-series${isVip ? ' sp-collection-series--vip' : ''}`}
                   >
                     <div className="sp-section-heading">
                       <div>
                         <p className="sp-eyebrow">
-                          {art ? spiritCatalog[art].category : series.theme}
+                          {isVip ? (
+                            <>
+                              <Crown size={16} aria-hidden="true" />
+                              訂閱會員專屬（可任選公益類別）
+                            </>
+                          ) : art ? (
+                            spiritCatalog[art].category
+                          ) : (
+                            series.theme
+                          )}
                         </p>
-                        <h3>{name}</h3>
+                        <div className="sp-collection-title-row">
+                          <h3>{name}</h3>
+                        </div>
                       </div>
                       <Badge
                         tone={unlockedLevel === 5 ? 'complete' : 'neutral'}

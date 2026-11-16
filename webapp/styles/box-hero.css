@@ -96,7 +96,7 @@
   isolation: isolate;
   overflow: visible;
   flex: 0 0 auto;
-  width: clamp(320px, 26vw, 380px);
+  width: clamp(400px, 31vw, 460px);
   min-width: 0;
   height: 180px;
   padding: 24px 36px;
@@ -146,9 +146,10 @@
 }
 .sp-box-page .sp-balance strong {
   color: var(--paper-number);
-  font-size: clamp(56px, 4vw, 76px);
+  font-size: clamp(52px, 3.5vw, 64px);
   line-height: var(--leading-display-relaxed);
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
   background: radial-gradient(ellipse, rgba(239,201,99,.15), transparent 72%);
 }
 .sp-box-page .sp-balance strong span { font-size: 16px; }
@@ -172,8 +173,8 @@
 @media (width < 48rem) {
   .sp-box-page .sp-hero-inner { gap: 12px; padding-bottom: 0; }
   .sp-box-page .sp-balance { width: 100%; height: 135px; padding: 20px 26px; border-radius: 8px 10px 8px 9px; }
-  .sp-box-page .sp-balance > .sp-points-copy { width: 100%; display: grid; grid-template-columns: auto auto; column-gap: 12px; text-align: left; }
-  .sp-box-page .sp-balance strong { font-size: clamp(56px, 12vw, 66px); justify-self: end; }
+  .sp-box-page .sp-balance > .sp-points-copy { width: 100%; text-align: center; }
+  .sp-box-page .sp-balance strong { font-size: clamp(42px, 12vw, 58px); }
   .sp-box-page .sp-balance small { display: block; grid-column: 1 / -1; text-align: center; margin-top: 4px; }
   .sp-box-page .sp-points-vine-top { width: 18%; top: -12px; left: -7px; }
   .sp-box-page .sp-points-vine-bottom { width: 30%; max-width: 112px; bottom: 2px; right: -4px; }

@@ -24,10 +24,11 @@ describe('spiritImage', () => {
     expect(spiritImage('cat', 3.7)).toBe('/illustrations/guardians/cat/lv3.webp')
   })
 
-  it('returns undefined for a spirit that has no artwork yet', () => {
-    // A normal state, not an error -- the caller shows the locked egg.
-    expect(spiritCatalog.dolphin.artwork).toBeUndefined()
-    expect(spiritImage('dolphin', 1)).toBeUndefined()
+  it('ships the newly completed rights and VIP artwork sets', () => {
+    expect(spiritCatalog.penguin.artwork).toBe('/illustrations/guardians/penguin')
+    expect(spiritCatalog.fennec.artwork).toBe('/illustrations/guardians/fennec')
+    expect(artworkByCode.rights).toBe('penguin')
+    expect(artworkByCode.vip).toBe('fennec')
   })
 })
 

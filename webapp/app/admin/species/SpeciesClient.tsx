@@ -8,6 +8,7 @@ import {
   artworkByCode,
   spiritCatalog,
   spiritImage,
+  VIP_GUARDIAN_CODE,
   type SpiritSpecies,
 } from '@/lib/guardianArtwork'
 
@@ -98,6 +99,7 @@ export default function SpeciesClient() {
   const unmapped = (Object.keys(spiritCatalog) as SpiritSpecies[]).filter(
     (key) => !mappedSpecies.has(key)
   )
+  const hasVipRow = species.some((row) => row.code === VIP_GUARDIAN_CODE)
 
   return (
     <>
@@ -115,6 +117,42 @@ export default function SpeciesClient() {
       )}
 
       <div className="flex flex-col gap-4">
+        {!hasVipRow && (
+          <section className="rounded-lg border border-amber-300 bg-amber-50/55 p-4">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-base font-bold text-black-900">
+                  {spiritCatalog.fennec.name}
+                </h2>
+                <code className="rounded bg-beige-200 px-1.5 py-0.5 text-[11px] text-black-700">
+                  {VIP_GUARDIAN_CODE}
+                </code>
+                <Badge tone="warn">前端預覽</Badge>
+                <Badge tone="muted">尚無資料列</Badge>
+              </div>
+              <span className="text-xs text-black-500">
+                尚未開放兌換 · 0 人擁有
+              </span>
+            </div>
+
+            <p className="mb-3 text-xs text-black-500">
+              {spiritCatalog.fennec.category}
+              {' · '}
+              訂閱會員限定；正式資料列上線後可任選公益類別
+            </p>
+
+            <div className="flex flex-wrap gap-3">
+              {LEVELS.map((level) => (
+                <LevelThumb
+                  key={level}
+                  species="fennec"
+                  level={level}
+                  owners={0}
+                />
+              ))}
+            </div>
+          </section>
+        )}
         {species.map((row) => {
           const art = artworkByCode[row.code]
           return (
@@ -173,7 +211,7 @@ export default function SpeciesClient() {
         })}
       </div>
 
-      {unmapped.length > 0 && (
+      {unmapped.filter((key) => key !== 'fennec').length > 0 && (
         <section className="mt-8">
           <h2 className="mb-2 text-base font-bold text-black-900">尚未對應到資料列的圖鑑定義</h2>
           <p className="mb-3 text-sm text-black-500">
@@ -181,7 +219,7 @@ export default function SpeciesClient() {
             資料列的 code 對應到它 —— 使用者無法在商店取得這些精靈。
           </p>
           <ul className="flex flex-wrap gap-2">
-            {unmapped.map((key) => (
+            {unmapped.filter((key) => key !== 'fennec').map((key) => (
               <li
                 key={key}
                 className="rounded-lg border border-brown-300 bg-white/40 px-3 py-2 text-sm"

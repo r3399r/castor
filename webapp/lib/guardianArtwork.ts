@@ -4,9 +4,10 @@ export type SpiritSpecies =
   | 'otter'
   | 'dog'
   | 'rabbit'
-  | 'dolphin'
+  | 'penguin'
   | 'bird'
   | 'deer'
+  | 'fennec'
 export type SpiritDefinition = {
   name: string
   category: string
@@ -43,11 +44,12 @@ export const spiritCatalog: Record<SpiritSpecies, SpiritDefinition> = {
     tone: 'forest',
     stages: ['初生', '萌芽', '探索', '茁壯', '綻放'],
   },
-  dolphin: {
-    name: '海豚精靈',
+  penguin: {
+    name: '企鵝精靈',
     category: '人權、法治、性別與社區',
+    artwork: '/illustrations/guardians/penguin',
     tone: 'sky',
-    stages: [],
+    stages: ['初生', '萌芽', '探索', '壯大', '綻放'],
   },
   bird: {
     name: '彩羽鳥靈',
@@ -62,6 +64,13 @@ export const spiritCatalog: Record<SpiritSpecies, SpiritDefinition> = {
     artwork: '/illustrations/guardians/deer',
     tone: 'forest',
     stages: ['初生', '萌芽', '探索', '茁壯', '綻放'],
+  },
+  fennec: {
+    name: '星冠狐靈',
+    category: '可任選公益類別',
+    artwork: '/illustrations/guardians/fennec',
+    tone: 'forest',
+    stages: ['初生', '萌芽', '探索', '壯大', '綻放'],
   },
 }
 /**
@@ -78,8 +87,13 @@ export const artworkByCode: Partial<Record<string, SpiritSpecies>> = {
   forest: 'deer',
   healing: 'rabbit',
   neurodevelopment: 'otter',
+  rights: 'penguin',
   wisdom: 'bird',
+  vip: 'fennec',
 }
+
+/** Database code reserved for the subscription-only egg. */
+export const VIP_GUARDIAN_CODE = 'vip'
 
 export function spiritImage(species: SpiritSpecies, level: number) {
   const root = spiritCatalog[species].artwork

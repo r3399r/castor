@@ -1496,6 +1496,22 @@
   justify-content: space-between;
   gap: 8px;
 }
+.sp-store-badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.sp-vip-lock-note {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--color-spirit-gold) 45%, transparent);
+  border-radius: var(--radius-spirit-control);
+  background: color-mix(in srgb, var(--color-spirit-gold) 10%, var(--color-spirit-cream));
+  color: var(--color-spirit-ink);
+  font-size: var(--text-spirit-caption);
+}
 .sp-store-purchase {
   margin-top: auto;
   padding-top: 12px;
@@ -1520,6 +1536,44 @@
 .sp-collection-series {
   margin-top: 28px;
   border-radius: 16px;
+}
+.sp-collection-series--vip {
+  position: relative;
+  overflow: hidden;
+  border-color: color-mix(in srgb, var(--color-spirit-gold) 62%, var(--color-spirit-line));
+  background:
+    linear-gradient(135deg, rgba(255, 250, 221, 0.92), rgba(242, 229, 188, 0.78)),
+    var(--spirit-surface);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 250, 218, 0.78),
+    0 10px 28px rgba(106, 78, 22, 0.1);
+}
+.sp-box-page .sp-collection-series--vip .sp-section-heading {
+  background:
+    radial-gradient(circle at 92% 10%, rgba(211, 174, 67, 0.26), transparent 34%),
+    rgba(239, 225, 172, 0.92);
+}
+.sp-collection-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.sp-collection-series--vip .sp-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #80601d;
+}
+.sp-collection-series--vip .sp-eyebrow svg {
+  flex: 0 0 auto;
+  color: #a97919;
+}
+.sp-collection-series--vip .sp-collection-card {
+  border-color: color-mix(in srgb, var(--color-spirit-gold) 42%, var(--color-spirit-line));
+}
+.sp-collection-series--vip .sp-collection-card:disabled .sp-collection-art {
+  background: #f7efd8;
 }
 .sp-collection-grid {
   display: grid;
