@@ -2,7 +2,14 @@ import { eq } from 'drizzle-orm';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { app } from 'src/app';
 import { closeDb, getDb } from 'src/db/client';
-import { guardianTable, pointTransactionTable, userGuardianTable, userTable } from 'src/db/schema';
+import {
+  guardianTable,
+  pointTransactionTable,
+  userGuardianTable,
+  userSubscriptionTable,
+  userTable,
+} from 'src/db/schema';
+import { VIP_GUARDIAN_CODE } from 'src/lib/guardianLevel';
 
 vi.mock('src/lib/firebaseAdmin', () => ({ verifyIdTokenUid: vi.fn() }));
 import { verifyIdTokenUid } from 'src/lib/firebaseAdmin';
@@ -30,7 +37,31 @@ const clearTables = async () => {
   await db.delete(pointTransactionTable);
   await db.delete(userGuardianTable);
   await db.delete(guardianTable);
+  await db.delete(userSubscriptionTable);
   await db.delete(userTable);
+};
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * A subscription period granting paid access right now. `cancelled` is
+ * deliberately still entitled -- the period already paid for runs to its
+ * end -- which is the case the VIP gate must not reject.
+ */
+const seedSubscription = async (userId: number, status = 'active', endsInDays = 30) => {
+  const db = getDb();
+  const now = new Date();
+  await db.insert(userSubscriptionTable).values({
+    userId,
+    plan: 'monthly',
+    status,
+    currentPeriodStart: new Date(now.getTime() - DAY_MS),
+    currentPeriodEnd: new Date(now.getTime() + endsInDays * DAY_MS),
+    provider: 'ecpay',
+    providerRef: `fixture-${userId}-${status}`,
+    createdAt: now,
+    updatedAt: now,
+  });
 };
 
 const seedUser = async (totalPoints = 0) => {
@@ -203,6 +234,67 @@ describe('store routes', () => {
 
       const res = await postRedeem({ speciesId });
       expect(res.status).toBe(404);
+    });
+
+    it('rejects the VIP species with SUBSCRIPTION_REQUIRED when the user has no paid access', async () => {
+      const userId = await seedUser(100);
+      const speciesId = await seedSpecies({ code: VIP_GUARDIAN_CODE, cost: 10 });
+
+      const res = await postRedeem({ speciesId });
+      expect(res.status).toBe(400);
+      expect(((await res.json()) as ErrorBody).code).toBe('SUBSCRIPTION_REQUIRED');
+
+      // The frontend gate is bypassable by design, so this one carries the
+      // rule: nothing may be spent and no guardian may exist afterwards.
+      const db = getDb();
+      const [user] = await db.select().from(userTable).where(eq(userTable.id, userId));
+      expect(user.totalPoints).toBe(100);
+      expect(await db.select().from(userGuardianTable)).toHaveLength(0);
+    });
+
+    it('redeems the VIP species for a subscriber', async () => {
+      const userId = await seedUser(100);
+      await seedSubscription(userId);
+      const speciesId = await seedSpecies({ code: VIP_GUARDIAN_CODE, cost: 10 });
+
+      const res = await postRedeem({ speciesId });
+      expect(res.status).toBe(200);
+      expect(((await res.json()) as PostRedeemResponse).totalPoints).toBe(90);
+    });
+
+    it('redeems the VIP species for a cancelled subscription still inside its paid period', async () => {
+      const userId = await seedUser(100);
+      await seedSubscription(userId, 'cancelled');
+      const speciesId = await seedSpecies({ code: VIP_GUARDIAN_CODE, cost: 10 });
+
+      const res = await postRedeem({ speciesId });
+      expect(res.status).toBe(200);
+    });
+
+    it('rejects the VIP species once its paid period has ended', async () => {
+      const userId = await seedUser(100);
+      await seedSubscription(userId, 'active', -1);
+      const speciesId = await seedSpecies({ code: VIP_GUARDIAN_CODE, cost: 10 });
+
+      const res = await postRedeem({ speciesId });
+      expect(res.status).toBe(400);
+      expect(((await res.json()) as ErrorBody).code).toBe('SUBSCRIPTION_REQUIRED');
+    });
+
+    it('reports ALREADY_OWNED rather than SUBSCRIPTION_REQUIRED when a lapsed subscriber owns the VIP egg', async () => {
+      const userId = await seedUser(100);
+      const speciesId = await seedSpecies({ code: VIP_GUARDIAN_CODE, cost: 10 });
+      const db = getDb();
+      await db.insert(userGuardianTable).values({
+        userId,
+        guardianId: speciesId,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      const res = await postRedeem({ speciesId });
+      expect(res.status).toBe(400);
+      expect(((await res.json()) as ErrorBody).code).toBe('ALREADY_OWNED');
     });
 
     it('does not deduct points or create a guardian row when redemption fails', async () => {

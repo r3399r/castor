@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS castor.payment_charge (
     -- 1 when the charge was simulated from the ECPay back office. Such a
     -- notification looks exactly like a real one but no money moved, so
     -- it must never grant a period.
-    simulate_paid TINYINT(1) NOT NULL DEFAULT 0,
+    simulate_paid TINYINT NOT NULL DEFAULT 0,
     created_at DATETIME(3) NULL DEFAULT CURRENT_TIMESTAMP(3),
 
     PRIMARY KEY (id),

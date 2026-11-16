@@ -5,6 +5,8 @@ import { Hono } from 'hono';
 import { describeRoute, resolver } from 'hono-openapi';
 import { z } from 'zod';
 import { guardianTable, pointTransactionTable, userGuardianTable, userTable } from 'src/db/schema';
+import { VIP_GUARDIAN_CODE } from 'src/lib/guardianLevel';
+import { findEntitledSubscription } from 'src/lib/subscription';
 import { BadRequestError, NotFoundError } from 'src/model/error';
 import { UserEnv } from 'src/middleware/requireUser';
 
@@ -75,7 +77,7 @@ const redeemDoc = describeRoute({
     },
     400: {
       description:
-        'Already owned (ALREADY_OWNED) or not enough points (INSUFFICIENT_POINTS) -- the code in the body says which',
+        'Already owned (ALREADY_OWNED), subscriber-only without paid access (SUBSCRIPTION_REQUIRED), or not enough points (INSUFFICIENT_POINTS) -- the code in the body says which',
     },
     401: { description: 'No valid identity' },
     404: { description: 'No such species, or it is not on sale' },
@@ -140,6 +142,21 @@ export const store = new Hono<UserEnv>()
       .from(userGuardianTable)
       .where(and(eq(userGuardianTable.userId, user.id), eq(userGuardianTable.guardianId, speciesId)));
     if (existing !== undefined) throw new BadRequestError('already own this guardian', 'ALREADY_OWNED');
+
+    // The VIP egg is subscriber-only. BoxClient checks this on the card
+    // and again beside the mutation, but both are frontend: without this
+    // check, `cost` points and a direct POST are enough to own a spirit
+    // whose category_id is NULL -- and NULL is what lets its owner send a
+    // real donation to any category.
+    //
+    // Entitled, not active: a cancelled agreement inside the period it
+    // already paid for still grants paid access, same rule guardian.ts
+    // uses for the XP bonus.
+    if (species.code === VIP_GUARDIAN_CODE) {
+      const entitled = await findEntitledSubscription(db, user.id);
+      if (entitled === undefined)
+        throw new BadRequestError('subscription required for this guardian', 'SUBSCRIPTION_REQUIRED');
+    }
 
     if (user.totalPoints < species.cost) throw new BadRequestError('insufficient points', 'INSUFFICIENT_POINTS');
 

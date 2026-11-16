@@ -76,10 +76,11 @@ services:
       # LV5 donation flow), so an environment without them is broken
       # rather than empty. 90_insert_category.sql used to sit here and was
       # dropped on 2026-11-15 for exactly that reason; do not add it back.
-      - ../db/script/v1.0.0/insert_guardian.sql:/docker-entrypoint-initdb.d/91_insert_guardian.sql:ro
-      # Last, because its UPDATE links each guardian to its category by
-      # matching code -- it needs the guardian rows from 91 to exist.
-      - ../db/script/v1.0.0/insert_charity_category.sql:/docker-entrypoint-initdb.d/92_insert_charity_category.sql:ro
+      - ../db/script/v1.0.0/insert_charity_category.sql:/docker-entrypoint-initdb.d/91_insert_charity_category.sql:ro
+      # After 91, which it reads: each guardian's category_id is a subquery
+      # on charity_category.code. Reversed, the subqueries return NULL
+      # without erroring and all seven eggs become VIP eggs.
+      - ../db/script/v1.0.0/insert_guardian.sql:/docker-entrypoint-initdb.d/92_insert_guardian.sql:ro
     healthcheck:
       test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost', '-u', 'root', '-proot']
       interval: 5s

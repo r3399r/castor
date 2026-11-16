@@ -26,6 +26,18 @@
 // mid-level, which is why POINTS.md says to start high and come down.
 export const LEVEL_XP_THRESHOLDS = [2_500, 7_500, 22_500, 67_500];
 
+/**
+ * The guardian.code of the subscriber-only egg.
+ *
+ * There is no column saying "this species needs a subscription" -- the
+ * code is the marker, and store.ts's redeem is what enforces it. The
+ * webapp keeps its own copy in webapp/lib/guardianArtwork.ts
+ * (VIP_GUARDIAN_CODE), which it needs for the card's lock state; that
+ * copy is presentation, this one is the gate. If a second subscriber-only
+ * species ever ships, this becomes a column rather than a third literal.
+ */
+export const VIP_GUARDIAN_CODE = 'vip';
+
 export const MAX_LEVEL = LEVEL_XP_THRESHOLDS.length + 1;
 
 /** The XP needed for the next level, or null for a spirit already maxed. */

@@ -21,15 +21,5 @@ CREATE TABLE IF NOT EXISTS castor.guardian (
     updated_at DATETIME(3) NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
     PRIMARY KEY (id),
     UNIQUE KEY uk_code (code),
-    -- Named, unlike every other foreign key in this schema, and it has to
-    -- stay named. Production acquired this constraint through a one-off
-    -- ALTER that spelled the name out; that script has since been deleted,
-    -- because the only database that ever needed it had already run it and
-    -- every new environment gets the column from this file instead.
-    -- Dropping the name here would give a rebuilt database
-    -- `guardian_ibfk_1` against production's `fk_guardian_category` -- two
-    -- schemas that look identical until something tries to DROP FOREIGN
-    -- KEY by name.
-    CONSTRAINT fk_guardian_category
-      FOREIGN KEY (category_id) REFERENCES castor.charity_category(id)
+    FOREIGN KEY (category_id) REFERENCES castor.charity_category(id)
 );

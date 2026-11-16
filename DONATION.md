@@ -296,19 +296,34 @@ mysql ... < db/table/donation.sql
 
 **順序有意義**：`charity_category` 要最先（`guardian` 的外鍵指向它），`donation.sql` 要最後（它的外鍵也指向 `charity_category`）。
 
+這一節假設環境裡已經有 guardian 資料列（正式庫就是這樣）。**如果是一個連 guardian 都還空著的新環境**，
+`insert_charity_category.sql` 還要排在 `db/script/v1.0.0/insert_guardian.sql` 之前——
+每顆蛋的 `category_id` 是用子查詢去對 `charity_category.code` 取的。順序顛倒不會報錯：
+子查詢會回 NULL，而 NULL 的語意是「可任選公益類別」，七顆蛋會全部變成 VIP。
+
 六支 table 檔是 `CREATE TABLE IF NOT EXISTS`，可以重複執行。
-`insert_charity_category.sql` 的 INSERT 不可重跑（`uk_code` 會擋），但它的 UPDATE 本身是 idempotent 的。
+`insert_charity_category.sql` 不可重跑（`uk_code` 會擋）。
 
 > **原本還有一支 `ALTER TABLE guardian ADD COLUMN category_id` 的升級腳本，已經刪掉。**
 > 它只對捐款功能之前就存在的資料庫有意義，而那個資料庫（正式庫）已經跑過了。
 > `category_id` 和它的外鍵現在由 `db/table/guardian.sql` 自己帶，新環境不需要任何 ALTER。
-> 外鍵名稱 `fk_guardian_category` 在那支檔案裡明寫著，**不要拿掉**——正式庫就是這個名字。
+> **外鍵名稱兩邊不同**：正式庫那條叫 `fk_guardian_category`（當初那支 ALTER 給的），
+> 而 `db/table/guardian.sql` 現在是不具名寫法，重建的資料庫會拿到 `guardian_ibfk_1`。
+> 功能完全相同，差別只在「用名字操作它」的時候——`ALTER TABLE ... DROP FOREIGN KEY <名字>`
+> 在另一邊會收到 `ERROR 1091`。要寫這種腳本時先查 `information_schema.KEY_COLUMN_USAGE`。
 
 > **不要用 GUI client 跑這些檔案。** `CREATE TABLE` 括號內有空行，而 DBeaver 若開了
 > 「Blank line is statement delimiter」會把一個語句切成好幾段（症狀是 `1064` 錯誤指在
 > `created_at` 那一行）。另外有幾支檔案的註解裡帶分號，也是切分地雷。用 `mysql` CLI。
 
-新環境不需要跑這些，`backend_new/docker-compose.yml` 已經掛好了：`charity_category` 是 `24a`（排在 `guardian` 的 25 之前），其餘 29–33，類別 seed 是 92（要在 guardian seed 91 之後，它靠 code 連回去）。
+新環境不需要跑這些，`backend_new/docker-compose.yml` 已經掛好了：`charity_category` 是 `24a`（排在 `guardian` 的 25 之前），其餘 29–33，類別 seed 是 `91`，guardian seed 是 `92`（它要讀類別的列）。
+
+> **這兩支 seed 的順序在 2026-11-16 反過來了。** 原本是 guardian seed 先跑（91），
+> 類別 seed（92）結尾再用一條 `UPDATE guardian g JOIN charity_category c ON c.code = g.code`
+> 回填 `category_id`。那條 UPDATE 只為了 2026-11-08 當下已經有七顆蛋的正式庫而存在，
+> 而它同時是個地雷：`guardian.code` 是 UNIQUE，所以同一類別的第二顆蛋 code 必然不同，
+> 那個 JOIN 永遠對不上它，`category_id` 留 NULL，就無聲多出一隻 VIP。
+> 現在 `category_id` 直接寫在 INSERT 裡，UPDATE 和地雷一起消失。正式庫已經跑過回填，不必補做。
 
 ---
 
@@ -322,7 +337,8 @@ mysql ... < db/table/donation.sql
 | `db/table/donation_batch.sql` | 新增 |
 | `db/table/donation_batch_evidence.sql` | 新增 |
 | `db/table/donation.sql` | 新增 |
-| `db/script/v1.0.0/insert_charity_category.sql` | 新增，七個類別的 seed ＋ 依 code 連回 guardian |
+| `db/script/v1.0.0/insert_charity_category.sql` | 新增，七個類別的 seed。原本結尾還有一條依 code 回填 `guardian.category_id` 的 UPDATE，2026-11-16 隨 seed 順序反轉移除 |
+| `db/script/v1.0.0/insert_guardian.sql` | `category_id` 改成在 INSERT 裡用子查詢對 `charity_category.code` 取，不再靠回填 |
 | `db/table/guardian.sql` | 加 `category_id`（取代原本的 `unrestricted_category`） |
 | `backend_new/src/db/schema.ts` | 加六張表 ＋ `guardian.categoryId` |
 | `backend_new/src/lib/guardianLevel.ts` | 新增。`LEVEL_XP_THRESHOLDS` / `MAX_LEVEL` 從 `routes/guardian.ts` 搬出來共用——捐款要判斷滿級，而 `MAX_LEVEL` 絕不能有兩份 |

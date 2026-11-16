@@ -33,9 +33,11 @@ VALUES ('vip', 'VIP 星冠之蛋', '可任選公益類別', 10, NULL, 99, 1, now
 
 ### 兩個一定會踩到的陷阱
 
-1. **`category_id` 必須在 INSERT 裡明寫。** 種子腳本的回填是
-   `JOIN charity_category c ON c.code = g.code`，而 `guardian.code` 是 UNIQUE——所以
-   **同一類別的第二顆蛋 code 必然不同，那個 JOIN 永遠對不上**。漏了不會報錯，
+1. **`category_id` 必須在 INSERT 裡明寫。** **沒有任何東西會幫你填它**——
+   2026-11-16 之前 `insert_charity_category.sql` 結尾有一條
+   `JOIN charity_category c ON c.code = g.code` 的回填 UPDATE，那條已經移除
+   （它只對七顆蛋 code 恰好等於類別 code 的初始狀態有效，而 `guardian.code` 是
+   UNIQUE，同一類別的第二顆蛋 code 必然不同，JOIN 永遠對不上）。漏了不會報錯，
    而 `category_id IS NULL` 的語意就是「可任選類別」，那顆蛋會直接變成一隻 VIP，
    主人可以把真實的錢導向任何類別。
 
@@ -57,7 +59,8 @@ VALUES ('vip', 'VIP 星冠之蛋', '可任選公益類別', 10, NULL, 99, 1, now
 
 這份文件就是為了讓那件事不再靠記憶。
 
-本文在 **2026-11-09** 對 `donation` 分支查證過。改動下列任一處時，連同這份文件一起更新。
+本文在 **2026-11-09** 對 `donation` 分支查證過，2026-11-16 隨兩支 seed 的順序反轉更新過
+（類別 seed 先、guardian seed 後，回填 UPDATE 移除）。改動下列任一處時，連同這份文件一起更新。
 
 ---
 
@@ -97,23 +100,30 @@ id 是 auto-increment，每個環境不一樣（正式庫的 guardian id 是 7�
 
 > ### ⚠️ 這裡是整份文件最危險的一步
 >
-> `db/script/v1.0.0/insert_charity_category.sql` 的回填是
-> `JOIN charity_category c ON c.code = g.code`——**只在蛋的 code 和類別的 code 相同時才會對上**。
+> **`category_id` 沒有任何補救機制，漏了就是漏了。**
 >
-> 而 `guardian.code` 是 UNIQUE，所以**同一個類別的第二顆蛋，code 必然不同**，
-> 那個 JOIN 永遠不會幫它填 `category_id`。
->
-> 漏掉 `category_id` 的後果不是「少一個欄位」：**NULL 的語意就是「不綁類別、可任選」**，
+> 漏掉它的後果不是「少一個欄位」：**NULL 的語意就是「不綁類別、可任選」**，
 > 也就是這顆蛋會變成一隻沉默的 VIP，它的主人可以把捐款導向任何類別。
 > 沒有任何地方會報錯。
 >
-> 所以：**第二顆同類別的蛋，`category_id` 一定要在 INSERT 裡明寫**（像上面那樣用子查詢）。
+> 所以：**每一條 guardian 的 INSERT 都要寫 `category_id`**（像上面那樣用子查詢，
+> 不要手打 id），VIP 則明寫 `NULL`。
+>
+> > 2026-11-16 之前 `insert_charity_category.sql` 結尾有一條
+> > `UPDATE guardian g JOIN charity_category c ON c.code = g.code` 的回填，
+> > 它**只在蛋的 code 和類別的 code 相同時才會對上**，而 `guardian.code` 是 UNIQUE，
+> > 所以同一類別的第二顆蛋永遠不會被它填到——看起來像個防線，其實不是。
+> > 那條 UPDATE 已經移除，兩支 seed 的順序也跟著反過來（類別先、蛋後）。
 
 ### A-2. repo 的種子副本
 
-`db/script/v1.0.0/insert_guardian.sql` 加一列。注意那支檔案**不寫 `category_id`**
-（它靠 `insert_charity_category.sql` 回填），所以如果新蛋的 code 不等於類別的 code，
-**你必須在那支檔案裡也明寫 `category_id`**，否則全新環境會長出一隻 VIP。
+`db/script/v1.0.0/insert_guardian.sql` 加一列，**連同 `category_id` 的子查詢一起寫**——
+那支檔案現在每一列都自己帶 `category_id`（`(SELECT id FROM castor.charity_category
+WHERE code = '...')`），沒有任何回填會補它。新蛋的 code 不等於類別的 code 時尤其注意：
+子查詢要對**類別的** code，不是蛋自己的 code，否則回 NULL，全新環境會長出一隻 VIP。
+
+那支檔案掛在 `92_insert_guardian.sql`，排在 `91_insert_charity_category.sql` 之後，
+因為它要讀類別的列。這個順序不要再換回去。
 
 `cost` 目前七顆一律 **10**，刻意不做階梯價，不要「修正」成遞增。
 
@@ -164,18 +174,23 @@ export const artworkByCode: Partial<Record<string, SpiritSpecies>> = {
 | 格式 | WebP，RGB |
 | 原始檔 | 同步放 `webapp/source-assets/png/illustrations/guardians/<species>/lv1..lv5.png` |
 
-**壓縮請用有損（lossy）。** 現有檔案不一致，這是既有的技術債：
+**壓縮請用有損（lossy）。** 2026-11-16 實測八個物種全部是 VP8（有損），
+範圍 61–434 KB：
 
-| 物種 | 編碼 | LV1–LV5 大小 |
-| --- | --- | --- |
-| `otter` | VP8（有損） | 212–326 KB |
-| `rabbit` | VP8（有損） | 198–378 KB |
-| `bird` | **VP8L（無損）** | 1407–1656 KB |
-| `cat` | **VP8L（無損）** | 1600–1906 KB |
-| `deer` | **VP8L（無損）** | 1402–2392 KB |
+| 物種 | LV1–LV5 大小 |
+| --- | --- |
+| `penguin` | 61–145 KB |
+| `fennec` | 75–141 KB |
+| `bird` | 103–159 KB |
+| `deer` | 109–434 KB |
+| `dog` | 135–281 KB |
+| `cat` | 143–254 KB |
+| `rabbit` | 198–378 KB |
+| `otter` | 228–326 KB |
 
-無損那三個是有損的 **5–7 倍**，一個物種五張就 7–10 MB。新蛋請對齊 `otter`／`rabbit`
-那一組：**壓到 200–350 KB 區間**，編碼是 VP8（有損）而非 VP8L。
+`bird`／`cat`／`deer` 曾經是 VP8L（無損）、1400–2400 KB，一個物種五張 7–10 MB，
+那筆技術債已經清掉了。新蛋**壓到 100–350 KB 區間**，編碼是 VP8（有損）而非 VP8L；
+用 `RIFF` header 第 12–16 byte 可以確認是 `VP8 ` 還是 `VP8L`。
 
 具體的品質參數**沒有紀錄**——現有檔案只能看出位元組大小和編碼，反推不出當初用的設定，
 所以請自己試幾個值，比對檔案大小和 1254×1254 下的畫質。repo 裡也沒有任何壓圖工具或腳本，
@@ -222,6 +237,17 @@ NULL 不是「忘了填」，它是一句完整的敘述：**這顆蛋的主人�
 - `POST /api/donation` 對這種精靈**要求**明寫 `categoryId`（省略回 `DONATION_CATEGORY_REQUIRED`）；
   一般精靈則相反，明寫錯的類別回 `DONATION_CATEGORY_INVALID`
 
+### 訂閱門檻在後端，認的是 `code`
+
+VIP 蛋限訂閱會員兌換，而**沒有任何欄位記載這件事**——`store.ts` 的 redeem 認的是
+`guardian.code === 'vip'`（常數在 `backend_new/src/lib/guardianLevel.ts` 的
+`VIP_GUARDIAN_CODE`，webapp 另有一份同名常數負責卡片的鎖定狀態）。
+沒有付費資格就回 `SUBSCRIPTION_REQUIRED`，判斷用 `findEntitledSubscription`，
+所以「已取消自動續訂但付費期間還沒結束」仍然可以兌換。
+
+前端 `BoxClient.tsx` 的檢查**不是門檻**，它自己的註解寫著是 frontend-only；
+後端那道才是。如果將來第二顆訂閱限定的蛋上線，這就該變成一個欄位，而不是第三份字串字面值。
+
 ### VIP 和「漏填」在畫面上一模一樣
 
 `/admin/species` 的「未綁定類別」badge **對真正的 VIP 也會亮**，而且是刻意的：
@@ -232,9 +258,12 @@ NULL 不是「忘了填」，它是一句完整的敘述：**這顆蛋的主人�
 
 ### 圖檔
 
-VIP 目前**沒有圖**。沒有圖時不要加進 `artworkByCode`，前端會用
+VIP 的圖**已經有了**：物種是 `fennec`（星冠狐靈），`artworkByCode.vip = 'fennec'`，
+五張圖在 `webapp/public/illustrations/guardians/fennec/`（1254×1254、VP8 有損、75–141 KB）。
+
+如果將來有蛋還沒有圖：不要加進 `artworkByCode`，前端會用
 `<span className="donation-vip-art-blank">` 這個留白佔位（已經在
-`DonationFlow.tsx` 和 `DonationDemo.tsx` 裡）。等圖做好後照 A-3、A-4 補上即可。
+`DonationFlow.tsx` 和 `DonationDemo.tsx` 裡）。
 
 ---
 
@@ -268,7 +297,7 @@ VALUES ('mycat', '新類別名稱', 8, 1, now(3));
 | --- | --- |
 | `backend_new/src/db/schema.ts` | 新增一列資料不是 schema 變更 |
 | 任何後端路由 | 蛋是資料，不是程式分支 |
-| `backend_new/docker-compose.yml` | 種子檔已經掛好（`91_insert_guardian.sql`） |
+| `backend_new/docker-compose.yml` | 種子檔已經掛好（`92_insert_guardian.sql`） |
 | `webapp/lib/donationDemo.ts` | 它從 `spiritCatalog` 推導，自動跟上 |
 | `webapp/app/box/DonationDemo.tsx` 的 `demoSpiritOptions` | 只影響 `?demo=donation` 的設計檢視清單。**可選**：想在 demo 裡看到新蛋才加 |
 
