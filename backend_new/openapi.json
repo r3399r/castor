@@ -6994,7 +6994,7 @@
             }
           },
           "400": {
-            "description": "Already owned (ALREADY_OWNED) or not enough points (INSUFFICIENT_POINTS) -- the code in the body says which"
+            "description": "Already owned (ALREADY_OWNED), subscriber-only without paid access (SUBSCRIPTION_REQUIRED), or not enough points (INSUFFICIENT_POINTS) -- the code in the body says which"
           },
           "401": {
             "description": "No valid identity"
