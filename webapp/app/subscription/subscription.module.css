@@ -35,7 +35,8 @@
 .pendingBadge { border-color: var(--color-warning-border); background: var(--color-warning-soft); color: var(--color-warning-text); }
 .paymentBadge { border-color: var(--color-danger); background: var(--color-danger-soft); color: var(--color-danger-text); }
 
-.benefitSummary h2 {
+.benefitSummary h2,
+.choiceHeading {
   margin-bottom: 14px;
   color: var(--color-spirit-canopy);
   font-size: 1.25rem;
@@ -73,8 +74,21 @@
 
 .benefitSummary li strong { min-width: 0; overflow-wrap: anywhere; font-size: .9375rem; }
 
+/*
+  One rule and one heading per choice: the plan group and the day-pass
+  payment group use the same .planOptions grid and the same card styling,
+  so with nothing between them the payment methods read as four more
+  plans. The rule sits on the block, not between the cards, so it also
+  separates the first group from 訂閱包含 above it.
+*/
+.choiceBlock {
+  margin-top: 28px;
+  padding-top: 28px;
+  border-top: 1px solid var(--color-spirit-line);
+}
+
 .billingFieldset {
-  margin-top: 32px;
+  margin-top: 0;
 }
 
 .planOptions {
@@ -273,6 +287,7 @@
   .planCard,
   .spiritSection { padding: 22px 18px; }
   .benefitSummary li { padding: 12px 14px; }
+  .choiceBlock { margin-top: 22px; padding-top: 22px; }
   .planOptions { grid-template-columns: 1fr; }
   .planOption { padding: 16px; }
   .planOptionHeading { align-items: flex-start; }

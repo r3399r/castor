@@ -109,9 +109,3 @@ jobs:
       - name: Deploy to dev environment
         run: |
           sh deploy.sh test
-
-      # temporary: deploy to prod environment for testing
-      # remove this step after testing is done
-      - name: Deploy to prod environment
-        run: |
-          sh deploy.sh prod

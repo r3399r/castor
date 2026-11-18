@@ -257,58 +257,68 @@ export default function SubscriptionPageClient() {
           </ul>
         </section>
 
-        <div
-          className={styles.billingFieldset}
-          role="radiogroup"
-          aria-label="月繳或年繳方案"
-          aria-disabled={!canChoosePlan}
-        >
-          <div className={styles.planOptions}>
-            {subscriptionPlans.map((plan) => {
-              const current = managedSubscription && plan.code === currentPlanCode
-              const amount = amounts?.[plan.code]
-              return (
-                <label key={plan.code} className={`${styles.planOption} ${current ? styles.currentPlan : ''}`}>
-                  <input
-                    type="radio"
-                    name="billing-period"
-                    value={plan.code}
-                    checked={selectedPlan === plan.code}
-                    disabled={!canChoosePlan}
-                    onChange={() => setSelectedPlan(plan.code)}
-                  />
-                  <span className={styles.radioMark} aria-hidden="true" />
-                  <span className={styles.planOptionContent}>
-                    <span className={styles.planOptionHeading}>
-                      <strong>{plan.name}</strong>
-                      <span className={styles.planBadges}>
-                        {current && <Badge tone="growth">目前方案</Badge>}
-                        {plan.recommended && <Badge tone="complete">推薦</Badge>}
+        {/*
+          Headed and ruled off because the payment-method group below uses
+          the same card grid: without a heading the two read as one list,
+          and a payment method looks like another plan. The heading is also
+          the group's accessible name -- the aria-label here used to say
+          "月繳或年繳方案", and there is no annual plan.
+        */}
+        <section className={styles.choiceBlock} aria-labelledby="plan-choice-title">
+          <h2 className={styles.choiceHeading} id="plan-choice-title">方案</h2>
+          <div
+            className={styles.billingFieldset}
+            role="radiogroup"
+            aria-labelledby="plan-choice-title"
+            aria-disabled={!canChoosePlan}
+          >
+            <div className={styles.planOptions}>
+              {subscriptionPlans.map((plan) => {
+                const current = managedSubscription && plan.code === currentPlanCode
+                const amount = amounts?.[plan.code]
+                return (
+                  <label key={plan.code} className={`${styles.planOption} ${current ? styles.currentPlan : ''}`}>
+                    <input
+                      type="radio"
+                      name="billing-period"
+                      value={plan.code}
+                      checked={selectedPlan === plan.code}
+                      disabled={!canChoosePlan}
+                      onChange={() => setSelectedPlan(plan.code)}
+                    />
+                    <span className={styles.radioMark} aria-hidden="true" />
+                    <span className={styles.planOptionContent}>
+                      <span className={styles.planOptionHeading}>
+                        <strong>{plan.name}</strong>
+                        <span className={styles.planBadges}>
+                          {current && <Badge tone="growth">目前方案</Badge>}
+                          {plan.recommended && <Badge tone="complete">推薦</Badge>}
+                        </span>
                       </span>
+                      {/*
+                        The price comes from the API, never from a constant
+                        here: this number has to be the one the server signs
+                        into the ECPay order. Until it arrives the plan is
+                        shown without a price rather than with a guess.
+                      */}
+                      <span className={styles.planOptionPrice}>
+                        {typeof amount === 'number' ? (
+                          <>
+                            <strong>NT${formatNumber(amount)}</strong>
+                            <span>／{plan.periodLabel}</span>
+                          </>
+                        ) : (
+                          <span>{amountsFailed ? '價格暫時無法顯示' : '讀取價格…'}</span>
+                        )}
+                      </span>
+                      <small>{plan.note}</small>
                     </span>
-                    {/*
-                      The price comes from the API, never from a constant
-                      here: this number has to be the one the server signs
-                      into the ECPay order. Until it arrives the plan is
-                      shown without a price rather than with a guess.
-                    */}
-                    <span className={styles.planOptionPrice}>
-                      {typeof amount === 'number' ? (
-                        <>
-                          <strong>NT${formatNumber(amount)}</strong>
-                          <span>／{plan.periodLabel}</span>
-                        </>
-                      ) : (
-                        <span>{amountsFailed ? '價格暫時無法顯示' : '讀取價格…'}</span>
-                      )}
-                    </span>
-                    <small>{plan.note}</small>
-                  </span>
-                </label>
-              )
-            })}
+                  </label>
+                )
+              })}
+            </div>
           </div>
-        </div>
+        </section>
 
         {/*
           Shown only for a day pass, and the choice is sent to ECPay as a
@@ -321,34 +331,37 @@ export default function SubscriptionPageClient() {
           correctly until the method is known.
         */}
         {selected.kind === 'dayPass' && (
-          <div
-            className={styles.billingFieldset}
-            role="radiogroup"
-            aria-label="付款方式"
-            aria-disabled={!canChoosePlan}
-          >
-            <div className={styles.planOptions}>
-              {dayPassPaymentMethods.map((method) => (
-                <label key={method.value} className={styles.planOption}>
-                  <input
-                    type="radio"
-                    name="payment-method"
-                    value={method.value}
-                    checked={selectedMethod === method.value}
-                    disabled={!canChoosePlan}
-                    onChange={() => setSelectedMethod(method.value)}
-                  />
-                  <span className={styles.radioMark} aria-hidden="true" />
-                  <span className={styles.planOptionContent}>
-                    <span className={styles.planOptionHeading}>
-                      <strong>{method.label}</strong>
+          <section className={styles.choiceBlock} aria-labelledby="payment-choice-title">
+            <h2 className={styles.choiceHeading} id="payment-choice-title">付款方式</h2>
+            <div
+              className={styles.billingFieldset}
+              role="radiogroup"
+              aria-labelledby="payment-choice-title"
+              aria-disabled={!canChoosePlan}
+            >
+              <div className={styles.planOptions}>
+                {dayPassPaymentMethods.map((method) => (
+                  <label key={method.value} className={styles.planOption}>
+                    <input
+                      type="radio"
+                      name="payment-method"
+                      value={method.value}
+                      checked={selectedMethod === method.value}
+                      disabled={!canChoosePlan}
+                      onChange={() => setSelectedMethod(method.value)}
+                    />
+                    <span className={styles.radioMark} aria-hidden="true" />
+                    <span className={styles.planOptionContent}>
+                      <span className={styles.planOptionHeading}>
+                        <strong>{method.label}</strong>
+                      </span>
+                      <small>{method.note}</small>
                     </span>
-                    <small>{method.note}</small>
-                  </span>
-                </label>
-              ))}
+                  </label>
+                ))}
+              </div>
             </div>
-          </div>
+          </section>
         )}
 
         <div className={styles.planAction}>
