@@ -25,7 +25,7 @@ curl -L -o chromium-arm64.zip \
 # Publish the layer (adjust region as needed)
 aws lambda publish-layer-version \
   --layer-name chromium-arm64 \
-  --compatible-runtimes nodejs22.x \
+  --compatible-runtimes nodejs24.x \
   --compatible-architectures arm64 \
   --zip-file fileb://chromium-arm64.zip \
   --region ap-east-1

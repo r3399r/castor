@@ -12,7 +12,7 @@
 
 ## 30 秒版
 
-- Hono 4 + Drizzle ORM + mysql2 + MySQL 8，打包成 AWS Lambda（arm64、nodejs22.x）。
+- Hono 4 + Drizzle ORM + mysql2 + MySQL 8，打包成 AWS Lambda（arm64、nodejs24.x）。
 - 一個 `app`（`src/app.ts`）掛 25 個 route group，每組前面接自己的 middleware chain。
 - 四個 Lambda 入口：`api` / `facebook` / `housekeep` / `questionStat`，各自 esbuild 成一包。
 - 回應的形狀寫在 route 檔裡的 zod schema；`openapi.json` 從 schema 生出來，

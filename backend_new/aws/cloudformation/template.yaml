@@ -112,7 +112,7 @@ Resources:
     Properties:
       Architectures: [arm64]
       Handler: index.api
-      Runtime: nodejs22.x
+      Runtime: nodejs24.x
       FunctionName: !Sub ${Project}-${TargetEnvr}-api
       Role: !GetAtt ApiExecutionRole.Arn
       # Own bundle, deliberately separate from FacebookFunction's --
@@ -286,7 +286,7 @@ Resources:
       LayerName: !Sub ${Project}-${TargetEnvr}-chromium
       ContentUri: ../../chromium-arm64.zip
       CompatibleRuntimes:
-        - nodejs22.x
+        - nodejs24.x
       CompatibleArchitectures:
         - arm64
       RetentionPolicy: Delete
@@ -296,7 +296,7 @@ Resources:
     Properties:
       Architectures: [arm64]
       Handler: index.facebook
-      Runtime: nodejs22.x
+      Runtime: nodejs24.x
       FunctionName: !Sub ${Project}-${TargetEnvr}-facebook
       Role: !GetAtt FacebookExecutionRole.Arn
       CodeUri: ../../dist/facebook
@@ -361,7 +361,7 @@ Resources:
     Properties:
       Architectures: [arm64]
       Handler: index.housekeep
-      Runtime: nodejs22.x
+      Runtime: nodejs24.x
       FunctionName: !Sub ${Project}-${TargetEnvr}-housekeep
       Role: !GetAtt HousekeepExecutionRole.Arn
       CodeUri: ../../dist/housekeep
@@ -424,7 +424,7 @@ Resources:
     Properties:
       Architectures: [arm64]
       Handler: index.questionStat
-      Runtime: nodejs22.x
+      Runtime: nodejs24.x
       FunctionName: !Sub ${Project}-${TargetEnvr}-question-stat
       Role: !GetAtt QuestionStatExecutionRole.Arn
       CodeUri: ../../dist/questionStat
