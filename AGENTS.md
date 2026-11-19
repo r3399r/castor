@@ -21,6 +21,7 @@ thing it describes has at least one failure mode that produces no error.
 | File | Answers | Read it when |
 | --- | --- | --- |
 | `AGENTS.md` | this file — rules, conventions, and the known-gaps table at the bottom | always, first |
+| `BACKEND.md` | `backend_new` 的形狀：請求生命週期、`app.ts` 的掛載表（每組 prefix 接哪些 middleware、誰呼叫得動）、route 檔的六塊、錯誤類別表、`ApiFunction` 的環境變數、本機怎麼跑 | writing or changing anything in `backend_new/` |
 | `GUARDIAN.md` | how to add a spirit egg (category-bound or VIP), and how to add a public-interest category | adding, removing or renaming an egg or a category |
 | `DONATION.md` | the LV5 donation feature: decisions, data model, every endpoint and page, what is still missing | anything touching donations, payouts or the public transparency page |
 | `POINTS.md` | the scoring formula, what a point is worth, and how the per-spirit total, the subscription price and the donation amount are locked together | changing scoring, XP thresholds, egg price, question sampling, or any of those three prices |
@@ -306,6 +307,8 @@ Root: `npm run dev` starts the webapp via `next dev webapp`.
 Deploy: `./deploy.sh <env>` (run from repo root, requires AWS creds) — builds+typechecks `backend_new`, packages/deploys its CloudFormation stack, then builds and syncs the webapp to S3. `dev.yml` deploying to the `prod` stack is deliberate (no real users yet; a proper dev/prod split is planned post-launch).
 
 ## backend_new architecture
+
+`BACKEND.md` is the long form of this section: the request lifecycle end to end, a table of every prefix in `src/app.ts` with its middleware chain and who can call it, the anatomy of a route file, the error-class table, the deployed environment variables, and the local-dev commands. What follows here is the short form — the constraints that get broken most often. Neither file repeats the per-endpoint response-shape record below, which lives only in *The OpenAPI document*.
 
 **Request pipeline** (`src/app.ts`): a single Hono app composes route groups behind per-path middleware chains — `adminAuth`/`requireAdmin` (Firebase-token-gated, admin allowlist), `transaction` (wraps the whole request in a Drizzle transaction), and `requireUser` (resolves the Firebase token to an app `userTable` row). Middleware order matters: `requireUser` must run after `transaction` because it reads `c.get('db')`.
 
