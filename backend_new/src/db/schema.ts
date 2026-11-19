@@ -653,7 +653,7 @@ export const charityOrganizationCategoryTable = mysqlTable(
 );
 
 // One actual transfer of money to one organisation. Payouts are batched
-// because a NT$1,000 wire costs more in fees than it carries; a
+// because a NT$100 wire costs more in fees than it carries; a
 // one-at-a-time payout is just a batch holding one donation.
 export const donationBatchTable = mysqlTable('donation_batch', {
   id: int('id', { unsigned: true }).autoincrement().primaryKey(),

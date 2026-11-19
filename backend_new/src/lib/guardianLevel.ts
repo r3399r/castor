@@ -22,8 +22,16 @@
 // changing one alone breaks the arithmetic in that file.
 //
 // Lowering it is the safe direction: every stored `user_guardian.xp` now
-// goes further, so nobody loses progress. Raising it would strand users
-// mid-level, which is why POINTS.md says to start high and come down.
+// goes further, so nobody loses progress.
+//
+// **Raising it is ruled out** (2026-11-20), not a last resort. `level` and
+// `xp` are stored and only recomputed on invest, so a raise silently moves
+// the goalposts under every spirit mid-level; and because MAX_LEVEL is
+// derived from this array's *length*, everyone already at LV5 keeps a
+// real-money donation entitlement that the new thresholds would not grant.
+// Neither has a remedy. If the donation amount has to be made solvent,
+// move the amount or the subscription revenue, not this. POINTS.md
+// ("一個不對稱性") carries the decision.
 export const LEVEL_XP_THRESHOLDS = [2_500, 7_500, 22_500, 67_500];
 
 /**

@@ -436,7 +436,7 @@ export const info = new Hono<TransactionEnv>()
     // disagree with the rows.
     //
     // distinctAmounts exists because the page's headline arithmetic is
-    // "57 x NT$1,000 = NT$57,000", which is only true while every member
+    // "57 x NT$100 = NT$5,700", which is only true while every member
     // carries the same frozen amount. One distinct value means that line
     // can be printed; more than one means it has to show the subtotal
     // alone, so the answer is computed here instead of being assumed.

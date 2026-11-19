@@ -221,8 +221,8 @@ describe('info donation record', () => {
   });
 
   describe('the per-batch arithmetic', () => {
-    // The whole layout: 57 x NT$1,000 + NT$3,000 = NT$60,000, and the
-    // receipt says NT$60,000. Three donations stand in for the 57.
+    // The whole layout: 57 x NT$100 + NT$300 = NT$6,000, and the receipt
+    // says NT$6,000. Three donations stand in for the 57.
     it('carries the count, the subtotal and the top-up, and they add up', async () => {
       const categoryId = await seedCategory();
       const organizationId = await seedOrganization('OO 基金會');
@@ -277,12 +277,19 @@ describe('info donation record', () => {
     it('passes a negative top-up through rather than clamping it', async () => {
       const categoryId = await seedCategory();
       const organizationId = await seedOrganization('OO 基金會');
-      const batchId = await seedBatch(organizationId, { transferredAmount: 1500 });
+      // Derived from the constant, not written out: the literal 1500 this
+      // used to carry described an underpayment only while DONATION_AMOUNT
+      // was 1000, and became a 1,300 overpayment the moment it moved. The
+      // shortfall stays under the subtotal because transferred_amount is
+      // INT UNSIGNED.
+      const shortfall = Math.floor(DONATION_AMOUNT / 2);
+      const transferredAmount = 2 * DONATION_AMOUNT - shortfall;
+      const batchId = await seedBatch(organizationId, { transferredAmount });
       await seedDonation({ categoryId, organizationId, batchId });
       await seedDonation({ categoryId, organizationId, batchId });
 
       const [batch] = (await getRecord()).data;
-      expect(batch.platformTopUp).toBe(-500);
+      expect(batch.platformTopUp).toBe(-shortfall);
       expect(batch.donationCount * (batch.donationUnitAmount ?? 0) + batch.platformTopUp).toBe(
         batch.transferredAmount
       );

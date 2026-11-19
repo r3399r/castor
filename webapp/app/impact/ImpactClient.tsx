@@ -18,7 +18,7 @@ import type { DonationEvidence, GetInfoDonationResponse } from '@/types/api'
  *
  * `donationUnitAmount` is null when the batch's donations were not all the
  * same amount, and the backend is the one that decides that (via COUNT
- * DISTINCT). When it is null the "57 × NT$1,000" line is not true, so only
+ * DISTINCT). When it is null the "57 × NT$100" line is not true, so only
  * the subtotal is shown.
  */
 

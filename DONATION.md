@@ -104,7 +104,7 @@ VIP 本身會是 `guardian` 的第 8 列，而它**不能**成為 `donation.guar
 | 決定 | 內容 |
 | --- | --- |
 | 建列時機 | **確認選擇時**才建 `donation` 列，不是滿級時 |
-| 金額 | **NT$1,000**，暫定值 |
+| 金額 | **NT$100**（2026-11-20 定案，原為暫定的 NT$1,000） |
 | 反悔 | **不可以**。`uk_user_guardian` UNIQUE |
 | 撥款 | 批次為主，逐筆＝只含一筆的批次 |
 | VIP | 規劃中，可捐給所有類別 |
@@ -146,9 +146,9 @@ promisedAmount   = confirmedAmount + pendingAmount
 
 `donation.amount` 在確認當下凍結，顯示時絕不可以回頭讀常數，否則調整金額會把歷史紀錄一起改寫。
 
-還沒改掉的兩個舊假數字：
-- `AGENTS.md` 寫 `NT$10`
-- `webapp/lib/donationDemo.ts` 的 `DEMO_DONATION_AMOUNT = 100`
+`AGENTS.md` 那個 `NT$10` 的舊假數字已經修掉。還留著一個同名但無關的常數：
+`webapp/lib/donationDemo.ts` 的 `DEMO_DONATION_AMOUNT = 100`，屬於 localStorage 設計 demo。
+它現在的數值**剛好**等於真實金額，那是巧合不是連動 —— 改 `DONATION_AMOUNT` 不會動到它。
 
 ### 使用者怎麼驗算自己那筆
 
@@ -156,13 +156,13 @@ promisedAmount   = confirmedAmount + pendingAmount
 
 ```
 批次 #12 — 財團法人OO基金會                   2026-12-01
-  使用者捐款  57 筆 × NT$1,000  =  NT$57,000
-  平台加碼                        +  NT$ 3,000
-  實際匯出                           NT$60,000   ← 收據上的數字
+  使用者捐款  57 筆 × NT$100    =  NT$ 5,700
+  平台加碼                        +  NT$ 300
+  實際匯出                           NT$ 6,000   ← 收據上的數字
   交易序號 ...8842   [匯款單] [收據] [感謝狀]
 ```
 
-筆數是驗算的錨點。使用者自己那頁寫「你的 NT$1,000 包含在批次 #12 中」並連過去，他就能自己算 57×1000+3000=60000。
+筆數是驗算的錨點。使用者自己那頁寫「你的 NT$100 包含在批次 #12 中」並連過去，他就能自己算 57×100+300=6000。
 
 ---
 
@@ -177,7 +177,7 @@ promisedAmount   = confirmedAmount + pendingAmount
    - `tax_id` 重複回 400；`isActive` query 用 `'true'|'false'` 字面值，不用 `z.coerce.boolean()`（它會把 `"false"` 轉成 true）
 3. ~~**`/api/donation`**~~ ✅ — 使用者確認選擇、查自己的紀錄
    - `POST /`（確認）、`GET /`（自己的紀錄，分頁，附 `donationAmount`）
-   - `DONATION_AMOUNT = 1000` 在 `src/lib/donationAmount.ts`，確認時複製進 `donation.amount`，顯示時絕不回頭讀。放在 lib 不放 route，因為 `/api/info/donation` 也要用它算還沒選的那半——route import route 只為一個常數，是第二份副本的起點
+   - `DONATION_AMOUNT = 100` 在 `src/lib/donationAmount.ts`，確認時複製進 `donation.amount`，顯示時絕不回頭讀。放在 lib 不放 route，因為 `/api/info/donation` 也要用它算還沒選的那半——route import route 只為一個常數，是第二份副本的起點
    - 重放的確認回 400 `DONATION_ALREADY_CONFIRMED`（`uk_user_guardian` 仍是真正的保證，這個檢查只是讓它有話可說而不是 500）
    - 別人的精靈回 **404 不是 403**——某個 id 存不存在不是這個呼叫者的事
    - 一般精靈只能捐自己的類別（`categoryId` 省略即可，填錯回 `DONATION_CATEGORY_INVALID`）；`guardian.category_id IS NULL` 的（VIP）必須明寫 `categoryId`
@@ -202,7 +202,7 @@ promisedAmount   = confirmedAmount + pendingAmount
    - 寫在 `routes/info.ts` 裡，不另開路由檔；`app.ts` 要單獨掛 `transaction`（那個 group 是逐路徑掛的，`/api/info` 本身是健康檢查，資料庫掛了也要回 200）
    - 只列 `published = 1` 的批次。**summary 的 `transferredAmount` 用同一個條件**，所以把看得到的批次加起來就等於那個總額
    - 每個批次帶 `donationCount` / `donationSubtotal` / `platformTopUp` / `transferredAmount`，而 `donationCount × donationUnitAmount + platformTopUp = transferredAmount` 就是收據上的數字
-   - `donationUnitAmount` 在成員金額不一致時回 **null**（用 `COUNT(DISTINCT amount)` 判斷）。「57 × NT$1,000」這行只在金額一致時成立，所以是後端決定、不是前端猜
+   - `donationUnitAmount` 在成員金額不一致時回 **null**（用 `COUNT(DISTINCT amount)` 判斷）。「57 × NT$100」這行只在金額一致時成立，所以是後端決定、不是前端猜
    - `platformTopUp` **帶正負號，不夾到 0**。匯少的批次本來就不該被公開（那是 admin 介面的責任），但真的漏出去時，夾成 0 會破壞這頁唯一存在的理由——那條驗算式
    - 聚合值在 SQL 裡 `cast(… as signed)`：裸的 `SUM()` 經 mysql2 回來是**字串**，會原封不動變成 JSON 裡的 `"57000"`。這點用測試釘住了（拿掉 cast 會爆 8 個）
 5. **admin 介面** — 分成後端與前端兩半
@@ -270,8 +270,41 @@ promisedAmount   = confirmedAmount + pendingAmount
 2026-11-09 搬進 `db/script/v1.0.0/`，`v1.1.0` 資料夾移除。那支 `ALTER` 腳本一併刪掉——
 它只對「在捐款功能之前就存在的資料庫」有意義，而那個資料庫只有一個（正式庫），已經跑過了。
 
-**④ 金額 NT$1,000 還是暫定的**
+**④ 金額已定為 NT$100（2026-11-20 改，原暫定 NT$1,000）**
 前端已經不再寫死任何金額：`SupportNote` 和選擇流程都從 API 讀，紀錄頁一律印凍結值。所以調整 `DONATION_AMOUNT` 不需要改前端。總積分與訂閱價的連動見 `POINTS.md`。
+
+調整的成本，兩個方向差很多，而且**程式成本完全相同**（就是 `DONATION_AMOUNT` 那一行；沒有 migration、沒有 backfill、沒有要重算的儲存聚合值，`openapi.json` 也不含這個值所以 CI 不會響）：
+
+- **調降**：財務約束放鬆，不用碰總積分。代價是承諾問題 —— 已確認的筆數因為 `amount` 凍結而不受影響，但**已養滿卻還沒選組織**的人會看到金額變少（`/api/info/donation` 的 `pendingAmount = pendingCount × DONATION_AMOUNT` 是全頁唯一按當下費率計的數字）。這個代價與「改的那一刻有多少人處在該狀態」成正比，**上線前是零**。
+- **調升**：財務約束收緊，必須擴大分母（訂閱價／人數／撥款比例）。**不可以用調升總積分來付** —— 2026-11-20 已排除，理由見 `POINTS.md`「一個不對稱性」：它會無聲卡住在養的精靈，並讓 LV5 的捐款資格跨使用者不一致，兩者都沒有補救機制。
+
+**混價批次：純顯示問題，而且避得開**
+
+跨越改動時點的撥款批次會同時存在兩種 `amount`，於是 `donationUnitAmount` 回 `null`（`COUNT(DISTINCT amount)` 判斷）。這**只是換一種寫法，不是那一行消失**：`ImpactClient.tsx` 的三元式在 null 時印「N 筆 · 小計 NT$X」而不是「N 筆 × NT$Y = NT$X」，筆數和小計照常，讀者仍然驗得了 `小計 + 平台補足 = 實際匯出`。
+
+運作完全不受影響。承重的兩個欄位在混價下都正確：`donationSubtotal` 是 `SUM(amount)`，加的是每筆凍結值；`platformTopUp` 是 `transferredAmount - donationSubtotal`。`PUT /{id}/publish` 拒絕負補足的那道守門讀的也是 subtotal。`donationUnitAmount` 全 repo 只有一個生產者（`routes/info.ts`）和一個消費者（那個三元式），沒有任何東西拿它做計算。
+
+而且混價可以完全避免，因為**批次成員在 `POST /api/donation-batch` 當下就凍結，批次不會事後長出新成員**（要改只能 DELETE 重建）。只要改金額前沒有任何「未入批次」的捐款，舊批次全是舊價、新批次全是新價。注意條件是「建批次」而不是「匯款」—— `batch_id` 在建批次時就寫入，之後何時 publish、何時真的匯錢都無所謂。
+
+**改金額前的兩條檢查**
+
+```sql
+-- 條件一：沒有未入批次的捐款 → 不會有混價批次（你控制得了）
+SELECT COUNT(*) FROM castor.donation WHERE batch_id IS NULL;
+
+-- 條件二：沒有「已養滿但還沒選組織」的精靈 → 沒人的承諾被改（你控制不了）
+SELECT (SELECT COUNT(*) FROM castor.user_guardian WHERE level = 5) -- MAX_LEVEL
+     - (SELECT COUNT(*) FROM castor.donation) AS pending;
+```
+
+條件一排得出來。條件二那群人**根本沒有 `donation` 列**，清撥款碰不到他們，而且精靈會持續有人養滿，窗口不會停在零 —— 那才是上線後調金額的真成本，而它不是 UI 問題，是說出口的承諾變了。兩個條件同時為零，只在**上線前**保證存在。
+
+費率歷史永遠查得回來，不需要額外的表：
+
+```sql
+SELECT amount, COUNT(*), MIN(confirmed_at), MAX(confirmed_at)
+FROM castor.donation GROUP BY amount;
+```
 
 **⑤ `SupportNote` 原本宣告的「每月提撥總額以新台幣 5,000 元為上限」已從文案移除**
 那個上限**沒有任何實作**——後端沒有任何每月累計或封頂邏輯，`POST /api/donation` 不看當月總額。留著它等於對使用者承諾一個系統不會執行的規則。如果這個上限是真的要有，它是一條後端規則（確認時檢查當月已確認金額），要另外做；在那之前文案不該宣稱它。
