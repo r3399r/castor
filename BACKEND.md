@@ -218,8 +218,8 @@ src/routes/*.ts 的 zod schema + describeRoute
 - **請求還沒進文件**，只有回應。query 和 body 由 `zValidator` 驗，`hono-openapi`
   看不到它 —— 要納入就得把 65 處換成 `hono-openapi` 自己的 `validator`，那同時會
   改掉非法請求拿到的 400 body。值得做，但自己一個 change。
-- **CI 會重跑一次然後 diff，有差就 fail**（`dev.yml`／`prod.yml`，在設定 AWS 憑證
-  那步之前）。所以**改到任何 route 的回應，就在同一個 commit 裡 `npm run openapi`**。
+- **CI 會重跑一次然後 diff，有差就 fail**（`.github/workflows/checks.yml` 裡的一步）。
+  所以**改到任何 route 的回應，就在同一個 commit 裡 `npm run openapi`**。
   這一步不需要 secret 也不需要資料庫。
 
 為什麼是 `hono-openapi` + `zod-openapi@^4` 而不是更有名的 `@hono/zod-openapi`、
@@ -238,6 +238,11 @@ src/routes/*.ts 的 zod schema + describeRoute
   `vitest.regression.config.ts`**，不要去找。
 - `fileParallelism: false`：regression 共用一個連線池並在 case 之間 truncate 表，
   平行跑會互相踩。
+- **CI 的閘門全部在 `.github/workflows/checks.yml`**，一個 `workflow_call` 的可重用
+  workflow，`dev.yml` 和 `prod.yml` 各用一行 `uses:` 叫它、再用 `needs: checks` 擋住
+  自己的 deploy job。順序是 `npm ci` → backend typecheck → backend unit tests →
+  openapi 漂移 → webapp unit tests → webapp typecheck，全部不需要 AWS 憑證也不需要
+  資料庫。定義一份而不是兩份：兩份閘門會漂移，而漂移的那一半永遠是守著 production 的那一半。
 - **regression 不在 CI 跑**（需要帶 schema 的 MySQL service container，那是另一個
   change）。所以一次 release 擋得住的只有：後端型別錯、webapp 型別錯、任一邊的
   unit test 失敗、文件過期 —— 其餘只有 regression 蓋到的東西會原封不動上線。

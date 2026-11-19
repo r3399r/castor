@@ -1,0 +1,80 @@
+# The checks that run before a deploy, defined once and called by both dev.yml
+# and prod.yml. Nothing here needs AWS credentials or a database, and that is
+# the point: it is a separate job that `needs` gates the deploy on, so a
+# release either stops before it has touched anything or runs to the end.
+#
+# A reusable workflow rather than copied into both files -- two copies of a
+# gate drift, and the half that drifts is always the one guarding production.
+#
+# The regression suite is deliberately absent. It needs a MySQL service
+# container with the schema loaded, which is its own change -- so what this
+# gate proves is narrower than "the tests pass".
+name: Checks
+
+on:
+  workflow_call:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '22.21.1'
+          cache: npm
+
+      # Not `npm install`: a lock file that does not match package.json should
+      # fail here rather than resolve to something nobody has run locally.
+      # One install covers both halves -- this is an npm workspaces monorepo
+      # with a single root lock file.
+      - name: Install dependencies
+        run: npm ci
+
+      # deploy.sh runs this too, via `pre:deploy`. It is here as well because
+      # there it runs after the AWS credentials are configured, and this is the
+      # cheapest signal in the pipeline.
+      - name: Typecheck the backend
+        run: npm run typecheck -w backend_new
+
+      - name: Run the backend unit tests
+        run: npm run test:unit -w backend_new
+
+      # The generated API document, regenerated here and compared with the
+      # committed one. It is what clients are typed from, so a stale one is a
+      # wrong type that compiles -- which is exactly what the hand-written
+      # types in the deleted packages/shared turned out to be, and nothing else
+      # in this pipeline would notice.
+      - name: Check the OpenAPI document matches the routes
+        run: |
+          npm run openapi -w backend_new
+          if ! git diff --exit-code -- backend_new/openapi.json; then
+            echo "::error file=backend_new/openapi.json::Out of date. Run 'npm run openapi' in backend_new and commit the result."
+            exit 1
+          fi
+
+      # The growth-bonus arithmetic the box screen states before an investment.
+      # It is written twice on purpose -- the server grants, the client states
+      # -- so what these pin is the rounding.
+      - name: Run the webapp unit tests
+        run: npm run test -w webapp
+
+      # The other half of the OpenAPI gate: the webapp's types are generated
+      # from that document, so this is what proves the document and the code
+      # that consumes it still agree. `pretypecheck` regenerates
+      # webapp/types/openapi.d.ts first -- it is not in git -- so this also
+      # proves that hook works on a clean checkout.
+      #
+      # It runs before the deploy job because of the deploy ORDER: deploy.sh
+      # releases the backend first and builds the webapp second, so a type
+      # error that only `next build` catches leaves a released backend with no
+      # matching webapp.
+      #
+      # `next-env.d.ts` is absent on a fresh checkout (gitignored, written by
+      # `next dev` and `next build`). Nothing here needs it today, but it is
+      # what types a static asset import, so the first `import x from
+      # './x.png'` would fail here while passing locally.
+      - name: Typecheck the webapp
+        run: npm run typecheck -w webapp

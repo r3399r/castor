@@ -1,91 +1,33 @@
-# This is a basic workflow to help you get started with Actions
-
 name: PROD
 
-# Controls when the workflow will run
 on:
   push:
     branches: [ master ]
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "build"
+  # Typecheck, unit tests, and the openapi/webapp-types gate. Defined in
+  # checks.yml so dev and prod cannot drift apart. `needs` below is what makes
+  # a failure here stop the deploy.
+  checks:
+    uses: ./.github/workflows/checks.yml
+
   build:
-    # The type of runner that the job will run on
+    needs: checks
     runs-on: ubuntu-latest
 
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v2
 
       - uses: actions/setup-node@v3
         with:
           node-version: '22.21.1'
+          # The checks job's install does not reach this runner, so deploy.sh
+          # installs again here. Caching ~/.npm is what keeps that second
+          # install from costing what the first one did.
+          cache: npm
 
-      # Everything from here to the deploy needs no AWS credentials and no
-      # database, and it all runs before them on purpose: a release should
-      # stop before it starts rather than halfway through.
-      #
-      # deploy.sh runs `npm install` itself, so this is that install moved
-      # earlier rather than a second one.
-      - name: Install dependencies
-        run: npm install
-
-      # Nine seconds, no database and no secrets: backend_new/test is pure
-      # logic and zod schema shapes, and regression/setup.ts loading a
-      # .env.local that does not exist here is a no-op.
-      #
-      # The 788 regression tests are deliberately not here. They need a
-      # MySQL service container and a schema to be loaded into it, which is
-      # its own change -- so what this gate proves is narrower than "the
-      # tests pass".
-      - name: Run the unit tests
-        run: npm run test:unit -w backend_new
-
-      # The generated API document, regenerated here and compared with the
-      # committed one. It is what clients are typed from, so a stale one
-      # is a wrong type that compiles -- which is exactly what the
-      # hand-written types in the deleted packages/shared turned out to
-      # be, and nothing else in this pipeline would notice.
-      - name: Check the OpenAPI document matches the routes
-        run: |
-          npm run openapi -w backend_new
-          if ! git diff --exit-code -- backend_new/openapi.json; then
-            echo "::error file=backend_new/openapi.json::Out of date. Run 'npm run openapi' in backend_new and commit the result."
-            exit 1
-          fi
-
-      # Fourteen tests, 200ms, no browser: the growth-bonus arithmetic the
-      # box screen states before an investment. It is written twice on
-      # purpose -- the server grants, the client states -- and the rate
-      # that used to be shared through a package now arrives from
-      # GET /api/info/growth, so what these pin is the rounding. The
-      # backend's own suite covers the granting half with the same worked
-      # examples.
-      - name: Run the webapp unit tests
-        run: npm run test -w webapp
-
-      # The other half of the same gate: the webapp's types are generated
-      # from that document, so this is what proves the document and the
-      # code that consumes it still agree. `pretypecheck` regenerates
-      # webapp/types/openapi.d.ts first -- it is not in git -- so this
-      # also proves that hook works on a clean checkout.
-      #
-      # It runs before the AWS credentials because of the deploy ORDER:
-      # deploy.sh releases the backend first and builds the webapp second,
-      # so a type error that only `next build` catches leaves a released
-      # backend with no matching webapp. Catching it here costs nothing and
-      # stops the release before it starts.
-      #
-      # `next-env.d.ts` is absent on a fresh checkout (gitignored, written
-      # by `next dev` and `next build`). Nothing here needs it today --
-      # verified by running tsc without it -- but it is what types a static
-      # asset import, so the first `import x from './x.png'` would fail
-      # here while passing locally. Generating it means running next.
-      - name: Typecheck the webapp
-        run: npm run typecheck -w webapp
-
+      # No install step: deploy.sh runs `npm install` itself before it builds
+      # either half.
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
@@ -93,6 +35,8 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
+      # `next build` inlines these, so they have to exist before deploy.sh
+      # reaches the webapp half.
       - name: 'Create env file'
         run: |
           cd webapp
@@ -105,7 +49,6 @@ jobs:
           echo NEXT_PUBLIC_FIREBASE_APP_ID=${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }} >> .env
           echo NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=${{ secrets.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID }} >> .env
 
-      # Runs a single command using the runners shell
       - name: Deploy to production environment
         run: |
           sh deploy.sh prod
