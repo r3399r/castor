@@ -14,7 +14,7 @@ export default function FilterPanel({ filters, disabled }: { filters: SharedFilt
     selectedExamIds,
     selectedTagIds,
     selectedFilterOptionByDim,
-    categoryList,
+    categoryGroups,
     filterDimensions,
     filteredSubjectList,
     visibleOptionsByDim,
@@ -48,20 +48,30 @@ export default function FilterPanel({ filters, disabled }: { filters: SharedFilt
         )}
       </div>
 
-      {/* 類別 */}
-      {categoryList.length > 0 && (
-        <div className={styles.filterOptions}>
-          {categoryList.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => selectCategory(String(c.id))}
-              disabled={disabled}
-              className={`${styles.filterOption} ${styles.categoryTone} ${
-                selectedCategoryId === String(c.id) ? styles.filterOptionSelected : ''
-              }`}
-            >
-              {c.name}
-            </button>
+      {/* 類別，分在它們所屬的考試類型下。家族本身不可點：
+          它不是查詢條件（QueryFilters 只帶 category/subject/exam/tag），
+          做成選項會讓「有在篩選」跟「清空篩選」要替一個不影響
+          結果的狀態表態。*/}
+      {categoryGroups.length > 0 && (
+        <div className={styles.filterGroup}>
+          {categoryGroups.map((group) => (
+            <div key={group.kind.code} className={styles.filterGroupRow}>
+              <span className={styles.filterLabel}>{group.kind.name}</span>
+              <div className={styles.filterOptions}>
+                {group.categories.map((c) => (
+                  <button
+                    key={c.id}
+                    onClick={() => selectCategory(String(c.id))}
+                    disabled={disabled}
+                    className={`${styles.filterOption} ${styles.categoryTone} ${
+                      selectedCategoryId === String(c.id) ? styles.filterOptionSelected : ''
+                    }`}
+                  >
+                    {c.name}
+                  </button>
+                ))}
+              </div>
+            </div>
           ))}
         </div>
       )}
@@ -92,21 +102,27 @@ export default function FilterPanel({ filters, disabled }: { filters: SharedFilt
         </div>
       )}
 
-      {/* 科目 */}
+      {/* 科目。這一層和類別一樣，在 2026-11-22 之前是沒有標題的裸 pill 列 --
+          四層之中兩層有標題、兩層沒有，讀起來不出層級。*/}
       {selectedCategoryId && filteredSubjectList.length > 0 && (
-        <div className={styles.filterOptions}>
-          {filteredSubjectList.map((s) => (
-            <button
-              key={s.id}
-              onClick={() => selectSubject(String(s.id))}
-              disabled={disabled}
-              className={`${styles.filterOption} ${styles.subjectTone} ${
-                selectedSubjectId === String(s.id) ? styles.filterOptionSelected : ''
-              }`}
-            >
-              {s.name}
-            </button>
-          ))}
+        <div className={styles.filterGroup}>
+          <div className={styles.filterGroupRow}>
+            <span className={styles.filterLabel}>科目</span>
+            <div className={styles.filterOptions}>
+              {filteredSubjectList.map((s) => (
+                <button
+                  key={s.id}
+                  onClick={() => selectSubject(String(s.id))}
+                  disabled={disabled}
+                  className={`${styles.filterOption} ${styles.subjectTone} ${
+                    selectedSubjectId === String(s.id) ? styles.filterOptionSelected : ''
+                  }`}
+                >
+                  {s.name}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 

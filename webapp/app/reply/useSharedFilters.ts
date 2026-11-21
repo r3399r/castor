@@ -2,9 +2,13 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { apiFetch } from '@/lib/api'
+import { groupCategoriesByKind } from '@/lib/categoryKind'
 import type {
+  Category,
   CategoryFilterDimension,
+  CategoryKind,
   CategorySubject,
+  GetCategoryKindsResponse,
   GetCategorySubjectsResponse,
   Paginate,
 } from '@/types/api'
@@ -13,7 +17,10 @@ import type {
 // realistic dataset near this size yet (mirrors /adaptive's constant).
 const ALL_ITEMS_LIMIT = 1000
 
-export type CategoryOption = { id: number; name: string }
+// `Category` from the document, not a local `{ id, name }`: it carries
+// `kind`, which is what the exam-family headings are grouped by. The local
+// copy omitted it, so the panel had nothing to group with -- see AGENTS.md
+// on response types written by hand.
 export type NamedOption = { id: number; name: string }
 export type SubjectDetail = { id: number; name: string; exams: NamedOption[]; tags: NamedOption[] }
 
@@ -39,7 +46,8 @@ export function useSharedFilters() {
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
   const [selectedFilterOptionByDim, setSelectedFilterOptionByDim] = useState<Record<number, number>>({})
 
-  const [categoryList, setCategoryList] = useState<CategoryOption[]>([])
+  const [categoryList, setCategoryList] = useState<Category[]>([])
+  const [kindList, setKindList] = useState<CategoryKind[]>([])
   const [subjectList, setSubjectList] = useState<CategorySubject[]>([])
   const [filterDimensions, setFilterDimensions] = useState<CategoryFilterDimension[]>([])
   const [examList, setExamList] = useState<NamedOption[]>([])
@@ -49,8 +57,20 @@ export function useSharedFilters() {
     !!selectedCategoryId || !!selectedSubjectId || selectedExamIds.length > 0 || selectedTagIds.length > 0
 
   useEffect(() => {
-    apiFetch<Paginate<CategoryOption>>('category', { limit: ALL_ITEMS_LIMIT })
+    apiFetch<Paginate<Category>>('category', { limit: ALL_ITEMS_LIMIT })
       .then((res) => setCategoryList(res.data))
+      .catch(console.error)
+  }, [])
+
+  // The exam families, for the headings the categories sit under. Codes,
+  // labels and order all come from the server -- this file must not hold a
+  // copy, same rule /adaptive follows. A failure leaves kindList empty and
+  // groupCategoriesByKind then falls back to one group per kind found in
+  // the data, so every category still renders; the heading is the raw code
+  // until the catalogue arrives.
+  useEffect(() => {
+    apiFetch<GetCategoryKindsResponse>('category/kind')
+      .then((res) => setKindList(res.data))
       .catch(console.error)
   }, [])
 
@@ -116,6 +136,19 @@ export function useSharedFilters() {
   const toggleTag = (id: string) => {
     setSelectedTagIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
   }
+
+  // Only families that have categories. The panel exists to offer
+  // choices, and a family with none offers nothing -- /adaptive keeps its
+  // empty groups because each is a card that has to hold its place in a
+  // three-column grid, while these are stacked rows where an empty one is
+  // just a heading over nothing.
+  const categoryGroups = useMemo(
+    () =>
+      groupCategoriesByKind(kindList, categoryList).filter(
+        (group) => group.categories.length > 0
+      ),
+    [kindList, categoryList]
+  )
 
   const { filteredSubjectList, visibleOptionsByDim } = useMemo(() => {
     const sortedDims = [...filterDimensions].sort((a, b) => a.sortOrder - b.sortOrder)
@@ -200,7 +233,7 @@ export function useSharedFilters() {
     selectedExamIds,
     selectedTagIds,
     selectedFilterOptionByDim,
-    categoryList,
+    categoryGroups,
     filterDimensions,
     filteredSubjectList,
     visibleOptionsByDim,
