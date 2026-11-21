@@ -6,7 +6,14 @@ import MultiSelectField from '@/components/MultiSelectField'
 import Pagination from '@/components/Pagination'
 import { Button, ErrorState, FormPanel, LoadingState, PageHeader, TableFrame } from '@/components/ui'
 import SortableTh, { type SortDirection } from '@/components/SortableTh'
-import type { Category, Paginate } from '@/types/api'
+import type {
+  AdminSubject,
+  Category,
+  GetFilterOptionSubjectsResponse,
+  GetSubjectsResponse,
+  Paginate,
+  PutFilterOptionSubjectsResponse,
+} from '@/types/api'
 
 // High enough to fetch every dimension/option/subject in one page for the
 // picker dropdowns -- there's no realistic admin dataset near this size yet.
@@ -29,7 +36,6 @@ type DimensionOption = { id: number; name: string; categoryId: number }
 
 // Subject names aren't unique, so the picker needs each subject's
 // categories alongside its name to tell duplicates apart.
-type SubjectOption = { id: number; name: string; categories: string | null }
 
 type SortColumn = 'id' | 'name' | 'dimension' | 'subjects'
 
@@ -38,7 +44,7 @@ export default function FilterOptionClient() {
   const [allCategories, setAllCategories] = useState<Category[]>([])
   const [allDimensions, setAllDimensions] = useState<DimensionOption[]>([])
   const [allOptions, setAllOptions] = useState<FilterOptionDto[]>([])
-  const [allSubjects, setAllSubjects] = useState<SubjectOption[]>([])
+  const [allSubjects, setAllSubjects] = useState<AdminSubject[]>([])
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [loading, setLoading] = useState(true)
@@ -101,7 +107,7 @@ export default function FilterOptionClient() {
     return parts.join(' - ')
   }
 
-  const subjectOptionLabel = (subject: SubjectOption) =>
+  const subjectOptionLabel = (subject: AdminSubject) =>
     subject.categories ? `${subject.name} - ${subject.categories}` : subject.name
 
   // A parent must live in the same category as the option being edited
@@ -151,7 +157,7 @@ export default function FilterOptionClient() {
     apiFetch<Paginate<FilterOptionDto>>('filter-option', { limit: ALL_ITEMS_LIMIT })
       .then((res) => setAllOptions(res.data))
       .catch(() => {})
-    apiFetch<Paginate<SubjectOption>>('subject', { limit: ALL_ITEMS_LIMIT })
+    apiFetch<GetSubjectsResponse>('subject', { limit: ALL_ITEMS_LIMIT })
       .then((res) => setAllSubjects(res.data))
       .catch(() => {})
   }
@@ -244,7 +250,7 @@ export default function FilterOptionClient() {
     setLoadingRelationId(id)
     setRelationError(null)
     try {
-      const { subjectIds } = await apiFetch<{ subjectIds: number[] }>(
+      const { subjectIds } = await apiFetch<GetFilterOptionSubjectsResponse>(
         `filter-option/${id}/subject`
       )
       setSelectedSubjectIds(subjectIds.map(String))
@@ -266,7 +272,7 @@ export default function FilterOptionClient() {
     setSavingRelationId(id)
     setRelationError(null)
     try {
-      await apiPut<{ subjectIds: number[] }>(`filter-option/${id}/subject`, {
+      await apiPut<PutFilterOptionSubjectsResponse>(`filter-option/${id}/subject`, {
         subjectIds: selectedSubjectIds.map(Number),
       })
       setEditingRelationId(null)

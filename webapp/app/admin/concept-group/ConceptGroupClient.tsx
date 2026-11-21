@@ -5,7 +5,7 @@ import { apiDelete, apiFetch, apiPost, apiPut, LIMIT } from '@/lib/api'
 import Pagination from '@/components/Pagination'
 import { Button, ErrorState, FormPanel, LoadingState, PageHeader, TableFrame } from '@/components/ui'
 import SortableTh, { type SortDirection } from '@/components/SortableTh'
-import type { Paginate } from '@/types/api'
+import type { AdminSubject, GetSubjectsResponse, Paginate } from '@/types/api'
 
 // High enough to fetch every subject in one page for the picker dropdown --
 // there's no realistic admin dataset near this size yet.
@@ -20,18 +20,17 @@ type ConceptGroupDto = {
 
 // Subject names aren't unique, so the picker needs each subject's
 // categories alongside its name to tell duplicates apart.
-type SubjectOption = { id: number; name: string; categories: string | null }
 
 type SortColumn = 'id' | 'name' | 'subject'
 
 // Flat, dash-separated label for the picker dropdown, where a single line
 // of text is all we have to disambiguate same-named subjects.
-const subjectOptionLabel = (subject: SubjectOption) =>
+const subjectOptionLabel = (subject: AdminSubject) =>
   subject.categories ? `${subject.name} - ${subject.categories}` : subject.name
 
 export default function ConceptGroupClient() {
   const [conceptGroups, setConceptGroups] = useState<ConceptGroupDto[] | null>(null)
-  const [allSubjects, setAllSubjects] = useState<SubjectOption[]>([])
+  const [allSubjects, setAllSubjects] = useState<AdminSubject[]>([])
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [loading, setLoading] = useState(true)
@@ -84,7 +83,7 @@ export default function ConceptGroupClient() {
 
   useEffect(() => {
     load(1, sortColumn, sortDirection)
-    apiFetch<Paginate<SubjectOption>>('subject', { limit: ALL_ITEMS_LIMIT })
+    apiFetch<GetSubjectsResponse>('subject', { limit: ALL_ITEMS_LIMIT })
       .then((res) => setAllSubjects(res.data))
       .catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps

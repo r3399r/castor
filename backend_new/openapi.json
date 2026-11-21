@@ -346,6 +346,10 @@
           "name": {
             "type": "string"
           },
+          "kind": {
+            "type": "string",
+            "description": "Which exam family this category belongs to: one of admission, national, license. A string rather than an enum because the column is a varchar -- writes through this API are restricted to that list, the database is not"
+          },
           "createdAt": {
             "type": [
               "string",
@@ -357,7 +361,30 @@
         "required": [
           "id",
           "name",
+          "kind",
           "createdAt"
+        ]
+      },
+      "CategoryKind": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "What `Category.kind` stores. Stable; the label is not"
+          },
+          "name": {
+            "type": "string",
+            "description": "The heading to print, in Traditional Chinese"
+          },
+          "sortOrder": {
+            "type": "integer",
+            "description": "1-based display order"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "sortOrder"
         ]
       },
       "Subject": {
@@ -2445,7 +2472,7 @@
       "post": {
         "operationId": "postApiCategory",
         "summary": "Create a category",
-        "description": "Admin only.",
+        "description": "Admin only. `kind` is one of admission, national, license and defaults to admission when omitted; it is what /adaptive groups its exam cards by.",
         "tags": [
           "category"
         ],
@@ -2468,6 +2495,39 @@
           },
           "403": {
             "description": "Not an admin"
+          }
+        }
+      }
+    },
+    "/api/category/kind": {
+      "get": {
+        "operationId": "getApiCategoryKind",
+        "summary": "List the exam families",
+        "description": "Reads here need no credentials: `adminAuth` gates POST/PUT/DELETE only. Served from a constant in the backend, so this is the authoritative list of what `Category.kind` can hold and the order a client should lay the families out in -- a client must not hard-code it. Unpaginated: there are three.",
+        "tags": [
+          "category"
+        ],
+        "responses": {
+          "200": {
+            "description": "Every exam family, in display order",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/CategoryKind"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
           }
         }
       }
@@ -2508,8 +2568,8 @@
       },
       "put": {
         "operationId": "putApiCategoryById",
-        "summary": "Rename a category",
-        "description": "Admin only.",
+        "summary": "Rename a category, or move it to another exam family",
+        "description": "Admin only. `name` is required; `kind` is optional and omitting it leaves the current one in place, so a rename cannot move a category between exam families by accident.",
         "tags": [
           "category"
         ],

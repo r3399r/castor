@@ -96,6 +96,12 @@
   box-shadow: var(--shadow-spirit-card);
 }
 
+/* One column per exam family, and the count is the one place the layout
+   still assumes three: a fourth family renders correctly but lands alone on
+   a second row. Widening to four squeezes .optionGrid, the two-column
+   category picker inside each card, so this is left to be decided when a
+   fourth actually exists rather than guessed now. .examTabs below has the
+   same note. */
 .examGrid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -111,6 +117,10 @@
   overflow: hidden;
 }
 
+/* See .examGrid: a fourth tab wraps to a row of its own at a third of the
+   width, which reads as a mistake. Four equal tabs on a 360px screen leave
+   about 64px of text width per label, which five Han characters overflow, so
+   the fix is a scrolling strip rather than more columns. */
 .examTabs {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -164,6 +174,16 @@
   color: var(--color-spirit-ink-soft);
   font-size: 0.9375rem;
   font-weight: 700;
+}
+
+/* An exam family with no categories yet. It replaces the grid rather than
+   sitting above an empty one, so the card keeps a height and does not
+   collapse next to its siblings in .examGrid. */
+.examCardEmpty {
+  margin: 0;
+  padding: 10px 0;
+  color: var(--adaptive-muted);
+  font-size: 0.875rem;
 }
 
 .optionGrid {

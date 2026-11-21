@@ -6,7 +6,13 @@ import MultiSelectField from '@/components/MultiSelectField'
 import Pagination from '@/components/Pagination'
 import { Button, ErrorState, FormPanel, LoadingState, PageHeader, TableFrame } from '@/components/ui'
 import SortableTh, { type SortDirection } from '@/components/SortableTh'
-import type { Paginate } from '@/types/api'
+import type {
+  AdminSubject,
+  GetExamSubjectsResponse,
+  GetSubjectsResponse,
+  Paginate,
+  PutExamSubjectsResponse,
+} from '@/types/api'
 
 // High enough to fetch every subject in one page for the relation-editor
 // dropdown -- there's no realistic admin dataset near this size yet.
@@ -23,7 +29,6 @@ type ExamDto = {
 
 // Subject names aren't unique, so the picker needs each subject's
 // categories alongside its name to tell duplicates apart.
-type SubjectOption = { id: number; name: string; categories: string | null }
 
 type SortColumn = 'id' | 'name' | 'subjects'
 
@@ -48,7 +53,7 @@ export default function ExamClient() {
 
   const [deletingId, setDeletingId] = useState<number | null>(null)
 
-  const [allSubjects, setAllSubjects] = useState<SubjectOption[]>([])
+  const [allSubjects, setAllSubjects] = useState<AdminSubject[]>([])
   const [editingRelationId, setEditingRelationId] = useState<number | null>(null)
   const [loadingRelationId, setLoadingRelationId] = useState<number | null>(null)
   const [selectedSubjectIds, setSelectedSubjectIds] = useState<string[]>([])
@@ -81,7 +86,7 @@ export default function ExamClient() {
 
   useEffect(() => {
     load(1, sortColumn, sortDirection)
-    apiFetch<Paginate<SubjectOption>>('subject', { limit: ALL_ITEMS_LIMIT })
+    apiFetch<GetSubjectsResponse>('subject', { limit: ALL_ITEMS_LIMIT })
       .then((res) => setAllSubjects(res.data))
       .catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -152,7 +157,7 @@ export default function ExamClient() {
     setLoadingRelationId(id)
     setRelationError(null)
     try {
-      const { subjectIds } = await apiFetch<{ subjectIds: number[] }>(
+      const { subjectIds } = await apiFetch<GetExamSubjectsResponse>(
         `exam/${id}/subject`
       )
       setSelectedSubjectIds(subjectIds.map(String))
@@ -174,7 +179,7 @@ export default function ExamClient() {
     setSavingRelationId(id)
     setRelationError(null)
     try {
-      await apiPut<{ subjectIds: number[] }>(`exam/${id}/subject`, {
+      await apiPut<PutExamSubjectsResponse>(`exam/${id}/subject`, {
         subjectIds: selectedSubjectIds.map(Number),
       })
       setEditingRelationId(null)

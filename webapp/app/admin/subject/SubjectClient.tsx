@@ -6,7 +6,12 @@ import MultiSelectField from '@/components/MultiSelectField'
 import Pagination from '@/components/Pagination'
 import { Button, ErrorState, FormPanel, LoadingState, PageHeader, TableFrame } from '@/components/ui'
 import SortableTh, { type SortDirection } from '@/components/SortableTh'
-import type { Category, Paginate } from '@/types/api'
+import type {
+  Category,
+  GetSubjectCategoriesResponse,
+  Paginate,
+  PutSubjectCategoriesResponse,
+} from '@/types/api'
 
 // High enough to fetch every category in one page for the relation-editor
 // dropdown -- there's no realistic admin dataset near this size yet.
@@ -160,7 +165,7 @@ export default function SubjectClient() {
     setLoadingRelationId(id)
     setRelationError(null)
     try {
-      const { categoryIds } = await apiFetch<{ categoryIds: number[] }>(
+      const { categoryIds } = await apiFetch<GetSubjectCategoriesResponse>(
         `subject/${id}/category`
       )
       setSelectedCategoryIds(categoryIds.map(String))
@@ -182,7 +187,7 @@ export default function SubjectClient() {
     setSavingRelationId(id)
     setRelationError(null)
     try {
-      await apiPut<{ categoryIds: number[] }>(`subject/${id}/category`, {
+      await apiPut<PutSubjectCategoriesResponse>(`subject/${id}/category`, {
         categoryIds: selectedCategoryIds.map(Number),
       })
       setEditingRelationId(null)

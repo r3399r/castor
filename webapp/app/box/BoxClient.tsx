@@ -48,7 +48,13 @@ import SupportNote from './SupportNote'
 // comes from GET /api/info/growth below, so that what this states before
 // an investment and what the server grants after it cannot drift apart.
 import { effectiveBonusPercent, investmentXp, pointsForXp } from '@/lib/invest'
-import type { Guardian, PostGuardianInvestResponse } from '@/types/api'
+import type {
+  GetGuardianResponse,
+  GetStoreSpeciesResponse,
+  Guardian,
+  GuardianSpecies,
+  PostGuardianInvestResponse,
+} from '@/types/api'
 import { DonationDemoBox } from './DonationDemo'
 import { DonationEntry } from './DonationFlow'
 
@@ -58,16 +64,12 @@ import { DonationEntry } from './DonationFlow'
 // panel needs.
 type GuardianDto = Guardian
 
-type SpeciesDto = {
-  id: number
-  code: string
-  name: string
-  theme: string
-  cost: number
-  owned: boolean
-  level: number | null
-  previewOnly?: boolean
-}
+// The same lesson one line up, which this type did not follow until
+// 2026-11-21: it restated all seven of GuardianSpecies' fields to add the
+// one the server does not send. An intersection adds that field without
+// taking a copy of the other seven, so a rename in the zod schema now
+// reaches this file.
+type SpeciesDto = GuardianSpecies & { previewOnly?: boolean }
 
 /**
  * Keeps the announced VIP spirit visible until the catalog API has a real
@@ -174,8 +176,8 @@ function RealBoxClient() {
   // the guardian and the balance), so they are always refreshed together.
   const reload = useCallback(async () => {
     const [guardianRes, storeRes] = await Promise.all([
-      apiFetch<{ data: GuardianDto[]; totalPoints: number }>('guardian'),
-      apiFetch<{ data: SpeciesDto[]; totalPoints: number }>('store/species'),
+      apiFetch<GetGuardianResponse>('guardian'),
+      apiFetch<GetStoreSpeciesResponse>('store/species'),
     ])
     setGuardians(guardianRes.data)
     setSpecies(storeRes.data)

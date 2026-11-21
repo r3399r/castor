@@ -56,6 +56,7 @@ export type Paginate<T> = { data: T[]; paginate: components['schemas']['Paginati
 // ---------------------------------------------------------------------------
 
 export type Category = components['schemas']['Category']
+export type CategoryKind = components['schemas']['CategoryKind']
 export type CharityCategoryRow = components['schemas']['CharityCategoryRow']
 export type CharityOrganization = components['schemas']['CharityOrganization']
 export type DailyMastery = components['schemas']['DailyMastery']
@@ -65,6 +66,7 @@ export type DonationBatch = components['schemas']['DonationBatch']
 export type DonationEvidence = components['schemas']['DonationEvidence']
 export type ForgettingRiskItem = components['schemas']['ForgettingRiskItem']
 export type Guardian = components['schemas']['Guardian']
+export type GuardianSpecies = components['schemas']['GuardianSpecies']
 export type PointTransaction = components['schemas']['PointTransaction']
 export type ReplyGroup = components['schemas']['ReplyGroup']
 export type SpeedComparison = components['schemas']['SpeedComparison']
@@ -93,6 +95,22 @@ export type Question = components['schemas']['QuestionDetail']
 export type GetAnalysisOverviewResponse = Ok<'getApiAnalysisOverview'>
 export type MasteryProgress = GetAnalysisOverviewResponse['progress']
 
+/** The exam families /adaptive lays its cards out by. */
+export type GetCategoryKindsResponse = Ok<'getApiCategoryKind'>
+
+export type GetCategorySubjectsResponse = Ok<'getApiCategoryByIdSubject'>
+/**
+ * A subject as the practice filters list it.
+ *
+ * Not `Subject`: this read sends `sortOrder` but no `createdAt`, and the
+ * admin list sends `categories` that this one does not. Three near-identical
+ * shapes, which is exactly why none of them should be written out by hand.
+ */
+export type CategorySubject = GetCategorySubjectsResponse['subjects'][number]
+/** One filter dimension with its options, from the same read. */
+export type CategoryFilterDimension =
+  GetCategorySubjectsResponse['filterDimensions'][number]
+
 export type GetCharityCategoriesResponse = Ok<'getApiCharityCategory'>
 export type GetSuggestedOrganizationResponse = Ok<'getApiCharityOrganizationSuggest'>
 
@@ -103,6 +121,13 @@ export type GetDonationBatchesResponse = Ok<'getApiDonationBatch'>
 export type GetUnpaidDonationsResponse = Ok<'getApiDonationBatchUnpaid'>
 /** The batch read adds its frozen membership list. */
 export type DonationBatchDetail = Ok<'getApiDonationBatchById'>
+
+export type GetExamSubjectsResponse = Ok<'getApiExamByIdSubject'>
+/** The PUT answers with the set it just stored, so the caller need not re-read. */
+export type PutExamSubjectsResponse = Ok<'putApiExamByIdSubject'>
+
+export type GetFilterOptionSubjectsResponse = Ok<'getApiFilterOptionByIdSubject'>
+export type PutFilterOptionSubjectsResponse = Ok<'putApiFilterOptionByIdSubject'>
 
 export type GetGuardianResponse = Ok<'getApiGuardian'>
 export type PostGuardianInvestResponse = Ok<'postApiGuardianByIdInvest'>
@@ -117,9 +142,22 @@ export type GetPaymentPurchasesResponse = Ok<'getApiPaymentPurchases'>
 export type PostPaymentCheckoutResponse = Ok<'postApiPaymentCheckout'>
 
 export type GetQuestionAdaptiveResponse = Ok<'getApiQuestionAdaptive'>
+export type GetQuestionCountResponse = Ok<'getApiQuestionCount'>
+/** Nested: one array per submitted question, each holding it and its children. */
+export type PostQuestionResponse = Created<'postApiQuestion'>
+/** 200, not 201 -- the figure is stored but no row is written. */
+export type PostQuestionFigureResponse = Ok<'postApiQuestionImageFigure'>
 
 export type GetReplyResponse = Ok<'getApiReply'>
 export type PostReplyResponse = Ok<'postApiReply'>
+
+export type GetStoreSpeciesResponse = Ok<'getApiStoreSpecies'>
+
+export type GetSubjectsResponse = Ok<'getApiSubject'>
+/** A subject in the admin list: `Subject` plus its comma-separated categories. */
+export type AdminSubject = GetSubjectsResponse['data'][number]
+export type GetSubjectCategoriesResponse = Ok<'getApiSubjectByIdCategory'>
+export type PutSubjectCategoriesResponse = Ok<'putApiSubjectByIdCategory'>
 
 export type GetSubscriptionHistoryResponse = Ok<'getApiSubscriptionHistory'>
 

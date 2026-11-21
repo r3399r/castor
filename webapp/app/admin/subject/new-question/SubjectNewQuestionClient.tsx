@@ -8,6 +8,7 @@ import { ErrorState, LoadingState, PageHeader } from '@/components/ui'
 import QuestionFigurePanel from '@/components/QuestionFigurePanel'
 import QuestionImageUpload from '@/components/QuestionImageUpload'
 import { takeQuestionDraft } from '@/lib/questionDraft'
+import type { PostQuestionResponse } from '@/types/api'
 import { MathJax } from 'better-react-mathjax'
 
 type SubjectDetail = {
@@ -237,7 +238,7 @@ export default function SubjectNewQuestionClient() {
       // One request for the whole batch -- the server runs it inside a
       // single transaction, so this either creates every question or none
       // of them (matching the all-or-nothing submit button above).
-      const res = await apiPost<{ id: number }[][]>('question', payload)
+      const res = await apiPost<PostQuestionResponse>('question', payload)
       const nextStatus: Record<number, string> = {}
       res.forEach((rows, i) => {
         nextStatus[i] = `成功建立 ${rows.length} 題`

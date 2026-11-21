@@ -12,12 +12,25 @@ import {
   subjectCategoryTable,
   subjectTable,
 } from 'src/db/schema';
+import {
+  CATEGORY_KINDS,
+  categoryKindCatalogue,
+  CategoryKindEntry,
+  DEFAULT_CATEGORY_KIND,
+} from 'src/lib/categoryKind';
 import { DEFAULT_LIMIT, genPagination, MAX_LIMIT, paginationSchema } from 'src/lib/paginator';
 import { TransactionEnv } from 'src/middleware/transaction';
 import { NotFoundError } from 'src/model/error';
 
 export const postCategorySchema = z.object({
   name: z.string().min(1),
+  // Optional and *without* a default, which is the difference between the
+  // two writes that share this schema: POST reads "absent" as
+  // DEFAULT_CATEGORY_KIND, PUT reads it as "leave it alone". A default here
+  // would make renaming a national-exam category silently move it back to
+  // 入學考試 -- no error, and nobody looks at /adaptive straight after a
+  // rename.
+  kind: z.enum(CATEGORY_KINDS).optional(),
 });
 
 const CATEGORY_SORT_COLUMNS = {
@@ -43,6 +56,11 @@ export const categoryListQuerySchema = z.object({
 export const categorySchema = z.object({
   id: z.number().int(),
   name: z.string(),
+  kind: z
+    .string()
+    .describe(
+      `Which exam family this category belongs to: one of ${CATEGORY_KINDS.join(', ')}. A string rather than an enum because the column is a varchar -- writes through this API are restricted to that list, the database is not`
+    ),
   createdAt: z.string().nullable().describe('ISO 8601'),
 }).openapi({ ref: 'Category' });
 
@@ -60,11 +78,32 @@ export const categorySchema = z.object({
 const toCategoryDto = (row: {
   id: number;
   name: string;
+  kind: string;
   createdAt: Date | null;
 }): z.infer<typeof categorySchema> => ({
   id: row.id,
   name: row.name,
+  kind: row.kind,
   createdAt: row.createdAt?.toISOString() ?? null,
+});
+
+/**
+ * One exam family, as /adaptive lays its cards out.
+ *
+ * Served from a constant, not a table -- see src/lib/categoryKind.ts for why,
+ * and for why this endpoint exists at all: the frontend holding its own copy
+ * of this list is what made a national-exam category impossible to show.
+ */
+export const categoryKindSchema = z.object({
+  code: z
+    .string()
+    .describe('What `Category.kind` stores. Stable; the label is not'),
+  name: z.string().describe('The heading to print, in Traditional Chinese'),
+  sortOrder: z.number().int().describe('1-based display order'),
+}).openapi({ ref: 'CategoryKind' });
+
+export const getCategoryKindListResponseSchema = z.object({
+  data: z.array(categoryKindSchema),
 });
 
 export const getCategoryListResponseSchema = z.object({
@@ -129,6 +168,19 @@ const listDoc = describeRoute({
   },
 });
 
+const kindDoc = describeRoute({
+  summary: 'List the exam families',
+  description:
+    'Reads here need no credentials: `adminAuth` gates POST/PUT/DELETE only. Served from a constant in the backend, so this is the authoritative list of what `Category.kind` can hold and the order a client should lay the families out in -- a client must not hard-code it. Unpaginated: there are three.',
+  tags: ['category'],
+  responses: {
+    200: {
+      description: 'Every exam family, in display order',
+      content: { 'application/json': { schema: resolver(getCategoryKindListResponseSchema) } },
+    },
+  },
+});
+
 const getDoc = describeRoute({
   summary: 'Read one category',
   description: 'Reads here need no credentials: `adminAuth` gates POST/PUT/DELETE only.',
@@ -144,7 +196,7 @@ const getDoc = describeRoute({
 
 const createDoc = describeRoute({
   summary: 'Create a category',
-  description: 'Admin only.',
+  description: `Admin only. \`kind\` is one of ${CATEGORY_KINDS.join(', ')} and defaults to ${DEFAULT_CATEGORY_KIND} when omitted; it is what /adaptive groups its exam cards by.`,
   tags: ['category'],
   responses: {
     201: {
@@ -158,8 +210,9 @@ const createDoc = describeRoute({
 });
 
 const updateDoc = describeRoute({
-  summary: 'Rename a category',
-  description: 'Admin only.',
+  summary: 'Rename a category, or move it to another exam family',
+  description:
+    'Admin only. `name` is required; `kind` is optional and omitting it leaves the current one in place, so a rename cannot move a category between exam families by accident.',
   tags: ['category'],
   responses: {
     200: {
@@ -222,6 +275,18 @@ export const category = new Hono<TransactionEnv>()
       paginate: genPagination(total, limit, offset),
     } satisfies z.infer<typeof getCategoryListResponseSchema>);
   })
+  /**
+   * Declared before `/:id`, and that is load-bearing: `:id` matches any one
+   * segment, so with the two the other way round this path resolves to the
+   * single-category read with id `NaN` and answers 404.
+   */
+  .get('/kind', kindDoc, async (c) => {
+    console.log('GET /api/category/kind');
+
+    return c.json({ data: categoryKindCatalogue() satisfies CategoryKindEntry[] } satisfies z.infer<
+      typeof getCategoryKindListResponseSchema
+    >);
+  })
   .get('/:id', getDoc, async (c) => {
     const id = c.req.param('id');
     console.log(`GET /api/category/${id}`);
@@ -236,13 +301,13 @@ export const category = new Hono<TransactionEnv>()
     return c.json(toCategoryDto(found) satisfies z.infer<typeof categorySchema>);
   })
   .post('/', createDoc, zValidator('json', postCategorySchema), async (c) => {
-    const { name } = c.req.valid('json');
-    console.log(`POST /api/category name=${name}`);
+    const { name, kind } = c.req.valid('json');
+    console.log(`POST /api/category name=${name} kind=${kind}`);
     const db = c.get('db');
 
     const [{ insertId }] = await db
       .insert(categoryTable)
-      .values({ name, createdAt: new Date() });
+      .values({ name, kind: kind ?? DEFAULT_CATEGORY_KIND, createdAt: new Date() });
     const [saved] = await db
       .select()
       .from(categoryTable)
@@ -253,12 +318,16 @@ export const category = new Hono<TransactionEnv>()
   .put('/:id', updateDoc, zValidator('json', postCategorySchema), async (c) => {
     const db = c.get('db');
     const id = Number(c.req.param('id'));
-    const { name } = c.req.valid('json');
-    console.log(`PUT /api/category/${id} name=${name}`);
+    const { name, kind } = c.req.valid('json');
+    console.log(`PUT /api/category/${id} name=${name} kind=${kind}`);
 
+    // A partial update: `kind` is only written when the body carried one.
+    // Spreading a conditional rather than passing `kind` straight through,
+    // because `set({ kind: undefined })` is not the same statement as
+    // omitting the column.
     const [{ affectedRows }] = await db
       .update(categoryTable)
-      .set({ name })
+      .set({ name, ...(kind === undefined ? {} : { kind }) })
       .where(eq(categoryTable.id, id));
     if (affectedRows === 0)
       throw new NotFoundError(`category ${id} not found`);

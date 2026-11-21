@@ -8,12 +8,19 @@ import { readableAnswer } from '@/lib/answerDisplay'
 import { blankNumbersFromPassage } from '@/lib/questionBlank'
 import { combinedOutcome, scoreOutcome, type ScoreOutcome } from '@/lib/scoreOutcome'
 import { formatNumber } from '@/lib/number'
+import { groupCategoriesByKind, resolveActiveKind } from '@/lib/categoryKind'
 import Chip, { tagColors } from '@/components/Chip'
 import DifficultyStars from '@/components/DifficultyStars'
 import DiscussionLink from '@/components/DiscussionLink'
 import MathJaxArea from '@/components/MathJaxArea'
 import { Button, Modal } from '@/components/ui'
 import type {
+  CategoryFilterDimension,
+  CategoryKind,
+  CategorySubject,
+  GetCategoryKindsResponse,
+  GetCategorySubjectsResponse,
+  GetQuestionCountResponse,
   GetQuestionAdaptiveResponse,
   Paginate,
   PostReplyRequest,
@@ -26,11 +33,13 @@ import styles from './adaptive.module.css'
 // dataset near this size yet.
 const ALL_ITEMS_LIMIT = 1000
 const ADAPTIVE_DRAFT_KEY = 'castor:adaptive-practice-draft'
-const examCategoryTabs = ['admission', 'national', 'license'] as const
-type ExamCategoryTab = (typeof examCategoryTabs)[number]
+// No list of exam families here on purpose: it comes from
+// GET /api/category/kind, so a fourth one needs no change to this file. The
+// draft persists whichever code was active as a plain string, and
+// resolveActiveKind decides what to show if the server no longer serves it.
+type ExamCategoryTab = string
 
-type CategoryOption = { id: number; name: string }
-type SubjectOption = { id: number; name: string; sortOrder: number }
+type CategoryOption = { id: number; name: string; kind: string }
 type NamedOption = { id: number; name: string }
 type ConceptGroupOption = { id: number; name: string; concepts: NamedOption[] }
 type SubjectDetail = {
@@ -39,12 +48,6 @@ type SubjectDetail = {
   exams: NamedOption[]
   tags: NamedOption[]
   conceptGroups: ConceptGroupOption[]
-}
-type FilterDimensionWithOptions = {
-  id: number
-  name: string
-  sortOrder: number
-  options: { id: number; name: string; parentId: number | null; subjectIds: number[] }[]
 }
 type QuestionProgressState = {
   answered: boolean
@@ -388,7 +391,10 @@ export default function AdaptiveClient({
   onPracticeStateChange?: (active: boolean) => void
 }) {
   const [selectedCategoryId, setSelectedCategoryId] = useState('')
-  const [activeExamCategoryTab, setActiveExamCategoryTab] = useState<ExamCategoryTab>('admission')
+  // '' until the draft or GET /api/category/kind says otherwise; the tab to
+  // highlight is derived by resolveActiveKind, never defaulted to a code
+  // written out here.
+  const [activeExamCategoryTab, setActiveExamCategoryTab] = useState<ExamCategoryTab>('')
   const [selectedSubjectId, setSelectedSubjectId] = useState('')
   const [selectedExamIds, setSelectedExamIds] = useState<string[]>([])
   const [selectedConceptIds, setSelectedConceptIds] = useState<string[]>([])
@@ -397,8 +403,9 @@ export default function AdaptiveClient({
   const [selectedFilterOptionByDim, setSelectedFilterOptionByDim] = useState<Record<number, number>>({})
 
   const [categoryList, setCategoryList] = useState<CategoryOption[]>([])
-  const [subjectList, setSubjectList] = useState<SubjectOption[]>([])
-  const [filterDimensions, setFilterDimensions] = useState<FilterDimensionWithOptions[]>([])
+  const [kindList, setKindList] = useState<CategoryKind[]>([])
+  const [subjectList, setSubjectList] = useState<CategorySubject[]>([])
+  const [filterDimensions, setFilterDimensions] = useState<CategoryFilterDimension[]>([])
   const [examList, setExamList] = useState<NamedOption[]>([])
   const [conceptGroupList, setConceptGroupList] = useState<ConceptGroupOption[]>([])
   const [tagList, setTagList] = useState<NamedOption[]>([])
@@ -417,9 +424,56 @@ export default function AdaptiveClient({
   const [loading, setLoading] = useState(false)
   const [draftReady, setDraftReady] = useState(false)
 
+  // Grouped once rather than filtered per card, because the same grouping
+  // feeds both layouts: .examGrid (desktop, a card per family) and
+  // .examTabbedCard (mobile, a tab panel per family).
+  const categoryGroups = useMemo(
+    () => groupCategoriesByKind(kindList, categoryList),
+    [kindList, categoryList]
+  )
+  // What the tab strip highlights: the restored draft's code while the server
+  // still serves it, the first family otherwise, '' until the catalogue
+  // arrives.
+  const activeKind = resolveActiveKind(kindList, activeExamCategoryTab)
+
+  /**
+   * The option buttons for one exam family, shared by both layouts.
+   *
+   * An empty family renders "尚未開放" rather than an empty grid: that is
+   * what the two hard-coded lists used to say implicitly, with five disabled
+   * buttons nobody could ever press.
+   */
+  const renderCategoryOptions = (options: CategoryOption[]) => {
+    if (options.length === 0) return <p className={styles.examCardEmpty}>尚未開放</p>
+
+    return (
+      <div className={styles.optionGrid}>
+        {options.map((c) => (
+          <button
+            key={c.id}
+            onClick={() => setSelectedCategoryId(String(c.id))}
+            aria-pressed={selectedCategoryId === String(c.id)}
+            className={`${styles.option} ${styles.categoryTone} ${selectedCategoryId === String(c.id) ? styles.selected : ''}`}
+          >
+            {c.name}
+          </button>
+        ))}
+      </div>
+    )
+  }
+
   const changeExamCategoryTab = (tab: ExamCategoryTab) => {
     setActiveExamCategoryTab(tab)
-    if (tab === 'admission') return
+    // Switching families hides whatever was selected, so the downstream
+    // selection goes with it -- unless the selected category belongs to the
+    // family being switched to, which is what a restored draft does.
+    //
+    // This used to read `if (tab === 'admission') return`, because the other
+    // two tabs held hard-coded disabled buttons and nothing could be
+    // selected under them. Now that they list real categories, the rule has
+    // to be about the selection rather than about which tab it is.
+    const selectedKind = categoryList.find((c) => String(c.id) === selectedCategoryId)?.kind
+    if (selectedCategoryId && selectedKind === tab) return
     setSelectedCategoryId('')
     setSelectedSubjectId('')
     setSelectedFilterOptionByDim({})
@@ -434,6 +488,10 @@ export default function AdaptiveClient({
   }
 
   const handleExamCategoryTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, currentTab: ExamCategoryTab) => {
+    // Over the groups rather than a fixed list, so arrow keys cover however
+    // many families the server serves -- including an unknown-code group.
+    const examCategoryTabs = categoryGroups.map((group) => group.kind.code)
+    if (examCategoryTabs.length === 0) return
     const currentIndex = examCategoryTabs.indexOf(currentTab)
     let nextIndex = currentIndex
     if (event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % examCategoryTabs.length
@@ -468,9 +526,12 @@ export default function AdaptiveClient({
         const draft = JSON.parse(savedDraft) as Partial<AdaptivePracticeDraft>
         if (Array.isArray(draft.questions) && draft.questions.length > 0) {
           setSelectedCategoryId(typeof draft.selectedCategoryId === 'string' ? draft.selectedCategoryId : '')
-          setActiveExamCategoryTab(examCategoryTabs.includes(draft.activeExamCategoryTab as ExamCategoryTab)
-            ? draft.activeExamCategoryTab as ExamCategoryTab
-            : 'admission')
+          // Stored as-is and checked at render time by resolveActiveKind.
+          // Validating here would mean the draft could not be restored until
+          // GET /api/category/kind had answered.
+          setActiveExamCategoryTab(
+            typeof draft.activeExamCategoryTab === 'string' ? draft.activeExamCategoryTab : ''
+          )
           setSelectedSubjectId(typeof draft.selectedSubjectId === 'string' ? draft.selectedSubjectId : '')
           setSelectedExamIds(Array.isArray(draft.selectedExamIds) ? draft.selectedExamIds : [])
           setSelectedConceptIds(Array.isArray(draft.selectedConceptIds) ? draft.selectedConceptIds : [])
@@ -743,6 +804,17 @@ export default function AdaptiveClient({
       .catch(console.error)
   }, [])
 
+  // The exam families, and the order to lay them out in. Unpaginated -- it is
+  // a handful of entries served from a backend constant. A failure here
+  // leaves kindList empty, and groupCategoriesByKind then falls back to one
+  // group per kind found in the data, so the page still lists every category
+  // rather than going blank.
+  useEffect(() => {
+    apiFetch<GetCategoryKindsResponse>('category/kind')
+      .then((res) => setKindList(res.data))
+      .catch(console.error)
+  }, [])
+
   useEffect(() => {
     if (!selectedCategoryId) return
     if (adaptiveQuestion.length === 0) {
@@ -753,7 +825,7 @@ export default function AdaptiveClient({
       setSelectedTagIds([])
     }
 
-    apiFetch<{ subjects: SubjectOption[]; filterDimensions: FilterDimensionWithOptions[] }>(
+    apiFetch<GetCategorySubjectsResponse>(
       `category/${selectedCategoryId}/subject`,
     )
       .then(({ subjects, filterDimensions }) => {
@@ -765,7 +837,7 @@ export default function AdaptiveClient({
 
   const { filteredSubjectList, visibleOptionsByDim } = useMemo(() => {
     const sortedDims = [...filterDimensions].sort((a, b) => a.sortOrder - b.sortOrder)
-    const visibleOptionsByDim: Record<number, FilterDimensionWithOptions['options']> = {}
+    const visibleOptionsByDim: Record<number, CategoryFilterDimension['options']> = {}
 
     // cascade display: track which parentIds are valid for the next dimension
     let validParentIds: Set<number | null> = new Set([null])
@@ -817,7 +889,7 @@ export default function AdaptiveClient({
     // avoid firing the request twice (once with the previous subject's stale filters)
     if (subjectJustChanged) return
     setQuestionCount(-1)
-    apiFetch<{ total: number }>('question/count', {
+    apiFetch<GetQuestionCountResponse>('question/count', {
       subjectId: selectedSubjectId,
       examIds: selectedExamIds.length ? selectedExamIds.join(',') : undefined,
       conceptIds: selectedConceptIds.length ? selectedConceptIds.join(',') : undefined,
@@ -968,140 +1040,46 @@ export default function AdaptiveClient({
             <h2>考試類別</h2>
           </div>
           <div className={`${styles.examGrid} ${filtersLocked ? styles.locked : ''}`}>
-            <div className={`${styles.card} ${styles.examCard}`}>
-              <h3 className={styles.examCardTitle}>入學考試</h3>
-              <div className={styles.optionGrid}>
-                {categoryList.map((c) => (
-                  <button
-                    key={c.id}
-                    onClick={() => setSelectedCategoryId(String(c.id))}
-                    aria-pressed={selectedCategoryId === String(c.id)}
-                    className={`${styles.option} ${styles.categoryTone} ${selectedCategoryId === String(c.id) ? styles.selected : ''}`}
-                  >
-                    {c.name}
-                  </button>
-                ))}
+            {categoryGroups.map((group) => (
+              <div key={group.kind.code} className={`${styles.card} ${styles.examCard}`}>
+                <h3 className={styles.examCardTitle}>{group.kind.name}</h3>
+                {renderCategoryOptions(group.categories)}
               </div>
-            </div>
-            <div className={`${styles.card} ${styles.examCard}`}>
-              <h3 className={styles.examCardTitle}>國家考試</h3>
-              <div className={styles.optionGrid}>
-                {['公務員高考三級', '公務員普考', '初等考試', '司法特考', '地方特考'].map((name) => (
-                  <button key={name} disabled className={`${styles.option} ${styles.categoryTone}`}>
-                    {name}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className={`${styles.card} ${styles.examCard}`}>
-              <h3 className={styles.examCardTitle}>專技證照</h3>
-              <div className={styles.optionGrid}>
-                {['護理師執照', '律師執照', '會計師執照'].map((name) => (
-                  <button key={name} disabled className={`${styles.option} ${styles.categoryTone}`}>
-                    {name}
-                  </button>
-                ))}
-              </div>
-            </div>
+            ))}
           </div>
           <div className={`${styles.card} ${styles.examTabbedCard} ${filtersLocked ? styles.locked : ''}`}>
             <div className={styles.examTabs} role="tablist" aria-label="考試類別">
-              <button
-                type="button"
-                role="tab"
-                id="exam-tab-admission"
-                aria-selected={activeExamCategoryTab === 'admission'}
-                aria-controls="exam-panel-admission"
-                tabIndex={activeExamCategoryTab === 'admission' ? 0 : -1}
-                className={styles.examTab}
-                onClick={() => changeExamCategoryTab('admission')}
-                onKeyDown={(event) => handleExamCategoryTabKeyDown(event, 'admission')}
-              >
-                學校考試
-              </button>
-              <button
-                type="button"
-                role="tab"
-                id="exam-tab-national"
-                aria-selected={activeExamCategoryTab === 'national'}
-                aria-controls="exam-panel-national"
-                tabIndex={activeExamCategoryTab === 'national' ? 0 : -1}
-                className={styles.examTab}
-                onClick={() => changeExamCategoryTab('national')}
-                onKeyDown={(event) => handleExamCategoryTabKeyDown(event, 'national')}
-              >
-                國家考試
-              </button>
-              <button
-                type="button"
-                role="tab"
-                id="exam-tab-license"
-                aria-selected={activeExamCategoryTab === 'license'}
-                aria-controls="exam-panel-license"
-                tabIndex={activeExamCategoryTab === 'license' ? 0 : -1}
-                className={styles.examTab}
-                onClick={() => changeExamCategoryTab('license')}
-                onKeyDown={(event) => handleExamCategoryTabKeyDown(event, 'license')}
-              >
-                專技證照
-              </button>
+              {categoryGroups.map((group) => (
+                <button
+                  key={group.kind.code}
+                  type="button"
+                  role="tab"
+                  id={`exam-tab-${group.kind.code}`}
+                  aria-selected={activeKind === group.kind.code}
+                  aria-controls={`exam-panel-${group.kind.code}`}
+                  tabIndex={activeKind === group.kind.code ? 0 : -1}
+                  className={styles.examTab}
+                  onClick={() => changeExamCategoryTab(group.kind.code)}
+                  onKeyDown={(event) => handleExamCategoryTabKeyDown(event, group.kind.code)}
+                >
+                  {group.kind.name}
+                </button>
+              ))}
             </div>
 
-            {activeExamCategoryTab === 'admission' && (
-              <div
-                id="exam-panel-admission"
-                role="tabpanel"
-                aria-labelledby="exam-tab-admission"
-                className={styles.examTabPanel}
-              >
-                <div className={styles.optionGrid}>
-                  {categoryList.map((c) => (
-                    <button
-                      key={c.id}
-                      onClick={() => setSelectedCategoryId(String(c.id))}
-                      aria-pressed={selectedCategoryId === String(c.id)}
-                      className={`${styles.option} ${styles.categoryTone} ${selectedCategoryId === String(c.id) ? styles.selected : ''}`}
-                    >
-                      {c.name}
-                    </button>
-                  ))}
+            {categoryGroups
+              .filter((group) => activeKind === group.kind.code)
+              .map((group) => (
+                <div
+                  key={group.kind.code}
+                  id={`exam-panel-${group.kind.code}`}
+                  role="tabpanel"
+                  aria-labelledby={`exam-tab-${group.kind.code}`}
+                  className={styles.examTabPanel}
+                >
+                  {renderCategoryOptions(group.categories)}
                 </div>
-              </div>
-            )}
-
-            {activeExamCategoryTab === 'national' && (
-              <div
-                id="exam-panel-national"
-                role="tabpanel"
-                aria-labelledby="exam-tab-national"
-                className={styles.examTabPanel}
-              >
-                <div className={styles.optionGrid}>
-                  {['公務員高考三級', '公務員普考', '初等考試', '司法特考', '地方特考'].map((name) => (
-                    <button key={name} disabled className={`${styles.option} ${styles.categoryTone}`}>
-                      {name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {activeExamCategoryTab === 'license' && (
-              <div
-                id="exam-panel-license"
-                role="tabpanel"
-                aria-labelledby="exam-tab-license"
-                className={styles.examTabPanel}
-              >
-                <div className={styles.optionGrid}>
-                  {['護理師執照', '律師執照', '會計師執照'].map((name) => (
-                    <button key={name} disabled className={`${styles.option} ${styles.categoryTone}`}>
-                      {name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
+              ))}
           </div>
         </section>
 

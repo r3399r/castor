@@ -8,7 +8,13 @@ import Pagination from '@/components/Pagination'
 import { ErrorState, LoadingState, Modal, PageHeader, TableFrame } from '@/components/ui'
 import SortableTh, { type SortDirection } from '@/components/SortableTh'
 import { readableAnswer } from '@/lib/answerDisplay'
-import type { Paginate, Question } from '@/types/api'
+import type {
+  Category,
+  GetCategorySubjectsResponse,
+  GetSubjectsResponse,
+  Paginate,
+  Question,
+} from '@/types/api'
 import { MathJax } from 'better-react-mathjax'
 
 type QuestionRow = {
@@ -84,6 +90,14 @@ type SubjectDetail = {
 
 type SortColumn = 'id' | 'subject' | 'type' | 'difficulty'
 
+/**
+ * What the filter selects render, not what an endpoint sends.
+ *
+ * Three different reads fill these lists -- categories, every subject,
+ * and one category's subjects -- and their rows carry different extra
+ * fields. This is the narrowing they all satisfy, so it stays local; the
+ * reads themselves are typed from the document.
+ */
 type Option = { id: number; name: string }
 
 /**
@@ -371,10 +385,10 @@ export default function QuestionClient() {
     // The filter bar's own option lists. A failure here leaves the
     // selects empty rather than blocking the table, which is still
     // usable unfiltered.
-    apiFetch<Paginate<Option>>('category', { limit: ALL_OPTIONS_LIMIT })
+    apiFetch<Paginate<Category>>('category', { limit: ALL_OPTIONS_LIMIT })
       .then((res) => setCategoryList(res.data))
       .catch(() => setCategoryList([]))
-    apiFetch<Paginate<Option>>('subject', { limit: ALL_OPTIONS_LIMIT })
+    apiFetch<GetSubjectsResponse>('subject', { limit: ALL_OPTIONS_LIMIT })
       .then((res) => setAllSubjects(res.data))
       .catch(() => setAllSubjects([]))
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -385,7 +399,7 @@ export default function QuestionClient() {
       setCategorySubjects(null)
       return
     }
-    apiFetch<{ subjects: Option[] }>(`category/${filters.categoryId}/subject`)
+    apiFetch<GetCategorySubjectsResponse>(`category/${filters.categoryId}/subject`)
       .then((res) => setCategorySubjects(res.subjects))
       .catch(() => setCategorySubjects([]))
   }, [filters.categoryId])

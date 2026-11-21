@@ -21,6 +21,7 @@ import {
 import { ADMIN_EMAILS } from 'src/middleware/adminAuth';
 import {
   categorySchema,
+  getCategoryKindListResponseSchema,
   getCategoryListResponseSchema,
   getCategorySubjectResponseSchema,
 } from 'src/routes/category';
@@ -31,7 +32,7 @@ import {
 vi.mock('src/lib/firebaseAdmin', () => ({ verifyIdToken: vi.fn() }));
 import { verifyIdToken } from 'src/lib/firebaseAdmin';
 
-type CategoryDto = { id: number; name: string; createdAt: string };
+type CategoryDto = { id: number; name: string; kind: string; createdAt: string };
 
 const postCategory = (body: unknown) =>
   app.request('/api/category', {
@@ -174,6 +175,138 @@ describe('category routes', () => {
 
       const getRes = await app.request(`/api/category/${created.id}`);
       expect(await getRes.json()).toMatchObject({ name: 'keep me' });
+    });
+  });
+
+  /**
+   * `kind` is what /adaptive groups its three exam cards by, and before the
+   * column existed the national and licence cards were hard-coded disabled
+   * buttons -- so a category created here could not reach them.
+   */
+  describe('kind', () => {
+    it('defaults to admission when the body omits it', async () => {
+      const created = (await (
+        await postCategory({ name: 'no kind given' })
+      ).json()) as CategoryDto;
+      expect(created.kind).toBe('admission');
+    });
+
+    it('stores and returns the kind it was given', async () => {
+      const created = (await (
+        await postCategory({ name: '司法特考', kind: 'national' })
+      ).json()) as CategoryDto;
+      expect(created.kind).toBe('national');
+
+      const read = (await (
+        await app.request(`/api/category/${created.id}`)
+      ).json()) as CategoryDto;
+      expect(read.kind).toBe('national');
+    });
+
+    it('rejects a kind outside the three', async () => {
+      const res = await postCategory({ name: 'bad kind', kind: 'postgraduate' });
+      expect(res.status).toBe(400);
+    });
+
+    it('moves a category to another exam family', async () => {
+      const created = (await (
+        await postCategory({ name: '律師執照' })
+      ).json()) as CategoryDto;
+
+      const res = await putCategory(created.id, { name: '律師執照', kind: 'license' });
+      expect(res.status).toBe(200);
+      expect((await res.json()) as CategoryDto).toMatchObject({ kind: 'license' });
+    });
+
+    /**
+     * The reason `kind` has no default on the *request* schema. With one, a
+     * rename that sends only a name would move the category back to
+     * admission -- no error, and the only place it shows is /adaptive, which
+     * nobody opens straight after renaming something in /admin.
+     */
+    it('leaves the kind alone when a PUT sends only a name', async () => {
+      const created = (await (
+        await postCategory({ name: '高考三級', kind: 'national' })
+      ).json()) as CategoryDto;
+
+      const res = await putCategory(created.id, { name: '公務員高考三級' });
+      expect(res.status).toBe(200);
+      expect((await res.json()) as CategoryDto).toMatchObject({
+        name: '公務員高考三級',
+        kind: 'national',
+      });
+    });
+
+    it('lists every kind, so the client can group them itself', async () => {
+      await postCategory({ name: '會考', kind: 'admission' });
+      await postCategory({ name: '初等考試', kind: 'national' });
+      await postCategory({ name: '護理師執照', kind: 'license' });
+
+      const body = (await (
+        await app.request('/api/category?limit=1000')
+      ).json()) as { data: CategoryDto[] };
+      const byName = new Map(body.data.map((row) => [row.name, row.kind]));
+      expect(byName.get('會考')).toBe('admission');
+      expect(byName.get('初等考試')).toBe('national');
+      expect(byName.get('護理師執照')).toBe('license');
+    });
+  });
+
+  /**
+   * The catalogue the frontend lays its cards out from. It replaced a copy of
+   * the same three codes and labels inside the webapp, which is why the
+   * national and licence cards were hard-coded disabled buttons.
+   */
+  describe('GET /kind', () => {
+    it('serves the exam families in display order, with no credentials', async () => {
+      const res = await app.request('/api/category/kind');
+      expect(res.status).toBe(200);
+
+      const body = (await res.json()) as { data: { code: string; sortOrder: number }[] };
+      expect(body.data.map((row) => row.code)).toEqual(['admission', 'national', 'license']);
+      expect(body.data.map((row) => row.sortOrder)).toEqual([1, 2, 3]);
+    });
+
+    /**
+     * `/:id` matches any single segment, so with the two routes the other way
+     * round this path would resolve to the single-category read, parse 'kind'
+     * as NaN and answer 404. Pinning it here because the fix is an ordering
+     * in the route chain, which nothing else would notice being undone.
+     */
+    it('is not swallowed by the /:id route', async () => {
+      const res = await app.request('/api/category/kind');
+      expect(res.status).not.toBe(404);
+      expect(await res.json()).toHaveProperty('data');
+    });
+
+    it('describes exactly what it sends', async () => {
+      const body: unknown = await (await app.request('/api/category/kind')).json();
+      const parsed = getCategoryKindListResponseSchema.safeParse(body);
+      expect(parsed.error?.issues ?? []).toEqual([]);
+      expect(Object.keys(body as object).sort()).toEqual(['data']);
+      expect(Object.keys((body as { data: object[] }).data[0]).sort()).toEqual([
+        'code',
+        'name',
+        'sortOrder',
+      ]);
+    });
+
+    /**
+     * The catalogue and the write validation are the same list, so every code
+     * this endpoint advertises has to be storable. Without this, serving a
+     * fourth family while POST still rejected it would look like a frontend
+     * bug.
+     */
+    it('serves only codes that POST accepts', async () => {
+      const { data } = (await (
+        await app.request('/api/category/kind')
+      ).json()) as { data: { code: string }[] };
+
+      for (const [index, { code }] of data.entries()) {
+        const res = await postCategory({ name: `accepts ${code} ${index}`, kind: code });
+        expect(res.status).toBe(201);
+        expect((await res.json()) as CategoryDto).toMatchObject({ kind: code });
+      }
     });
   });
 
@@ -415,13 +548,14 @@ describe('category routes', () => {
       expect(Object.keys((list as { data: object[] }).data[0]).sort()).toEqual([
         'createdAt',
         'id',
+        'kind',
         'name',
       ]);
 
       const one: unknown = await (await app.request(`/api/category/${created.id}`)).json();
       const oneParsed = categorySchema.safeParse(one);
       expect(oneParsed.error?.issues ?? []).toEqual([]);
-      expect(Object.keys(one as object).sort()).toEqual(['createdAt', 'id', 'name']);
+      expect(Object.keys(one as object).sort()).toEqual(['createdAt', 'id', 'kind', 'name']);
     });
 
     it("describes exactly what a category's subjects and filters send", async () => {

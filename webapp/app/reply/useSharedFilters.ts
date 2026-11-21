@@ -2,22 +2,20 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { apiFetch } from '@/lib/api'
-import type { Paginate } from '@/types/api'
+import type {
+  CategoryFilterDimension,
+  CategorySubject,
+  GetCategorySubjectsResponse,
+  Paginate,
+} from '@/types/api'
 
 // High enough to fetch every category/subject in one page -- there's no
 // realistic dataset near this size yet (mirrors /adaptive's constant).
 const ALL_ITEMS_LIMIT = 1000
 
 export type CategoryOption = { id: number; name: string }
-export type SubjectOption = { id: number; name: string; sortOrder: number }
 export type NamedOption = { id: number; name: string }
 export type SubjectDetail = { id: number; name: string; exams: NamedOption[]; tags: NamedOption[] }
-export type FilterDimensionWithOptions = {
-  id: number
-  name: string
-  sortOrder: number
-  options: { id: number; name: string; parentId: number | null; subjectIds: number[] }[]
-}
 
 // The subset of shared filter state that actually drives list queries --
 // both ReplyClient and WrongClient take this as a prop so they refetch
@@ -42,8 +40,8 @@ export function useSharedFilters() {
   const [selectedFilterOptionByDim, setSelectedFilterOptionByDim] = useState<Record<number, number>>({})
 
   const [categoryList, setCategoryList] = useState<CategoryOption[]>([])
-  const [subjectList, setSubjectList] = useState<SubjectOption[]>([])
-  const [filterDimensions, setFilterDimensions] = useState<FilterDimensionWithOptions[]>([])
+  const [subjectList, setSubjectList] = useState<CategorySubject[]>([])
+  const [filterDimensions, setFilterDimensions] = useState<CategoryFilterDimension[]>([])
   const [examList, setExamList] = useState<NamedOption[]>([])
   const [tagList, setTagList] = useState<NamedOption[]>([])
 
@@ -77,7 +75,7 @@ export function useSharedFilters() {
       setFilterDimensions([])
       return
     }
-    apiFetch<{ subjects: SubjectOption[]; filterDimensions: FilterDimensionWithOptions[] }>(`category/${next}/subject`)
+    apiFetch<GetCategorySubjectsResponse>(`category/${next}/subject`)
       .then(({ subjects, filterDimensions }) => {
         setSubjectList(subjects)
         setFilterDimensions(filterDimensions)
@@ -121,7 +119,7 @@ export function useSharedFilters() {
 
   const { filteredSubjectList, visibleOptionsByDim } = useMemo(() => {
     const sortedDims = [...filterDimensions].sort((a, b) => a.sortOrder - b.sortOrder)
-    const visibleOptionsByDim: Record<number, FilterDimensionWithOptions['options']> = {}
+    const visibleOptionsByDim: Record<number, CategoryFilterDimension['options']> = {}
 
     // cascade display: track which parentIds are valid for the next dimension
     let validParentIds: Set<number | null> = new Set([null])

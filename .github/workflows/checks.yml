@@ -55,6 +55,32 @@ jobs:
             exit 1
           fi
 
+      # The one defect class typecheck and tests are blind to by construction.
+      #
+      # A type literal as an api* helper's type argument is a response shape
+      # written beside the API instead of generated from it. It compiles
+      # perfectly and proves nothing: the copy is connected to nothing, so a
+      # rename in the zod schema reaches neither it nor any test. That is how
+      # it survives review -- every gate stays green. AGENTS.md states the
+      # rule ("Response types are generated, not written"); prose alone did
+      # not hold, and 14 of these had accumulated by 2026-11-21.
+      #
+      # The fix at a call site is an `Ok<'operationId'>` alias in
+      # webapp/types/api.ts. A narrowing the UI renders may stay local, as
+      # `Option` does in the admin question screen -- just not as the fetch's
+      # own type.
+      #
+      # Deliberately narrow: it catches this one syntax, not every hand-written
+      # type. A named type that restates a schema (as `SpeciesDto` did) still
+      # needs review to spot.
+      - name: Check no API response type is written by hand
+        run: |
+          if matches=$(grep -rnE 'api(Fetch|Post|Put|Delete)<[[:space:]]*\{' webapp --include='*.ts' --include='*.tsx'); then
+            echo "::error::API response type written by hand. Alias the generated type from webapp/types/api.ts instead:"
+            echo "$matches"
+            exit 1
+          fi
+
       # The growth-bonus arithmetic the box screen states before an investment.
       # It is written twice on purpose -- the server grants, the client states
       # -- so what these pin is the rounding.

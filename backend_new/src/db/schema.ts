@@ -17,6 +17,16 @@ import {
 export const categoryTable = mysqlTable('category', {
   id: int('id', { unsigned: true }).autoincrement().primaryKey(),
   name: varchar('name', { length: 255 }).notNull(),
+  // Which exam family the category belongs to, and the only thing that tells
+  // them apart. The list of families lives in src/lib/categoryKind.ts and is
+  // served by GET /api/category/kind, so adding a fourth touches no frontend.
+  //
+  // varchar, not an ENUM: this schema holds no ENUM anywhere, and widening
+  // one means rewriting the table. The closed set is enforced by that lib
+  // through the request schema, not by the column -- so the response
+  // describes it as a string, the same way payment.ts does for
+  // choosePayment.
+  kind: varchar('kind', { length: 20 }).notNull().default('admission'),
   // mode: 'date' (not 'string') so the mysql2 driver formats the value for
   // MySQL's DATETIME literal syntax itself -- that format isn't ISO 8601
   // ('T'/'Z'), and passing an ISO string through as mode: 'string' fails

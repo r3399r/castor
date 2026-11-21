@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import { ApiError, apiPost } from '@/lib/api'
 import { toApiImage } from '@/lib/imageFile'
+import type { PostQuestionFigureResponse } from '@/types/api'
 
 // Mirrors backend_new's QUESTION_FIGURE_MIME_TYPES, which is narrower than
 // what the screenshot uploader accepts: a figure ends up in an <img> a
@@ -83,7 +84,7 @@ export default function QuestionFigurePanel({
         return
       }
 
-      const { url } = await apiPost<{ url: string }, typeof image>(
+      const { url } = await apiPost<PostQuestionFigureResponse, typeof image>(
         'question/image/figure',
         image
       )

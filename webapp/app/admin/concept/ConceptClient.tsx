@@ -5,7 +5,7 @@ import { apiDelete, apiFetch, apiPost, apiPut, LIMIT } from '@/lib/api'
 import Pagination from '@/components/Pagination'
 import { Button, ErrorState, FormPanel, LoadingState, PageHeader, TableFrame } from '@/components/ui'
 import SortableTh, { type SortDirection } from '@/components/SortableTh'
-import type { Paginate } from '@/types/api'
+import type { AdminSubject, GetSubjectsResponse, Paginate } from '@/types/api'
 
 // High enough to fetch every concept group / subject in one page for the
 // picker dropdown -- there's no realistic admin dataset near this size yet.
@@ -25,14 +25,13 @@ type ConceptDto = {
 // aren't unique across categories, so the picker needs the full
 // conceptGroup -> subject -> category chain to tell duplicates apart.
 type ConceptGroupOption = { id: number; name: string; subjectId: number }
-type SubjectOption = { id: number; name: string; categories: string | null }
 
 type SortColumn = 'id' | 'name' | 'conceptGroup' | 'numberOfQuestions'
 
 export default function ConceptClient() {
   const [concepts, setConcepts] = useState<ConceptDto[] | null>(null)
   const [allConceptGroups, setAllConceptGroups] = useState<ConceptGroupOption[]>([])
-  const [allSubjects, setAllSubjects] = useState<SubjectOption[]>([])
+  const [allSubjects, setAllSubjects] = useState<AdminSubject[]>([])
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [loading, setLoading] = useState(true)
@@ -100,7 +99,7 @@ export default function ConceptClient() {
     apiFetch<Paginate<ConceptGroupOption>>('concept-group', { limit: ALL_ITEMS_LIMIT })
       .then((res) => setAllConceptGroups(res.data))
       .catch(() => {})
-    apiFetch<Paginate<SubjectOption>>('subject', { limit: ALL_ITEMS_LIMIT })
+    apiFetch<GetSubjectsResponse>('subject', { limit: ALL_ITEMS_LIMIT })
       .then((res) => setAllSubjects(res.data))
       .catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
