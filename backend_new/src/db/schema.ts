@@ -424,27 +424,35 @@ export const pointTransactionTable = mysqlTable('point_transaction', {
 });
 
 // Store catalog for the box/guardian feature -- one row per redeemable
-// guardian (name/theme/cost mirror what used to be webapp's hardcoded
+// guardian (name/cost mirror what used to be webapp's hardcoded
 // storeEggs mock). No admin CRUD yet; managed by hand via
 // db/script/v1.0.0/insert_guardian.sql and direct SQL updates, same as
 // category's seed data.
+//
+// There is no `theme` column. It held a per-egg display label that was a
+// copy of charity_category.name for the seven bound eggs and the
+// sentence "any category" for the eighth, so every screen that showed it
+// was showing either a duplicate or a constant. Dropped 2026-11-21; the
+// screens read `category` off the response, and the null case is a label
+// in the frontend because that is what it always was.
 export const guardianTable = mysqlTable('guardian', {
   id: int('id', { unsigned: true }).autoincrement().primaryKey(),
   code: varchar('code', { length: 50 }).notNull(),
   name: varchar('name', { length: 100 }).notNull(),
-  theme: varchar('theme', { length: 100 }).notNull(),
   cost: int('cost', { unsigned: true }).notNull(),
-  // When true, this spirit's LV5 donation may be directed at any of the
-  // public-interest categories instead of only its own -- the planned VIP
-  // spirit. A flag rather than a check on `code`, so the rule is data.
-  // Such a guardian is not itself a category and must never end up in
-  // donation.guardianId.
   // The public-interest category this species supports, or null for a
-  // species not tied to one -- which is how the planned VIP spirit says
-  // its owner may direct the donation at any category. Replaced an
+  // species not tied to one -- which is how the VIP spirit says its owner
+  // may direct the donation at any category. Replaced an
   // unrestrictedCategory boolean that said the same thing without the
   // database being able to enforce it.
   categoryId: int('category_id', { unsigned: true }).references(() => charityCategoryTable.id),
+  // Subscriber-only. store.ts's redeem answers SUBSCRIPTION_REQUIRED
+  // without paid access; the shelf only locks the card. Replaced a
+  // hardcoded `code = 'vip'` on 2026-11-21, so the paywall survives the
+  // code being renamed -- which it was, to the species each egg depicts.
+  // Independent of categoryId: the fennec egg sets both, either stands
+  // alone.
+  requiresSubscription: boolean('requires_subscription').notNull().default(false),
   sortOrder: tinyint('sort_order', { unsigned: true }).notNull().default(0),
   isActive: boolean('is_active').notNull().default(true),
   createdAt: datetime('created_at', { mode: 'date', fsp: 3 }),
@@ -604,10 +612,12 @@ export const paymentPurchaseTable = mysqlTable('payment_purchase', {
 // render its recipient's name on the public record. isActive = false
 // removes it from the chooser and nothing else.
 // A public-interest category a donation can be directed at. Separate
-// from guardian, which it used to be folded into via guardian.theme: a
-// category can now be added without shipping a new egg, several eggs can
-// share one category, and a species with no category at all (VIP) is
-// expressible as categoryId null.
+// from guardian, which it used to be folded into via a guardian.theme
+// column: a category can now be added without shipping a new egg,
+// several eggs can share one category, and a species with no category at
+// all (VIP) is expressible as categoryId null. That column survived the
+// split as a display label holding a copy of `name` below, and was
+// dropped on 2026-11-21.
 //
 // Watch the two column names from here on: userGuardian.guardianId is a
 // *species*, donation.categoryId is a *category*. Both were guardianId
@@ -617,8 +627,9 @@ export const charityCategoryTable = mysqlTable('charity_category', {
   // Stable slug, not shown to users -- the same role guardian.code plays
   // for artwork.
   code: varchar('code', { length: 50 }).notNull(),
-  // The displayed name, e.g. '兒少、家庭與婦幼'. The string guardian.theme
-  // used to hold, and unique so two categories cannot share a label.
+  // The displayed name, e.g. '兒少、家庭與婦幼'. The one every screen
+  // shows, now that guardian.theme no longer keeps a copy of it, and
+  // unique so two categories cannot share a label.
   name: varchar('name', { length: 100 }).notNull(),
   sortOrder: smallint('sort_order', { unsigned: true }).notNull().default(0),
   // Inactive categories stay here: existing donations point at them and

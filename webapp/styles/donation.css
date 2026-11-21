@@ -1,41 +1,26 @@
-/* Despite the file name, this is no longer demo-only. The .donation-flow-*,
-   .donation-spirit-*, .donation-org-*, .donation-confirm-* and
-   .donation-record-* rules are shared by three screens: the localStorage
-   design demo (app/box/DonationDemo.tsx), the real LV5 donation flow
+/* Shared by two screens: the real LV5 donation flow
    (app/box/DonationFlow.tsx) and the public transparency page
-   (app/impact/). Only the .donation-demo-* rules belong to the demo alone.
-   Renaming the file is a one-line change in app/globals.css if that ever
-   feels worth doing. */
-.donation-demo-page,
-.donation-demo-box {
+   (app/impact/).
+   There were three until 2026-11-21, when the localStorage design demo was
+   deleted. This file was donation-demo.css then, and the rules named for
+   the demo went with it -- except the one that set the gradient on the
+   real /box/donation route despite its name, which is .donation-page
+   below. */
+.donation-page {
   min-height: 100vh;
   color: var(--color-spirit-ink);
   background: linear-gradient(180deg, var(--color-spirit-cream), #e7eee3 62%, #dbe9e5);
 }
 
-.donation-demo-shell,
 .donation-flow-inner {
   width: min(var(--container-site), calc(100% - 32px));
   margin-inline: auto;
 }
 
-.donation-demo-shell { padding: 32px 0 72px; }
-.donation-demo-controls { display: grid; grid-template-columns: 1fr auto; gap: 20px 32px; padding: 24px; }
-.donation-demo-controls h1 { margin: 4px 0 6px; font-size: var(--text-spirit-section); }
-.donation-demo-fields { display: flex; align-items: end; gap: 20px; }
-.donation-demo-fields label { display: grid; gap: 6px; font-size: var(--text-spirit-label); font-weight: 600; }
-.donation-demo-fields select { min-height: 42px; padding: 0 36px 0 12px; border: var(--spirit-border); border-radius: var(--radius-spirit-control); background: var(--color-spirit-paper); }
-.donation-demo-control-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 10px; border-top: var(--spirit-border); padding-top: 18px; }
-.donation-demo-growing { margin-top: 24px; }
-.donation-vip-scene { min-height: 520px; justify-content: flex-end; }
 .donation-vip-art-blank { display: block; width: 100%; height: 100%; background: transparent; }
-.donation-max-card { display: flex; flex-direction: column; justify-content: center; padding: 32px; }
-.donation-max-card > h2 { margin: 5px 0 24px; font-size: var(--text-spirit-character); }
-.donation-locked-message,
 .donation-unlocked-message { display: grid; justify-items: start; gap: 14px; }
 .donation-unlocked-message h3 { margin: 0; font-size: var(--text-spirit-heading); }
-.donation-unlocked-message p,
-.donation-locked-message p { margin: 0; color: var(--color-spirit-ink-soft); line-height: var(--leading-relaxed); }
+.donation-unlocked-message p { margin: 0; color: var(--color-spirit-ink-soft); line-height: var(--leading-relaxed); }
 
 .donation-celebration { --celebration-gutter: 28px; isolation: isolate; text-align: center; }
 .donation-celebration > :not(.donation-confetti) { position: relative; z-index: 1; }
@@ -159,7 +144,6 @@
 .donation-complete-icon { display: grid; place-items: center; width: 64px; height: 64px; border-radius: 50%; color: white; background: var(--color-spirit-teal); }
 
 .donation-org-card:focus-visible,
-.donation-demo-fields select:focus-visible { outline: var(--spirit-focus-outline); outline-offset: var(--focus-ring-offset); }
 
 /* Public transparency page (app/impact/). It reuses .donation-flow-inner
    and .donation-record-card; these are the parts it adds. */
@@ -173,15 +157,11 @@
 .donation-impact-evidence { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
 
 @media (width < 64rem) {
-  .donation-demo-controls { grid-template-columns: 1fr; }
   .donation-org-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (width < 48rem) {
-  .donation-demo-shell, .donation-flow-inner { width: min(100% - 24px, var(--container-site)); }
-  .donation-demo-shell, .donation-flow { padding-top: 18px; }
-  .donation-demo-fields, .donation-demo-control-actions { align-items: stretch; flex-direction: column; }
-  .donation-demo-fields select { width: 100%; }
-  .donation-max-card { padding: 24px 20px; }
+  .donation-flow-inner { width: min(100% - 24px, var(--container-site)); }
+  .donation-flow { padding-top: 18px; }
   /* Clears the fixed action bar, which is taller here because the two
      buttons stack. */
   .donation-org-grid { grid-template-columns: 1fr; padding-bottom: 210px; }

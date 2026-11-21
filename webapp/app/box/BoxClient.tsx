@@ -1,7 +1,6 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
 import { formatNumber } from '@/lib/number'
 import {
   ArrowRight,
@@ -34,9 +33,8 @@ import {
   SpiritStatusCard,
 } from '@/components/spirit'
 import {
-  artworkByCode,
+  artworkFor,
   spiritCatalog,
-  VIP_GUARDIAN_CODE,
   type SpiritSpecies,
 } from '@/lib/guardianArtwork'
 import { apiFetch, apiPost } from '@/lib/api'
@@ -55,7 +53,6 @@ import type {
   GuardianSpecies,
   PostGuardianInvestResponse,
 } from '@/types/api'
-import { DonationDemoBox } from './DonationDemo'
 import { DonationEntry } from './DonationFlow'
 
 // The shared contract, not a local copy of it. There used to be a
@@ -64,28 +61,29 @@ import { DonationEntry } from './DonationFlow'
 // panel needs.
 type GuardianDto = Guardian
 
-// The same lesson one line up, which this type did not follow until
-// 2026-11-21: it restated all seven of GuardianSpecies' fields to add the
-// one the server does not send. An intersection adds that field without
-// taking a copy of the other seven, so a rename in the zod schema now
-// reaches this file.
-type SpeciesDto = GuardianSpecies & { previewOnly?: boolean }
+// A `SpeciesDto = GuardianSpecies & { previewOnly?: boolean }` alias and a
+// VIP_PREVIEW object stood here until 2026-11-21. The object was a
+// hardcoded eighth card with a negative id, shown while the catalog API
+// had no fennec row to return, and `previewOnly` disabled its button.
+// The row exists and the response reports requiresSubscription, so the
+// shelf renders what the server sends and nothing here knows which egg
+// is the VIP. GuardianSpecies is used directly: an alias that adds
+// nothing is one more name for the same shape.
 
 /**
- * Keeps the announced VIP spirit visible until the catalog API has a real
- * guardian row for it. A negative id can never be submitted: previewOnly
- * disables the action, and a real `code: "vip"` row replaces this object.
+ * What an egg tied to no category supports.
+ *
+ * `category === null` is not a missing value -- it means the owner picks
+ * at LV5 -- so this is that state's label, not a fallback for one. It was
+ * `guardian.theme` until 2026-11-21: a column holding a copy of the
+ * category's name for the seven bound eggs and this sentence for the
+ * eighth, which is why dropping it needed no replacement column.
  */
-const VIP_PREVIEW: SpeciesDto = {
-  id: -1,
-  code: VIP_GUARDIAN_CODE,
-  name: 'VIP 星冠之蛋',
-  theme: '可任選公益類別',
-  cost: 0,
-  owned: false,
-  level: null,
-  previewOnly: true,
-}
+const ANY_CATEGORY_LABEL = '可任選公益類別'
+
+/** The cause an egg supports, as its eyebrow prints it. */
+const categoryLabel = (species: { category: { name: string } | null }) =>
+  species.category?.name ?? ANY_CATEGORY_LABEL
 
 /** Levels in a complete collection series, matching the backend's MAX_LEVEL. */
 const MAX_LEVEL = 5
@@ -122,17 +120,12 @@ function ArtworkPlaceholder() {
   )
 }
 export default function BoxClient() {
-  const searchParams = useSearchParams()
-  return searchParams.get('demo') === 'donation' ? <DonationDemoBox /> : <RealBoxClient />
-}
-
-function RealBoxClient() {
   const { subscription } = useAuth()
   const [activeTab, setActiveTab] = useState<
     'growing' | 'store' | 'collection'
   >('growing')
   const [guardians, setGuardians] = useState<GuardianDto[]>([])
-  const [species, setSpecies] = useState<SpeciesDto[]>([])
+  const [species, setSpecies] = useState<GuardianSpecies[]>([])
   const [totalPoints, setTotalPoints] = useState(0)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -141,7 +134,7 @@ function RealBoxClient() {
   const [busy, setBusy] = useState(false)
   const [selectedGuardianId, setSelectedGuardianId] = useState<number | null>(null)
   const [pointsToUse, setPointsToUse] = useState(1)
-  const [eggToExchange, setEggToExchange] = useState<SpeciesDto | null>(null)
+  const [eggToExchange, setEggToExchange] = useState<GuardianSpecies | null>(null)
   const [showInvestDialog, setShowInvestDialog] = useState(false)
   const [levelUpCelebration, setLevelUpCelebration] = useState<{
     name: string
@@ -150,7 +143,7 @@ function RealBoxClient() {
   } | null>(null)
   const [collectionPreview, setCollectionPreview] = useState<{
     name: string
-    theme: string
+    category: string
     level: number
     species?: SpiritSpecies
   } | null>(null)
@@ -194,7 +187,7 @@ function RealBoxClient() {
   const hasGuardian = guardians.length > 0
   const guardian =
     guardians.find((item) => item.id === selectedGuardianId) ?? guardians[0]
-  const artwork = guardian ? artworkByCode[guardian.code] : undefined
+  const artwork = guardian ? artworkFor(guardian.code) : undefined
   const availablePoints = totalPoints
   const level = guardian?.level ?? 1
   const complete = level >= MAX_LEVEL
@@ -225,12 +218,6 @@ function RealBoxClient() {
   const totalExperienceXp = investmentXp(pointsToUse, bonusPercent)
   const memberBonusXp = totalExperienceXp - pointsToUse
 
-  const displaySpecies = species.some(
-    (item) => item.code === VIP_GUARDIAN_CODE,
-  )
-    ? species
-    : [...species, VIP_PREVIEW]
-
   useEffect(() => {
     setPointsToUse((value) => {
       if (maxInvestablePoints === 0) return 0
@@ -240,7 +227,7 @@ function RealBoxClient() {
 
   // Started species first, so the collection opens on what the user has
   // actually been growing.
-  const collection = [...displaySpecies].sort(
+  const collection = [...species].sort(
     (a, b) => Number((b.level ?? 0) > 0) - Number((a.level ?? 0) > 0),
   )
 
@@ -263,10 +250,7 @@ function RealBoxClient() {
     // This is intentionally a frontend-only product gate. Keeping the
     // check beside the mutation as well as on the card prevents a dialog
     // opened under stale client state from submitting.
-    if (
-      eggToExchange.code === VIP_GUARDIAN_CODE &&
-      subscription?.entitled !== true
-    ) {
+    if (eggToExchange.requiresSubscription && subscription?.entitled !== true) {
       setActionError('這顆 VIP 蛋僅限訂閱會員兌換。')
       return
     }
@@ -465,8 +449,8 @@ function RealBoxClient() {
         >
           {guardians.map((item) => (
             <option key={item.id} value={item.id}>
-              {artworkByCode[item.code]
-                ? spiritCatalog[artworkByCode[item.code]!].name
+              {artworkFor(item.code)
+                ? spiritCatalog[artworkFor(item.code)!].name
                 : item.name}{' '}
               · LV{item.level}
             </option>
@@ -570,6 +554,7 @@ function RealBoxClient() {
                       <SpiritStatusCard
                         headerAction={guardianSelector}
                         species={artwork}
+                        category={categoryLabel(guardian)}
                         level={level}
                         xp={guardian.xp}
                         nextLevelXp={complete ? null : guardian.nextLevelXp}
@@ -584,7 +569,7 @@ function RealBoxClient() {
                       <ContentPanel className="sp-status">
                         <div className="sp-status-heading">
                           <div>
-                            <p className="sp-eyebrow">{guardian.theme}</p>
+                            <p className="sp-eyebrow">{categoryLabel(guardian)}</p>
                             <h2>{guardian.name}</h2>
                           </div>
                           {guardianSelector}
@@ -694,15 +679,17 @@ function RealBoxClient() {
                 </RewardBanner>
               )}
               <div className="sp-store-grid">
-                {displaySpecies.map((egg) => {
+                {species.map((egg) => {
                   const pointsNeeded = Math.max(egg.cost - availablePoints, 0)
                   const canAfford = availablePoints >= egg.cost
                   const isOwned = egg.owned
-                  const isVip = egg.code === VIP_GUARDIAN_CODE
-                  const isPreviewOnly = egg.previewOnly === true
+                  // The flag, not the code: a second subscriber-only egg
+                  // would need no change here, and renaming this one's
+                  // code cannot unlock it.
+                  const isVip = egg.requiresSubscription
                   const checkingVipAccess = isVip && subscription === null
                   const vipLocked = isVip && subscription?.entitled === false
-                  const art = artworkByCode[egg.code]
+                  const art = artworkFor(egg.code)
                   return (
                     <Card key={egg.id} className="sp-store-card">
                       <div className="sp-store-art">
@@ -718,7 +705,9 @@ function RealBoxClient() {
                         )}
                       </div>
                       <div className="sp-store-info">
-                        <p className="sp-eyebrow">{egg.theme}</p>
+                        <p className="sp-eyebrow">
+                          {categoryLabel(egg)}
+                        </p>
                         <div className="sp-store-title">
                           <h3>{egg.name}</h3>
                           <div className="sp-store-badges">
@@ -747,20 +736,14 @@ function RealBoxClient() {
                           </p>
                         )}
                         <div className="sp-store-purchase">
-                          {isPreviewOnly ? (
-                            <p className="sp-caption">
-                              目前為圖鑑預覽，正式兌換開放後會在此顯示所需積分。
-                            </p>
-                          ) : (
-                            <div className="sp-progress-heading">
-                              <span>兌換所需</span>
-                              <strong>
-                                <Coins size={16} aria-hidden="true" />
-                                {formatNumber(egg.cost)} 點
-                              </strong>
-                            </div>
-                          )}
-                          {!isPreviewOnly && !isOwned && !canAfford && (
+                          <div className="sp-progress-heading">
+                            <span>兌換所需</span>
+                            <strong>
+                              <Coins size={16} aria-hidden="true" />
+                              {formatNumber(egg.cost)} 點
+                            </strong>
+                          </div>
+                          {!isOwned && !canAfford && (
                             <>
                               <Progress
                                 value={availablePoints}
@@ -776,7 +759,6 @@ function RealBoxClient() {
                             variant={isOwned ? 'secondary' : 'primary'}
                             disabled={
                               isOwned ||
-                              isPreviewOnly ||
                               !canAfford ||
                               checkingVipAccess ||
                               vipLocked
@@ -785,15 +767,13 @@ function RealBoxClient() {
                           >
                             {isOwned
                               ? '已擁有'
-                              : isPreviewOnly
-                                ? '即將開放'
                               : checkingVipAccess
                                 ? '確認會員狀態…'
                                 : vipLocked
                                   ? '訂閱會員限定'
-                              : canAfford
-                                ? '兌換'
-                                : '積分不足'}
+                                  : canAfford
+                                    ? '兌換'
+                                    : '積分不足'}
                           </Button>
                         </div>
                       </div>
@@ -833,9 +813,9 @@ function RealBoxClient() {
               )}
               {collection.map((series) => {
                 const unlockedLevel = series.level ?? 0
-                const art = artworkByCode[series.code]
+                const art = artworkFor(series.code)
                 const name = art ? spiritCatalog[art].name : series.name
-                const isVip = series.code === VIP_GUARDIAN_CODE
+                const isVip = series.requiresSubscription
                 return (
                   <ContentPanel
                     key={series.id}
@@ -847,12 +827,12 @@ function RealBoxClient() {
                           {isVip ? (
                             <>
                               <Crown size={16} aria-hidden="true" />
-                              訂閱會員專屬（可任選公益類別）
+                              訂閱會員專屬
+                              {series.category === null &&
+                                `（${ANY_CATEGORY_LABEL}）`}
                             </>
-                          ) : art ? (
-                            spiritCatalog[art].category
                           ) : (
-                            series.theme
+                            categoryLabel(series)
                           )}
                         </p>
                         <div className="sp-collection-title-row">
@@ -882,7 +862,7 @@ function RealBoxClient() {
                             onClick={() =>
                               setCollectionPreview({
                                 name,
-                                theme: series.theme,
+                                category: categoryLabel(series),
                                 level: stage,
                                 species: art,
                               })
@@ -933,9 +913,9 @@ function RealBoxClient() {
         >
           <div className="sp-dialog-item">
             <div>
-              {artworkByCode[eggToExchange.code] ? (
+              {artworkFor(eggToExchange.code) ? (
                 <SpiritArtwork
-                  species={artworkByCode[eggToExchange.code]!}
+                  species={artworkFor(eggToExchange.code)!}
                   level={1}
                 />
               ) : (
@@ -943,7 +923,9 @@ function RealBoxClient() {
               )}
             </div>
             <div>
-              <p className="sp-eyebrow">{eggToExchange.theme}</p>
+              <p className="sp-eyebrow">
+                {categoryLabel(eggToExchange)}
+              </p>
               <h3>{eggToExchange.name}</h3>
               <p>將使用 {formatNumber(eggToExchange.cost)} 點</p>
             </div>
@@ -1006,7 +988,7 @@ function RealBoxClient() {
           className="sp-modal--art"
           onClose={() => setCollectionPreview(null)}
         >
-          <p className="sp-eyebrow">{collectionPreview.theme}</p>
+          <p className="sp-eyebrow">{collectionPreview.category}</p>
           <div className="sp-dialog-art">
             {collectionPreview.species ? (
               <SpiritArtwork

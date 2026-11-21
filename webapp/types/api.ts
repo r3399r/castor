@@ -57,6 +57,7 @@ export type Paginate<T> = { data: T[]; paginate: components['schemas']['Paginati
 
 export type Category = components['schemas']['Category']
 export type CategoryKind = components['schemas']['CategoryKind']
+export type AdminSpecies = components['schemas']['AdminSpecies']
 export type CharityCategoryRow = components['schemas']['CharityCategoryRow']
 export type CharityOrganization = components['schemas']['CharityOrganization']
 export type DailyMastery = components['schemas']['DailyMastery']
@@ -151,6 +152,7 @@ export type PostQuestionFigureResponse = Ok<'postApiQuestionImageFigure'>
 export type GetReplyResponse = Ok<'getApiReply'>
 export type PostReplyResponse = Ok<'postApiReply'>
 
+export type GetSpeciesResponse = Ok<'getApiSpecies'>
 export type GetStoreSpeciesResponse = Ok<'getApiStoreSpecies'>
 
 export type GetSubjectsResponse = Ok<'getApiSubject'>

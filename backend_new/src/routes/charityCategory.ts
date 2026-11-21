@@ -12,10 +12,17 @@ import { TransactionEnv } from 'src/middleware/transaction';
  * The seven public-interest categories, read-only.
  *
  * Read-only because the rows are seeded (db/script/v1.0.0/
- * insert_charity_category.sql) and tied to the spirit species by `code`:
+ * insert_charity_category.sql) and pointed at by `guardian.category_id`:
  * creating an eighth through an API would produce a category no egg leads
  * to, and renaming one would silently rewrite what past public records
  * say a donation supported. Changes go through SQL, deliberately.
+ *
+ * Not tied to a species by `code`, which this comment claimed until
+ * 2026-11-21. The link is the `category_id` foreign key, by id. The seven
+ * `guardian.code` values happen to be spelled like the seven
+ * `charity_category.code` values because `guardian.theme` used to hold the
+ * category name and the slug was reused -- nothing requires it, and a
+ * second egg in an existing category cannot repeat it anyway (`uk_code`).
  *
  * Reads are open, like charityOrganization's: these names are printed on
  * the public transparency page, so there is nothing here to gate. The

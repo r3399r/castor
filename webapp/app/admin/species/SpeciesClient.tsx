@@ -5,26 +5,17 @@ import { apiFetch } from '@/lib/api'
 import { formatNumber } from '@/lib/number'
 import { ErrorState, LoadingState, PageHeader } from '@/components/ui'
 import {
-  artworkByCode,
+  artworkFor,
   spiritCatalog,
   spiritImage,
-  VIP_GUARDIAN_CODE,
   type SpiritSpecies,
 } from '@/lib/guardianArtwork'
+import type { AdminSpecies, GetSpeciesResponse } from '@/types/api'
 
-type SpeciesDto = {
-  id: number
-  code: string
-  name: string
-  theme: string
-  cost: number
-  sortOrder: number
-  isActive: boolean
-  /** The donation category, or null for a species tied to none. */
-  category: { id: number; name: string } | null
-  /** Keyed by level; a level with no owners is absent. */
-  ownersByLevel: Record<string, number>
-}
+// A hand-written SpeciesDto restated all eight of AdminSpecies' fields
+// here until 2026-11-21, which is how it missed requiresSubscription when
+// that column shipped: the page compiled green and simply never mentioned
+// that an egg was subscriber-only. See AGENTS.md on the generated types.
 
 const LEVELS = [1, 2, 3, 4, 5]
 
@@ -79,11 +70,11 @@ function LevelThumb({
 }
 
 export default function SpeciesClient() {
-  const [species, setSpecies] = useState<SpeciesDto[] | null>(null)
+  const [species, setSpecies] = useState<AdminSpecies[] | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    apiFetch<SpeciesDto[]>('species')
+    apiFetch<GetSpeciesResponse>('species')
       .then(setSpecies)
       .catch(() => setError('無法載入精靈清單。'))
   }, [])
@@ -94,20 +85,20 @@ export default function SpeciesClient() {
   // Catalog entries with no database row: artwork and a definition exist
   // in the frontend, but nothing in the store can be bought to reach it.
   const mappedSpecies = new Set(
-    species.map((row) => artworkByCode[row.code]).filter(Boolean) as SpiritSpecies[]
+    species.map((row) => artworkFor(row.code)).filter(Boolean) as SpiritSpecies[]
   )
   const unmapped = (Object.keys(spiritCatalog) as SpiritSpecies[]).filter(
     (key) => !mappedSpecies.has(key)
   )
-  const hasVipRow = species.some((row) => row.code === VIP_GUARDIAN_CODE)
 
   return (
     <>
       <PageHeader title="精靈圖鑑（唯讀）" />
       <p className="mb-6 text-sm text-black-500">
-        精靈由資料庫的 <code>guardian</code> 資料列與前端寫死的圖檔對應共同構成，
-        因此這裡只供檢視。新增或更換精靈需要同時提供圖檔與{' '}
-        <code>artworkByCode</code> 對應，屬於程式碼變更。
+        精靈由資料庫的 <code>guardian</code> 資料列與前端寫死的圖檔共同構成，
+        因此這裡只供檢視。<code>guardian.code</code> 就是物種名稱（
+        <code>deer</code> 是森林之蛋），前端以它直接查 <code>spiritCatalog</code>，
+        所以新增或更換精靈需要一併提供圖檔，屬於程式碼變更。
       </p>
 
       {species.length === 0 && (
@@ -116,45 +107,15 @@ export default function SpeciesClient() {
         </p>
       )}
 
+      {/* A hardcoded section for the fennec egg stood at the top of this
+          list until 2026-11-21, shown while no guardian row had that code
+          -- the admin-side twin of BoxClient's VIP_PREVIEW. The row exists,
+          and naming a catalog entry that no row reaches is exactly what the
+          generic section at the bottom of this page does, so the special
+          case is gone and fennec is no longer excluded from that one. */}
       <div className="flex flex-col gap-4">
-        {!hasVipRow && (
-          <section className="rounded-lg border border-amber-300 bg-amber-50/55 p-4">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-base font-bold text-black-900">
-                  {spiritCatalog.fennec.name}
-                </h2>
-                <code className="rounded bg-beige-200 px-1.5 py-0.5 text-[11px] text-black-700">
-                  {VIP_GUARDIAN_CODE}
-                </code>
-                <Badge tone="warn">前端預覽</Badge>
-                <Badge tone="muted">尚無資料列</Badge>
-              </div>
-              <span className="text-xs text-black-500">
-                尚未開放兌換 · 0 人擁有
-              </span>
-            </div>
-
-            <p className="mb-3 text-xs text-black-500">
-              {spiritCatalog.fennec.category}
-              {' · '}
-              訂閱會員限定；正式資料列上線後可任選公益類別
-            </p>
-
-            <div className="flex flex-wrap gap-3">
-              {LEVELS.map((level) => (
-                <LevelThumb
-                  key={level}
-                  species="fennec"
-                  level={level}
-                  owners={0}
-                />
-              ))}
-            </div>
-          </section>
-        )}
         {species.map((row) => {
-          const art = artworkByCode[row.code]
+          const art = artworkFor(row.code)
           return (
             <section
               key={row.id}
@@ -174,11 +135,15 @@ export default function SpeciesClient() {
                     <Badge tone="muted">已下架</Badge>
                   )}
                   {art === undefined && <Badge tone="warn">尚無圖檔</Badge>}
+                  {row.requiresSubscription && <Badge tone="muted">訂閱限定</Badge>}
                   {/* Amber on purpose, including for the VIP spirit whose
                       category really is meant to be null: the badge's job
                       is to make a reader stop and ask whether this egg
                       should be unbound, and an egg seeded without a
-                      category_id looks exactly like one that should. */}
+                      category_id looks exactly like one that should.
+                      requiresSubscription above does not settle it either
+                      -- the two are independent, so a subscriber-only egg
+                      can still have had its category forgotten. */}
                   {row.category === null && <Badge tone="warn">未綁定類別</Badge>}
                 </div>
                 <span className="text-xs text-black-500">
@@ -191,8 +156,6 @@ export default function SpeciesClient() {
               </div>
 
               <p className="mb-3 text-xs text-black-500">
-                {row.theme}
-                {' · '}
                 {row.category === null ? '未綁定公益類別（可任選）' : `公益類別 ${row.category.name}`}
               </p>
 
@@ -211,7 +174,7 @@ export default function SpeciesClient() {
         })}
       </div>
 
-      {unmapped.filter((key) => key !== 'fennec').length > 0 && (
+      {unmapped.length > 0 && (
         <section className="mt-8">
           <h2 className="mb-2 text-base font-bold text-black-900">尚未對應到資料列的圖鑑定義</h2>
           <p className="mb-3 text-sm text-black-500">
@@ -219,7 +182,7 @@ export default function SpeciesClient() {
             資料列的 code 對應到它 —— 使用者無法在商店取得這些精靈。
           </p>
           <ul className="flex flex-wrap gap-2">
-            {unmapped.filter((key) => key !== 'fennec').map((key) => (
+            {unmapped.map((key) => (
               <li
                 key={key}
                 className="rounded-lg border border-brown-300 bg-white/40 px-3 py-2 text-sm"

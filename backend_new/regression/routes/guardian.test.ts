@@ -113,7 +113,6 @@ const seedSpecies = async (overrides: Partial<typeof guardianTable.$inferInsert>
   const [{ insertId: speciesId }] = await db.insert(guardianTable).values({
     code: 'forest',
     name: '森林之蛋',
-    theme: '森林保育',
     cost: 20,
     sortOrder: 0,
     isActive: true,
@@ -182,7 +181,8 @@ describe('guardian routes', () => {
 
     it('names the category the spirit supports, which the LV5 donation screen needs', async () => {
       // The donation flow is per spirit: it has to list that category's
-      // organisations, and `theme` is only a display label.
+      // organisations. It is also the only name of a cause this response
+      // carries, since the `theme` column that held a copy of it is gone.
       const userId = await seedUser(0);
       const categoryId = await seedCategory();
       const speciesId = await seedSpecies({ categoryId });
@@ -249,7 +249,6 @@ describe('guardian routes', () => {
         'level',
         'name',
         'nextLevelXp',
-        'theme',
         'xp',
       ]);
     });

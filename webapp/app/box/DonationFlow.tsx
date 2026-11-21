@@ -6,7 +6,7 @@ import { Check, ChevronDown, ChevronLeft, ExternalLink, HeartHandshake } from 'l
 import { Badge, Button, ButtonLink, Card, ContentPanel, Modal } from '@/components/ui'
 import { SpiritArtwork } from '@/components/spirit'
 import { ApiError, apiFetch, apiPost } from '@/lib/api'
-import { artworkByCode, type SpiritSpecies } from '@/lib/guardianArtwork'
+import { artworkFor, type SpiritSpecies } from '@/lib/guardianArtwork'
 import { formatNumber } from '@/lib/number'
 import type {
   CharityCategoryRow,
@@ -23,11 +23,12 @@ import type {
 /**
  * The real LV5 donation flow, against the API.
  *
- * Deliberately a separate file from DonationDemo.tsx rather than a
- * `demoMode` branch inside it: that file's state lives in localStorage and
- * its organisations are fictional, and interleaving the two sources in one
- * component is how a demo value ends up rendered as a real promise. The
- * demo stays reachable at /box/donation/?demo=donation for design review.
+ * The only donation flow. A localStorage design demo of it lived in
+ * DonationDemo.tsx until 2026-11-21, deliberately a separate file rather
+ * than a `demoMode` branch in here: its state came from localStorage and
+ * its organisations were fictional, and interleaving the two sources in
+ * one component is how a demo value ends up rendered as a real promise.
+ * That reasoning still applies if one is ever wanted again.
  *
  * Two facts shape everything here:
  *
@@ -261,7 +262,7 @@ function SpiritSummary({
   categoryChoices?: CharityCategoryRow[]
   onCategoryChange?: (categoryId: number) => void
 }) {
-  const artwork = artworkByCode[guardian.code]
+  const artwork = artworkFor(guardian.code)
   return (
     <section className="donation-spirit-summary">
       <div className="donation-spirit-thumb">
@@ -656,8 +657,8 @@ export function DonationFlowClient() {
             <ContentPanel className="donation-confirm-card">
               <div className="donation-confirm-spirit">
                 <div className="donation-confirm-spirit-art">
-                  {artworkByCode[guardian.code] ? (
-                    <SpiritArtwork species={artworkByCode[guardian.code]!} level={5} priority />
+                  {artworkFor(guardian.code) ? (
+                    <SpiritArtwork species={artworkFor(guardian.code)!} level={5} priority />
                   ) : (
                     <span className="donation-vip-art-blank" aria-label="圖片尚未提供" />
                   )}
@@ -723,8 +724,8 @@ export function DonationFlowClient() {
             <ContentPanel className="donation-record-card">
               <div className="donation-confirm-spirit">
                 <div className="donation-confirm-spirit-art">
-                  {artworkByCode[guardian.code] ? (
-                    <SpiritArtwork species={artworkByCode[guardian.code]!} level={5} priority />
+                  {artworkFor(guardian.code) ? (
+                    <SpiritArtwork species={artworkFor(guardian.code)!} level={5} priority />
                   ) : (
                     <span className="donation-vip-art-blank" aria-label="圖片尚未提供" />
                   )}

@@ -142,7 +142,6 @@ const seedSpirit = async (userId: number, categoryId: number) => {
   const [{ insertId: speciesId }] = await db.insert(guardianTable).values({
     code: `species-${seq}`,
     name: `第 ${seq} 之蛋`,
-    theme: `主題 ${seq}`,
     cost: 10,
     categoryId,
     // Flat 0, not seq: guardian.sort_order is TINYINT UNSIGNED and this

@@ -7,23 +7,14 @@ import {
   userGuardianTable,
   userTable,
 } from 'src/db/schema';
+import { z } from 'zod';
 import { ADMIN_EMAILS } from 'src/middleware/adminAuth';
 import { getSpeciesResponseSchema } from 'src/routes/species';
 
 vi.mock('src/lib/firebaseAdmin', () => ({ verifyIdToken: vi.fn(), verifyIdTokenUid: vi.fn() }));
 import { verifyIdToken } from 'src/lib/firebaseAdmin';
 
-type SpeciesDto = {
-  id: number;
-  code: string;
-  name: string;
-  theme: string;
-  cost: number;
-  sortOrder: number;
-  isActive: boolean;
-  category: { id: number; name: string } | null;
-  ownersByLevel: Record<string, number>;
-};
+type SpeciesDto = z.infer<typeof getSpeciesResponseSchema>[number];
 
 const getSpecies = () => app.request('/api/species');
 
@@ -50,21 +41,23 @@ const seedSpecies = async (
     sortOrder = 1,
     isActive = true,
     categoryId = null,
+    requiresSubscription = false,
   }: {
     cost?: number;
     sortOrder?: number;
     isActive?: boolean;
     categoryId?: number | null;
+    requiresSubscription?: boolean;
   } = {}
 ) => {
   const [{ insertId }] = await getDb().insert(guardianTable).values({
     code,
     name: `${code} egg`,
-    theme: `${code} theme`,
     cost,
     sortOrder,
     isActive,
     categoryId,
+    requiresSubscription,
     createdAt: new Date(),
   });
   return insertId;
@@ -155,8 +148,8 @@ describe('species', () => {
       expect(body.find((s) => s.code === 'unowned')?.ownersByLevel).toEqual({});
     });
 
-    // The whole reason this field exists: `theme` reads the same as the
-    // category name today, so without it a species seeded with no
+    // The whole reason this field exists: it is the only name of a cause
+    // the response carries, and without it a species seeded with no
     // category_id is indistinguishable on the page from a correct one.
     it('names the category a species supports, and says so when there is none', async () => {
       const categoryId = await seedCategory('children');
@@ -183,12 +176,27 @@ describe('species', () => {
       expect(body.map((s) => s.code)).toEqual(['unbound']);
     });
 
+    // Independent of the category, which is the point: a null category
+    // does not imply subscriber-only and a subscriber-only egg may well
+    // have a category, so the page needs both facts separately.
+    it('reports whether a species needs paid access, independently of its category', async () => {
+      const categoryId = await seedCategory('children');
+      await seedSpecies('free-bound', { sortOrder: 1, categoryId });
+      await seedSpecies('paid-bound', { sortOrder: 2, categoryId, requiresSubscription: true });
+      await seedSpecies('paid-unbound', { sortOrder: 3, requiresSubscription: true });
+      vi.mocked(verifyIdToken).mockResolvedValue(ADMIN_EMAILS[0]);
+
+      const body = (await (await getSpecies()).json()) as SpeciesDto[];
+      expect(body.map((s) => s.requiresSubscription)).toEqual([false, true, true]);
+      expect(body[1].category).not.toBeNull();
+    });
+
     it('exposes no write verbs', async () => {
       vi.mocked(verifyIdToken).mockResolvedValue(ADMIN_EMAILS[0]);
       const post = await app.request('/api/species', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: 'x', name: 'x', theme: 'x', cost: 1 }),
+        body: JSON.stringify({ code: 'x', name: 'x', cost: 1 }),
       });
       expect(post.status).toBe(404);
     });
@@ -221,8 +229,8 @@ describe('species', () => {
       'isActive',
       'name',
       'ownersByLevel',
+      'requiresSubscription',
       'sortOrder',
-      'theme',
     ]);
     expect(Object.keys(row.category).sort()).toEqual(['id', 'name']);
   });

@@ -120,7 +120,6 @@ const seedDonationTo = async (organizationId: number, categoryId: number, amount
   const [{ insertId: speciesId }] = await db.insert(guardianTable).values({
     code: `sp-${seq}`,
     name: `species ${seq}`,
-    theme: 'theme',
     cost: 10,
     categoryId,
     // Flat 0: guardian.sort_order is TINYINT UNSIGNED and this file's
@@ -472,7 +471,6 @@ describe('charity organization routes', () => {
       const [{ insertId: speciesId }] = await db.insert(guardianTable).values({
         code: `species-${cat}`,
         name: '測試之蛋',
-        theme: '測試主題',
         cost: 10,
         categoryId: cat,
         createdAt: new Date(),

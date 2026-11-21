@@ -4,6 +4,7 @@ import { useState, type ReactNode } from 'react'
 import { Check, Sparkles, Sprout } from 'lucide-react'
 import { Badge, ContentPanel, Progress } from '@/components/ui'
 import { formatNumber } from '@/lib/number'
+import { growthStageState } from '@/lib/growthStage'
 import {
   spiritCatalog,
   spiritImage,
@@ -73,6 +74,15 @@ export function IllustratedHero({
     </header>
   )
 }
+/**
+ * The levels a spirit has artwork and a stage label for, matching the
+ * backend's MAX_LEVEL (src/lib/guardianLevel.ts). Both components below
+ * read these rather than writing 5 twice, which is what they did until
+ * 2026-11-21.
+ */
+const LEVELS = [1, 2, 3, 4, 5]
+const MAX_LEVEL = LEVELS.length
+
 export function SpiritArtwork({
   species,
   level,
@@ -128,6 +138,7 @@ export function SpiritScene({
 }
 export function SpiritStatusCard({
   species,
+  category,
   level,
   xp,
   nextLevelXp,
@@ -135,6 +146,16 @@ export function SpiritStatusCard({
   headerAction,
 }: {
   species: SpiritSpecies
+  /**
+   * The cause this spirit supports, as the eyebrow prints it.
+   *
+   * A prop since 2026-11-21, not `spiritCatalog[species].category`: that
+   * was a hardcoded copy of charity_category.name, so renaming a
+   * category in the database left this card showing the old one. The
+   * caller has the API's answer; this component should not have a
+   * second opinion.
+   */
+  category: string
   level: number
   xp: number
   nextLevelXp: number | null
@@ -142,12 +163,12 @@ export function SpiritStatusCard({
   headerAction?: ReactNode
 }) {
   const definition = spiritCatalog[species]
-  const complete = level >= 5
+  const complete = level >= MAX_LEVEL
   return (
     <ContentPanel className="sp-status">
       <div className="sp-status-heading">
         <div>
-          <p className="sp-eyebrow">{definition.category}</p>
+          <p className="sp-eyebrow">{category}</p>
           <h2>{definition.name}</h2>
         </div>
         {headerAction ?? (
@@ -200,17 +221,27 @@ export function GrowthTrack({
   xp: number
   nextLevelXp: number | null
 }) {
+  // Only read while a level is `growing`, where nextLevelXp is never
+  // null; the fallback is a guard against dividing by it, not a value
+  // anything renders.
   const progress = nextLevelXp ? Math.min((xp / nextLevelXp) * 100, 100) : 100
 
   return (
     <ol className="sp-growth-track">
-      {[1, 2, 3, 4, 5].map((level) => {
-        const locked = level > unlockedLevel
-        const current = level === unlockedLevel
+      {LEVELS.map((level) => {
+        const state = growthStageState(level, unlockedLevel, MAX_LEVEL)
+        const locked = state === 'locked'
+        // Still earning XP toward this level. Not the same as standing on
+        // it: at the top level the spirit is finished, so the caption and
+        // the bar below treat it as reached.
+        const growing = state === 'growing'
+        // Where the user is, which keeps the highlight on the top level
+        // too -- is-current is "you are here", not "in progress".
+        const atThisLevel = level === unlockedLevel
         return (
           <li
             key={level}
-            className={`sp-growth-stage${current ? ' is-current' : ''}${locked ? ' is-locked' : ''}`}
+            className={`sp-growth-stage${atThisLevel ? ' is-current' : ''}${locked ? ' is-locked' : ''}`}
           >
             <span className="sp-growth-image">
               {locked ? (
@@ -237,11 +268,11 @@ export function GrowthTrack({
             <span className="sp-growth-state">
               {locked
                 ? '尚未解鎖'
-                : current
+                : growing
                   ? '培育中'
                   : spiritCatalog[species].stages[level - 1]}
             </span>
-            {current && (
+            {growing && (
               <span className="sp-stage-progress" aria-label={`培育進度 ${Math.round(progress)}%`}>
                 <span style={{ width: `${progress}%` }} />
               </span>

@@ -1765,13 +1765,13 @@
           "name": {
             "type": "string"
           },
-          "theme": {
-            "type": "string",
-            "description": "The egg's own label, which is not the category link below"
-          },
           "cost": {
             "type": "integer",
             "description": "Points to redeem one"
+          },
+          "requiresSubscription": {
+            "type": "boolean",
+            "description": "Subscriber-only. Nothing else in this response says so -- a null category does not, since the two are independent"
           },
           "sortOrder": {
             "type": "integer"
@@ -1811,8 +1811,8 @@
           "id",
           "code",
           "name",
-          "theme",
           "cost",
+          "requiresSubscription",
           "sortOrder",
           "isActive",
           "category",
@@ -1827,17 +1827,37 @@
           },
           "code": {
             "type": "string",
-            "description": "What the frontend keys this species' artwork by"
+            "description": "What the frontend keys this species' artwork by -- it names the species drawn, not the category supported, so 'deer' is the forest egg"
           },
           "name": {
-            "type": "string"
-          },
-          "theme": {
             "type": "string"
           },
           "cost": {
             "type": "integer",
             "description": "Points to redeem one"
+          },
+          "requiresSubscription": {
+            "type": "boolean",
+            "description": "Whether redeeming needs paid access. POST /store/redeem enforces it and answers SUBSCRIPTION_REQUIRED; a client that only hides the button changes nothing"
+          },
+          "category": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ],
+            "description": "The donation category this species supports, or null for one tied to none -- the VIP egg, whose owner picks at LV5. The only name of a cause this response carries; a `theme` column held a copy of it until 2026-11-21, and null is what the shelf renders as \"any category\""
           },
           "owned": {
             "type": "boolean"
@@ -1854,8 +1874,9 @@
           "id",
           "code",
           "name",
-          "theme",
           "cost",
+          "requiresSubscription",
+          "category",
           "owned",
           "level"
         ]
@@ -1873,9 +1894,6 @@
             "type": "string"
           },
           "name": {
-            "type": "string"
-          },
-          "theme": {
             "type": "string"
           },
           "level": {
@@ -1916,7 +1934,6 @@
           "guardianId",
           "code",
           "name",
-          "theme",
           "level",
           "xp",
           "nextLevelXp",

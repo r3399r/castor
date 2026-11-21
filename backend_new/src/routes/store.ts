@@ -4,8 +4,13 @@ import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { describeRoute, resolver } from 'hono-openapi';
 import { z } from 'zod';
-import { guardianTable, pointTransactionTable, userGuardianTable, userTable } from 'src/db/schema';
-import { VIP_GUARDIAN_CODE } from 'src/lib/guardianLevel';
+import {
+  charityCategoryTable,
+  guardianTable,
+  pointTransactionTable,
+  userGuardianTable,
+  userTable,
+} from 'src/db/schema';
 import { findEntitledSubscription } from 'src/lib/subscription';
 import { BadRequestError, NotFoundError } from 'src/model/error';
 import { UserEnv } from 'src/middleware/requireUser';
@@ -22,10 +27,24 @@ export const redeemBodySchema = z.object({ speciesId: z.number().int().positive(
  */
 export const guardianSpeciesSchema = z.object({
   id: z.number().int(),
-  code: z.string().describe('What the frontend keys this species\' artwork by'),
+  code: z
+    .string()
+    .describe(
+      "What the frontend keys this species' artwork by -- it names the species drawn, not the category supported, so 'deer' is the forest egg"
+    ),
   name: z.string(),
-  theme: z.string(),
   cost: z.number().int().describe('Points to redeem one'),
+  requiresSubscription: z
+    .boolean()
+    .describe(
+      'Whether redeeming needs paid access. POST /store/redeem enforces it and answers SUBSCRIPTION_REQUIRED; a client that only hides the button changes nothing'
+    ),
+  category: z
+    .object({ id: z.number().int(), name: z.string() })
+    .nullable()
+    .describe(
+      'The donation category this species supports, or null for one tied to none -- the VIP egg, whose owner picks at LV5. The only name of a cause this response carries; a `theme` column held a copy of it until 2026-11-21, and null is what the shelf renders as "any category"'
+    ),
   owned: z.boolean(),
   level: z
     .number()
@@ -90,9 +109,24 @@ export const store = new Hono<UserEnv>()
     const db = c.get('db');
     console.log(`GET /api/store/species userId=${user.id}`);
 
+    // Columns listed rather than a bare .select() because of the join
+    // below: with one, a bare select nests every row under table names and
+    // silently changes this response's shape.
     const species = await db
-      .select()
+      .select({
+        id: guardianTable.id,
+        code: guardianTable.code,
+        name: guardianTable.name,
+        cost: guardianTable.cost,
+        requiresSubscription: guardianTable.requiresSubscription,
+        categoryId: charityCategoryTable.id,
+        categoryName: charityCategoryTable.name,
+      })
       .from(guardianTable)
+      // Left, not inner: category_id is NULL for an egg tied to no
+      // category, and an inner join would drop that egg off the shelf
+      // altogether -- the VIP egg would simply never be on sale.
+      .leftJoin(charityCategoryTable, eq(charityCategoryTable.id, guardianTable.categoryId))
       .where(eq(guardianTable.isActive, true))
       .orderBy(asc(guardianTable.sortOrder));
 
@@ -114,8 +148,12 @@ export const store = new Hono<UserEnv>()
       id: s.id,
       code: s.code,
       name: s.name,
-      theme: s.theme,
       cost: s.cost,
+      requiresSubscription: s.requiresSubscription,
+      category:
+        s.categoryId !== null && s.categoryName !== null
+          ? { id: s.categoryId, name: s.categoryName }
+          : null,
       owned: levelBySpeciesId.has(s.id),
       level: levelBySpeciesId.get(s.id) ?? null,
     }));
@@ -143,16 +181,20 @@ export const store = new Hono<UserEnv>()
       .where(and(eq(userGuardianTable.userId, user.id), eq(userGuardianTable.guardianId, speciesId)));
     if (existing !== undefined) throw new BadRequestError('already own this guardian', 'ALREADY_OWNED');
 
-    // The VIP egg is subscriber-only. BoxClient checks this on the card
-    // and again beside the mutation, but both are frontend: without this
-    // check, `cost` points and a direct POST are enough to own a spirit
-    // whose category_id is NULL -- and NULL is what lets its owner send a
-    // real donation to any category.
+    // BoxClient checks this on the card and again beside the mutation,
+    // but both are frontend: without this check, `cost` points and a
+    // direct POST are enough to own a spirit whose category_id is NULL --
+    // and NULL is what lets its owner send a real donation to any
+    // category.
+    //
+    // The column, not `code === 'vip'`, which this was until 2026-11-21:
+    // the codes name the species drawn and were renamed, which would have
+    // switched the paywall off with nothing failing.
     //
     // Entitled, not active: a cancelled agreement inside the period it
     // already paid for still grants paid access, same rule guardian.ts
     // uses for the XP bonus.
-    if (species.code === VIP_GUARDIAN_CODE) {
+    if (species.requiresSubscription) {
       const entitled = await findEntitledSubscription(db, user.id);
       if (entitled === undefined)
         throw new BadRequestError('subscription required for this guardian', 'SUBSCRIPTION_REQUIRED');

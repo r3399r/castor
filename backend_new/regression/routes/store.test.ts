@@ -2,14 +2,15 @@ import { eq } from 'drizzle-orm';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { app } from 'src/app';
 import { closeDb, getDb } from 'src/db/client';
+import { z } from 'zod';
 import {
+  charityCategoryTable,
   guardianTable,
   pointTransactionTable,
   userGuardianTable,
   userSubscriptionTable,
   userTable,
 } from 'src/db/schema';
-import { VIP_GUARDIAN_CODE } from 'src/lib/guardianLevel';
 
 vi.mock('src/lib/firebaseAdmin', () => ({ verifyIdTokenUid: vi.fn() }));
 import { verifyIdTokenUid } from 'src/lib/firebaseAdmin';
@@ -18,9 +19,8 @@ import {
   postStoreRedeemResponseSchema,
 } from 'src/routes/store';
 
-type GuardianSpeciesDto = { id: number; code: string; name: string; theme: string; cost: number; owned: boolean; level: number | null };
-type GetStoreSpeciesResponse = { data: GuardianSpeciesDto[]; totalPoints: number };
-type PostRedeemResponse = { guardian: { id: number; speciesId: number; level: number; xp: number }; totalPoints: number };
+type GetStoreSpeciesResponse = z.infer<typeof getStoreSpeciesResponseSchema>;
+type PostRedeemResponse = z.infer<typeof postStoreRedeemResponseSchema>;
 type ErrorBody = { message: string; code?: string };
 
 const getSpecies = () => app.request('/api/store/species');
@@ -36,7 +36,9 @@ const clearTables = async () => {
   const db = getDb();
   await db.delete(pointTransactionTable);
   await db.delete(userGuardianTable);
+  // Before the categories: guardian.category_id references them.
   await db.delete(guardianTable);
+  await db.delete(charityCategoryTable);
   await db.delete(userSubscriptionTable);
   await db.delete(userTable);
 };
@@ -64,6 +66,13 @@ const seedSubscription = async (userId: number, status = 'active', endsInDays = 
   });
 };
 
+const seedCategory = async (code: string) => {
+  const [{ insertId }] = await getDb()
+    .insert(charityCategoryTable)
+    .values({ code, name: `${code} category`, sortOrder: 1, isActive: true, createdAt: new Date() });
+  return insertId;
+};
+
 const seedUser = async (totalPoints = 0) => {
   const db = getDb();
   const [{ insertId: userId }] = await db.insert(userTable).values({
@@ -83,7 +92,6 @@ const seedSpecies = async (overrides: Partial<typeof guardianTable.$inferInsert>
   const [{ insertId: speciesId }] = await db.insert(guardianTable).values({
     code: 'forest',
     name: '森林之蛋',
-    theme: '森林保育',
     cost: 20,
     sortOrder: 0,
     isActive: true,
@@ -150,6 +158,49 @@ describe('store routes', () => {
       const body = (await res.json()) as GetStoreSpeciesResponse;
       expect(body.data[0].owned).toBe(true);
       expect(body.data[0].level).toBe(1);
+    });
+
+    // The shelf is where someone chooses what to support, so it has to
+    // name the cause. It used to send only `theme`, a column holding a
+    // copy of the category's name -- true by coincidence for every row
+    // that existed, and false as soon as one category holds two eggs. The
+    // column is gone; this is the only name of a cause on the shelf.
+    it('names the category a species supports, and sends null for one tied to none', async () => {
+      await seedUser(50);
+      const categoryId = await seedCategory('forest');
+      await seedSpecies({ code: 'deer', sortOrder: 0, categoryId });
+      await seedSpecies({ code: 'fennec', sortOrder: 1 });
+
+      const body = (await (await getSpecies()).json()) as GetStoreSpeciesResponse;
+      expect(body.data.find((s) => s.code === 'deer')?.category).toEqual({
+        id: categoryId,
+        name: 'forest category',
+      });
+      // null, not omitted: the card branches on it to say "any category".
+      expect(body.data.find((s) => s.code === 'fennec')?.category).toBeNull();
+    });
+
+    // A left join, not an inner one. An inner join would have dropped
+    // every egg with no category off the shelf -- which is the VIP egg, so
+    // the one species this gate exists for would never have been on sale.
+    it('still lists a species that supports no category', async () => {
+      await seedUser(50);
+      await seedSpecies({ code: 'fennec' });
+
+      const body = (await (await getSpecies()).json()) as GetStoreSpeciesResponse;
+      expect(body.data.map((s) => s.code)).toEqual(['fennec']);
+    });
+
+    // The card locks on this, and POST /redeem enforces it. Default false
+    // rather than absent, so a client never has to treat the two alike.
+    it('reports whether a species needs paid access', async () => {
+      await seedUser(50);
+      await seedSpecies({ code: 'deer', sortOrder: 0 });
+      await seedSpecies({ code: 'fennec', sortOrder: 1, requiresSubscription: true });
+
+      const body = (await (await getSpecies()).json()) as GetStoreSpeciesResponse;
+      expect(body.data.find((s) => s.code === 'deer')?.requiresSubscription).toBe(false);
+      expect(body.data.find((s) => s.code === 'fennec')?.requiresSubscription).toBe(true);
     });
 
     // The collection view sorts by progress, so it needs the grown level
@@ -236,9 +287,9 @@ describe('store routes', () => {
       expect(res.status).toBe(404);
     });
 
-    it('rejects the VIP species with SUBSCRIPTION_REQUIRED when the user has no paid access', async () => {
+    it('rejects a subscriber-only species with SUBSCRIPTION_REQUIRED when the user has no paid access', async () => {
       const userId = await seedUser(100);
-      const speciesId = await seedSpecies({ code: VIP_GUARDIAN_CODE, cost: 10 });
+      const speciesId = await seedSpecies({ requiresSubscription: true, cost: 10 });
 
       const res = await postRedeem({ speciesId });
       expect(res.status).toBe(400);
@@ -252,38 +303,38 @@ describe('store routes', () => {
       expect(await db.select().from(userGuardianTable)).toHaveLength(0);
     });
 
-    it('redeems the VIP species for a subscriber', async () => {
+    it('redeems a subscriber-only species for a subscriber', async () => {
       const userId = await seedUser(100);
       await seedSubscription(userId);
-      const speciesId = await seedSpecies({ code: VIP_GUARDIAN_CODE, cost: 10 });
+      const speciesId = await seedSpecies({ requiresSubscription: true, cost: 10 });
 
       const res = await postRedeem({ speciesId });
       expect(res.status).toBe(200);
       expect(((await res.json()) as PostRedeemResponse).totalPoints).toBe(90);
     });
 
-    it('redeems the VIP species for a cancelled subscription still inside its paid period', async () => {
+    it('redeems a subscriber-only species for a cancelled subscription still inside its paid period', async () => {
       const userId = await seedUser(100);
       await seedSubscription(userId, 'cancelled');
-      const speciesId = await seedSpecies({ code: VIP_GUARDIAN_CODE, cost: 10 });
+      const speciesId = await seedSpecies({ requiresSubscription: true, cost: 10 });
 
       const res = await postRedeem({ speciesId });
       expect(res.status).toBe(200);
     });
 
-    it('rejects the VIP species once its paid period has ended', async () => {
+    it('rejects a subscriber-only species once its paid period has ended', async () => {
       const userId = await seedUser(100);
       await seedSubscription(userId, 'active', -1);
-      const speciesId = await seedSpecies({ code: VIP_GUARDIAN_CODE, cost: 10 });
+      const speciesId = await seedSpecies({ requiresSubscription: true, cost: 10 });
 
       const res = await postRedeem({ speciesId });
       expect(res.status).toBe(400);
       expect(((await res.json()) as ErrorBody).code).toBe('SUBSCRIPTION_REQUIRED');
     });
 
-    it('reports ALREADY_OWNED rather than SUBSCRIPTION_REQUIRED when a lapsed subscriber owns the VIP egg', async () => {
+    it('reports ALREADY_OWNED rather than SUBSCRIPTION_REQUIRED when a lapsed subscriber owns a subscriber-only egg', async () => {
       const userId = await seedUser(100);
-      const speciesId = await seedSpecies({ code: VIP_GUARDIAN_CODE, cost: 10 });
+      const speciesId = await seedSpecies({ requiresSubscription: true, cost: 10 });
       const db = getDb();
       await db.insert(userGuardianTable).values({
         userId,
@@ -328,13 +379,14 @@ describe('store routes', () => {
     expect(shelfParsed.error?.issues ?? []).toEqual([]);
     expect(Object.keys(shelf as object).sort()).toEqual(['data', 'totalPoints']);
     expect(Object.keys((shelf as { data: object[] }).data[0]).sort()).toEqual([
+      'category',
       'code',
       'cost',
       'id',
       'level',
       'name',
       'owned',
-      'theme',
+      'requiresSubscription',
     ]);
 
     const redeemed: unknown = await (await postRedeem({ speciesId })).json();

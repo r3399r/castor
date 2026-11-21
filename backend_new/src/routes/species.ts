@@ -32,8 +32,12 @@ export const adminSpeciesSchema = z.object({
   id: z.number().int(),
   code: z.string().describe("What the frontend keys this species' artwork by"),
   name: z.string(),
-  theme: z.string().describe("The egg's own label, which is not the category link below"),
   cost: z.number().int().describe('Points to redeem one'),
+  requiresSubscription: z
+    .boolean()
+    .describe(
+      'Subscriber-only. Nothing else in this response says so -- a null category does not, since the two are independent'
+    ),
   sortOrder: z.number().int(),
   isActive: z.boolean().describe('Whether it is still on sale; owners of a retired one keep it'),
   category: z
@@ -82,8 +86,8 @@ export const species = new Hono<TransactionEnv>().get('/', listDoc, async (c) =>
       id: guardianTable.id,
       code: guardianTable.code,
       name: guardianTable.name,
-      theme: guardianTable.theme,
       cost: guardianTable.cost,
+      requiresSubscription: guardianTable.requiresSubscription,
       sortOrder: guardianTable.sortOrder,
       isActive: guardianTable.isActive,
       categoryId: charityCategoryTable.id,
@@ -124,17 +128,16 @@ export const species = new Hono<TransactionEnv>().get('/', listDoc, async (c) =>
       id: row.id,
       code: row.code,
       name: row.name,
-      theme: row.theme,
       cost: row.cost,
+      requiresSubscription: row.requiresSubscription,
       sortOrder: row.sortOrder,
       isActive: row.isActive,
       // The donation category this species supports, or null for one
-      // tied to none. Worth returning even though `theme` currently
-      // reads the same: theme is the egg's own label, this is the link
-      // the donation route actually reads. null is both what the planned
-      // VIP spirit is and what a freshly seeded egg looks like when its
-      // category_id was forgotten -- indistinguishable from here, which
-      // is why the admin page says it out loud instead of leaving a gap.
+      // tied to none. The only name this response carries for a cause --
+      // a `theme` column held a copy of it until 2026-11-21. null is both
+      // what the VIP spirit is and what a freshly seeded egg looks like
+      // when its category_id was forgotten -- indistinguishable from
+      // here, which is why the admin page says it out loud.
       category:
         row.categoryId !== null && row.categoryName !== null
           ? { id: row.categoryId, name: row.categoryName }

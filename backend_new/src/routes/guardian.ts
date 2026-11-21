@@ -48,7 +48,6 @@ const guardianSchema = z.object({
   guardianId: z.number().int(),
   code: z.string(),
   name: z.string(),
-  theme: z.string(),
   level: z.number().int(),
   xp: z.number().int(),
   nextLevelXp: z
@@ -61,9 +60,9 @@ const guardianSchema = z.object({
    * what lets its owner direct the donation at any category.
    *
    * Carried here because the LV5 donation screen is per spirit: it has to
-   * list that category's organisations, and `theme` is only a display
-   * label (it reads the same as the category's name today and will
-   * diverge once one category holds several eggs).
+   * list that category's organisations. It is also what the card's eyebrow
+   * prints -- a `theme` column used to, holding a copy of this name, and
+   * was dropped on 2026-11-21.
    */
   category: categorySchema
     .nullable()
@@ -122,7 +121,6 @@ const toDto = (row: {
   guardianId: number;
   code: string;
   name: string;
-  theme: string;
   level: number;
   xp: number;
   categoryId: number | null;
@@ -151,7 +149,6 @@ export const guardian = new Hono<UserEnv>()
         guardianId: userGuardianTable.guardianId,
         code: guardianTable.code,
         name: guardianTable.name,
-        theme: guardianTable.theme,
         level: userGuardianTable.level,
         xp: userGuardianTable.xp,
         categoryId: charityCategoryTable.id,
@@ -188,7 +185,6 @@ export const guardian = new Hono<UserEnv>()
         guardianId: userGuardianTable.guardianId,
         code: guardianTable.code,
         name: guardianTable.name,
-        theme: guardianTable.theme,
         categoryId: charityCategoryTable.id,
         categoryName: charityCategoryTable.name,
       })
@@ -258,7 +254,6 @@ export const guardian = new Hono<UserEnv>()
         guardianId: existing.guardianId,
         code: existing.code,
         name: existing.name,
-        theme: existing.theme,
         categoryId: existing.categoryId,
         categoryName: existing.categoryName,
         level,
