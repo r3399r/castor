@@ -1,72 +1,109 @@
 # 新增一顆精靈蛋 — 完整步驟
 
 > Keywords: add a new egg / guardian / spirit species, new charity category,
-> VIP egg, `guardian.category_id` NULL, `requires_subscription`, `artworkFor`, `spiritCatalog`,
-> `SpiritSpecies`, egg artwork, 新增蛋, 新增精靈, 新增公益類別.
+> VIP egg, `guardian.category_id` NULL, `requires_subscription`, `artworkFor`,
+> `spiritCatalog`, `SpiritSpecies`, egg artwork, 新增蛋, 新增精靈, 新增公益類別.
 
 ## 快速答案
 
-**改五個地方。① 和 ⑤ 沒有任何錯誤訊息，漏了只會無聲壞掉。**
+**六個地方，按順序。只有③ 會編譯失敗；其餘五個漏了都是無聲的。**
 
-| | 情境 1：綁定某個公益類別 | 情境 2：VIP（不綁類別） |
+| | 做什麼 | 漏了會怎樣 |
 | --- | --- | --- |
-| ① `castor.guardian` 資料列 | `category_id` = 該類別的 id，**用子查詢取、不要手打** | `category_id` = **`NULL`**（刻意的，見下） |
-| ② `db/script/v1.0.0/insert_guardian.sql` | 加同一列，**明寫 `category_id`** | 加同一列，`category_id` 留 NULL |
-| ③ `webapp/lib/guardianArtwork.ts` | 兩處：`SpiritSpecies` 聯集 ＋ `spiritCatalog`。**`guardian.code` 必須等於這個物種名** | 同左 |
-| ④ 圖檔 ×5 | `webapp/public/illustrations/guardians/<species>/lv1..lv5.webp` | 沒有圖就跳過，前端自動留白 |
-| ⑤ `AGENTS.md` 的 Spirit categories 表 | 加一列 | 加一列，**務必註明它是 VIP** |
+| ① `castor.guardian` 資料列（正式庫手跑） | 複製下方 SQL。**`category_id` 用子查詢取，不要手打 id** | 蛋不存在 |
+| ② `db/script/v1.0.0/insert_guardian.sql` | 同一列的 repo 副本 | 重建的 docker 資料庫少一顆蛋 |
+| ③ `webapp/lib/guardianArtwork.ts` | 兩處：`SpiritSpecies` 聯集 ＋ `spiritCatalog` 項目 | **TypeScript 編譯失敗**（唯一會吵的一處） |
+| ④ `webapp/public/illustrations/guardians/<code>/lv1..lv5.webp` | 五張圖 | 顯示鎖住的蛋 |
+| ⑤ `webapp/source-assets/png/illustrations/guardians/<code>/lv1..lv5.png` | 原始 PNG | 日後重壓圖沒來源 |
+| ⑥ `AGENTS.md` 的 **Spirit categories** 表 | 加一列 | 下一個 agent 照過期清單工作 |
+
+### 三條硬規則
+
+1. **`guardian.code` 就是物種名，必須等於 `spiritCatalog` 的 key。**
+   畫的是鹿就叫 `deer`，不是類別名（不是 `forest`）。`artworkFor(code)`
+   直接拿 code 去查，沒有任何對應表。
+2. **子查詢要對「類別」的 code，不是蛋的 code。** 兩者刻意不同名（`deer` → `forest`）。
+   對錯會回 NULL，而 NULL 的語意是「可任選類別」——這顆蛋會變成一隻 VIP。
+3. **同一個類別的第二顆蛋是另一隻動物。** `uk_code` 是 UNIQUE，所以是 `fox`，
+   不是 `forest2`。類別與蛋是一對多。
+
+### SQL（兩種情境，可直接複製）
 
 ```sql
--- 情境 1：code 寫物種名（畫的是哪隻動物），子查詢對的是「類別」的 code。
--- 兩者刻意不同名 -- 同一個類別的第二顆蛋就是這樣加的。
+SET NAMES utf8mb4;
+
+-- 情境 A：綁定某個現有類別
 INSERT INTO castor.guardian
 (code, name, cost, category_id, requires_subscription, sort_order, is_active, created_at)
 SELECT 'fox', '狐狸之蛋', 10, c.id, 0, 8, 1, now(3)
-FROM castor.charity_category c WHERE c.code = 'forest';
+FROM castor.charity_category c
+WHERE c.code = 'forest';          -- ← 類別的 code，不是蛋的
 
--- 情境 2（VIP）：category_id NULL 和 requires_subscription 1 是兩件
--- 互相獨立的事，都要明寫。
+-- 情境 B：訂閱限定、不綁類別（目前只有 fennec）
 INSERT INTO castor.guardian
 (code, name, cost, category_id, requires_subscription, sort_order, is_active, created_at)
 VALUES ('fennec', 'VIP 星冠之蛋', 10, NULL, 1, 99, 1, now(3));
 ```
 
-**驗證**：`cd backend_new && npm run typecheck` → `cd webapp && npm run build` → 開 **`/admin/species`**。
+`category_id IS NULL` 和 `requires_subscription = 1` 是**兩件獨立的事**：
+綁了類別的蛋也可以是訂閱限定。兩者都要明寫。
 
-### 兩個一定會踩到的陷阱
+沒有 `theme` 欄位（2026-11-21 刪除）。寫了會 SQL 錯誤。
 
-1. **`category_id` 必須在 INSERT 裡明寫。** **沒有任何東西會幫你填它**——
-   2026-11-16 之前 `insert_charity_category.sql` 結尾有一條
-   `JOIN charity_category c ON c.code = g.code` 的回填 UPDATE，那條已經移除
-   （它只對七顆蛋 code 恰好等於類別 code 的初始狀態有效，而 `guardian.code` 是
-   UNIQUE，同一類別的第二顆蛋 code 必然不同，JOIN 永遠對不上）。漏了不會報錯，
-   而 `category_id IS NULL` 的語意就是「可任選類別」，那顆蛋會直接變成一隻 VIP，
-   主人可以把真實的錢導向任何類別。
+### 前端（`webapp/lib/guardianArtwork.ts`，兩處）
 
-2. **VIP 和「漏填」在畫面上完全一樣。** `/admin/species` 的琥珀色「未綁定類別」badge
-   對真 VIP 也會亮（刻意的）。所以 **`AGENTS.md` 那張表是唯一能分辨兩者的地方**。
+```ts
+export type SpiritSpecies = | 'cat' /* … */ | 'fox'   // ← 1. 聯集
 
-**不需要改**：`schema.ts`、任何後端路由、`docker-compose.yml`。
+export const spiritCatalog: Record<SpiritSpecies, SpiritDefinition> = {
+  fox: {                                              // ← 2. key ＝ guardian.code
+    name: '夜行狐靈',                              // 物種名，不是蛋名
+    artwork: '/illustrations/guardians/fox',           // 沒圖就整行省略
+    tone: 'forest',                                   // 'forest' 是預設；'sky' 有自己的背景
+    stages: ['初生', '萌芽', '探索', '茁壯', '綻放'],   // 正好五個
+  },
+}
+```
+
+沒有第三步。`category` 欄位已刪（類別是 `guardian.category_id` 的事），
+`artworkByCode` 對應表也已刪。
+
+### 驗證（照順序，不要跳）
+
+```bash
+cd backend_new && npm run typecheck     # 兩份 tsconfig 都跑
+cd webapp && npm run typecheck
+cd webapp && rm -rf .next out && npm run build
+```
+
+然後開 **`/admin/species`** —— 它是唯一同時從兩個方向檢查的地方，
+也是上述無聲失敗的主要防線：資料庫每一列旁邊的圖、「尚無圖檔」、
+前端有定義卻沒有資料列的、以及**琥珀色「未綁定類別」**。
+最後開 `/box` 確認商店列出新蛋、兌換後圖片正確。
+
+### 不需要改
+
+`schema.ts`、任何後端路由、`docker-compose.yml`。
 新增一顆蛋是加資料，不是加程式分支。
 
-**只要新增類別、不出新蛋**：看下面的「情境 C」，答案是只跑一條 INSERT，零程式碼變更。
+**只新增類別、不出新蛋**：看「情境 C」，答案是一條 INSERT，零程式碼變更。
 
 ---
 
 以下是完整版本與理由。
 
-一顆蛋的身分**不是單一來源**：資料庫有一列、前端有三份硬編碼、圖檔是五個檔案、
-`AGENTS.md` 有一張對照表。任何一處漏掉都不會報錯——它會**無聲地**退化成鎖住的蛋、
+一顆蛋的身分**不是單一來源**：資料庫有一列、前端有兩處硬編碼、
+圖檔是五個檔案（加原始 PNG 十個）、`AGENTS.md` 有一張對照表。
+除了前端那兩處，其餘漏掉都不會報錯——它會**無聲地**退化成鎖住的蛋、
 沒有圖、或（最糟的）變成一隻多出來的 VIP。
 
 這份文件就是為了讓那件事不再靠記憶。
 
-本文在 **2026-11-09** 對 `donation` 分支查證過，2026-11-16 隨兩支 seed 的順序反轉更新過
-（類別 seed 先、guardian seed 後，回填 UPDATE 移除），2026-11-21 隨 `guardian.code` 改用
-物種命名、`requires_subscription` 成為欄位、`artworkByCode` 刪除、
+審核紀錄：**2026-11-09** 對 `donation` 分支查證過；2026-11-16 隨兩支 seed
+順序反轉更新（類別先、蛋後，回填 UPDATE 移除）；2026-11-21 隨 `guardian.code`
+改用物種命名、`requires_subscription` 成為欄位、`artworkByCode` 刪除、
 `guardian.theme` 欄位刪除、`spiritCatalog` 的 `category` 欄位刪除、
-localStorage 捐款 demo 刪除而更新。
-改動下列任一處時，連同這份文件一起更新。
+localStorage 捐款 demo 刪除而更新。改動上述任一處時，連同這份文件一起更新。
 
 ---
 
@@ -78,11 +115,11 @@ localStorage 捐款 demo 刪除而更新。
 | 2 | `db/script/v1.0.0/insert_guardian.sql` | 同一列的 repo 副本 | 全新環境（docker）沒有這顆蛋 |
 | 3 | `webapp/lib/guardianArtwork.ts` → `SpiritSpecies` | 型別聯集加一個 key | TypeScript 編譯失敗（這是唯一會**吵**的一處） |
 | 4 | 同上 → `spiritCatalog` | `name`、`artwork`、`tone`、`stages` | 型別缺 key，編譯失敗 |
-| 6 | `webapp/public/illustrations/guardians/<species>/lv1..lv5.webp` | 五張圖 | **無聲**：`spiritImage()` 回 undefined，顯示鎖住的蛋 |
-| 7 | `webapp/source-assets/png/illustrations/guardians/<species>/` | 原始 PNG | 之後要重壓圖時沒有來源 |
-| 8 | `AGENTS.md` 的 **Spirit categories** 表 | 一列 | 下一個人（或 AI）讀到的是過期清單 |
+| 5 | `webapp/public/illustrations/guardians/<code>/lv1..lv5.webp` | 五張圖 | **無聲**：`artworkFor()` 回 undefined，顯示鎖住的蛋 |
+| 6 | `webapp/source-assets/png/illustrations/guardians/<code>/` | 原始 PNG | 之後要重壓圖時沒有來源 |
+| 7 | `AGENTS.md` 的 **Spirit categories** 表 | 一列 | 下一個人（或 AI）讀到的是過期清單 |
 
-第 3、4 項會讓 build 失敗，所以不會漏。**真正會咬人的是 1 和 6**——它們都無聲。
+第 3、4 項會讓 build 失敗，所以不會漏。**真正會咬人的是 1 和 5**——它們都無聲。
 
 （2026-11-21 之前這張表還有第 5 項 `artworkByCode`：一張 `guardian.code` → `SpiritSpecies`
 的對應表。code 改成物種名之後它變成恆等映射，已刪除，改為 `artworkFor(code)`。代價是
@@ -181,10 +218,10 @@ export const spiritCatalog: Record<SpiritSpecies, SpiritDefinition> = {
 
 | | |
 | --- | --- |
-| 路徑 | `webapp/public/illustrations/guardians/<species>/lv1.webp` … `lv5.webp` |
+| 路徑 | `webapp/public/illustrations/guardians/<code>/lv1.webp` … `lv5.webp`（`<code>` ＝ `guardian.code` ＝ `spiritCatalog` 的 key，三者同一個字串）|
 | 尺寸 | **1254 × 1254**（現有全部都是，`locked-egg.webp` 也是） |
 | 格式 | WebP，RGB |
-| 原始檔 | 同步放 `webapp/source-assets/png/illustrations/guardians/<species>/lv1..lv5.png` |
+| 原始檔 | 同步放 `webapp/source-assets/png/illustrations/guardians/<code>/lv1..lv5.png` |
 
 **壓縮請用有損（lossy）。** 2026-11-16 實測八個物種全部是 VP8（有損），
 範圍 61–434 KB：
@@ -213,8 +250,12 @@ export const spiritCatalog: Record<SpiritSpecies, SpiritDefinition> = {
 **Spirit categories** 那張表加一列：
 
 ```
-| `mycode` | 兒少、家庭與婦幼 | 某某 | LV1-LV5 available | 某某之蛋 |
+| `fox` | 生態環境與動物福利 (`forest`) | 狐 | LV1-LV5 available | 狐狸之蛋 |
 ```
+
+第二欄括號裡是**類別自己的 code**，就是 seed 子查詢要對的那個；
+它刻意不等於第一欄的蛋 code。2026-11-21 之前兩欄是同一個字串，
+那正是它們看起來像同一件事的原因。
 
 那張表是 repo 對「哪些 code 是活的」的紀錄。它曾經過期過——一次改名留下三個不存在的 code
 在種子檔裡，同時四個活的 code 沒被 seed，而沒有任何機制會發現。
