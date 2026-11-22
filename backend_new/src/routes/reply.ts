@@ -23,11 +23,16 @@ import {
   userWrongQuestionTable,
 } from 'src/db/schema';
 import { DEFAULT_LIMIT, genPagination, MAX_LIMIT, paginationSchema } from 'src/lib/paginator';
+import { conceptIdsForReply } from 'src/lib/questionConcept';
 import { buildQuestionDtos, parseIdList, questionDetailSchema } from 'src/routes/question';
 import { UserEnv } from 'src/middleware/requireUser';
 import { TransactionEnv } from 'src/middleware/transaction';
 
 type Db = TransactionEnv['Variables']['db'];
+
+// Shared empty set for the standalone-question path, which is most
+// replies -- conceptIdsForReply only reads it.
+const EMPTY_CONCEPT_IDS: ReadonlySet<number> = new Set<number>();
 
 const replyItemSchema = z.object({
   questionId: z.number().int().positive(),
@@ -506,6 +511,33 @@ export const reply = new Hono<UserEnv>()
       conceptIdsByQuestion.set(link.questionId, list);
     }
 
+    // Every concept claimed by *any* child of the groups involved, which
+    // is what conceptIdsForReply subtracts from the parent's merged set.
+    //
+    // A separate query rather than reusing conceptIdsByQuestion above:
+    // that map only covers the questions in this request and their
+    // parents, so a sibling nobody answered this time would be missing
+    // from it -- and then the concepts credited would depend on how the
+    // client happened to split its submissions, which is not something an
+    // answer's effect on mastery should turn on.
+    const childConceptRows =
+      parentIds.length === 0
+        ? []
+        : await db
+            .select({
+              parentId: questionTable.parentId,
+              conceptId: questionConceptTable.conceptId,
+            })
+            .from(questionConceptTable)
+            .innerJoin(questionTable, eq(questionTable.id, questionConceptTable.questionId))
+            .where(inArray(questionTable.parentId, parentIds));
+    const claimedByParent = new Map<number, Set<number>>();
+    for (const row of childConceptRows) {
+      const set = claimedByParent.get(row.parentId!) ?? new Set<number>();
+      set.add(row.conceptId);
+      claimedByParent.set(row.parentId!, set);
+    }
+
     // Mastery snapshot and per-concept weights for the points calculation
     // below -- fetched once before the loop mutates anything, so every
     // item's reward reflects skill *going into* this batch, not skill
@@ -586,9 +618,14 @@ export const reply = new Hono<UserEnv>()
 
       const score = calcScore(question.type, item.repliedAnswer, question.answer ?? '');
 
-      const conceptIds = new Set<number>(conceptIdsByQuestion.get(question.id) ?? []);
-      if (parentQuestion)
-        for (const conceptId of conceptIdsByQuestion.get(parentQuestion.id) ?? []) conceptIds.add(conceptId);
+      // Its own concepts, plus the group-level ones -- not the whole
+      // parent set, which holds every sibling's too. See
+      // lib/questionConcept.ts for what that cost before 2026-11-22.
+      const conceptIds = conceptIdsForReply(
+        conceptIdsByQuestion.get(question.id) ?? [],
+        parentQuestion ? conceptIdsByQuestion.get(parentQuestion.id) ?? [] : [],
+        (parentQuestion && claimedByParent.get(parentQuestion.id)) || EMPTY_CONCEPT_IDS
+      );
 
       // Snapshot mastery/difficulty as they stood going into this attempt
       // -- computed before question.adjustedDifficulty is nudged by this

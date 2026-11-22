@@ -230,7 +230,11 @@ export const questionTagTable = mysqlTable(
 );
 
 // Many-to-many join between question and concept -- same shape as
-// question_tag; only the parent of a GROUP question gets concept links.
+// question_tag, but unlike it a GROUP question's children get rows here
+// too: each sub-question links the concepts it tests, and the parent
+// links the union of its own and all of theirs. The parent's row is what
+// every concept filter matches (they all require `parent_id IS NULL`),
+// and the children's are for display. See createOneQuestion.
 export const questionConceptTable = mysqlTable(
   'question_concept',
   {

@@ -6,6 +6,12 @@
  * actually ships, because the API lambda is a single esbuild bundle with
  * no repo files next to it at runtime. Edit both together.
  *
+ * `questionPrompt.sync.test.ts` enforces that, because "edit both
+ * together" on its own does not: 2026-11-22's per-sub-question conceptIds
+ * went into QUESTION.md and not into here, so the file the admins read
+ * documented a field the model was never told about. Nothing failed --
+ * the extraction just never produced it.
+ *
  * The reply is still a JSON array even though one upload is normally one
  * question: a GROUP and its children come back as a single element, and
  * keeping the array means the result drops straight into POST /question's
@@ -28,7 +34,7 @@ export const QUESTION_EXTRACT_INSTRUCTION = `
 - 內容使用 HTML 格式，盡量符合原題目的排版，css使用html inline style，不含多餘空白與換行（數學公式除外，見「數學公式」一節；排版的限制見「排版與手機寬度」一節）
 - 所有字串中的雙引號需正確跳脫
 - 只辨識截圖中實際存在的內容，不要自行補上截圖外的題目或選項
-- conceptIds 至少要有一個，必須從使用者提供的觀念清單中挑選。不可以回傳空陣列 []；若沒有完全吻合的，挑最接近的那一個
+- 每個頂層元素的 conceptIds 至少要有一個，必須從使用者提供的觀念清單中挑選。不可以回傳空陣列 []；若沒有完全吻合的，挑最接近的那一個。題組子題也可以有自己的 conceptIds，那個是選填的，見「題組的 conceptIds」
 - 若截圖模糊、殘缺或裁切到看不出完整題目，回傳空 array []，不要猜測內容
 
 ## 排版與手機寬度
@@ -179,12 +185,32 @@ CLOZE 與 FILL 的差別：FILL 是「一個答案拆成幾個數字位」，必
       "content": "子題內容",
       "options": "A|B|C|D",
       "answer": "A",
-      "difficulty": 5
+      "difficulty": 5,
+      "conceptIds": [2]
     }
   ]
 }
 
 sortOrder 從 0 開始遞增。子題的 type 不可以是 GROUP 或 CLOZE。
+
+### 題組的 conceptIds
+
+母題和子題都可以有 conceptIds：
+
+- **母題的 conceptIds 是必填**，放整個題組都用到的觀念
+- **子題的 conceptIds 是選填**，放「只有這一題用到」的觀念
+
+三子題各考一個不同觀念時，請把那三個觀念分別寫在三個子題上，母題寫共用的那個（或其中最主要的一個）。這樣作答畫面才能在每一題旁邊標出它自己的觀念；全部塞在母題的話，三個觀念會一起出現在每一題上方，等於沒有標。
+
+子題的 conceptIds 只能從使用者給的觀念清單裡選，和母題同一份清單。後端會把母題和所有子題的 conceptIds 聯集起來存給母題，所以：
+
+- 寫在子題的觀念**不會漏掉**，不需要為了保險再抄一份到母題
+- 母題寫了、子題沒寫的觀念，會顯示在題組標題列（屬於整個題組）
+
+子題的 conceptIds 不只影響顯示，也決定作答後哪些觀念的熟練度會被更新，所以寧可留空也不要亂猜：
+
+- 判斷不出來哪個觀念屬於哪一題時，**所有子題一律留空**，只寫母題
+- 要標就全部子題都標，不要只標其中一兩個。只標一部分時，沒標到的子題只會算到母題層級的觀念，拿不到其他子題標走的那些
 
 題組是給「一段共用的說明文字，後面接幾道各自有題幹的題目」用的，例如同一張圖表問三個不同的問題。「一篇文章多個編號空格、共用一組選項」不是題組，是一道 CLOZE，見「CLOZE 格式」。
 

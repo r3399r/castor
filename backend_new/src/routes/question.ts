@@ -107,6 +107,15 @@ const childQuestionSchema = z.object({
   options: z.string().min(1),
   answer: z.string().min(1),
   difficulty: z.number().int().min(1).max(10),
+  // Which of the 題組's concepts *this* sub-question tests, so a reader
+  // sees one concept on the sub-question it belongs to instead of all of
+  // the group's on every one of them.
+  //
+  // Additive, never a replacement for the parent's: createOneQuestion
+  // merges these into the parent's own set. Optional because neither the
+  // extraction prompt's older output nor a hand-pasted batch carries it,
+  // and a required field would reject both.
+  conceptIds: z.array(z.number().int().positive()).optional(),
 });
 
 // "solution" is accepted (Gemini's output includes it) but never
@@ -243,6 +252,12 @@ const aiChildQuestionSchema = z.object({
   options: z.string().min(1),
   answer: z.string().min(1),
   difficulty: z.number().int().min(1).max(10),
+  // Narrower than it looks: the prompt asks for a subset of the parent's
+  // conceptIds, but nothing here enforces that, and nothing needs to --
+  // createOneQuestion merges whatever arrives into the parent's set, so a
+  // child naming a concept the parent omitted adds it rather than
+  // contradicting it.
+  conceptIds: z.array(z.number().int()).nullish(),
 });
 
 const aiQuestionSchema = z.object({
@@ -296,6 +311,7 @@ export const questionImageResponseJsonSchema = {
             options: { type: 'string' },
             answer: { type: 'string' },
             difficulty: { type: 'integer', minimum: 1, maximum: 10 },
+            conceptIds: { type: 'array', items: { type: 'integer' } },
           },
           required: ['type', 'sortOrder', 'content', 'options', 'answer', 'difficulty'],
         },
@@ -429,6 +445,11 @@ export const questionDetailChildSchema = z.object({
   answer: z.string().nullable(),
   difficulty: z.number().int(),
   adjustedDifficulty: z.number(),
+  concept: z
+    .array(namedSchema.extend({ conceptGroup: namedSchema }))
+    .describe(
+      "The concepts this sub-question tests -- always a subset of the parent's, which holds the union of its own and every child's. Empty when the 題組 was authored without per-child concepts, which is every question created before 2026-11-22; read the parent's `concept` in that case. exam and tag stay parent-only"
+    ),
 }).openapi({ ref: 'QuestionDetailChild' });
 
 /**
@@ -513,23 +534,14 @@ export const buildQuestionDtos = async (db: Db, ids: number[]) => {
     .from(questionConceptTable)
     .innerJoin(conceptTable, eq(conceptTable.id, questionConceptTable.conceptId))
     .innerJoin(conceptGroupTable, eq(conceptGroupTable.id, conceptTable.conceptGroupId))
-    .where(inArray(questionConceptTable.questionId, ids));
+    // Children included, not just the ids asked for: a sub-question
+    // carries its own subset of the group's concepts and shows them on
+    // its own row. exam/tag stay parent-only, so those two queries above
+    // are deliberately not widened the same way.
+    .where(
+      inArray(questionConceptTable.questionId, [...ids, ...childRows.map((child) => child.id)])
+    );
 
-  const childrenByParent = new Map<number, QuestionDetailChildDto[]>();
-  for (const child of childRows) {
-    const list = childrenByParent.get(child.parentId!) ?? [];
-    list.push({
-      id: child.id,
-      type: child.type,
-      sortOrder: child.sortOrder,
-      content: child.content,
-      options: child.options,
-      answer: child.answer,
-      difficulty: child.difficulty,
-      adjustedDifficulty: child.adjustedDifficulty,
-    });
-    childrenByParent.set(child.parentId!, list);
-  }
   const examsByQuestion = new Map<number, { id: number; name: string }[]>();
   for (const link of examLinks) {
     const list = examsByQuestion.get(link.questionId) ?? [];
@@ -551,6 +563,25 @@ export const buildQuestionDtos = async (db: Db, ids: number[]) => {
       conceptGroup: { id: link.conceptGroupId, name: link.conceptGroupName },
     });
     conceptsByQuestion.set(link.questionId, list);
+  }
+
+  // Built after conceptsByQuestion rather than next to childRows, since
+  // each child now reads its own entry out of it.
+  const childrenByParent = new Map<number, QuestionDetailChildDto[]>();
+  for (const child of childRows) {
+    const list = childrenByParent.get(child.parentId!) ?? [];
+    list.push({
+      id: child.id,
+      type: child.type,
+      sortOrder: child.sortOrder,
+      content: child.content,
+      options: child.options,
+      answer: child.answer,
+      difficulty: child.difficulty,
+      adjustedDifficulty: child.adjustedDifficulty,
+      concept: conceptsByQuestion.get(child.id) ?? [],
+    });
+    childrenByParent.set(child.parentId!, list);
   }
 
   for (const row of rows)
@@ -651,9 +682,29 @@ const createOneQuestion = async (
   item: QuestionItem
 ) => {
   const tags = await validateTagsForSubject(db, subjectId, item.tagIds ?? []);
-  const conceptIdsSet = [...new Set(item.conceptIds)];
+
+  // The parent gets the union of its own concepts and every child's.
+  //
+  // That merge is the whole reason a per-child concept changes nothing
+  // else. Every concept filter in this file -- the admin list, /count,
+  // and the adaptive candidate pools -- resolves question_concept against
+  // *top-level* rows (`parent_id IS NULL`), so a concept that existed
+  // only on a child would be invisible to all three, and a 題組 whose
+  // concepts had all moved down to its children would stop being served
+  // at all, filter or no filter: the unfiltered path walks the same
+  // per-concept pools. The children's own links are purely additive.
+  const childConceptIds = (item.childQuestions ?? []).flatMap((child) => child.conceptIds ?? []);
+  const conceptIdsSet = [...new Set([...item.conceptIds, ...childConceptIds])];
+  // One call covers the children's ids too, since they are in the set.
   await validateConceptsForSubject(db, subjectId, conceptIdsSet);
 
+  // Once per concept on the merged set, and deliberately *not* again for
+  // the per-child links inserted below. numberOfQuestions weights
+  // adaptive selection, which serves top-level rows, so it counts
+  // questions a user can actually be given: a 題組 is one of those
+  // however many of its children name the same concept. Counting the
+  // children would inflate that concept's share of the candidate pool by
+  // the size of the group.
   for (const conceptId of conceptIdsSet)
     await db
       .update(conceptTable)
@@ -726,6 +777,16 @@ const createOneQuestion = async (
       updatedAt: now,
     });
     childIds.push(childId);
+
+    // Already validated as part of the merged set above, so no second
+    // round trip. Nothing to do when the child named no concepts: it then
+    // shows the parent's, which is how every 題組 authored before
+    // 2026-11-22 behaves.
+    const childConceptIdsSet = [...new Set(child.conceptIds ?? [])];
+    if (childConceptIdsSet.length > 0)
+      await db
+        .insert(questionConceptTable)
+        .values(childConceptIdsSet.map((conceptId) => ({ questionId: childId, conceptId })));
   }
 
   const createdRows = await db
@@ -869,7 +930,7 @@ export const getQuestionByIdResponseSchema = questionRowSchema.extend({
   children: z
     .array(questionDetailChildSchema)
     .describe(
-      "A 題組's sub-questions, so an admin preview shows what a user is actually given. Empty for a standalone question; children carry no exam, tag or concept links of their own"
+      "A 題組's sub-questions, so an admin preview shows what a user is actually given. Empty for a standalone question. Each carries its own concepts (a subset of the parent's); exam and tag links stay parent-only"
     ),
 });
 
@@ -1699,9 +1760,9 @@ export const question = new Hono<UserEnv>()
 
     // A 題組's sub-questions, so the admin preview can show what a user
     // is actually given rather than just the parent's stem. Empty for a
-    // standalone question. Children carry no exam/tag/concept links of
-    // their own -- those live on the parent -- so only their own fields
-    // are returned.
+    // standalone question. Children carry no exam or tag links of their
+    // own -- those live on the parent -- but they do carry concepts,
+    // hydrated just below.
     const children = await db
       .select({
         id: questionTable.id,
@@ -1721,12 +1782,50 @@ export const question = new Hono<UserEnv>()
       .where(eq(questionTable.parentId, id))
       .orderBy(asc(questionTable.sortOrder), asc(questionTable.id));
 
+    // Named objects rather than the bare ids this route uses for the
+    // parent: children share questionDetailChildSchema with /adaptive and
+    // /reply, and that shape carries the names so a reader does not have
+    // to resolve them.
+    const childConceptLinks =
+      children.length === 0
+        ? []
+        : await db
+            .select({
+              questionId: questionConceptTable.questionId,
+              id: conceptTable.id,
+              name: conceptTable.name,
+              conceptGroupId: conceptGroupTable.id,
+              conceptGroupName: conceptGroupTable.name,
+            })
+            .from(questionConceptTable)
+            .innerJoin(conceptTable, eq(conceptTable.id, questionConceptTable.conceptId))
+            .innerJoin(conceptGroupTable, eq(conceptGroupTable.id, conceptTable.conceptGroupId))
+            .where(
+              inArray(
+                questionConceptTable.questionId,
+                children.map((child) => child.id)
+              )
+            );
+    const childConceptsById = new Map<number, QuestionDetailChildDto['concept']>();
+    for (const link of childConceptLinks) {
+      const list = childConceptsById.get(link.questionId) ?? [];
+      list.push({
+        id: link.id,
+        name: link.name,
+        conceptGroup: { id: link.conceptGroupId, name: link.conceptGroupName },
+      });
+      childConceptsById.set(link.questionId, list);
+    }
+
     return c.json({
       ...toQuestionRowDto(found),
       examId: examLink?.examId ?? null,
       tagIds: tagLinks.map((l) => l.tagId),
       conceptIds: conceptLinks.map((l) => l.conceptId),
-      children,
+      children: children.map((child) => ({
+        ...child,
+        concept: childConceptsById.get(child.id) ?? [],
+      })),
     } satisfies z.infer<typeof getQuestionByIdResponseSchema>);
   })
   .post('/', createDoc, zValidator('json', questionBodySchema), async (c) => {
@@ -1894,7 +1993,15 @@ export const question = new Hono<UserEnv>()
       answer: item.answer ?? undefined,
       difficulty: item.difficulty,
       conceptIds: (item.conceptIds ?? []).filter((id) => validConceptIds.has(id)),
-      childQuestions: item.childQuestions ?? undefined,
+      // Children's ids go through the same allowlist as the parent's --
+      // the model picks from one list, so a hallucination is as likely on
+      // a sub-question as on the group, and an unfiltered bad id here
+      // would fail the whole batch at POST / instead of being quietly
+      // dropped like the parent's.
+      childQuestions: item.childQuestions?.map((child) => ({
+        ...child,
+        conceptIds: (child.conceptIds ?? []).filter((id) => validConceptIds.has(id)),
+      })),
     }));
 
     return c.json({
@@ -1960,9 +2067,26 @@ export const question = new Hono<UserEnv>()
     await db.delete(questionTagTable).where(eq(questionTagTable.questionId, id));
     await db.delete(questionConceptTable).where(eq(questionConceptTable.questionId, id));
     await db.delete(questionExamTable).where(eq(questionExamTable.questionId, id));
-    // A GROUP question's children have no independent join rows of their
-    // own (only the parent gets exam/tag/concept links), so they're just
-    // deleted outright once the parent's own links are gone.
+    // A 題組's children carry concept links of their own, and
+    // question_concept's FK to question(id) has no ON DELETE CASCADE, so
+    // those rows have to go before the child rows they point at -- the
+    // delete below fails outright otherwise. Children still hold no
+    // exam/tag links, so there is no equivalent for those two.
+    //
+    // numberOfQuestions is deliberately left alone here: it was only ever
+    // incremented for the parent's merged set, which the loop above has
+    // already decremented.
+    const childRows = await db
+      .select({ id: questionTable.id })
+      .from(questionTable)
+      .where(eq(questionTable.parentId, id));
+    if (childRows.length > 0)
+      await db.delete(questionConceptTable).where(
+        inArray(
+          questionConceptTable.questionId,
+          childRows.map((row) => row.id)
+        )
+      );
     await db.delete(questionTable).where(eq(questionTable.parentId, id));
     await db.delete(questionTable).where(eq(questionTable.id, id));
 

@@ -1382,6 +1382,41 @@
           },
           "adjustedDifficulty": {
             "type": "number"
+          },
+          "concept": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "conceptGroup": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "conceptGroup"
+              ]
+            },
+            "description": "The concepts this sub-question tests -- always a subset of the parent's, which holds the union of its own and every child's. Empty when the 題組 was authored without per-child concepts, which is every question created before 2026-11-22; read the parent's `concept` in that case. exam and tag stay parent-only"
           }
         },
         "required": [
@@ -1392,7 +1427,8 @@
           "options",
           "answer",
           "difficulty",
-          "adjustedDifficulty"
+          "adjustedDifficulty",
+          "concept"
         ]
       },
       "QuestionRow": {
@@ -6069,7 +6105,7 @@
                       "items": {
                         "$ref": "#/components/schemas/QuestionDetailChild"
                       },
-                      "description": "A 題組's sub-questions, so an admin preview shows what a user is actually given. Empty for a standalone question; children carry no exam, tag or concept links of their own"
+                      "description": "A 題組's sub-questions, so an admin preview shows what a user is actually given. Empty for a standalone question. Each carries its own concepts (a subset of the parent's); exam and tag links stay parent-only"
                     }
                   },
                   "required": [

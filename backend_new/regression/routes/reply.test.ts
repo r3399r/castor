@@ -148,7 +148,10 @@ const createGroupQuestion = async (
   subjectId: number,
   examId: number,
   conceptIds: number[],
-  children: { answer: string; options: string }[]
+  // conceptIds per child is optional: most callers want a group whose
+  // concepts all sit on the parent, which is how every 題組 authored
+  // before 2026-11-22 looks.
+  children: { answer: string; options: string; conceptIds?: number[] }[]
 ) => {
   const res = await postQuestions({
     subjectId,
@@ -165,6 +168,7 @@ const createGroupQuestion = async (
           options: c.options,
           answer: c.answer,
           difficulty: 5,
+          ...(c.conceptIds === undefined ? {} : { conceptIds: c.conceptIds }),
         })),
       },
     ],
@@ -935,6 +939,170 @@ describe('reply routes', () => {
         .where(eq(userConceptStatTable.conceptId, conceptId));
       expect(secondStat.attemptCount).toBe(2);
       expect(secondStat.scoringTotal).toBe(10);
+    });
+
+
+    describe("a 題組's per-sub-question concepts", () => {
+      // Three concepts: one left on the parent (group-level) and one for
+      // each child.
+      const seedSplitConcepts = async (subjectId: number) => {
+        const db = getDb();
+        const [{ insertId: groupId }] = await db
+          .insert(conceptGroupTable)
+          .values({ name: 'split group', subjectId, createdAt: new Date() });
+        const ids: number[] = [];
+        for (const name of ['group level', 'child zero', 'child one']) {
+          const [{ insertId }] = await db
+            .insert(conceptTable)
+            .values({ name, conceptGroupId: groupId, createdAt: new Date() });
+          ids.push(insertId);
+        }
+        return ids as [number, number, number];
+      };
+
+      const statsByConcept = async (userId: number) => {
+        const rows = await getDb()
+          .select()
+          .from(userConceptStatTable)
+          .where(eq(userConceptStatTable.userId, userId));
+        return new Map(rows.map((r) => [r.conceptId, r]));
+      };
+
+      it('does not credit a sibling sub-question’s concept', async () => {
+        const userId = await seedUser();
+        vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+        const { subjectId, examId } = await seedFixture();
+        const [groupLevel, c0, c1] = await seedSplitConcepts(subjectId);
+
+        const [, child0] = await createGroupQuestion(
+          subjectId,
+          examId,
+          [groupLevel],
+          [
+            { answer: 'A', options: 'A|B', conceptIds: [c0] },
+            { answer: 'A', options: 'A|B', conceptIds: [c1] },
+          ]
+        );
+
+        await postReply([{ questionId: child0.id, repliedAnswer: 'A' }]);
+
+        const stats = await statsByConcept(userId);
+        // Its own, and the group-level one the author left on the parent.
+        expect(stats.has(c0)).toBe(true);
+        expect(stats.has(groupLevel)).toBe(true);
+        // Not the sibling's. The parent carries c1 (the create merges it
+        // up there so concept filters can find the group), which is
+        // exactly why this needs subtracting rather than just reading.
+        expect(stats.has(c1)).toBe(false);
+      });
+
+      it('scores each sub-question’s own concept on its own answer', async () => {
+        const userId = await seedUser();
+        vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+        const { subjectId, examId } = await seedFixture();
+        const [groupLevel, c0, c1] = await seedSplitConcepts(subjectId);
+
+        const [, child0, child1] = await createGroupQuestion(
+          subjectId,
+          examId,
+          [groupLevel],
+          [
+            { answer: 'A', options: 'A|B', conceptIds: [c0] },
+            { answer: 'A', options: 'A|B', conceptIds: [c1] },
+          ]
+        );
+
+        // One right, one wrong, submitted together -- the case that used
+        // to return three identical rows (attempts 2, scoringTotal 10) no
+        // matter which sub-question the user actually got right.
+        await postReply([
+          { questionId: child0.id, repliedAnswer: 'A' },
+          { questionId: child1.id, repliedAnswer: 'B' },
+        ]);
+
+        const stats = await statsByConcept(userId);
+        expect(stats.get(c0)).toMatchObject({ attemptCount: 1, scoringTotal: 10 });
+        expect(stats.get(c1)).toMatchObject({ attemptCount: 1, scoringTotal: 0 });
+        // The group-level concept is credited by both answers, so it
+        // records what the group as a whole scored: half.
+        expect(stats.get(groupLevel)).toMatchObject({ attemptCount: 2, scoringTotal: 10 });
+      });
+
+      it("credits the parent's whole set when no sub-question is tagged", async () => {
+        const userId = await seedUser();
+        vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+        const { subjectId, examId } = await seedFixture();
+        const [a, b] = await seedSplitConcepts(subjectId);
+
+        // No child conceptIds at all -- every 題組 that existed before
+        // this change. Nothing is claimed, so nothing is subtracted and
+        // the behaviour is what it has always been. This is why the
+        // change needs no backfill.
+        const [, child0] = await createGroupQuestion(
+          subjectId,
+          examId,
+          [a, b],
+          [{ answer: 'A', options: 'A|B' }, { answer: 'A', options: 'A|B' }]
+        );
+
+        await postReply([{ questionId: child0.id, repliedAnswer: 'A' }]);
+
+        const stats = await statsByConcept(userId);
+        expect(stats.get(a)).toMatchObject({ attemptCount: 1, scoringTotal: 10 });
+        expect(stats.get(b)).toMatchObject({ attemptCount: 1, scoringTotal: 10 });
+      });
+
+      it('counts a sibling outside the request as having claimed its concept', async () => {
+        const userId = await seedUser();
+        vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+        const { subjectId, examId } = await seedFixture();
+        const [groupLevel, c0, c1] = await seedSplitConcepts(subjectId);
+
+        const [, child0] = await createGroupQuestion(
+          subjectId,
+          examId,
+          [groupLevel],
+          [
+            { answer: 'A', options: 'A|B', conceptIds: [c0] },
+            { answer: 'A', options: 'A|B', conceptIds: [c1] },
+          ]
+        );
+
+        // child1 is deliberately *not* in this batch. If the claimed set
+        // were read off the request rather than the database, c1 would
+        // look unclaimed and get credited here -- making the mastery
+        // effect of an answer depend on how the client batched it.
+        await postReply([{ questionId: child0.id, repliedAnswer: 'A' }]);
+
+        const stats = await statsByConcept(userId);
+        expect(stats.has(c1)).toBe(false);
+      });
+
+      it('falls back to the group-level concept for an untagged child of a tagged group', async () => {
+        const userId = await seedUser();
+        vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+        const { subjectId, examId } = await seedFixture();
+        const [groupLevel, c0] = await seedSplitConcepts(subjectId);
+
+        // Half-tagged: child0 names c0, child1 names nothing.
+        const [, , child1] = await createGroupQuestion(
+          subjectId,
+          examId,
+          [groupLevel],
+          [
+            { answer: 'A', options: 'A|B', conceptIds: [c0] },
+            { answer: 'A', options: 'A|B' },
+          ]
+        );
+
+        await postReply([{ questionId: child1.id, repliedAnswer: 'A' }]);
+
+        const stats = await statsByConcept(userId);
+        expect(stats.has(groupLevel)).toBe(true);
+        // Not c0: that belongs to the sibling it is tagged on, and this
+        // sub-question says nothing about what it tests.
+        expect(stats.has(c0)).toBe(false);
+      });
     });
 
     it('clears pending_reply rows for answered questions', async () => {

@@ -12,6 +12,7 @@ import Pagination from '@/components/Pagination'
 import { Button, EmptyState, ErrorState, LoadingState } from '@/components/ui'
 import { formatNumber } from '@/lib/number'
 import { blankNumberFromContent, markBlanksInPassage } from '@/lib/questionBlank'
+import { groupLevelConcepts } from '@/lib/questionConcept'
 import type {
   GetWrongQuestionResponse,
   PutWrongQuestionNoteResponse,
@@ -101,6 +102,15 @@ function WrongEntry({
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <Chip label={typeLabel[question.type] ?? question.type} />
+          {/* This sub-question's own concepts. The card header above shows
+              only the ones no sub-question claimed. */}
+          {question.concept.map((c) => (
+            <Chip
+              key={c.id}
+              label={c.conceptGroup.name === c.name ? c.name : c.conceptGroup.name + '-' + c.name}
+              color={tagColors.concept}
+            />
+          ))}
           {isGroup && position > 0 && (
             <span className="text-xs whitespace-nowrap text-black-500">
               題組第 {position} 題／共 {siblingCount} 題
@@ -198,16 +208,25 @@ function WrongCard({
 }) {
   const isGroup = item.parentQuestion !== null
 
-  // exam/concept/tag links only ever live on a question's top-level row,
-  // so for a 題組 they sit on the parent -- a child has none of its own to
+  // exam and tag links only ever live on a question's top-level row, so
+  // for a 題組 they sit on the parent -- a child has none of its own to
   // find. These used to be read off the child, which meant group cards
   // showed no exam, concept or tag at all, while the filter panel filtered
   // on exactly those links (the server resolves them against the parent).
   // You could filter by 學測 and get cards with no 學測 chip on them.
   const metaSource = item.parentQuestion ?? item.entries[0]?.question
   const exams = metaSource?.exam ?? []
-  const concepts = metaSource?.concept ?? []
   const tags = metaSource?.tag ?? []
+
+  // Concepts are the exception since 2026-11-22: a sub-question carries
+  // the subset it tests and prints it on its own row, so the card header
+  // keeps only what no sub-question claimed. The parent's row holds the
+  // union of its own and every child's, which is why this has to subtract
+  // rather than just print it -- see lib/questionConcept.ts.
+  const concepts = groupLevelConcepts(
+    metaSource?.concept ?? [],
+    item.parentQuestion?.children ?? []
+  )
 
   // Positions come from the parent's full child list, so an entry can say
   // "第 2 題／共 5 題" even when only one of the five went wrong. By

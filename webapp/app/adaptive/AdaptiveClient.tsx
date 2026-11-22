@@ -9,6 +9,7 @@ import { blankNumbersFromPassage } from '@/lib/questionBlank'
 import { combinedOutcome, scoreOutcome, type ScoreOutcome } from '@/lib/scoreOutcome'
 import { formatNumber } from '@/lib/number'
 import { groupCategoriesByKind, resolveActiveKind } from '@/lib/categoryKind'
+import { groupLevelConcepts } from '@/lib/questionConcept'
 import Chip, { tagColors } from '@/components/Chip'
 import DifficultyStars from '@/components/DifficultyStars'
 import DiscussionLink from '@/components/DiscussionLink'
@@ -626,6 +627,15 @@ export default function AdaptiveClient({
 
   const currentQuestion = adaptiveQuestion[currentIndex]
   const currentOffset = responseOffsets[currentIndex] ?? 0
+
+  // The card header prints what the 題組 tests as a whole; each
+  // sub-question prints its own below. Without the subtraction every
+  // per-child concept would appear twice, because the parent row carries
+  // the union of its own and all of its children's -- see
+  // lib/questionConcept.ts.
+  const headerConcepts = currentQuestion
+    ? groupLevelConcepts(currentQuestion.concept, currentQuestion.children)
+    : []
 
   const questionProgress = useMemo<QuestionProgressState[]>(() =>
     adaptiveQuestion.map((question, index) => {
@@ -1563,7 +1573,7 @@ export default function AdaptiveClient({
                   {currentQuestion.exam.map((e) => (
                     <Chip key={e.id} label={e.name} color={tagColors.exam} />
                   ))}
-                  {currentQuestion.concept.map((c) => (
+                  {headerConcepts.map((c) => (
                     <Chip
                       key={c.id}
                       label={c.conceptGroup.name === c.name ? c.name : c.conceptGroup.name + '-' + c.name}
@@ -1585,7 +1595,7 @@ export default function AdaptiveClient({
                     {currentQuestion.exam.map((e) => (
                       <Chip key={e.id} label={e.name} color={tagColors.exam} />
                     ))}
-                    {currentQuestion.concept.map((c) => (
+                    {headerConcepts.map((c) => (
                       <Chip
                         key={c.id}
                         label={c.conceptGroup.name === c.name ? c.name : c.conceptGroup.name + '-' + c.name}
@@ -1636,9 +1646,28 @@ export default function AdaptiveClient({
                         until you have already answered it wrongly. Wrapped in
                         its own row because questionBody is a flex column, so
                         a bare chip would stretch the full width.
+
+                        The concepts sit here too, for the same reason: the
+                        header can only show the group's, so a four-concept
+                        題組 used to print all four above every one of its
+                        sub-questions, saying nothing about which belongs to
+                        which. Empty for a 題組 authored before 2026-11-22,
+                        whose concepts are all on the parent and so all in
+                        the header.
                       */}
                       <div className="flex flex-wrap gap-2">
                         <Chip label={typeLabel[child.type] ?? child.type} color={tagColors.type} />
+                        {child.concept.map((c) => (
+                          <Chip
+                            key={c.id}
+                            label={
+                              c.conceptGroup.name === c.name
+                                ? c.name
+                                : c.conceptGroup.name + '-' + c.name
+                            }
+                            color={tagColors.concept}
+                          />
+                        ))}
                       </div>
                       {child.content && (
                         <div

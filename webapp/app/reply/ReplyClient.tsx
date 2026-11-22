@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { BookOpenText } from 'lucide-react'
 import { apiFetch, LIMIT } from '@/lib/api'
 import { readableAnswer } from '@/lib/answerDisplay'
+import { groupLevelConcepts } from '@/lib/questionConcept'
 import Chip, { tagColors } from '@/components/Chip'
 import DifficultyStars from '@/components/DifficultyStars'
 import DiscussionLink from '@/components/DiscussionLink'
@@ -37,8 +38,12 @@ function ReplyRow({ item }: { item: ReplyGroup }) {
   if (!question) return null
 
   const exams = question.exam ?? []
-  const concepts = question.concept ?? []
   const tags = question.tag ?? []
+  // Only the concepts no sub-question claimed: each prints its own below,
+  // and the parent carries the union of its own and all of theirs. For a
+  // standalone question there are no children, so this is the whole set.
+  // See lib/questionConcept.ts.
+  const concepts = groupLevelConcepts(question.concept ?? [], question.children ?? [])
   const difficulty = question.adjustedDifficulty ?? question.difficulty ?? 0
   const fbPostId = question.fbPostId
   const isGroup = item.parentQuestion !== null
@@ -107,6 +112,23 @@ function ReplyRow({ item }: { item: ReplyGroup }) {
             const childQ = isGroup ? child.question : null
             return (
               <div key={child.id} className={isGroup ? styles.subQuestion : ''}>
+                {/* This sub-question's own concepts, above its stem, in the
+                    same idiom as the 錯題本 tab. Only for a 題組: a
+                    standalone question shows them in the card header, and
+                    repeating them here would print each one twice. */}
+                {isGroup && (childQ?.concept.length ?? 0) > 0 && (
+                  <div className="mb-2 flex flex-wrap gap-2">
+                    {childQ!.concept.map((c) => (
+                      <Chip
+                        key={c.id}
+                        label={
+                          c.conceptGroup.name === c.name ? c.name : c.conceptGroup.name + '-' + c.name
+                        }
+                        color={tagColors.concept}
+                      />
+                    ))}
+                  </div>
+                )}
                 {childQ?.content && (
                   <div
                     dangerouslySetInnerHTML={{ __html: childQ.content }}

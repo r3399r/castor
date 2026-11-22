@@ -43,6 +43,10 @@ type ChildQuestion = {
   answer: string | null
   difficulty: number
   adjustedDifficulty: number
+  // The subset of the 題組's concepts this sub-question tests, already
+  // resolved to names by the server. [] for a group authored before
+  // 2026-11-22, whose concepts are all on the parent.
+  concept: { id: number; name: string; conceptGroup: { id: number; name: string } }[]
 }
 
 /**
@@ -299,6 +303,22 @@ function PreviewModal({
                   難度 {showDifficulty(child.adjustedDifficulty)}
                 </span>
               </p>
+              {/* Named, unlike the 觀念 row above, which resolves the
+                  parent's bare ids against the subject's concept groups --
+                  the server sends these already resolved. Absent, not
+                  blank, when the sub-question names none: this is a
+                  read-only view, so there is nothing for an empty row to
+                  invite. The group's own concepts are in the 觀念 row. */}
+              {child.concept.length > 0 && (
+                <p className="mt-1 text-sm text-black-500">
+                  觀念：
+                  {child.concept
+                    .map((c) =>
+                      c.conceptGroup.name === c.name ? c.name : `${c.conceptGroup.name} - ${c.name}`
+                    )
+                    .join('、')}
+                </p>
+              )}
             </div>
           </div>
         ))}

@@ -32,6 +32,17 @@ type ChildQuestionDraft = {
   options?: string
   answer?: string
   difficulty?: number
+  /**
+   * Which of the 題組's concepts this sub-question tests, so the answering
+   * screen can print one concept beside it instead of all of the group's.
+   *
+   * Optional, and additive: the server merges these into the parent's set,
+   * so leaving it out is exactly how every 題組 behaved before 2026-11-22.
+   * Validated no further than "ids that exist in this subject" -- the
+   * server does that, and rejecting a stray id here would block a submit
+   * over something the admin can see and fix in the list below.
+   */
+  conceptIds?: number[]
 }
 
 // The shape pasted into the textarea below -- everything except
@@ -540,6 +551,22 @@ export default function SubjectNewQuestionClient() {
                                   difficulty:
                                 </span>
                                 <span className="text-black-900">{child.difficulty ?? '—'}</span>
+                              </div>
+                              {/* Blank, not absent, when the sub-question
+                                  names none: the row is how an admin sees
+                                  that it was left out rather than wondering
+                                  whether the preview shows it at all. */}
+                              <div className="flex gap-2">
+                                <span className="w-20 shrink-0 font-medium text-black-500">
+                                  concepts:
+                                </span>
+                                <span className="text-black-900">
+                                  {child.conceptIds && child.conceptIds.length > 0
+                                    ? child.conceptIds
+                                        .map((id) => conceptNameById.get(id) ?? `#${id}`)
+                                        .join(', ')
+                                    : '—'}
+                                </span>
                               </div>
                             </div>
                           </div>

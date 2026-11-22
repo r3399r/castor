@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import {
   afterAll,
   afterEach,
@@ -458,6 +458,208 @@ describe('question routes', () => {
       adjustedDifficulty: 8,
     });
   });
+
+  describe("a 題組's per-child concepts", () => {
+    // seedFixture gives one concept; these need three to tell the
+    // parent's own apart from the ones only a child names.
+    const seedThreeConcepts = async (subjectId: number) => {
+      const db = getDb();
+      const [{ insertId: groupId }] = await db
+        .insert(conceptGroupTable)
+        .values({ name: 'child concept group', subjectId, createdAt: new Date() });
+      const ids: number[] = [];
+      for (const name of ['concept a', 'concept b', 'concept c']) {
+        const [{ insertId }] = await db
+          .insert(conceptTable)
+          .values({ name, conceptGroupId: groupId, createdAt: new Date() });
+        ids.push(insertId);
+      }
+      return ids as [number, number, number];
+    };
+
+    const createGroup = async (
+      subjectId: number,
+      examId: number,
+      parentConceptIds: number[],
+      childConceptIds: (number[] | undefined)[]
+    ) => {
+      const res = await postQuestions({
+        subjectId,
+        examId,
+        questions: [
+          {
+            type: 'GROUP',
+            content: 'shared stem',
+            difficulty: 5,
+            conceptIds: parentConceptIds,
+            childQuestions: childConceptIds.map((conceptIds, i) => ({
+              type: 'SINGLE',
+              sortOrder: i,
+              content: `child ${i}`,
+              options: 'A|B',
+              answer: 'A',
+              difficulty: 5,
+              ...(conceptIds === undefined ? {} : { conceptIds }),
+            })),
+          },
+        ],
+      });
+      return res;
+    };
+
+    const conceptIdsOf = async (questionId: number) => {
+      const rows = await getDb()
+        .select({ conceptId: questionConceptTable.conceptId })
+        .from(questionConceptTable)
+        .where(eq(questionConceptTable.questionId, questionId));
+      return rows.map((r) => r.conceptId).sort((a, b) => a - b);
+    };
+
+    it("stores each child's own concepts and merges all of them into the parent", async () => {
+      const { subjectId, examId } = await seedFixture();
+      const [a, b, c] = await seedThreeConcepts(subjectId);
+
+      const res = await createGroup(subjectId, examId, [a], [[b], [b, c]]);
+      expect(res.status).toBe(201);
+      const [[parent, child0, child1]] = (await res.json()) as QuestionDto[][];
+
+      // The parent holds the union -- a, which only it named, plus b and c
+      // from its children. Without this every concept filter in the route
+      // (all of which require parent_id IS NULL) would miss b and c.
+      expect(await conceptIdsOf(parent.id)).toEqual([a, b, c].sort((x, y) => x - y));
+      expect(await conceptIdsOf(child0.id)).toEqual([b]);
+      expect(await conceptIdsOf(child1.id)).toEqual([b, c].sort((x, y) => x - y));
+    });
+
+    it('leaves a child that names no concepts with no links of its own', async () => {
+      const { subjectId, examId } = await seedFixture();
+      const [a, b] = await seedThreeConcepts(subjectId);
+
+      const res = await createGroup(subjectId, examId, [a], [[b], undefined]);
+      const [[parent, child0, child1]] = (await res.json()) as QuestionDto[][];
+
+      expect(await conceptIdsOf(parent.id)).toEqual([a, b].sort((x, y) => x - y));
+      expect(await conceptIdsOf(child0.id)).toEqual([b]);
+      // How every 題組 authored before 2026-11-22 looks: the reader falls
+      // back to the parent's set for this one.
+      expect(await conceptIdsOf(child1.id)).toEqual([]);
+    });
+
+    it('counts the 題組 once per concept, however many children name it', async () => {
+      const { subjectId, examId } = await seedFixture();
+      const [a, b, c] = await seedThreeConcepts(subjectId);
+
+      // b is named by both children *and* lands in the parent's set.
+      await createGroup(subjectId, examId, [a], [[b], [b, c]]);
+
+      const rows = await getDb()
+        .select({ id: conceptTable.id, numberOfQuestions: conceptTable.numberOfQuestions })
+        .from(conceptTable)
+        .where(inArray(conceptTable.id, [a, b, c]));
+      const countById = new Map(rows.map((r) => [r.id, r.numberOfQuestions]));
+
+      // One each. numberOfQuestions weights adaptive selection, which
+      // serves top-level rows, so a 題組 is one servable question no
+      // matter how its concepts are spread across its children -- 2 for b
+      // would inflate its share of the candidate pool by the group's size.
+      expect(countById.get(a)).toBe(1);
+      expect(countById.get(b)).toBe(1);
+      expect(countById.get(c)).toBe(1);
+    });
+
+    it('still serves the group for a concept only one of its children named', async () => {
+      await seedUser();
+      vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+      const { subjectId, examId } = await seedFixture();
+      const [a, , c] = await seedThreeConcepts(subjectId);
+
+      const res = await createGroup(subjectId, examId, [a], [[], [c]]);
+      const [[parent]] = (await res.json()) as QuestionDto[][];
+
+      // The whole point of the merge. Filtering on c has to reach the
+      // group through its parent row; before the merge this returned [].
+      const adaptive = await getAdaptive(`?subjectId=${subjectId}&conceptIds=${c}`);
+      expect(adaptive.status).toBe(200);
+      const body = (await adaptive.json()) as { id: number }[];
+      expect(body.map((q) => q.id)).toEqual([parent.id]);
+    });
+
+    it("reports each sub-question's own concepts on /adaptive", async () => {
+      await seedUser();
+      vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+      const { subjectId, examId } = await seedFixture();
+      const [a, b, c] = await seedThreeConcepts(subjectId);
+
+      await createGroup(subjectId, examId, [a], [[b], [c]]);
+
+      const adaptive = await getAdaptive(`?subjectId=${subjectId}`);
+      const [group] = (await adaptive.json()) as {
+        concept: { id: number }[];
+        children: { concept: { id: number; name: string; conceptGroup: { name: string } }[] }[];
+      }[];
+
+      expect(group.concept.map((x) => x.id).sort((x, y) => x - y)).toEqual(
+        [a, b, c].sort((x, y) => x - y)
+      );
+      expect(group.children[0].concept.map((x) => x.id)).toEqual([b]);
+      expect(group.children[1].concept.map((x) => x.id)).toEqual([c]);
+      // Named, not just ids -- the chips print the concept group too.
+      expect(group.children[0].concept[0]).toMatchObject({
+        name: 'concept b',
+        conceptGroup: { name: 'child concept group' },
+      });
+    });
+
+    it("returns each sub-question's concepts from the admin single-read too", async () => {
+      const { subjectId, examId } = await seedFixture();
+      const [a, b] = await seedThreeConcepts(subjectId);
+
+      const res = await createGroup(subjectId, examId, [a], [[b]]);
+      const [[parent]] = (await res.json()) as QuestionDto[][];
+
+      const detail = (await (await getQuestion(parent.id)).json()) as {
+        children: { concept: { id: number }[] }[];
+      };
+      expect(detail.children[0].concept.map((x) => x.id)).toEqual([b]);
+    });
+
+    it('deletes a 題組 whose children carry concept links', async () => {
+      const { subjectId, examId } = await seedFixture();
+      const [a, b] = await seedThreeConcepts(subjectId);
+
+      const res = await createGroup(subjectId, examId, [a], [[b]]);
+      const [[parent, child]] = (await res.json()) as QuestionDto[][];
+
+      // question_concept's FK to question(id) has no ON DELETE CASCADE, so
+      // the child's link row has to go before the child row. Without that
+      // this 204 is a 500 and the question is undeletable.
+      const deleteRes = await deleteQuestion(parent.id);
+      expect(deleteRes.status).toBe(204);
+      expect((await getQuestion(child.id)).status).toBe(404);
+      expect(await conceptIdsOf(child.id)).toEqual([]);
+    });
+
+    it("rejects a child conceptId from another subject with 400", async () => {
+      const { subjectId, examId } = await seedFixture();
+      const [a] = await seedThreeConcepts(subjectId);
+      const db = getDb();
+      const [{ insertId: otherSubjectId }] = await db
+        .insert(subjectTable)
+        .values({ name: 'other child-concept subject', createdAt: new Date() });
+      const [{ insertId: otherGroupId }] = await db
+        .insert(conceptGroupTable)
+        .values({ name: 'other child-concept group', subjectId: otherSubjectId, createdAt: new Date() });
+      const [{ insertId: foreignConceptId }] = await db
+        .insert(conceptTable)
+        .values({ name: 'foreign concept', conceptGroupId: otherGroupId, createdAt: new Date() });
+
+      // Validated through the merged set, so a child's id gets the same
+      // subject check the parent's always had -- it is not a hole.
+      const res = await createGroup(subjectId, examId, [a], [[foreignConceptId]]);
+      expect(res.status).toBe(400);
+    });
+  });
+
 
   it('rejects an empty conceptIds with 400', async () => {
     const { subjectId, examId } = await seedFixture();
