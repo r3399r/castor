@@ -114,7 +114,7 @@ const listDoc = describeRoute({
 const noteDoc = describeRoute({
   summary: 'Write or clear the note on one wrong sub-question',
   description:
-    'Behind requireUser, and scoped to the caller: a row belonging to someone else reads as 404 rather than 403, so this never confirms that a given id exists for another user. `note: null` clears it.',
+    'Behind requireUser **and** requireSubscription, and scoped to the caller: a row belonging to someone else reads as 404 rather than 403, so this never confirms that a given id exists for another user. `note: null` clears it. Writing is the only part of the wrong-question list that is paid -- GET / keeps returning the notes a user wrote while subscribed, because the text is theirs; a lapsed subscriber can still read it, and can still remove the whole row with DELETE /{id}.',
   tags: ['wrong-question'],
   responses: {
     200: {
@@ -123,6 +123,7 @@ const noteDoc = describeRoute({
     },
     400: { description: 'note missing, or longer than 2000 characters' },
     401: { description: 'No valid identity' },
+    403: { description: 'SUBSCRIPTION_REQUIRED -- authenticated, but not entitled' },
     404: { description: 'No such row belongs to this caller' },
   },
 });

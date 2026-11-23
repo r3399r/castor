@@ -189,7 +189,10 @@
 
 .analysisGrid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  /* Was repeat(3, …), which stranded the fourth card alone on a second
+     row. auto-fit lays out as many as fit and stretches the rest, so
+     three cards still read exactly as they did. */
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
   gap: 20px;
 }
 
@@ -207,6 +210,7 @@
 .analysisIconLeaf { background: var(--color-category-leaf-soft); color: var(--color-spirit-leaf); }
 .analysisIconTeal { background: var(--color-info-soft); color: var(--color-spirit-teal); }
 .analysisIconGold { background: var(--color-category-gold-soft); color: var(--color-spirit-gold-ink); }
+.analysisIconClay { background: var(--color-badge-type); color: var(--color-badge-type-text); }
 
 .analysisCard h3,
 .spiritBonus h3 {

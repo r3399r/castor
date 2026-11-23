@@ -235,6 +235,20 @@
   resize: vertical;
 }
 
+/* A saved note shown to someone who can no longer edit it. Same box as
+   .noteInput so the card does not reflow when a subscription lapses;
+   pre-wrap because the textarea it came from accepts line breaks. */
+.noteReadOnly {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--reply-line);
+  border-radius: 8px;
+  background: var(--reply-hover);
+  color: var(--reply-ink);
+  font-size: 0.875rem;
+  white-space: pre-wrap;
+}
+
 .loginLink { color: var(--reply-forest); font-size: 0.875rem; text-decoration: underline; }
 
 @media (max-width: 47.999rem) {

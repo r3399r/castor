@@ -7,6 +7,7 @@ import {
   BrainCircuit,
   Check,
   Gauge,
+  NotebookPen,
   RefreshCw,
   Sparkles,
   TrendingUp,
@@ -39,6 +40,7 @@ import styles from './subscription.module.css'
 
 const benefitSummary = [
   { label: '完整進階學習分析', icon: BarChart3 },
+  { label: '錯題筆記', icon: NotebookPen },
   { label: '訂閱限定精靈', icon: Sparkles },
   { label: '精靈培養 XP 加成', icon: Zap },
 ]
@@ -61,6 +63,12 @@ const analysisFeatures = [
     description: '比較各科答題速度與平台中位數，理解自己的作答節奏。',
     icon: Gauge,
     iconClass: styles.analysisIconGold,
+  },
+  {
+    title: '錯題筆記',
+    description: '在錯題本的每一題寫下自己錯在哪裡，下次複習時先看自己的提醒。',
+    icon: NotebookPen,
+    iconClass: styles.analysisIconClay,
   },
 ]
 

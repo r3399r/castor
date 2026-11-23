@@ -126,6 +126,12 @@ export const app = new Hono()
   .route('/api/reply', reply)
   .use('/api/wrong-question/*', transaction)
   .use('/api/wrong-question/*', requireUser)
+  // Writing a note is subscriber-only; the rest of the wrong-question
+  // list, including reading notes already written, stays free. Hence a
+  // path gate on the one route rather than the prefix gate used for
+  // /api/analysis -- but still a middleware, so the entitlement check
+  // cannot be forgotten inside the handler.
+  .use('/api/wrong-question/:id/note', requireSubscription)
   .route('/api/wrong-question', wrongQuestion)
   .use('/api/wallet/*', transaction)
   .use('/api/wallet/*', requireUser)

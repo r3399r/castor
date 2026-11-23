@@ -9,7 +9,8 @@ import DifficultyStars from '@/components/DifficultyStars'
 import DiscussionLink from '@/components/DiscussionLink'
 import MathJaxArea from '@/components/MathJaxArea'
 import Pagination from '@/components/Pagination'
-import { Button, EmptyState, ErrorState, LoadingState } from '@/components/ui'
+import { Button, ButtonLink, EmptyState, ErrorState, LoadingState } from '@/components/ui'
+import { useAuth } from '@/contexts/AuthContext'
 import { formatNumber } from '@/lib/number'
 import { blankNumberFromContent, markBlanksInPassage } from '@/lib/questionBlank'
 import { groupLevelConcepts } from '@/lib/questionConcept'
@@ -52,6 +53,7 @@ function WrongEntry({
   position,
   siblingCount,
   blankNumber,
+  isFirstEntry,
   onSaveNote,
   onDelete,
 }: {
@@ -68,11 +70,28 @@ function WrongEntry({
    * reader has to go on.
    */
   blankNumber: number | null
+  /**
+   * First entry in its card. Only it offers the subscription prompt, so
+   * a 題組 with four wrong sub-questions shows one rather than four.
+   * Taken from the render order rather than `position`, which is the
+   * sub-question's number in the paper -- getting #2 and #3 wrong but
+   * not #1 would otherwise leave no entry willing to show it.
+   */
+  isFirstEntry: boolean
   onSaveNote: (id: number, note: string | null) => Promise<void>
   onDelete: (id: number) => Promise<void>
 }) {
   const question = entry.question
   const difficulty = question.adjustedDifficulty ?? question.difficulty ?? 0
+
+  // Read here rather than threaded down from WrongClient: entitlement is
+  // a global fact, and WrongCard sits in between with no use for it.
+  const { subscription } = useAuth()
+  // `entitled`, not `active`: a cancelled subscription keeps its paid
+  // features until the period it already paid for runs out. null is
+  // "sync has not answered", which is not the same as "not subscribed"
+  // -- hence the third branch below rather than a boolean.
+  const entitled = subscription?.entitled === true
 
   const [note, setNote] = useState(entry.note ?? '')
   const [saving, setSaving] = useState(false)
@@ -164,21 +183,61 @@ function WrongEntry({
         </div>
       </div>
 
-      <div className="mt-3 flex flex-col gap-2">
-        <label className="text-sm font-bold text-black-700">我的筆記</label>
-        <textarea
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          placeholder="寫下這題錯在哪裡、下次要注意什麼…"
-          rows={2}
-          className={styles.noteInput}
-        />
-      </div>
+      {/* Writing a note is a subscriber feature; reading one is not.
+          Whatever was written while subscribed stays on screen -- it is
+          the user's own writing, and hiding it would read as holding it
+          hostage rather than as a locked feature. The server enforces
+          the same split (PUT /:id/note is behind requireSubscription,
+          GET / is not), so this is presentation, not the gate. */}
+      {subscription === null ? (
+        // Sync has not answered. Rendering nothing beats flashing the
+        // upgrade prompt at someone who turns out to be a subscriber.
+        null
+      ) : entitled ? (
+        <div className="mt-3 flex flex-col gap-2">
+          <label className="text-sm font-bold text-black-700">我的筆記</label>
+          <textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="寫下這題錯在哪裡、下次要注意什麼…"
+            rows={2}
+            className={styles.noteInput}
+          />
+        </div>
+      ) : (
+        (entry.note || isFirstEntry) && (
+          <div className="mt-3 flex flex-col items-start gap-2">
+            {entry.note && (
+              <>
+                <label className="text-sm font-bold text-black-700">我的筆記</label>
+                <p className={styles.noteReadOnly}>{entry.note}</p>
+              </>
+            )}
+            {isFirstEntry && (
+              <>
+                <p className="text-sm text-black-500">
+                  {entry.note
+                    ? '錯題筆記是訂閱功能，訂閱後可以繼續編輯。'
+                    : '錯題筆記是訂閱功能，訂閱後可以在每一題寫下自己錯在哪裡、下次要注意什麼。'}
+                </p>
+                <ButtonLink href="/subscription" size="sm">
+                  查看訂閱方案
+                </ButtonLink>
+              </>
+            )}
+          </div>
+        )
+      )}
 
-      <div className="mt-3 flex items-center justify-between">
-        <Button onClick={handleSave} disabled={saving || !noteChanged} loading={saving}>
-          {saving ? '儲存中…' : '儲存筆記'}
-        </Button>
+      <div className={`mt-3 flex items-center ${entitled ? 'justify-between' : 'justify-end'}`}>
+        {entitled && (
+          <Button onClick={handleSave} disabled={saving || !noteChanged} loading={saving}>
+            {saving ? '儲存中…' : '儲存筆記'}
+          </Button>
+        )}
+        {/* Not gated: removing the row is giving up data, never a paid
+            action, and it is the only way a lapsed subscriber can get
+            rid of a note they no longer want. */}
         <Button variant="danger" onClick={handleDelete} disabled={deleting} loading={deleting}>
           {deleting ? '移除中…' : '從錯題本移除'}
         </Button>
@@ -318,7 +377,7 @@ function WrongCard({
             />
           )}
 
-          {item.entries.map((entry) => {
+          {item.entries.map((entry, index) => {
             const blank = blankNumbers.get(entry.id) ?? null
             return (
               <WrongEntry
@@ -327,6 +386,7 @@ function WrongCard({
                 isGroup={isGroup}
                 position={positionById.get(entry.question.id) ?? 0}
                 siblingCount={siblings.length}
+                isFirstEntry={index === 0}
                 blankNumber={blank !== null && markedBlanks.has(blank) ? blank : null}
                 onSaveNote={onSaveNote}
                 onDelete={onDelete}

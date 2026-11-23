@@ -19,6 +19,7 @@ import {
   tagTable,
   userConceptStatTable,
   userStatHistoryTable,
+  userSubscriptionTable,
   userTable,
   userWrongQuestionTable,
 } from 'src/db/schema';
@@ -145,6 +146,7 @@ const clearTables = async () => {
   await db.delete(subjectCategoryTable);
   await db.delete(subjectTable);
   await db.delete(categoryTable);
+  await db.delete(userSubscriptionTable);
   await db.delete(userTable);
 };
 
@@ -176,6 +178,27 @@ const seedUser = async (firebaseUid = 'fixture-uid') => {
     updatedAt: new Date(),
   });
   return userId;
+};
+
+/**
+ * Entitles a user to the paid features, which for this route means
+ * writing notes at all.
+ *
+ * A plain active period: the interesting entitlement cases (a cancelled
+ * agreement inside the period it already paid for, an expired one) are
+ * findEntitledSubscription's, and are tested against the middleware in
+ * subscription.test.ts rather than re-tested through every gated route.
+ */
+const grantSubscription = async (userId: number) => {
+  const now = Date.now();
+  await getDb().insert(userSubscriptionTable).values({
+    userId,
+    plan: 'monthly',
+    status: 'active',
+    currentPeriodStart: new Date(now - 86400000),
+    currentPeriodEnd: new Date(now + 30 * 86400000),
+    createdAt: new Date(),
+  });
 };
 
 // Wrong-question rows are only ever created as a side effect of POST
@@ -564,7 +587,7 @@ describe('wrongQuestion routes', () => {
     });
 
     it('sets a note on the entry', async () => {
-      await seedUser();
+      await grantSubscription(await seedUser());
       vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
       const { subjectId, examId, conceptId } = await seedFixture();
       await seedWrongQuestion(subjectId, examId, conceptId);
@@ -582,7 +605,7 @@ describe('wrongQuestion routes', () => {
     });
 
     it('clears an existing note when note is null', async () => {
-      await seedUser();
+      await grantSubscription(await seedUser());
       vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
       const { subjectId, examId, conceptId } = await seedFixture();
       await seedWrongQuestion(subjectId, examId, conceptId);
@@ -596,8 +619,10 @@ describe('wrongQuestion routes', () => {
     });
 
     it("rejects updating another user's entry with 404", async () => {
-      await seedUser('fixture-uid');
-      await seedUser('other-uid');
+      await grantSubscription(await seedUser('fixture-uid'));
+      // The other user is a subscriber too, or this would stop at the
+      // 403 and stop testing what it is named for.
+      await grantSubscription(await seedUser('other-uid'));
       const { subjectId, examId, conceptId } = await seedFixture();
       vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
       const q = await seedWrongQuestion(subjectId, examId, conceptId);
@@ -611,10 +636,62 @@ describe('wrongQuestion routes', () => {
     });
 
     it('returns 404 for a non-existent id', async () => {
-      await seedUser();
+      await grantSubscription(await seedUser());
       vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
       const res = await putWrongQuestionNote(999999, 'x');
       expect(res.status).toBe(404);
+    });
+
+    describe('the subscription gate', () => {
+      it('rejects a non-subscriber with 403 SUBSCRIPTION_REQUIRED', async () => {
+        await seedUser();
+        vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+        const { subjectId, examId, conceptId } = await seedFixture();
+        await seedWrongQuestion(subjectId, examId, conceptId);
+        const { data } = (await (await getWrongQuestionList()).json()) as {
+          data: WrongQuestionDto[];
+        };
+
+        const res = await putWrongQuestionNote(data[0].entries[0].id, 'x');
+
+        expect(res.status).toBe(403);
+        // The code, not just the status: the frontend shows an upgrade
+        // prompt for this and an error for any other 403.
+        expect(await res.json()).toMatchObject({ code: 'SUBSCRIPTION_REQUIRED' });
+      });
+
+      it('answers 403 before 404, so a non-subscriber cannot probe ids', async () => {
+        await seedUser();
+        vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+
+        // Entitlement is middleware, so it runs before the handler ever
+        // looks the row up -- an id that does not exist and one that
+        // belongs to someone else answer identically.
+        expect((await putWrongQuestionNote(999999, 'x')).status).toBe(403);
+      });
+
+      it('still returns the notes a lapsed subscriber already wrote', async () => {
+        const userId = await seedUser();
+        await grantSubscription(userId);
+        vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
+        const { subjectId, examId, conceptId } = await seedFixture();
+        await seedWrongQuestion(subjectId, examId, conceptId);
+        const { data } = (await (await getWrongQuestionList()).json()) as {
+          data: WrongQuestionDto[];
+        };
+        await putWrongQuestionNote(data[0].entries[0].id, '訂閱期間寫的筆記');
+
+        // The subscription ends. The note is the user's own writing, so
+        // only writing is paid -- it stays readable, and the row can
+        // still be removed outright.
+        await getDb().delete(userSubscriptionTable);
+
+        const after = (await (await getWrongQuestionList()).json()) as {
+          data: WrongQuestionDto[];
+        };
+        expect(after.data[0].entries[0].note).toBe('訂閱期間寫的筆記');
+        expect((await deleteWrongQuestion(after.data[0].entries[0].id)).status).toBe(204);
+      });
     });
   });
 
@@ -697,7 +774,9 @@ describe('wrongQuestion routes', () => {
       ];
 
     it('describes exactly what the list and the note write send', async () => {
-      await seedUser();
+      // Subscribed, because this asserts the note write's response shape
+      // and the write is now behind requireSubscription.
+      await grantSubscription(await seedUser());
       vi.mocked(verifyIdTokenUid).mockResolvedValue('fixture-uid');
       const { subjectId, examId, conceptId } = await seedFixture();
       await seedWrongQuestion(subjectId, examId, conceptId);

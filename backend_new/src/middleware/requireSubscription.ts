@@ -19,8 +19,9 @@ export type SubscriptionEnv = UserEnv & {
  * caller is authenticated, they just lack entitlement, and a 401 would
  * send the client off to re-authenticate and land back here.
  *
- * Nothing is mounted behind this yet -- it ships with the subscription
- * feature so the first gated route can simply use it. It is covered by
+ * Mounted on /api/analysis/* as a prefix gate, and on the single route
+ * PUT /api/wrong-question/:id/note -- a path gate, because the rest of
+ * that resource is free. Also covered by
  * regression/routes/subscription.test.ts against a stand-in route.
  */
 export const requireSubscription = createMiddleware<SubscriptionEnv>(async (c, next) => {
