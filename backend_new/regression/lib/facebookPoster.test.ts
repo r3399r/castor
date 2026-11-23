@@ -78,7 +78,7 @@ const seedFixture = async () => {
 
 const insertQuestion = async (
   subjectId: number,
-  overrides: Partial<{ content: string | null; fbPostId: string | null; parentId: number | null; sortOrder: number | null; enabled: boolean }> = {}
+  overrides: Partial<{ content: string | null; fbPostId: string | null; fbCaptionDirty: boolean; parentId: number | null; sortOrder: number | null; enabled: boolean }> = {}
 ) => {
   const db = getDb();
   const now = new Date();
@@ -87,6 +87,7 @@ const insertQuestion = async (
     subjectId,
     parentId: overrides.parentId ?? null,
     fbPostId: overrides.fbPostId ?? null,
+    fbCaptionDirty: overrides.fbCaptionDirty ?? false,
     isGroup: false,
     // The poster only picks up enabled questions (they are created
     // disabled and wait for an admin review); these tests are about what
@@ -329,6 +330,189 @@ describe('facebookPoster', () => {
       expect(childAfter.fbPostId).toBeNull();
       expect(htmlToS3Url).not.toHaveBeenCalled();
       expect(sendMock).toHaveBeenCalledWith(expect.objectContaining({ __command: 'DisableRuleCommand' }));
+    });
+
+
+    // Facebook can edit a published post's text but not its photo, so an
+    // edit to a question's tags/concepts/exam is handled here rather
+    // than by re-posting: question.fb_caption_dirty is the queue the
+    // edit routes write to.
+    describe('pending caption rewrites', () => {
+      const captionOf = (call: number) =>
+        new URLSearchParams(vi.mocked(fetch).mock.calls[call][1]!.body as string);
+
+      const seedPostedQuestion = async (
+        subjectId: number,
+        links: { examId: number; tagId: number; conceptId: number },
+        overrides: { fbPostId?: string; enabled?: boolean } = {}
+      ) => {
+        const questionId = await insertQuestion(subjectId, {
+          content: '<p>posted</p>',
+          fbPostId: overrides.fbPostId ?? 'page_post123',
+          fbCaptionDirty: true,
+          enabled: overrides.enabled ?? true,
+        });
+        const db = getDb();
+        await db.insert(questionExamTable).values({ questionId, examId: links.examId });
+        await db.insert(questionTagTable).values({ questionId, tagId: links.tagId });
+        await db.insert(questionConceptTable).values({ questionId, conceptId: links.conceptId });
+        return questionId;
+      };
+
+      it("rewrites a flagged post's text in place and clears the flag", async () => {
+        const { subjectId, ...links } = await seedFixture();
+        const questionId = await seedPostedQuestion(subjectId, links);
+
+        vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ success: true }), { status: 200 }));
+
+        await processNextQuestion(getDb());
+
+        // POST /{page-post-id} with `message` -- the one edit Graph API
+        // documents for a published post. No photo endpoint is involved,
+        // which is the whole reason this path exists.
+        expect(vi.mocked(fetch).mock.calls[0][0]).toBe('https://graph.facebook.com/page_post123');
+        expect(captionOf(0).get('message')).toContain('#fixturetag');
+        expect(captionOf(0).get('message')).toContain('#fixtureconcept');
+        expect(captionOf(0).get('url')).toBeNull();
+        // Nothing is re-rendered or re-uploaded for a caption-only edit.
+        expect(htmlToS3Url).not.toHaveBeenCalled();
+        expect(deleteS3File).not.toHaveBeenCalled();
+
+        const [after] = await getDb().select().from(questionTable).where(eq(questionTable.id, questionId));
+        expect(after.fbCaptionDirty).toBe(false);
+        expect(after.fbPostId).toBe('page_post123');
+      });
+
+      it('publishes a new question before rewriting any caption', async () => {
+        const { subjectId, ...links } = await seedFixture();
+        const flaggedId = await seedPostedQuestion(subjectId, links);
+        const unpostedId = await insertQuestion(subjectId, { content: '<p>new</p>' });
+
+        vi.mocked(htmlToS3Url).mockResolvedValue({ url: 'https://s3.example.com/img.png', key: 'k' });
+        vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ post_id: 'p_new' }), { status: 200 }));
+
+        // A backlog of new questions is what users are waiting for; a
+        // stale hashtag can wait three minutes.
+        await processNextQuestion(getDb());
+        const [posted] = await getDb().select().from(questionTable).where(eq(questionTable.id, unpostedId));
+        expect(posted.fbPostId).toBe('p_new');
+        const [stillFlagged] = await getDb().select().from(questionTable).where(eq(questionTable.id, flaggedId));
+        expect(stillFlagged.fbCaptionDirty).toBe(true);
+
+        vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ success: true }), { status: 200 }));
+        await processNextQuestion(getDb());
+        const [rewritten] = await getDb().select().from(questionTable).where(eq(questionTable.id, flaggedId));
+        expect(rewritten.fbCaptionDirty).toBe(false);
+      });
+
+      it('keeps the rule armed while a caption rewrite is still pending', async () => {
+        const { subjectId, ...links } = await seedFixture();
+        await seedPostedQuestion(subjectId, links);
+
+        vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ success: true }), { status: 200 }));
+
+        // Nothing to post, so the old code would have disarmed here and
+        // the edit would never have reached Facebook.
+        await processNextQuestion(getDb());
+        expect(sendMock).not.toHaveBeenCalled();
+
+        // Queue drained: now it disarms.
+        await processNextQuestion(getDb());
+        expect(sendMock).toHaveBeenCalledWith(
+          expect.objectContaining({ __command: 'DisableRuleCommand' })
+        );
+      });
+
+      it('ignores the flag on a question with no post to rewrite', async () => {
+        const { subjectId } = await seedFixture();
+        // The edit routes set the flag unconditionally, so a question
+        // edited before it was ever posted carries it with no post id.
+        // Acted on, this row would keep the rule polling forever.
+        await insertQuestion(subjectId, { content: null, fbCaptionDirty: true });
+
+        await processNextQuestion(getDb());
+
+        expect(fetch).not.toHaveBeenCalled();
+        expect(sendMock).toHaveBeenCalledWith(
+          expect.objectContaining({ __command: 'DisableRuleCommand' })
+        );
+      });
+
+      it("rewrites a disabled question's caption, since its post is still up", async () => {
+        const { subjectId, ...links } = await seedFixture();
+        await seedPostedQuestion(subjectId, links, { enabled: false });
+
+        vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ success: true }), { status: 200 }));
+
+        // Disabling hides a question from practice; it does not take the
+        // post off the page, so the hashtags on it should still be
+        // current. (The posting queue does filter on enabled -- an
+        // unreviewed question must not reach the page at all.)
+        await processNextQuestion(getDb());
+
+        expect(vi.mocked(fetch).mock.calls[0][0]).toBe('https://graph.facebook.com/page_post123');
+      });
+
+      it('never treats a child row as having its own post', async () => {
+        const { subjectId, ...links } = await seedFixture();
+        const parentId = await seedPostedQuestion(subjectId, links);
+        await getDb()
+          .update(questionTable)
+          .set({ fbCaptionDirty: false })
+          .where(eq(questionTable.id, parentId));
+        // Only a top-level row ever gets an fb_post_id written to it; a
+        // child carrying one is corrupt data, not a second post to edit.
+        await insertQuestion(subjectId, {
+          content: '<p>child</p>',
+          parentId,
+          fbPostId: 'child_post',
+          fbCaptionDirty: true,
+        });
+
+        await processNextQuestion(getDb());
+
+        expect(fetch).not.toHaveBeenCalled();
+        expect(sendMock).toHaveBeenCalledWith(
+          expect.objectContaining({ __command: 'DisableRuleCommand' })
+        );
+      });
+
+      it('leaves the flag set when Facebook rejects the rewrite', async () => {
+        const { subjectId, ...links } = await seedFixture();
+        const questionId = await seedPostedQuestion(subjectId, links);
+
+        vi.mocked(fetch).mockResolvedValue(new Response('bad token', { status: 400 }));
+
+        // The lambda logs and swallows, and the rule fires again in three
+        // minutes -- so the flag has to survive a failure or the edit is
+        // lost silently.
+        await expect(processNextQuestion(getDb())).rejects.toThrow('Facebook post update failed');
+
+        const [after] = await getDb().select().from(questionTable).where(eq(questionTable.id, questionId));
+        expect(after.fbCaptionDirty).toBe(true);
+      });
+
+      it('clears a flag left over from an edit made before the first post', async () => {
+        const { subjectId, ...links } = await seedFixture();
+        const questionId = await insertQuestion(subjectId, {
+          content: '<p>edited while unposted</p>',
+          fbCaptionDirty: true,
+        });
+        const db = getDb();
+        await db.insert(questionExamTable).values({ questionId, examId: links.examId });
+
+        vi.mocked(htmlToS3Url).mockResolvedValue({ url: 'https://s3.example.com/img.png', key: 'k' });
+        vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ post_id: 'p_first' }), { status: 200 }));
+
+        await processNextQuestion(getDb());
+
+        // The new post carries the current caption, so there is nothing
+        // left to rewrite -- without this the next tick would spend a
+        // Graph API call writing the text it just published.
+        const [after] = await getDb().select().from(questionTable).where(eq(questionTable.id, questionId));
+        expect(after.fbPostId).toBe('p_first');
+        expect(after.fbCaptionDirty).toBe(false);
+      });
     });
 
     it('deletes the uploaded S3 image even if the Facebook post request fails', async () => {

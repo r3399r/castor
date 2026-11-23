@@ -261,9 +261,16 @@ src/routes/*.ts 的 zod schema + describeRoute
 | 入口 | 觸發 | 備註 |
 | --- | --- | --- |
 | `src/lambda/api.ts` | API Gateway `ANY /{proxy+}` | `handle(app)`，256 MB／30 s |
-| `src/lambda/facebook.ts` | EventBridge `cron(*/3 * * * ? *)`，但規則**以 `State: DISABLED` 建立**：跑空了自己 `events:DisableRule`，`POST /api/question` 再 `events:EnableRule` 把它叫起來 | Puppeteer + Chromium layer，1024 MB／60 s。`@sparticuz/chromium` 是 `--external` |
+| `src/lambda/facebook.ts` | EventBridge `cron(*/3 * * * ? *)`，但規則**以 `State: DISABLED` 建立**：跑空了自己 `events:DisableRule`，`POST /api/question` 和每一次題目編輯再 `events:EnableRule` 把它叫起來 | Puppeteer + Chromium layer，1024 MB／60 s。`@sparticuz/chromium` 是 `--external` |
 | `src/lambda/housekeep.ts` | EventBridge `cron(5 20 * * ? *)` | 三個獨立包裝的任務：資料清理、過期未付購買、被日票取代的訂單 |
 | `src/lambda/questionStat.ts` | EventBridge `cron(0 19 * * ? *)` | 重算題目／科目／全域作答時間統計 |
+
+`facebook` 一輪只做一件事，而且有兩個 queue：先發沒發過的題
+（`fb_post_id IS NULL`），兩個都空了才把自己關掉。第二個 queue 是
+`fb_caption_dirty`＝已經發出去、但 hashtag 被編輯改掉的貼文，走
+`POST /{page-post-id}` 只改 `message`。**圖不能換** —— Graph API 沒有這種端點
+—— 所以改到 content 的編輯是把 `fb_post_id` 清成 NULL 重發一篇新的，舊貼文
+留著不刪（刪了留言就一起消失）。兩個欄位都寫在母題那一列。
 
 **三個排程 Lambda 都把錯誤 log 完吞掉**，不往外丟。失敗只代表今晚這輪跳過，
 明天再跑；丟出去會變成 Lambda retry 風暴和 CloudWatch 告警。`api` 相反 ——

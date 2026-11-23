@@ -46,6 +46,7 @@ import { verifyIdToken, verifyIdTokenUid } from 'src/lib/firebaseAdmin';
 // harmless, since the rule name never matches a real deployed one
 // locally) network call to AWS on every question creation.
 vi.mock('src/lib/facebookEventBridge', () => ({ enableFacebookEventBridge: vi.fn() }));
+import { enableFacebookEventBridge } from 'src/lib/facebookEventBridge';
 
 // POST /question/image's only external dependency -- mocked so the suite
 // exercises the concept resolution, output validation and id filtering
@@ -1520,6 +1521,181 @@ describe('question routes', () => {
         examId: unlinkedExamId,
       });
       expect(res.status).toBe(400);
+    });
+  });
+
+  // Facebook can edit a published post's text but not its photo, so the
+  // two kinds of edit are handled differently: a new image means a new
+  // post, while new hashtags are written onto the post already up.
+  describe('the Facebook post an edit invalidates', () => {
+    const fbStateOf = async (questionId: number) => {
+      const [row] = await getDb()
+        .select({
+          fbPostId: questionTable.fbPostId,
+          fbCaptionDirty: questionTable.fbCaptionDirty,
+        })
+        .from(questionTable)
+        .where(eq(questionTable.id, questionId));
+      return row;
+    };
+
+    // Stands in for the poster having already published this question.
+    const markPosted = (questionId: number) =>
+      getDb()
+        .update(questionTable)
+        .set({ fbPostId: 'page_post', fbCaptionDirty: false })
+        .where(eq(questionTable.id, questionId));
+
+    const createPostedGroup = async (subjectId: number, examId: number, conceptId: number) => {
+      const res = await postQuestions({
+        subjectId,
+        examId,
+        questions: [
+          {
+            type: 'GROUP',
+            content: 'passage',
+            difficulty: 5,
+            conceptIds: [conceptId],
+            childQuestions: [
+              {
+                type: 'SINGLE',
+                sortOrder: 0,
+                content: 'child content',
+                options: 'A|B',
+                answer: 'A',
+                difficulty: 5,
+              },
+            ],
+          },
+        ],
+      });
+      const [[parent, child]] = (await res.json()) as { id: number }[][];
+      await markPosted(parent.id);
+      return { parent, child };
+    };
+
+    beforeEach(() => {
+      vi.mocked(enableFacebookEventBridge).mockClear();
+    });
+
+    it('drops the post id when the content changed, and re-arms the poller', async () => {
+      const { subjectId, examId, conceptId } = await seedFixture();
+      const q = await createQuestion(subjectId, examId, { conceptIds: [conceptId] });
+      await markPosted(q.id);
+
+      const res = await putQuestion(q.id, {
+        type: 'SINGLE',
+        content: 'rewritten content',
+        options: 'A|B',
+        answer: 'A',
+        difficulty: 5,
+        examId,
+      });
+      expect(res.status).toBe(200);
+
+      // Back in the posting queue. The old post is deliberately left on
+      // the page -- deleting it would take its comments with it -- it
+      // just stops being what 討論區 links to.
+      expect(await fbStateOf(q.id)).toMatchObject({ fbPostId: null });
+      // The rule disarms itself when it runs out of work, so a re-post
+      // that nothing re-arms would sit in the queue indefinitely.
+      expect(enableFacebookEventBridge).toHaveBeenCalled();
+    });
+
+    it('keeps the post id when the content is unchanged', async () => {
+      const { subjectId, examId, conceptId } = await seedFixture();
+      const q = await createQuestion(subjectId, examId, { conceptIds: [conceptId] });
+      await markPosted(q.id);
+
+      // The admin page sends this route on every save, whatever the
+      // admin actually touched (QuestionClient's handleSave), so taking
+      // the call as proof of a content change would publish a duplicate
+      // post every time someone edited a tag.
+      const res = await putQuestion(q.id, {
+        type: 'SINGLE',
+        content: 'question content',
+        options: 'A|B',
+        answer: 'B',
+        difficulty: 9,
+        examId,
+      });
+      expect(res.status).toBe(200);
+
+      // A new answer and difficulty change nothing in the image --
+      // htmlSnapshot renders content and nothing else -- so the post
+      // stands and only its caption is queued for a rewrite.
+      expect(await fbStateOf(q.id)).toMatchObject({
+        fbPostId: 'page_post',
+        fbCaptionDirty: true,
+      });
+    });
+
+    it("drops the parent's post id when a child's content changed", async () => {
+      const { subjectId, examId, conceptId } = await seedFixture();
+      const { parent, child } = await createPostedGroup(subjectId, examId, conceptId);
+
+      const res = await putQuestion(child.id, {
+        type: 'SINGLE',
+        content: 'rewritten child',
+        options: 'A|B',
+        answer: 'A',
+        difficulty: 5,
+        examId,
+      });
+      expect(res.status).toBe(200);
+
+      // The posted image is the parent and its children rendered
+      // together, and the post id only ever lives on the parent.
+      expect(await fbStateOf(parent.id)).toMatchObject({ fbPostId: null });
+    });
+
+    it('flags the caption when the tags changed', async () => {
+      const { subjectId, examId, tagId, conceptId } = await seedFixture();
+      const q = await createQuestion(subjectId, examId, { conceptIds: [conceptId] });
+      await markPosted(q.id);
+
+      expect((await putQuestionTag(q.id, { tagIds: [tagId] })).status).toBe(200);
+
+      expect(await fbStateOf(q.id)).toMatchObject({
+        fbPostId: 'page_post',
+        fbCaptionDirty: true,
+      });
+      expect(enableFacebookEventBridge).toHaveBeenCalled();
+    });
+
+    it('flags the caption when the concepts changed', async () => {
+      const { subjectId, examId, conceptId } = await seedFixture();
+      const q = await createQuestion(subjectId, examId, { conceptIds: [conceptId] });
+      const db = getDb();
+      const [{ insertId: otherGroupId }] = await db
+        .insert(conceptGroupTable)
+        .values({ name: 'other group', subjectId, createdAt: new Date() });
+      const [{ insertId: otherConceptId }] = await db
+        .insert(conceptTable)
+        .values({ name: 'other concept', conceptGroupId: otherGroupId, createdAt: new Date() });
+      await markPosted(q.id);
+
+      expect((await putQuestionConcept(q.id, { conceptIds: [otherConceptId] })).status).toBe(200);
+
+      expect(await fbStateOf(q.id)).toMatchObject({
+        fbPostId: 'page_post',
+        fbCaptionDirty: true,
+      });
+    });
+
+    it("flags the parent when a child's concepts changed", async () => {
+      const { subjectId, examId, conceptId } = await seedFixture();
+      const { parent, child } = await createPostedGroup(subjectId, examId, conceptId);
+
+      expect((await putQuestionConcept(child.id, { conceptIds: [conceptId] })).status).toBe(200);
+
+      // The caption is built from the parent's own links, so the child
+      // has no post of its own to flag.
+      expect(await fbStateOf(parent.id)).toMatchObject({
+        fbPostId: 'page_post',
+        fbCaptionDirty: true,
+      });
+      expect(await fbStateOf(child.id)).toMatchObject({ fbPostId: null });
     });
   });
 

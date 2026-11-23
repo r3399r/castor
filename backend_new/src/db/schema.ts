@@ -177,6 +177,10 @@ export const questionTable = mysqlTable('question', {
     (): AnyMySqlColumn => questionTable.id
   ),
   fbPostId: varchar('fb_post_id', { length: 255 }),
+  // Pending caption rewrite -- see db/table/question.sql. Written by the
+  // question edit routes, cleared by facebookPoster once the new text is
+  // on the existing post.
+  fbCaptionDirty: boolean('fb_caption_dirty').notNull().default(false),
   isGroup: boolean('is_group').notNull().default(false),
   // Admin review gate -- see db/table/question.sql. Created false; only
   // question/adaptive, question/count and the Facebook auto-poster filter

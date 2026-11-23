@@ -622,6 +622,47 @@ const pickRandom = (arr: number[]) => {
 
 type QuestionItem = z.infer<typeof questionItemSchema>;
 
+/**
+ * Records that a question's Facebook post no longer matches the question,
+ * and re-arms the poller to deal with it.
+ *
+ * `repost: true` (a content edit) drops the post id, which puts the
+ * question back in the posting queue: Graph API can edit a post's text
+ * but has no endpoint that replaces a published photo, so a new image
+ * means a new post. The old post is deliberately left on the page --
+ * deleting it would take its comments with it -- it just stops being
+ * what 討論區 links to. Otherwise only the caption is stale, and the
+ * poller rewrites it in place.
+ *
+ * Always aimed at the top-level row: fb_post_id only ever lives there,
+ * and the caption is built from the parent's own links, so an edit to a
+ * child is an edit to its parent's post.
+ *
+ * Both writes are unconditional rather than diffed against what the
+ * links were, because the admin page saves all of content, tags and
+ * concepts on every edit (QuestionClient's handleSave) -- with one
+ * exception, below, where the cost of a false positive is a duplicate
+ * post rather than a redundant API call.
+ */
+const markFacebookPostStale = async (
+  db: Db,
+  question: { id: number; parentId: number | null },
+  { repost = false }: { repost?: boolean } = {}
+) => {
+  await db
+    .update(questionTable)
+    .set({
+      fbCaptionDirty: true,
+      ...(repost ? { fbPostId: null } : {}),
+      updatedAt: new Date(),
+    })
+    .where(eq(questionTable.id, question.parentId ?? question.id));
+  // Best-effort, same as everywhere else this is called: the rule
+  // disarms itself when it runs out of work, so a failure here only
+  // means the change waits for the next thing that arms it.
+  await enableFacebookEventBridge();
+};
+
 const validateExamForSubject = async (db: Db, subjectId: number, examId: number) => {
   const [exam] = await db.select().from(examTable).where(eq(examTable.id, examId));
   if (exam === undefined) throw new NotFoundError(`exam ${examId} not found`);
@@ -2041,6 +2082,16 @@ export const question = new Hono<UserEnv>()
     await db.delete(questionExamTable).where(eq(questionExamTable.questionId, id));
     await db.insert(questionExamTable).values({ questionId: id, examId: data.examId });
 
+    // The one diffed trigger (see markFacebookPostStale): the admin page
+    // sends this route on every save, so taking the call itself as proof
+    // of a content change would publish a duplicate post each time
+    // someone edited a tag. content is also the only field that reaches
+    // the image -- htmlSnapshot renders nothing else, so a new answer or
+    // difficulty does not need a new post.
+    await markFacebookPostStale(db, found, {
+      repost: (data.content ?? null) !== found.content,
+    });
+
     const [updated] = await db.select().from(questionTable).where(eq(questionTable.id, id));
     return c.json(toQuestionRowDto(updated) satisfies z.infer<typeof questionRowSchema>);
   })
@@ -2163,6 +2214,8 @@ export const question = new Hono<UserEnv>()
         .insert(questionTagTable)
         .values(tags.map((tag) => ({ questionId: id, tagId: tag.id })));
 
+    await markFacebookPostStale(db, found);
+
     const links = await db
       .select({ tagId: questionTagTable.tagId })
       .from(questionTagTable)
@@ -2230,6 +2283,8 @@ export const question = new Hono<UserEnv>()
       await db
         .insert(questionConceptTable)
         .values(nextIdsSet.map((conceptId) => ({ questionId: id, conceptId })));
+
+      await markFacebookPostStale(db, found);
 
       const links = await db
         .select({ conceptId: questionConceptTable.conceptId })

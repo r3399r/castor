@@ -4,6 +4,18 @@ CREATE TABLE IF NOT EXISTS castor.question (
     subject_id INT UNSIGNED NOT NULL,
     parent_id INT UNSIGNED NULL,
     fb_post_id VARCHAR(255) NULL,
+    -- "the caption of the post above no longer matches this question".
+    -- Set by every question edit route, cleared by the Facebook poller
+    -- once it has rewritten that post's text (Graph API supports editing
+    -- a post's message, but has no endpoint that replaces a published
+    -- photo -- a content edit drops fb_post_id and re-posts instead).
+    --
+    -- Only acted on where fb_post_id IS NOT NULL, and only on a
+    -- top-level row: the caption is built from the parent's own
+    -- category/subject/exam/tag/concept links, so an edit to a child
+    -- marks its parent. Set on a not-yet-posted question it is harmless
+    -- and is cleared by the post itself.
+    fb_caption_dirty TINYINT NOT NULL DEFAULT 0,
     is_group TINYINT NOT NULL DEFAULT 0,
     -- Visibility gate: controls whether a question reaches users
     -- (question/adaptive, question/count, the Facebook auto-poster).
