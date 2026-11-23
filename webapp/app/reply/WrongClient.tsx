@@ -108,8 +108,9 @@ function WrongEntry({
    *
    *   subscriber              -- the ordinary editor.
    *   no subscription, a note -- the same textarea and button, both
-   *     disabled: the note reads where its author left it, and a
-   *     greyed-out pair says why it cannot be touched.
+   *     disabled, with a line under the box saying it is a subscriber
+   *     feature: the note reads where its author left it, and the
+   *     greyed-out pair is explained rather than left looking broken.
    *   no subscription, none   -- neither; just the prompt below. An
    *     empty disabled box sells the feature worse than a sentence.
    */
@@ -217,6 +218,16 @@ function WrongEntry({
             disabled={!entitled}
             className={styles.noteInput}
           />
+          {/* A greyed-out box on its own reads as a bug. This sits with
+              the box it explains -- once per locked note rather than
+              once per card, because the box is per sub-question and an
+              unexplained one further down the card is the whole
+              complaint. The upsell link stays below, once. */}
+          {!entitled && (
+            <p className="text-sm text-black-500">
+              錯題筆記是訂閱功能，訂閱後可以繼續編輯這則筆記。
+            </p>
+          )}
         </div>
       )}
 
@@ -228,11 +239,15 @@ function WrongEntry({
           while sync is still in flight. */}
       {subscription !== null && !entitled && isFirstEntry && (
         <div className="mt-3 flex flex-col items-start gap-2">
-          <p className="text-sm text-black-500">
-            {entry.note
-              ? '錯題筆記是訂閱功能，訂閱後可以繼續編輯。'
-              : '錯題筆記是訂閱功能，訂閱後可以在每一題寫下自己錯在哪裡、下次要注意什麼。'}
-          </p>
+          {/* Skipped when the box above already said it: with no
+              subscription `showNote` only holds when this entry has a
+              note, so the remaining case is an entry with none, and the
+              sentence that sells the feature is the one to show. */}
+          {!showNote && (
+            <p className="text-sm text-black-500">
+              錯題筆記是訂閱功能，訂閱後可以在每一題寫下自己錯在哪裡、下次要注意什麼。
+            </p>
+          )}
           <ButtonLink href="/subscription" size="sm">
             查看訂閱方案
           </ButtonLink>
