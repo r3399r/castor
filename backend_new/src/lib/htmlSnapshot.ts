@@ -55,6 +55,7 @@ const wrapHtml = (content: string) => `<!DOCTYPE html>
        box with it, and !important is required because what it overrides
        is an inline style. */
     mjx-utext { font-family: MJXZERO, 'Times New Roman', 'Tinos', 'Noto Serif TC', serif !important; }
+    p, ol, ul { margin: 0 0 6px; }
     img { max-width: 100%; }
     /* Separates a GROUP's sub-questions, which otherwise read as one
        run-on paragraph (see facebookPoster.ts). */
