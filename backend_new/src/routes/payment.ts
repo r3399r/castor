@@ -1,6 +1,6 @@
 import 'zod-openapi/extend';
 import { zValidator } from '@hono/zod-validator';
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq, inArray } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { describeRoute, resolver } from 'hono-openapi';
 import { z } from 'zod';
@@ -19,10 +19,11 @@ import {
   ORDER_STATUS_CREATED,
   findActiveOrder,
 } from 'src/lib/paymentOrder';
-import { setSubscription } from 'src/lib/subscription';
+import { findEntitledSubscription, setSubscription } from 'src/lib/subscription';
 import { findPlan, isDayPassPlan } from 'src/lib/subscriptionPlan';
 import {
   PURCHASE_STATUS_CREATED,
+  PURCHASE_STATUSES_OPEN,
 } from 'src/lib/paymentPurchase';
 import { BadRequestError, NotFoundError } from 'src/model/error';
 import { UserEnv } from 'src/middleware/requireUser';
@@ -138,7 +139,7 @@ export const getPaymentPurchasesResponseSchema = z.object({
 const checkoutDoc = describeRoute({
   summary: 'Start a payment',
   description:
-    "Behind requireUser. **Charges nothing.** It answers with a signed form the browser has to POST to `action`, because the cardholder has to reach ECPay's own page to enter a card -- the amount and the callback URLs are signed server-side so they cannot be tampered with, and the submit happens client-side. Until ECPay's webhook arrives the order is only `created`, and the user may simply close the tab.\n\nA day pass requires `method`; the recurring plan refuses one, since ECPay's 定期定額 is credit-card only -- which is the reason the day passes exist at all. Changing recurring plan replaces the agreement, because ECPay cannot amend one: the old agreement is stopped by this call, so abandoning the payment page leaves the caller with no auto-renew. The UI has to say so before calling this.",
+    "Behind requireUser. **Charges nothing.** It answers with a signed form the browser has to POST to `action`, because the cardholder has to reach ECPay's own page to enter a card -- the amount and the callback URLs are signed server-side so they cannot be tampered with, and the submit happens client-side. Until ECPay's webhook arrives the order is only `created`, and the user may simply close the tab.\n\nA day pass requires `method`; the recurring plan refuses one, since ECPay's 定期定額 is credit-card only -- which is the reason the day passes exist at all. Changing recurring plan replaces the agreement, because ECPay cannot amend one: the old agreement is stopped by this call, so abandoning the payment page leaves the caller with no auto-renew. The UI has to say so before calling this.\n\n**One kind of paid access at a time.** A pass is refused while a recurring agreement is live (CANCEL_AUTORENEW_FIRST -- cancel it first, the days already paid for are kept). An agreement is refused while the caller is still entitled to anything (ALREADY_ENTITLED), and while a day-pass payment is open and might yet land (PENDING_DAY_PASS). The one exception is resuming the very plan whose paid period is still running with nothing renewing it, which is allowed: it restores the access already there rather than adding a second kind.",
   tags: ['payment'],
   responses: {
     200: {
@@ -149,7 +150,7 @@ const checkoutDoc = describeRoute({
     },
     400: {
       description:
-        'A day pass with no method (PAYMENT_METHOD_REQUIRED), or the recurring plan the caller is already on (ALREADY_SUBSCRIBED) -- the code in the body says which',
+        'The code in the body says which: PAYMENT_METHOD_REQUIRED (a day pass with no method), ALREADY_SUBSCRIBED (the recurring plan the caller is already on), CANCEL_AUTORENEW_FIRST (a day pass while an agreement is live), ALREADY_ENTITLED (an agreement while paid access is still running), PENDING_DAY_PASS (an agreement while a day-pass payment is still open)',
     },
     401: { description: 'No valid identity' },
     404: { description: 'No such plan (UNKNOWN_PLAN)' },
@@ -199,14 +200,25 @@ export const payment = new Hono<UserEnv>()
      * not cancel a live recurring agreement here. ECPay's cancel is
      * one-way, while an ATM or store payment can go unpaid for a week:
      * cancelling now would leave someone who never pays with no
-     * subscription and no pass. The cancel happens once the money
-     * actually arrives, swept by housekeep rather than done inside the
-     * callback.
+     * subscription and no pass. Since 2026-11-24 it does not have to:
+     * a pass is refused outright while an agreement is live, and the
+     * housekeep sweep is left to handle only the slow path, where the
+     * code was issued before the agreement existed.
      */
     if (isDayPassPlan(plan)) {
       const { method } = c.req.valid('json');
       if (method === undefined)
         throw new BadRequestError('a payment method is required', 'PAYMENT_METHOD_REQUIRED');
+
+      // Auto-renew first, days second, never both at once. Someone
+      // holding an agreement has to stop it before buying days, so that
+      // nobody ends up being charged monthly for a period they have
+      // already bought outright.
+      if ((await findActiveOrder(db, user.id)) !== undefined)
+        throw new BadRequestError(
+          'cancel the recurring agreement first',
+          'CANCEL_AUTORENEW_FIRST'
+        );
 
       const now = new Date();
       const merchantTradeNo = generateMerchantTradeNo();
@@ -238,6 +250,28 @@ export const payment = new Hono<UserEnv>()
       } satisfies z.infer<typeof postPaymentCheckoutResponseSchema>);
     }
 
+    // A day-pass payment that has not landed yet. Letting an agreement
+    // start on top of one is the single path that still reaches the
+    // housekeep sweep: the slip is paid days later, the pass supersedes
+    // the agreement, and the user's auto-renew disappears the same
+    // night with nothing on screen having warned them. Refusing here is
+    // the warning.
+    const [openPurchase] = await db
+      .select({ id: paymentPurchaseTable.id })
+      .from(paymentPurchaseTable)
+      .where(
+        and(
+          eq(paymentPurchaseTable.userId, user.id),
+          inArray(paymentPurchaseTable.status, [...PURCHASE_STATUSES_OPEN])
+        )
+      )
+      .limit(1);
+    if (openPurchase !== undefined)
+      throw new BadRequestError(
+        'a day-pass payment is still open',
+        'PENDING_DAY_PASS'
+      );
+
     const live = await findActiveOrder(db, user.id);
 
     // Re-buying the plan they are already on would just charge them
@@ -245,6 +279,30 @@ export const payment = new Hono<UserEnv>()
     // can say so rather than showing a generic failure.
     if (live !== undefined && live.plan === plan.code)
       throw new BadRequestError('already subscribed to this plan', 'ALREADY_SUBSCRIBED');
+
+    /**
+     * An agreement may only be taken out from a standing start.
+     *
+     * Paid days and a recurring agreement can coexist in the database
+     * perfectly well -- the period simply queues behind the furthest-out
+     * end -- but they cannot coexist in a user's head: the plan name on
+     * the status screen, the day the card is charged and the day access
+     * runs out all stop lining up. One kind of paid access at a time is
+     * the rule the UI shows, and this is where it holds.
+     *
+     * The exception is resuming the very plan whose paid period is still
+     * running, with nothing renewing it: that adds no second kind of
+     * access, it restores the one already there, and refusing it would
+     * mean telling someone who cancelled this morning to wait a month
+     * before they could change their mind.
+     */
+    const entitled = await findEntitledSubscription(db, user.id);
+    const resuming = entitled !== undefined && entitled.plan === plan.code && live === undefined;
+    if (entitled !== undefined && !resuming)
+      throw new BadRequestError(
+        'already entitled to paid access',
+        'ALREADY_ENTITLED'
+      );
 
     const now = new Date();
     const merchantTradeNo = generateMerchantTradeNo();

@@ -5662,7 +5662,7 @@
       "post": {
         "operationId": "postApiPaymentCheckout",
         "summary": "Start a payment",
-        "description": "Behind requireUser. **Charges nothing.** It answers with a signed form the browser has to POST to `action`, because the cardholder has to reach ECPay's own page to enter a card -- the amount and the callback URLs are signed server-side so they cannot be tampered with, and the submit happens client-side. Until ECPay's webhook arrives the order is only `created`, and the user may simply close the tab.\n\nA day pass requires `method`; the recurring plan refuses one, since ECPay's 定期定額 is credit-card only -- which is the reason the day passes exist at all. Changing recurring plan replaces the agreement, because ECPay cannot amend one: the old agreement is stopped by this call, so abandoning the payment page leaves the caller with no auto-renew. The UI has to say so before calling this.",
+        "description": "Behind requireUser. **Charges nothing.** It answers with a signed form the browser has to POST to `action`, because the cardholder has to reach ECPay's own page to enter a card -- the amount and the callback URLs are signed server-side so they cannot be tampered with, and the submit happens client-side. Until ECPay's webhook arrives the order is only `created`, and the user may simply close the tab.\n\nA day pass requires `method`; the recurring plan refuses one, since ECPay's 定期定額 is credit-card only -- which is the reason the day passes exist at all. Changing recurring plan replaces the agreement, because ECPay cannot amend one: the old agreement is stopped by this call, so abandoning the payment page leaves the caller with no auto-renew. The UI has to say so before calling this.\n\n**One kind of paid access at a time.** A pass is refused while a recurring agreement is live (CANCEL_AUTORENEW_FIRST -- cancel it first, the days already paid for are kept). An agreement is refused while the caller is still entitled to anything (ALREADY_ENTITLED), and while a day-pass payment is open and might yet land (PENDING_DAY_PASS). The one exception is resuming the very plan whose paid period is still running with nothing renewing it, which is allowed: it restores the access already there rather than adding a second kind.",
         "tags": [
           "payment"
         ],
@@ -5695,7 +5695,7 @@
             }
           },
           "400": {
-            "description": "A day pass with no method (PAYMENT_METHOD_REQUIRED), or the recurring plan the caller is already on (ALREADY_SUBSCRIBED) -- the code in the body says which"
+            "description": "The code in the body says which: PAYMENT_METHOD_REQUIRED (a day pass with no method), ALREADY_SUBSCRIBED (the recurring plan the caller is already on), CANCEL_AUTORENEW_FIRST (a day pass while an agreement is live), ALREADY_ENTITLED (an agreement while paid access is still running), PENDING_DAY_PASS (an agreement while a day-pass payment is still open)"
           },
           "401": {
             "description": "No valid identity"

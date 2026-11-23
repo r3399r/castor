@@ -119,6 +119,11 @@
 .planOption:has(input:focus-visible) { outline: var(--spirit-focus-outline); outline-offset: 3px; }
 .billingFieldset[aria-disabled="true"] .planOption { cursor: default; }
 .billingFieldset[aria-disabled="true"] .planOption:not(.currentPlan) { opacity: .72; }
+/* A plan this account cannot buy right now (see planOffer). Dimmed
+   rather than hidden: the catalogue is part of what the page is for,
+   and the copy under the picker says what to do to unlock it. */
+.planOptionBlocked { cursor: default; opacity: .55; }
+.planOptionBlocked:has(input:checked) { border-color: var(--color-spirit-line); box-shadow: none; }
 
 .radioMark {
   width: 18px;

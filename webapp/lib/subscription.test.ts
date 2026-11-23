@@ -6,8 +6,10 @@ import {
   formatTaiwanDate,
   getSubscriptionPlan,
   isDayPassPlanCode,
+  planOffer,
   subscriptionPlans,
 } from './subscription'
+import type { SubscriptionView } from './subscription'
 
 const status = (over: Partial<SubscriptionStatus> = {}): SubscriptionStatus => ({
   active: false,
@@ -226,5 +228,74 @@ describe('deriveSubscriptionView', () => {
       period({ id: 1, plan: 'monthly', status: 'cancelled', currentPeriodEnd: future }),
     ])
     expect(view).toEqual({ kind: 'expired', planCode: 'days30' })
+  })
+})
+
+describe('planOffer', () => {
+  const monthly = getSubscriptionPlan('monthly')!
+  const pass = getSubscriptionPlan('days90')!
+  const endsAt = new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString()
+
+  const free: SubscriptionView = { kind: 'free', previousExpired: false }
+  const active: SubscriptionView = { kind: 'active', planCode: 'monthly', entitlementEndsAt: endsAt }
+  const passHolder: SubscriptionView = {
+    kind: 'unmanaged',
+    planCode: 'days90',
+    entitlementEndsAt: endsAt,
+  }
+  const cancelled: SubscriptionView = {
+    kind: 'cancelled',
+    planCode: 'monthly',
+    entitlementEndsAt: endsAt,
+    entitlementActive: true,
+  }
+
+  it('offers everything to someone with no paid access', () => {
+    expect(planOffer(free, monthly)).toEqual({ allowed: true, action: 'buy' })
+    expect(planOffer(free, pass)).toEqual({ allowed: true, action: 'buy' })
+    expect(planOffer({ kind: 'expired', planCode: 'days30' }, monthly)).toEqual({
+      allowed: true,
+      action: 'buy',
+    })
+  })
+
+  it('lets a pass holder buy more days but not an agreement', () => {
+    expect(planOffer(passHolder, pass)).toEqual({ allowed: true, action: 'buy' })
+    expect(planOffer(passHolder, monthly)).toEqual({ allowed: false, reason: 'entitled' })
+  })
+
+  it('offers an auto-renewing subscriber nothing but cancelling', () => {
+    expect(planOffer(active, monthly)).toEqual({ allowed: false, reason: 'entitled' })
+    // The one that used to be allowed, and the reason the whole rule
+    // exists: it left the user paying monthly for days they had just
+    // bought outright, until housekeep noticed overnight.
+    expect(planOffer(active, pass)).toEqual({ allowed: false, reason: 'autoRenewLive' })
+  })
+
+  it('treats a cancelled subscriber as a pass holder, plus resuming', () => {
+    expect(planOffer(cancelled, pass)).toEqual({ allowed: true, action: 'buy' })
+    expect(planOffer(cancelled, monthly)).toEqual({ allowed: true, action: 'resume' })
+  })
+
+  it('only resumes the plan that is actually paid for', () => {
+    // A pass period can read `cancelled` too, and resuming it as a
+    // monthly agreement would be a different purchase entirely.
+    const cancelledPass: SubscriptionView = {
+      kind: 'cancelled',
+      planCode: 'days30',
+      entitlementEndsAt: endsAt,
+      entitlementActive: true,
+    }
+    expect(planOffer(cancelledPass, monthly)).toEqual({ allowed: false, reason: 'entitled' })
+  })
+
+  it('offers nothing while a renewal has failed', () => {
+    const failed: SubscriptionView = {
+      kind: 'payment_failed',
+      planCode: 'monthly',
+      entitlementActive: false,
+    }
+    expect(planOffer(failed, monthly)).toEqual({ allowed: false, reason: 'paymentFailed' })
+    expect(planOffer(failed, pass)).toEqual({ allowed: false, reason: 'paymentFailed' })
   })
 })

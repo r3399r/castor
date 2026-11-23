@@ -237,3 +237,55 @@ export function deriveSubscriptionView(
 
   return { kind: 'expired', planCode: latest.plan }
 }
+
+/**
+ * Whether a plan can be bought right now, and as what.
+ *
+ * One kind of paid access at a time: paid days and a recurring
+ * agreement can coexist in the database perfectly well -- the period
+ * queues behind the furthest-out end -- but not in a user's head, where
+ * the plan name, the charge date and the expiry date all stop agreeing.
+ *
+ * `resume` is the one entitled case allowed: restarting the very plan
+ * whose paid period is still running, with nothing renewing it. It adds
+ * no second kind of access, it restores the one already there, and
+ * without it someone who cancelled this morning would have to wait out
+ * the month before changing their mind.
+ *
+ * This is the same rule `POST /api/payment/checkout` enforces (the
+ * reasons line up with its CANCEL_AUTORENEW_FIRST and ALREADY_ENTITLED
+ * codes). The server is the one that counts -- it is what stops a
+ * crafted POST from being charged -- so this exists to keep the page
+ * from offering a button the server would refuse, not as the gate.
+ *
+ * `pendingDayPass` has no case here: the page would need the purchase
+ * list to know about an unpaid slip, which is a request it does not
+ * otherwise make, and the server answers PENDING_DAY_PASS for a
+ * situation most users will never be in.
+ */
+export type PlanOffer =
+  | { allowed: true; action: 'buy' | 'resume' }
+  | { allowed: false; reason: 'autoRenewLive' | 'entitled' | 'paymentFailed' }
+
+export function planOffer(view: SubscriptionView, plan: SubscriptionPlan): PlanOffer {
+  // A failed renewal is its own screen: it offers retrying or
+  // cancelling, and buying something else on top would make the mess
+  // worse rather than resolve it.
+  if (view.kind === 'payment_failed') return { allowed: false, reason: 'paymentFailed' }
+
+  if (plan.kind === 'dayPass')
+    return view.kind === 'active'
+      ? { allowed: false, reason: 'autoRenewLive' }
+      : { allowed: true, action: 'buy' }
+
+  // Recurring. `active` is the plan renewing itself, so there is
+  // nothing to buy; `cancelled` and `unmanaged` are paid days with
+  // nothing behind them, where only resuming the same plan is offered.
+  if (view.kind === 'active') return { allowed: false, reason: 'entitled' }
+  if (view.kind === 'cancelled' || view.kind === 'unmanaged')
+    return view.planCode === plan.code
+      ? { allowed: true, action: 'resume' }
+      : { allowed: false, reason: 'entitled' }
+
+  return { allowed: true, action: 'buy' }
+}

@@ -20,6 +20,7 @@ import { investmentXp } from '@/lib/invest'
 import { ApiError, apiFetch, apiPost } from '@/lib/api'
 import { submitCheckout } from '@/lib/checkout'
 import {
+  planOffer,
   dayPassPaymentMethods,
   deriveSubscriptionView,
   formatPlanPrice,
@@ -85,9 +86,11 @@ const analysisFeatures = [
 const faqsFor = (bonusPercent: number | null): [string, string][] => [
   ['訂閱後何時可以使用進階分析？', '刷卡完成、收到綠界的付款結果後就會開通，通常是幾秒內。若畫面尚未更新，重新整理即可。'],
   ['可以用什麼方式付款？', '目前只支援信用卡。自動續訂是透過綠界的信用卡定期定額，刷一次卡之後由綠界按週期扣款，不支援銀聯卡。'],
+  ['可以同時有月繳訂閱和天數型方案嗎？', '不行，一次只會有一種。月繳訂閱期間無法加購天數型方案；想改用天數型，請先到個人資料頁取消自動續訂，已付費的天數不會損失，取消後購買的天數會接在到期日之後。'],
+  ['持有天數型方案期間，可以改訂月繳嗎？', '要等天數用完才能開始月繳訂閱。這段期間可以直接加購天數型方案，新購的天數會接在目前的到期日之後，不會浪費。'],
   ['原本的學習紀錄會保留嗎？', '會，訂閱不會影響既有的練習紀錄與學習資料。'],
   ['如何取消訂閱？', '到個人資料頁點「取消續訂」即可。取消後不再扣款，但已付費的這一期仍可使用到期末。'],
-  ['取消後想再訂閱呢？', '可以，但會是一份全新的訂閱，需要重新刷卡且當下就會扣款。新的訂閱期間會接在原本已付費的期間之後開始，不會浪費你已付的天數。'],
+  ['取消後想再訂閱呢？', '可以隨時恢復自動續訂。綠界無法重啟已取消的合約，所以會是一份全新的訂閱，需要重新刷卡且當下就會扣款；新的訂閱期間會接在原本已付費的期間之後開始，不會浪費你已付的天數。'],
   ['中途換方案會怎麼計費？', '會立即停止原本的自動續訂、重新刷卡，新方案當下就扣款；新的訂閱期間一樣接在目前期間結束後才開始。'],
   ...(bonusPercent === null
     ? []
@@ -191,32 +194,51 @@ export default function SubscriptionPageClient() {
   const selectedIsCurrent = selectedPlan === currentPlanCode
   const selectedAmount = amounts?.[selected.code] ?? null
 
-  // Starting a subscription replaces whatever agreement exists, so the
-  // only state with nothing to offer is "already on this exact plan with
-  // auto-renew on". A cancelled subscriber choosing their own plan again
-  // is resubscribing, which is a new agreement and therefore allowed.
-  // Only an agreement can be "the plan you are already on": buying a
-  // second pass is a perfectly good thing to do, and the backend allows
-  // it, so the button must not refuse it.
+  // One kind of paid access at a time, decided per plan by the same
+  // rule the server enforces -- see planOffer. null while the state is
+  // still loading, which is not the same as "refused".
+  const offers = useMemo(
+    () =>
+      view === null
+        ? null
+        : new Map(subscriptionPlans.map((plan) => [plan.code, planOffer(view, plan)])),
+    [view],
+  )
+  const offer = offers?.get(selected.code) ?? null
+  // The day paid access runs out, for the three views that have one.
+  // Narrowed here rather than inside the JSX, where the compiler cannot
+  // see that `resume` implies one of those views.
+  const entitlementEndsAt =
+    view?.kind === 'active' || view?.kind === 'cancelled' || view?.kind === 'unmanaged'
+      ? view.entitlementEndsAt
+      : null
+
+  // The default selection is the monthly plan, which a pass holder is
+  // not allowed to buy. Landing on a disabled card with a disabled
+  // button reads as a broken page, so move to the first plan that is
+  // actually on offer once the state is known.
+  useEffect(() => {
+    if (offers === null || offers.get(selectedPlan)?.allowed !== false) return
+    const open = subscriptionPlans.find((plan) => offers.get(plan.code)?.allowed)
+    if (open !== undefined) setSelectedPlan(open.code)
+  }, [offers, selectedPlan])
+
+  const resuming = offer?.allowed === true && offer.action === 'resume'
   const alreadyOnThisPlan =
     view?.kind === 'active' && selectedIsCurrent && selected.kind === 'recurring'
   const actionLabel = alreadyOnThisPlan
     ? '目前使用此方案'
-    : selected.kind === 'dayPass'
-      ? `購買 ${selected.name}`
-      : view?.kind === 'active'
-        ? `改用${selected.name}`
-        : view?.kind === 'cancelled'
-          ? selectedIsCurrent
-            ? '重新訂閱'
-            : `改用${selected.name}`
-          : '開始訂閱'
+    : resuming
+      ? '恢復自動續訂'
+      : selected.kind === 'dayPass'
+        ? `購買 ${selected.name}`
+        : '開始訂閱'
 
   // A purchase is never offered at a price the server has not confirmed:
   // the amount shown has to be the amount that gets charged.
   const canSubscribe =
-    !!user && !statePending && !statusError && !alreadyOnThisPlan &&
-    view?.kind !== 'payment_failed' && selectedAmount !== null && !submitting
+    !!user && !statePending && !statusError && offer?.allowed === true &&
+    selectedAmount !== null && !submitting
 
   /**
    * Hands the browser to ECPay. Replacing an existing agreement is
@@ -284,14 +306,21 @@ export default function SubscriptionPageClient() {
               {subscriptionPlans.map((plan) => {
                 const current = managedSubscription && plan.code === currentPlanCode
                 const amount = amounts?.[plan.code]
+                // Still selectable while the state loads: `offers` is
+                // null then, and disabling everything would make the
+                // page flicker shut and open again.
+                const blocked = offers?.get(plan.code)?.allowed === false
                 return (
-                  <label key={plan.code} className={`${styles.planOption} ${current ? styles.currentPlan : ''}`}>
+                  <label
+                    key={plan.code}
+                    className={`${styles.planOption} ${current ? styles.currentPlan : ''} ${blocked ? styles.planOptionBlocked : ''}`}
+                  >
                     <input
                       type="radio"
                       name="billing-period"
                       value={plan.code}
                       checked={selectedPlan === plan.code}
-                      disabled={!canChoosePlan}
+                      disabled={!canChoosePlan || blocked}
                       onChange={() => setSelectedPlan(plan.code)}
                     />
                     <span className={styles.radioMark} aria-hidden="true" />
@@ -399,6 +428,27 @@ export default function SubscriptionPageClient() {
               */}
               {!user ? (
                 <p>請先登入，才能開始訂閱。</p>
+              ) : offer?.allowed === false ? (
+                /* Refused by the same rule the server enforces. Each
+                   one names the way out, because a disabled card that
+                   explains nothing reads as a broken page. */
+                <p>
+                  {offer.reason === 'autoRenewLive' ? (
+                    <>
+                      目前是<strong>自動續訂中</strong>，無法同時購買天數型方案。
+                      請先到<strong>個人資料頁</strong>取消自動續訂 ——
+                      已付費的天數不會損失，取消後購買的天數會接在到期日之後。
+                    </>
+                  ) : entitlementEndsAt !== null ? (
+                    <>
+                      目前的權益可使用至 {formatTaiwanDate(entitlementEndsAt)}，
+                      這段期間無法另外開始月繳訂閱。想延長使用期限可以直接加購天數型方案，
+                      天數會接在到期日之後。
+                    </>
+                  ) : (
+                    <>目前的訂閱狀態無法購買這個方案。</>
+                  )}
+                </p>
               ) : selected.kind === 'dayPass' ? (
                 <>
                   <p>
@@ -416,33 +466,21 @@ export default function SubscriptionPageClient() {
                       非信用卡付款恕不提供線上退款。
                     </p>
                   )}
-                  {view?.kind === 'active' && (
-                    <p>
-                      你目前有自動續訂中的方案。
-                      <strong>完成付款後會自動停止自動續訂</strong>，已付費的天數不受影響。
-                    </p>
-                  )}
                 </>
-              ) : view?.kind === 'cancelled' ? (
+              ) : resuming ? (
+                /* Restarting the plan whose paid period is still
+                   running. A new agreement either way -- ECPay cannot
+                   restart a cancelled one -- so the charge is immediate
+                   and the period it buys queues behind the one already
+                   paid for. */
                 <p>
-                  原訂閱權益可使用至 {formatTaiwanDate(view.entitlementEndsAt)}。
-                  重新訂閱會立即扣款，新的訂閱期間接在該日之後開始。
-                </p>
-              ) : view?.kind === 'unmanaged' ? (
-                /* Paid days with nothing renewing them -- a pass, or a
-                   period granted by hand. Subscribing keeps them: the
-                   first charge happens now, and the agreement's period
-                   starts where the existing one ends. */
-                <p>
-                  目前的權益可使用至 {formatTaiwanDate(view.entitlementEndsAt)}，這些天數不會損失。
-                  訂閱會立即扣款，訂閱期間接在該日之後開始，之後{selected.renewalLabel}自動續訂。
+                  {entitlementEndsAt !== null && (
+                    <>原訂閱權益可使用至 {formatTaiwanDate(entitlementEndsAt)}，這些天數不會損失。</>
+                  )}
+                  恢復自動續訂會立即扣款，新的訂閱期間接在原本的到期日之後開始。
                 </p>
               ) : view?.kind === 'active' ? (
-                <p>
-                  {alreadyOnThisPlan
-                    ? `${selected.name}將${selected.renewalLabel}自動續訂；可至個人資料頁取消續訂。`
-                    : '改用其他方案會立即停止目前的自動續訂並重新刷卡，已付費的天數不會損失。'}
-                </p>
+                <p>{`${selected.name}將${selected.renewalLabel}自動續訂；可至個人資料頁取消續訂。`}</p>
               ) : (
                 <p>{selected.name}將{selected.renewalLabel}自動續訂；訂閱後可至個人資料頁取消續訂。</p>
               )}
@@ -453,16 +491,12 @@ export default function SubscriptionPageClient() {
                 size="lg"
                 disabled={!canSubscribe}
                 onClick={() => {
-                  // Replacing a live agreement is irreversible, so it is
-                  // confirmed; a first subscription is not, because
-                  // ECPay's own payment page is the next step either way.
-                  //
-                  // A day pass is never that: it cancels nothing at
-                  // checkout, precisely because an ATM payment can go
-                  // unpaid for a week and cancelling now would leave
-                  // someone who never pays with neither. The cancel
-                  // happens after the money arrives.
-                  if (managedSubscription && selected.kind === 'recurring') setConfirming(true)
+                  // Resuming charges today for a period that starts
+                  // when the one already paid for runs out, which is
+                  // worth saying before the card is taken. Everything
+                  // else goes straight on: ECPay's own payment page is
+                  // the next step and nothing here is irreversible.
+                  if (resuming) setConfirming(true)
                   else startCheckout()
                 }}
               >
@@ -480,28 +514,17 @@ export default function SubscriptionPageClient() {
         will not be charged now" -- both were true of the provider this
         screen was first drafted against, and neither is true here.
       */}
-      {confirming && managedSubscription && (
-        <Modal
-          title={view.kind === 'cancelled' && selectedIsCurrent ? '重新訂閱？' : `改用${selected.name}？`}
-          onClose={() => setConfirming(false)}
-        >
+      {confirming && resuming && (
+        <Modal title="恢復自動續訂？" onClose={() => setConfirming(false)}>
           <p className={styles.dialogCopy}>
-            {view.kind === 'active' && (
-              <>目前方案可使用至 {formatTaiwanDate(view.entitlementEndsAt)}，這些天數不會損失。</>
-            )}
-            {view.kind === 'cancelled' && (
-              <>原訂閱權益可使用至 {formatTaiwanDate(view.entitlementEndsAt)}，這些天數不會損失。</>
+            {entitlementEndsAt !== null && (
+              <>原訂閱權益可使用至 {formatTaiwanDate(entitlementEndsAt)}，這些天數不會損失。</>
             )}
             {' '}
-            確認後會前往綠界重新刷卡，
+            綠界無法重啟已取消的合約，所以確認後會前往綠界重新刷卡，
             {selectedAmount !== null && <>本次就會扣款 NT${formatNumber(selectedAmount)}，</>}
             新的訂閱期間接在上述日期之後開始，之後{selected.renewalLabel}自動續訂。
           </p>
-          {view.kind === 'active' && (
-            <div className={styles.managementNotice} role="note">
-              目前的自動續訂會在此時停止，且無法復原。若沒有完成這次刷卡，到期後就不會再自動續訂。
-            </div>
-          )}
           {actionError && <p role="alert">{actionError}</p>}
           <div className="sp-dialog-actions">
             <Button variant="secondary" onClick={() => setConfirming(false)} disabled={submitting}>

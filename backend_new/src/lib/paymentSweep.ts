@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNotNull, lt } from 'drizzle-orm';
+import { and, eq, gt, isNotNull, lt } from 'drizzle-orm';
 import { MySql2Database } from 'drizzle-orm/mysql2';
 import { paymentOrderTable, paymentPurchaseTable } from 'src/db/schema';
 import { cancelPeriodOrder } from 'src/lib/ecpay';
@@ -54,37 +54,44 @@ export const expireUnpaidPurchases = async (db: Db): Promise<number> => {
  * retried tomorrow.
  *
  * Why there is no "cancel requested" column: the work is derivable from
- * state the payment already wrote -- a paid purchase next to an active
- * order. That also makes it self-clearing, because cancelling the order
- * is what stops it matching.
+ * state the payment already wrote -- a pass paid after the agreement
+ * began, next to an active order. That also makes it self-clearing,
+ * because cancelling the order is what stops it matching.
+ *
+ * `paid_at > created_at` is the whole of "superseded", and leaving it
+ * out was a bug: matching on "this user has ever paid for a pass" meant
+ * a pass bought and used up months ago cancelled the agreement the user
+ * signed today, the night they signed it -- every time they tried, with
+ * nothing on screen explaining it. Since 2026-11-24 the checkout refuses
+ * a pass while an agreement is live, so the one path that still reaches
+ * here is the slow one it was written for: a code or ATM slip issued
+ * before the agreement existed and paid days afterwards.
  *
  * The delay costs at most one extra charge, and only if a monthly
  * authorisation happens to fall inside the same day. That charge is not
  * lost either -- it extends the subscription further.
  */
 export const cancelOrdersSupersededByDayPass = async (db: Db): Promise<number> => {
-  const paidUsers = await db
-    .selectDistinct({ userId: paymentPurchaseTable.userId })
-    .from(paymentPurchaseTable)
-    .where(eq(paymentPurchaseTable.status, PURCHASE_STATUS_PAID));
-  if (paidUsers.length === 0) return 0;
-
+  // One row per order however many passes match it, hence distinct: the
+  // join is only here to ask "is there such a pass".
   const orders = await db
-    .select({
+    .selectDistinct({
       id: paymentOrderTable.id,
       userId: paymentOrderTable.userId,
       merchantTradeNo: paymentOrderTable.merchantTradeNo,
     })
     .from(paymentOrderTable)
-    .where(
+    .innerJoin(
+      paymentPurchaseTable,
       and(
-        eq(paymentOrderTable.status, ORDER_STATUS_ACTIVE),
-        inArray(
-          paymentOrderTable.userId,
-          paidUsers.map((row) => row.userId)
-        )
+        eq(paymentPurchaseTable.userId, paymentOrderTable.userId),
+        eq(paymentPurchaseTable.status, PURCHASE_STATUS_PAID),
+        // NULL on either side drops the row, which is the answer we
+        // want: a purchase with no paid_at was never paid.
+        gt(paymentPurchaseTable.paidAt, paymentOrderTable.createdAt)
       )
-    );
+    )
+    .where(eq(paymentOrderTable.status, ORDER_STATUS_ACTIVE));
 
   let cancelled = 0;
   for (const order of orders) {

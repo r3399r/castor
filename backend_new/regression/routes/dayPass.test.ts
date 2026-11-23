@@ -111,7 +111,28 @@ const subscriptionsOf = async (userId: number) =>
     .where(eq(userSubscriptionTable.userId, userId))
     .orderBy(desc(userSubscriptionTable.id));
 
-/** The payment-result notification for a day pass. */
+/**
+ * ECPay's own format for a moment: Taipei local time, their separators.
+ * `parseEcpayDate` reads it back to the right instant.
+ */
+const ecpayDate = (at: Date): string => {
+  const taipei = new Date(at.getTime() + 8 * 60 * 60 * 1000);
+  const p = (n: number) => String(n).padStart(2, '0');
+  return (
+    `${taipei.getUTCFullYear()}/${p(taipei.getUTCMonth() + 1)}/${p(taipei.getUTCDate())} ` +
+    `${p(taipei.getUTCHours())}:${p(taipei.getUTCMinutes())}:${p(taipei.getUTCSeconds())}`
+  );
+};
+
+/**
+ * The payment-result notification for a day pass.
+ *
+ * PaymentDate defaults to now rather than to a fixed date, because it is
+ * what lands in `paid_at` and the sweep compares that against the
+ * agreement's created_at. A fixed 2024 date would make every fixture a
+ * pass paid two years before the agreement existed -- which is exactly
+ * the case that must *not* cancel anything.
+ */
 const paidBody = (merchantTradeNo: string, overrides: Record<string, string> = {}) =>
   notification({
     MerchantID: '3002607',
@@ -120,7 +141,7 @@ const paidBody = (merchantTradeNo: string, overrides: Record<string, string> = {
     RtnMsg: '交易成功',
     TradeAmt: '549',
     TradeNo: 'ECDP0001',
-    PaymentDate: '2024/03/12 15:30:23',
+    PaymentDate: ecpayDate(new Date()),
     PaymentType: 'ATM_TAISHIN',
     SimulatePaid: '0',
     ...overrides,
@@ -152,7 +173,19 @@ const buy = async (plan: string, method: string): Promise<string> => {
   return body.params.MerchantTradeNo;
 };
 
+/**
+ * An agreement taken out an hour ago.
+ *
+ * Not `new Date()`: ECPay reports a payment moment to the second, while
+ * created_at carries milliseconds, so an agreement and a payment in the
+ * same second would compare as "paid first" and the sweep would read a
+ * fixture as the one case it is meant to ignore. An hour is not a
+ * workaround for that -- nobody signs an agreement and pays an ATM slip
+ * in the same second -- it just stops the fixture sitting on the
+ * boundary.
+ */
 const seedOrder = async (userId: number, merchantTradeNo = 'CSREC1') => {
+  const anHourAgo = new Date(Date.now() - 60 * 60 * 1000);
   const [{ insertId }] = await getDb().insert(paymentOrderTable).values({
     userId,
     plan: 'monthly',
@@ -163,8 +196,8 @@ const seedOrder = async (userId: number, merchantTradeNo = 'CSREC1') => {
     frequency: 1,
     execTimes: 99,
     periodAmount: 179,
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    createdAt: anHourAgo,
+    updatedAt: anHourAgo,
   });
   return insertId;
 };
@@ -248,15 +281,23 @@ describe('day pass', () => {
       expect(res.status).toBe(400);
     });
 
-    it('does not cancel a live agreement at checkout', async () => {
-      // ECPay's cancel is one-way and an ATM payment can go unpaid for a
-      // week. Cancelling here would leave someone who never pays with no
-      // subscription and no pass.
+    it('refuses a pass while a recurring agreement is live', async () => {
+      // One kind of paid access at a time: holding both makes the plan
+      // name, the charge date and the expiry date stop agreeing with
+      // each other on the status screen.
       const userId = await seedUser();
       await seedOrder(userId);
-      await buy('days90', 'ATM');
 
+      vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
+      const res = await checkout({ plan: 'days90', method: 'ATM' });
+
+      expect(res.status).toBe(400);
+      expect(await res.json()).toMatchObject({ code: 'CANCEL_AUTORENEW_FIRST' });
+      // Refused, not cancelled: ECPay's cancel is one-way, so a checkout
+      // that stopped the agreement would leave someone who then closed
+      // the tab with no subscription and no pass.
       expect(vi.mocked(cancelPeriodOrder)).not.toHaveBeenCalled();
+      expect(await purchasesOf(userId)).toHaveLength(0);
       const [order] = await getDb()
         .select()
         .from(paymentOrderTable)
@@ -787,8 +828,13 @@ it('sends the browser back by GET only, never by a POST we cannot answer', async
       // Otherwise ECPay keeps charging monthly on top of the prepaid
       // days, and the user only finds out on their card statement.
       const userId = await seedUser();
+      // The order this now has to happen in, because the checkout
+      // refuses a pass while an agreement is live: the slip is issued
+      // first, the agreement is taken out while it is still unpaid, and
+      // the money arrives days later. Writing the purchase through the
+      // real checkout keeps that honest.
+      const no = await buy('days365', 'ATM');
       await seedOrder(userId, 'CSREC1');
-      const no = await buy('days365', 'Credit');
       await postWebhook('/api/webhook/ecpay/notify', paidBody(no));
 
       expect(await cancelOrdersSupersededByDayPass(getDb())).toBe(1);
@@ -804,8 +850,13 @@ it('sends the browser back by GET only, never by a POST we cannot answer', async
     it('keeps every day the user paid for when it cancels', async () => {
       // The agreement stopping is not the period ending.
       const userId = await seedUser();
+      // The order this now has to happen in, because the checkout
+      // refuses a pass while an agreement is live: the slip is issued
+      // first, the agreement is taken out while it is still unpaid, and
+      // the money arrives days later. Writing the purchase through the
+      // real checkout keeps that honest.
+      const no = await buy('days365', 'ATM');
       await seedOrder(userId, 'CSREC1');
-      const no = await buy('days365', 'Credit');
       await postWebhook('/api/webhook/ecpay/notify', paidBody(no));
       const before = (await subscriptionsOf(userId))[0];
 
@@ -821,8 +872,8 @@ it('sends the browser back by GET only, never by a POST we cannot answer', async
       // outcome available: ECPay would keep charging and nothing here
       // would ever look at it again.
       const userId = await seedUser();
+      const no = await buy('days365', 'ATM');
       await seedOrder(userId, 'CSREC1');
-      const no = await buy('days365', 'Credit');
       await postWebhook('/api/webhook/ecpay/notify', paidBody(no));
       vi.mocked(cancelPeriodOrder).mockRejectedValue(new Error('ECPay said no'));
 
@@ -837,11 +888,36 @@ it('sends the browser back by GET only, never by a POST we cannot answer', async
 
     it('does not cancel anything for a pass that was never paid', async () => {
       const userId = await seedUser();
-      await seedOrder(userId, 'CSREC1');
       await buy('days365', 'ATM');
+      await seedOrder(userId, 'CSREC1');
 
       expect(await cancelOrdersSupersededByDayPass(getDb())).toBe(0);
       expect(vi.mocked(cancelPeriodOrder)).not.toHaveBeenCalled();
+    });
+
+    it('leaves an agreement alone when the pass was paid before it began', async () => {
+      // The bug this condition fixes: the sweep matched on "this user
+      // has ever paid for a pass", so a pass bought and used up months
+      // ago cancelled the agreement they signed today -- the night they
+      // signed it, every time they tried, with nothing on screen saying
+      // why.
+      const userId = await seedUser();
+      const no = await buy('days30', 'Credit');
+      await postWebhook(
+        '/api/webhook/ecpay/notify',
+        paidBody(no, { PaymentDate: ecpayDate(new Date(Date.now() - 60 * DAY_MS)) })
+      );
+
+      // Only now does the user take out a recurring agreement.
+      await seedOrder(userId, 'CSREC2');
+
+      expect(await cancelOrdersSupersededByDayPass(getDb())).toBe(0);
+      expect(vi.mocked(cancelPeriodOrder)).not.toHaveBeenCalled();
+      const [order] = await getDb()
+        .select()
+        .from(paymentOrderTable)
+        .where(eq(paymentOrderTable.userId, userId));
+      expect(order.status).toBe('active');
     });
 
     it('is a no-op on the second run, since cancelling clears the work', async () => {
@@ -849,8 +925,13 @@ it('sends the browser back by GET only, never by a POST we cannot answer', async
       // purchase next to an active order, so cancelling the order is what
       // stops it matching.
       const userId = await seedUser();
+      // The order this now has to happen in, because the checkout
+      // refuses a pass while an agreement is live: the slip is issued
+      // first, the agreement is taken out while it is still unpaid, and
+      // the money arrives days later. Writing the purchase through the
+      // real checkout keeps that honest.
+      const no = await buy('days365', 'ATM');
       await seedOrder(userId, 'CSREC1');
-      const no = await buy('days365', 'Credit');
       await postWebhook('/api/webhook/ecpay/notify', paidBody(no));
 
       expect(await cancelOrdersSupersededByDayPass(getDb())).toBe(1);

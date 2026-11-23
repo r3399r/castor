@@ -155,6 +155,127 @@ describe('payment', () => {
       expect(await subscriptionsOf(userId)).toEqual([]);
     });
 
+
+    describe('one kind of paid access at a time', () => {
+      const checkoutMonthly = async () => {
+        vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
+        return app.request('/api/payment/checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ plan: 'monthly' }),
+        });
+      };
+
+      const seedPeriod = async (
+        userId: number,
+        { plan = 'monthly', status = 'active', endsInDays = 10 } = {}
+      ) =>
+        getDb().insert(userSubscriptionTable).values({
+          userId,
+          plan,
+          status,
+          currentPeriodStart: new Date(Date.now() - DAY_MS),
+          currentPeriodEnd: new Date(Date.now() + endsInDays * DAY_MS),
+          createdAt: new Date(),
+        });
+
+      it('refuses a recurring agreement while a day pass is still running', async () => {
+        const userId = await seedUser();
+        await seedPeriod(userId, { plan: 'days90' });
+
+        const res = await checkoutMonthly();
+
+        expect(res.status).toBe(400);
+        expect(await res.json()).toMatchObject({ code: 'ALREADY_ENTITLED' });
+        // Nothing was written: an order created here would be charged
+        // the moment the user reached ECPay's page.
+        expect(await getDb().select().from(paymentOrderTable)).toEqual([]);
+      });
+
+      it('refuses while an unpaid day-pass slip is still open', async () => {
+        // The one path that would otherwise reach the housekeep sweep:
+        // the slip is paid days later, supersedes the agreement, and the
+        // user's auto-renew disappears overnight with nothing having
+        // warned them.
+        const userId = await seedUser();
+        await getDb().insert(paymentPurchaseTable).values({
+          userId,
+          plan: 'days90',
+          provider: 'ecpay',
+          merchantTradeNo: 'CSDP0001',
+          amount: 549,
+          days: 90,
+          choosePayment: 'ATM',
+          status: 'awaiting',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+
+        const res = await checkoutMonthly();
+
+        expect(res.status).toBe(400);
+        expect(await res.json()).toMatchObject({ code: 'PENDING_DAY_PASS' });
+      });
+
+      it('ignores a day-pass slip that has already lapsed', async () => {
+        // `expired` cannot become `paid` under normal operation, so it
+        // must not lock the user out of subscribing for good.
+        const userId = await seedUser();
+        await getDb().insert(paymentPurchaseTable).values({
+          userId,
+          plan: 'days90',
+          provider: 'ecpay',
+          merchantTradeNo: 'CSDP0002',
+          amount: 549,
+          days: 90,
+          choosePayment: 'ATM',
+          status: 'expired',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+
+        expect((await checkoutMonthly()).status).toBe(200);
+      });
+
+      it('lets a cancelled subscriber resume the same plan before it runs out', async () => {
+        // The exception to the rule above: this adds no second kind of
+        // access, it restores the one already there. Without it,
+        // changing your mind an hour after cancelling would mean waiting
+        // out the month first.
+        const userId = await seedUser();
+        await seedPeriod(userId, { plan: 'monthly', status: 'cancelled' });
+
+        expect((await checkoutMonthly()).status).toBe(200);
+
+        // A fresh agreement, because ECPay cannot restart a cancelled
+        // one. The period it eventually pays for queues behind the one
+        // already paid -- see the renewal tests above.
+        const [order] = await getDb().select().from(paymentOrderTable);
+        expect(order).toMatchObject({ plan: 'monthly', status: 'created' });
+      });
+
+      it('still refuses when the cancelled period is a day pass', async () => {
+        // A pass row can read `cancelled` too -- that is what pressing
+        // the old cancel button did to one. Resuming is only for the
+        // plan being bought, so this is not it.
+        const userId = await seedUser();
+        await seedPeriod(userId, { plan: 'days30', status: 'cancelled' });
+
+        const res = await checkoutMonthly();
+
+        expect(res.status).toBe(400);
+        expect(await res.json()).toMatchObject({ code: 'ALREADY_ENTITLED' });
+      });
+
+      it('lets a lapsed subscriber start again', async () => {
+        // Entitlement ended, so there is nothing to be confused with.
+        const userId = await seedUser();
+        await seedPeriod(userId, { plan: 'days30', status: 'expired', endsInDays: -1 });
+
+        expect((await checkoutMonthly()).status).toBe(200);
+      });
+    });
+
     it('refuses to re-buy the plan the user is already paying for', async () => {
       const userId = await seedUser();
       await seedOrder(userId, { status: 'active' });
