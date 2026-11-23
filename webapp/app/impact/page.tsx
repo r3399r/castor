@@ -3,9 +3,9 @@ import Navbar from '@/components/Navbar'
 import ImpactClient from './ImpactClient'
 
 export const metadata: Metadata = {
-  title: '公益徵信紀錄',
+  title: '公益捐款紀錄',
   description:
-    '學益平台所有已完成的公益撥款紀錄：受贈單位、金額、匯款日期與證明文件，任何人都可以查看核對。',
+    '學益平台所有已完成的公益捐款紀錄：受贈單位、金額、匯款日期與證明文件，任何人都可以查看核對。',
 }
 
 /**

@@ -430,7 +430,7 @@ export default function CharityOrganizationClient() {
               />
             </Field>
 
-            <Field label="簡介" hint="會印在公開徵信頁上。">
+            <Field label="簡介" hint="會印在公開捐款頁上。">
               <textarea
                 value={form.introduction}
                 onChange={(e) => setForm({ ...form, introduction: e.target.value })}

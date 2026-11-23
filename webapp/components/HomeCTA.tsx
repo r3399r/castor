@@ -47,7 +47,7 @@ export default function HomeCTA() {
               href="/impact"
               className="inline-flex min-h-[var(--control-height-lg)] items-center justify-center rounded-[var(--radius-spirit-control)] border border-spirit-on-dark/40 px-6 py-3 text-base font-bold text-spirit-on-dark transition-colors hover:border-spirit-on-dark hover:bg-spirit-on-dark/10"
             >
-              公益徵信紀錄
+              公益捐款紀錄
             </Link>
           </div>
         </div>

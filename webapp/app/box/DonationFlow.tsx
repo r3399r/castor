@@ -217,7 +217,7 @@ export function DonationEntry({
               ? '等待平台撥款'
               : donation.batch.published
                 ? '平台已完成撥款'
-                : '已撥款，徵信資料準備中'}
+                : '已撥款，捐款資料準備中'}
           </Badge>
           <h3>已選擇支持{donation.organization.name}</h3>
           <Button variant="secondary" onClick={() => open('record')}>
@@ -682,7 +682,7 @@ export function DonationFlowClient() {
                 </div>
               </dl>
               <p>款項由平台支付，你不需要付款。</p>
-              <p>平台會定期彙整撥款，完成後可在公開徵信頁查到這筆紀錄。</p>
+              <p>平台會定期彙整撥款，完成後可在公開捐款頁查到這筆紀錄。</p>
               <p className="donation-final-warning">確認後將無法更換本次支持對象。</p>
               {submitError && <p className="donation-final-warning">{submitError}</p>}
               <div className="donation-confirm-actions">
@@ -774,7 +774,7 @@ export function DonationFlowClient() {
                       ? '等待平台撥款'
                       : donation.batch.published
                         ? '平台已完成撥款'
-                        : '已撥款，徵信資料準備中'}
+                        : '已撥款，捐款資料準備中'}
                   </dd>
                 </div>
                 {donation.batch !== null && (
@@ -791,7 +791,7 @@ export function DonationFlowClient() {
                         link would land on a page that does not mention it. */}
                     {donation.batch?.published ? (
                       <a className="donation-record-link" href="/impact/">
-                        查看公開徵信紀錄 <ExternalLink size={15} aria-hidden="true" />
+                        查看公開捐款紀錄 <ExternalLink size={15} aria-hidden="true" />
                       </a>
                     ) : (
                       <span className="donation-record-pending">

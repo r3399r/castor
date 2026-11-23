@@ -284,7 +284,7 @@ export default function DonationBatchClient() {
   const handlePublish = async (batch: DonationBatch) => {
     if (
       !confirm(
-        `確定要公開批次 #${batch.id} 嗎？\n\n公開後任何人都能在徵信頁看到這筆撥款與證明文件，而且批次內容不能再修改。`
+        `確定要公開批次 #${batch.id} 嗎？\n\n公開後任何人都能在捐款頁看到這筆撥款與證明文件，而且批次內容不能再修改。`
       )
     )
       return
@@ -301,7 +301,7 @@ export default function DonationBatchClient() {
   }
 
   const handleUnpublish = async (batch: DonationBatch) => {
-    if (!confirm(`確定要取消公開批次 #${batch.id} 嗎？徵信頁會立刻看不到它。`)) return
+    if (!confirm(`確定要取消公開批次 #${batch.id} 嗎？捐款頁會立刻看不到它。`)) return
     setBusy(true)
     setDetailError(null)
     try {
@@ -515,7 +515,7 @@ export default function DonationBatchClient() {
                       />
                     </Field>
 
-                    <Field label="交易序號" hint="會印在公開徵信頁上，供人核對。">
+                    <Field label="交易序號" hint="會印在公開捐款頁上，供人核對。">
                       <input
                         value={reference}
                         onChange={(e) => setReference(e.target.value)}

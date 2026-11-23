@@ -57,7 +57,7 @@ export default function SupportNote() {
               target="_blank"
               rel="noopener noreferrer"
             >
-              查看公開徵信紀錄 <ExternalLink size={14} aria-hidden="true" />
+              查看公開捐款紀錄 <ExternalLink size={14} aria-hidden="true" />
             </a>
           </p>
         </div>
@@ -76,7 +76,7 @@ export default function SupportNote() {
       <div className="sp-support-rules">
         <p>
           實際受贈機構、捐款時間與執行方式，將依當期公益計畫及合作條件為準。
-          平台會定期彙整撥款，完成並取得證明文件後公布於公開徵信頁。
+          平台會定期彙整撥款，完成並取得證明文件後公布於公開捐款頁。
           本活動中的積分與培育行為不等同於使用者直接捐款，亦不提供捐款收據或稅務抵扣憑證。
           每筆提撥金額以確認支持對象的當下為準，後續調整不影響已確認的紀錄。
         </p>

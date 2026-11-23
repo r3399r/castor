@@ -80,7 +80,7 @@ export default function ImpactClient() {
     return (
       <main className="donation-flow">
         <div className="donation-flow-inner">
-          <ErrorState>暫時無法載入公益徵信紀錄，請稍後再試。</ErrorState>
+          <ErrorState>暫時無法載入公益捐款紀錄，請稍後再試。</ErrorState>
         </div>
       </main>
     )
@@ -92,7 +92,7 @@ export default function ImpactClient() {
       <div className="donation-flow-inner">
         <header className="donation-flow-heading">
           <p className="sp-eyebrow">Learn for Good</p>
-          <h1>公益徵信紀錄</h1>
+          <h1>公益捐款紀錄</h1>
           <p>
             使用者把精靈養到 LV5，就能指定一個公益組織，由平台捐出款項——使用者不需付費。
             這一頁列出所有已完成的撥款，連同匯款證明，任何人都可以核對。

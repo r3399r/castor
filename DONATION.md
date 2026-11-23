@@ -20,7 +20,7 @@
 | `/api/donation-batch` | ✅ 完成，51 個 regression test |
 | admin 介面（前端） | ✅ 完成，兩頁 |
 | 使用者前端（`/box/donation`） | ✅ 完成，改打真實 API |
-| 公開徵信頁（`/impact`） | ✅ 完成，不需登入 |
+| 公開捐款頁（`/impact`） | ✅ 完成，不需登入 |
 
 已驗證：五支 SQL 實際灌進本機 dev DB、五條 FK 建立成功、drizzle 欄位名對得上真實資料庫、後端全套測試 193 unit ＋ 714 regression 全過（45 檔 907 個）、webapp `next build` 通過。
 
@@ -198,7 +198,7 @@ promisedAmount   = confirmedAmount + pendingAmount
      - **刻意做成「建議」而不是在 `POST /api/donation` 裡偷偷挑。** 紀錄和公開頁都會寫出
        組織名稱，所以使用者必須先看到是誰才確認，而且仍然可以改選
      - `/suggest` 必須宣告在 `/:id` **之前**（Hono 依序比對，否則會被當成 `Number('suggest')` = NaN），有測試釘住
-4. ~~**`/api/info/donation`**~~ ✅ — 公開徵信頁的資料。掛在 `/api/info/*` 底下可直接吃到既有的 5 分鐘 CloudFront TTL，且那條 behavior 本來就不轉送 `Authorization`，公開端點完全相符
+4. ~~**`/api/info/donation`**~~ ✅ — 公開捐款頁的資料。掛在 `/api/info/*` 底下可直接吃到既有的 5 分鐘 CloudFront TTL，且那條 behavior 本來就不轉送 `Authorization`，公開端點完全相符
    - 寫在 `routes/info.ts` 裡，不另開路由檔；`app.ts` 要單獨掛 `transaction`（那個 group 是逐路徑掛的，`/api/info` 本身是健康檢查，資料庫掛了也要回 200）
    - 只列 `published = 1` 的批次。**summary 的 `transferredAmount` 用同一個條件**，所以把看得到的批次加起來就等於那個總額
    - 每個批次帶 `donationCount` / `donationSubtotal` / `platformTopUp` / `transferredAmount`，而 `donationCount × donationUnitAmount + platformTopUp = transferredAmount` 就是收據上的數字
@@ -382,7 +382,7 @@ mysql ... < db/table/donation.sql
 | `backend_new/src/routes/guardian.ts` | 加回傳 `category`（列表與 `invest` 都要） |
 | `webapp/app/box/DonationFlow.tsx` | 新增。真實 LV5 流程 |
 | `webapp/app/box/donation/DonationRouteClient.tsx` | 新增。demo 與真實流程的路由分流 |
-| `webapp/app/impact/` | 新增。公開徵信頁，不需登入 |
+| `webapp/app/impact/` | 新增。公開捐款頁，不需登入 |
 | `webapp/app/box/SupportNote.tsx` | 金額改讀 API；加公開頁連結；移除未實作的每月上限文案 |
 | `webapp/app/box/BoxClient.tsx` | 改用 `DonationEntry`；本地 `GuardianDto` 改為 shared `Guardian` 的別名 |
 | `webapp/styles/donation-demo.css` | 加 `/impact` 的樣式 ＋ 檔頭說明 |
@@ -390,7 +390,7 @@ mysql ... < db/table/donation.sql
 | `webapp/app/admin/donation-batch/` | 新增。撥款流程兩個 tab |
 | `webapp/app/admin/page.tsx` | 加兩個後台入口 |
 | `backend_new/src/lib/donationAmount.ts` | 新增。`DONATION_AMOUNT` 從 `routes/donation.ts` 搬出來，給 `/api/info/donation` 共用 |
-| `backend_new/src/routes/info.ts` | 加 `GET /donation`（公開徵信） |
+| `backend_new/src/routes/info.ts` | 加 `GET /donation`（公開捐款） |
 | `backend_new/src/routes/species.ts` | 加回傳 `category`，讓 `/admin/species` 看得見漏綁類別的蛋 |
 | `webapp/app/admin/species/SpeciesClient.tsx` | 印公益類別；未綁定時出警示 badge |
 | `backend_new/docker-compose.yml` | 掛載 29–33 |
