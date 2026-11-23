@@ -165,7 +165,7 @@ function WrongEntry({
       </div>
 
       <div className="mt-3 flex flex-col gap-2">
-        <label className="text-sm font-bold text-black-700">我的註記</label>
+        <label className="text-sm font-bold text-black-700">我的筆記</label>
         <textarea
           value={note}
           onChange={(e) => setNote(e.target.value)}
@@ -177,7 +177,7 @@ function WrongEntry({
 
       <div className="mt-3 flex items-center justify-between">
         <Button onClick={handleSave} disabled={saving || !noteChanged} loading={saving}>
-          {saving ? '儲存中…' : '儲存註記'}
+          {saving ? '儲存中…' : '儲存筆記'}
         </Button>
         <Button variant="danger" onClick={handleDelete} disabled={deleting} loading={deleting}>
           {deleting ? '移除中…' : '從錯題本移除'}
@@ -444,7 +444,7 @@ export default function WrongClient({
 
   return (
     <div>
-      <p className={styles.description}>作答時未拿到滿分的題目會自動收錄在這裡，答對後也不會自動移除，你可以自己加註記或移除。</p>
+      <p className={styles.description}>作答時未拿到滿分的題目會自動收錄在這裡，答對後也不會自動移除，你可以自己加筆記或移除。</p>
 
       {isEmpty ? (
         <EmptyState>

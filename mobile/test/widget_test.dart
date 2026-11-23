@@ -23,7 +23,7 @@ void main() {
     expect(find.text('錯題本'), findsOneWidget);
     expect(find.text('歷史紀錄'), findsOneWidget);
     expect(
-      find.text('作答時未拿到滿分的題目會自動收錄在這裡，答對後也不會自動移除，你可以自己加註記或移除。'),
+      find.text('作答時未拿到滿分的題目會自動收錄在這裡，答對後也不會自動移除，你可以自己加筆記或移除。'),
       findsOneWidget,
     );
   });
