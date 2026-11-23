@@ -98,6 +98,23 @@ function WrongEntry({
   const [deleting, setDeleting] = useState(false)
   const noteChanged = note !== (entry.note ?? '')
 
+  /**
+   * Whether the note control is on screen at all. The textarea and the
+   * save button share it so they cannot disagree -- gating them
+   * separately left a lone disabled button under no textarea while sync
+   * was still in flight.
+   *
+   * Three states come out of this and `entitled`:
+   *
+   *   subscriber              -- the ordinary editor.
+   *   no subscription, a note -- the same textarea and button, both
+   *     disabled: the note reads where its author left it, and a
+   *     greyed-out pair says why it cannot be touched.
+   *   no subscription, none   -- neither; just the prompt below. An
+   *     empty disabled box sells the feature worse than a sentence.
+   */
+  const showNote = subscription !== null && (entitled || Boolean(entry.note))
+
   const handleSave = async () => {
     setSaving(true)
     try {
@@ -189,11 +206,7 @@ function WrongEntry({
           hostage rather than as a locked feature. The server enforces
           the same split (PUT /:id/note is behind requireSubscription,
           GET / is not), so this is presentation, not the gate. */}
-      {subscription === null ? (
-        // Sync has not answered. Rendering nothing beats flashing the
-        // upgrade prompt at someone who turns out to be a subscriber.
-        null
-      ) : entitled ? (
+      {showNote && (
         <div className="mt-3 flex flex-col gap-2">
           <label className="text-sm font-bold text-black-700">我的筆記</label>
           <textarea
@@ -201,37 +214,43 @@ function WrongEntry({
             onChange={(e) => setNote(e.target.value)}
             placeholder="寫下這題錯在哪裡、下次要注意什麼…"
             rows={2}
+            disabled={!entitled}
             className={styles.noteInput}
           />
         </div>
-      ) : (
-        (entry.note || isFirstEntry) && (
-          <div className="mt-3 flex flex-col items-start gap-2">
-            {entry.note && (
-              <>
-                <label className="text-sm font-bold text-black-700">我的筆記</label>
-                <p className={styles.noteReadOnly}>{entry.note}</p>
-              </>
-            )}
-            {isFirstEntry && (
-              <>
-                <p className="text-sm text-black-500">
-                  {entry.note
-                    ? '錯題筆記是訂閱功能，訂閱後可以繼續編輯。'
-                    : '錯題筆記是訂閱功能，訂閱後可以在每一題寫下自己錯在哪裡、下次要注意什麼。'}
-                </p>
-                <ButtonLink href="/subscription" size="sm">
-                  查看訂閱方案
-                </ButtonLink>
-              </>
-            )}
-          </div>
-        )
       )}
 
-      <div className={`mt-3 flex items-center ${entitled ? 'justify-between' : 'justify-end'}`}>
-        {entitled && (
-          <Button onClick={handleSave} disabled={saving || !noteChanged} loading={saving}>
+      {/* Once per card, not once per sub-question: four wrong
+          sub-questions of one passage would otherwise carry four copies
+          of the same upsell. The disabled boxes above still appear on
+          every entry that has a note, which is what identifies them.
+          `subscription !== null` keeps it from flashing at a subscriber
+          while sync is still in flight. */}
+      {subscription !== null && !entitled && isFirstEntry && (
+        <div className="mt-3 flex flex-col items-start gap-2">
+          <p className="text-sm text-black-500">
+            {entry.note
+              ? '錯題筆記是訂閱功能，訂閱後可以繼續編輯。'
+              : '錯題筆記是訂閱功能，訂閱後可以在每一題寫下自己錯在哪裡、下次要注意什麼。'}
+          </p>
+          <ButtonLink href="/subscription" size="sm">
+            查看訂閱方案
+          </ButtonLink>
+        </div>
+      )}
+
+      <div className={`mt-3 flex items-center ${showNote ? 'justify-between' : 'justify-end'}`}>
+        {showNote && (
+          // Disabled rather than absent next to a disabled textarea: a
+          // box with no button under it looks broken, where a
+          // greyed-out pair reads as one locked control. `!entitled` is
+          // stated rather than left to noteChanged, which happens to be
+          // false too when nothing can be typed.
+          <Button
+            onClick={handleSave}
+            disabled={!entitled || saving || !noteChanged}
+            loading={saving}
+          >
             {saving ? '儲存中…' : '儲存筆記'}
           </Button>
         )}

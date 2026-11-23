@@ -235,18 +235,17 @@
   resize: vertical;
 }
 
-/* A saved note shown to someone who can no longer edit it. Same box as
-   .noteInput so the card does not reflow when a subscription lapses;
-   pre-wrap because the textarea it came from accepts line breaks. */
-.noteReadOnly {
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid var(--reply-line);
-  border-radius: 8px;
+/* A note whose author's subscription has lapsed: the same box, visibly
+   out of service. Chrome's own disabled styling greys the text almost
+   to invisibility, which reads as "broken" rather than "locked" -- the
+   note has to stay comfortably readable, since being able to read it is
+   the point of leaving it on screen. */
+.noteInput:disabled {
+  border-color: var(--reply-line);
   background: var(--reply-hover);
   color: var(--reply-ink);
-  font-size: 0.875rem;
-  white-space: pre-wrap;
+  cursor: not-allowed;
+  opacity: 1;
 }
 
 .loginLink { color: var(--reply-forest); font-size: 0.875rem; text-decoration: underline; }
