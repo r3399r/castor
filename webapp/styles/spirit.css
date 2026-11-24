@@ -29,6 +29,26 @@
   color: var(--color-spirit-on-dark);
   line-height: var(--leading-normal);
 }
+/* The beta marker, shown only while NEXT_PUBLIC_BETA_MODE is on (see
+   webapp/lib/beta.ts). Gold on the canopy green, like the active nav
+   link, so it reads as part of the brand rather than as a warning;
+   nowrap and flex-none so it never becomes the thing that wraps when
+   the logo runs out of room. */
+.site-header__beta {
+  flex: 0 0 auto;
+  align-self: center;
+  border: 1px solid color-mix(in srgb, var(--color-spirit-gold) 60%, transparent);
+  border-radius: 999px;
+  padding: 1px 7px;
+  background: color-mix(in srgb, var(--color-spirit-gold) 16%, transparent);
+  color: var(--color-spirit-gold);
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1.5;
+  text-transform: lowercase;
+  white-space: nowrap;
+}
 .site-header__mark {
   width: 36px;
   height: 36px;

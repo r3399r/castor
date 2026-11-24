@@ -11,6 +11,7 @@ import MathJaxArea from '@/components/MathJaxArea'
 import Pagination from '@/components/Pagination'
 import { Button, ButtonLink, EmptyState, ErrorState, LoadingState } from '@/components/ui'
 import { useAuth } from '@/contexts/AuthContext'
+import { resolveEntitlement } from '@/lib/beta'
 import { formatNumber } from '@/lib/number'
 import { blankNumberFromContent, markBlanksInPassage } from '@/lib/questionBlank'
 import { groupLevelConcepts } from '@/lib/questionConcept'
@@ -87,11 +88,21 @@ function WrongEntry({
   // Read here rather than threaded down from WrongClient: entitlement is
   // a global fact, and WrongCard sits in between with no use for it.
   const { subscription } = useAuth()
-  // `entitled`, not `active`: a cancelled subscription keeps its paid
-  // features until the period it already paid for runs out. null is
-  // "sync has not answered", which is not the same as "not subscribed"
-  // -- hence the third branch below rather than a boolean.
-  const entitled = subscription?.entitled === true
+  /**
+   * `entitled`, not `active`: a cancelled subscription keeps its paid
+   * features until the period it already paid for runs out. null is
+   * "sync has not answered", which is not the same as "not subscribed"
+   * -- hence the third branch below rather than a boolean, and hence
+   * `=== true` / `=== null` at every use rather than a truthiness test.
+   *
+   * Through resolveEntitlement, so beta mode opens the note editor; it
+   * also answers true straight away under beta, which is why the two
+   * `subscription !== null` guards below became `access !== null` --
+   * otherwise the upsell would still be waiting on a sync it no longer
+   * depends on.
+   */
+  const access = resolveEntitlement(subscription)
+  const entitled = access === true
 
   const [note, setNote] = useState(entry.note ?? '')
   const [saving, setSaving] = useState(false)
@@ -114,7 +125,7 @@ function WrongEntry({
    *   no subscription, none   -- neither; just the prompt below. An
    *     empty disabled box sells the feature worse than a sentence.
    */
-  const showNote = subscription !== null && (entitled || Boolean(entry.note))
+  const showNote = access !== null && (entitled || Boolean(entry.note))
 
   const handleSave = async () => {
     setSaving(true)
@@ -235,9 +246,9 @@ function WrongEntry({
           sub-questions of one passage would otherwise carry four copies
           of the same upsell. The disabled boxes above still appear on
           every entry that has a note, which is what identifies them.
-          `subscription !== null` keeps it from flashing at a subscriber
+          `access !== null` keeps it from flashing at a subscriber
           while sync is still in flight. */}
-      {subscription !== null && !entitled && isFirstEntry && (
+      {access !== null && !entitled && isFirstEntry && (
         <div className="mt-3 flex flex-col items-start gap-2">
           {/* Skipped when the box above already said it: with no
               subscription `showNote` only holds when this entry has a

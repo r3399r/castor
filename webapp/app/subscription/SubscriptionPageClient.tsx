@@ -3,15 +3,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { formatNumber } from '@/lib/number'
 import {
-  BarChart3,
   BrainCircuit,
   Check,
   Gauge,
   NotebookPen,
   RefreshCw,
-  Sparkles,
   TrendingUp,
-  Zap,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { usePlanAmounts } from '@/hooks/usePlanAmounts'
@@ -37,14 +34,8 @@ import type {
   PostPaymentCheckoutResponse,
   SubscriptionStatus,
 } from '@/types/api'
+import { benefitSummary } from './benefits'
 import styles from './subscription.module.css'
-
-const benefitSummary = [
-  { label: '完整進階學習分析', icon: BarChart3 },
-  { label: '錯題筆記', icon: NotebookPen },
-  { label: '訂閱限定精靈', icon: Sparkles },
-  { label: '精靈培養 XP 加成', icon: Zap },
-]
 
 const analysisFeatures = [
   {

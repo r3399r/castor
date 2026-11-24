@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { CreditCard, RefreshCw } from 'lucide-react'
 import { apiFetch, apiPost } from '@/lib/api'
+import { isBetaMode } from '@/lib/beta'
 import { usePlanAmounts, type PlanAmounts } from '@/hooks/usePlanAmounts'
 import {
   deriveSubscriptionView,
@@ -38,6 +39,26 @@ function PlanLine({ planCode, amounts }: { planCode: string; amounts: PlanAmount
 }
 
 /**
+ * What the card says while nothing is for sale.
+ *
+ * Replaces the two not-paying states only. A user who *does* hold a
+ * paid period during beta -- an admin grant, or something bought before
+ * the flag went on -- keeps seeing their real state below, because it
+ * is still true and because `active` is the one state with a cancel
+ * button, and hiding it would leave them no way to stop a renewal.
+ */
+function BetaDetails() {
+  return (
+    <>
+      <Badge tone="complete" className={styles.subscriptionBadge}>公開測試中</Badge>
+      <p className={styles.subscriptionDescription}>
+        beta 期間所有付費功能免費開放，不需要訂閱，也不會向你收取費用。
+      </p>
+    </>
+  )
+}
+
+/**
  * What the card says in each state.
  *
  * Four of them are states a user reaches deliberately -- paid with a
@@ -51,11 +72,14 @@ function PlanLine({ planCode, amounts }: { planCode: string; amounts: PlanAmount
 function SubscriptionDetails({
   view,
   amounts,
+  beta,
 }: {
   view: SubscriptionView
   amounts: PlanAmounts | null
+  beta: boolean
 }) {
   if (view.kind === 'free') {
+    if (beta) return <BetaDetails />
     return (
       <>
         <Badge tone="neutral" className={styles.subscriptionBadge}>免費會員</Badge>
@@ -135,6 +159,8 @@ function SubscriptionDetails({
     )
   }
 
+  // `expired`, and anything a future state forgets to handle.
+  if (beta) return <BetaDetails />
   return (
     <>
       <Badge tone="neutral" className={styles.subscriptionBadge}>免費會員</Badge>
@@ -238,6 +264,13 @@ export default function SubscriptionCard() {
     }
   }, [load])
 
+  /**
+   * Beta closes /subscription, so every link to it is hidden here. The
+   * cancel button is not a link to it and stays: an agreement that is
+   * still charging a card has to remain cancellable whatever this flag
+   * says.
+   */
+  const beta = isBetaMode()
   const active = view?.kind === 'active'
   const unmanaged = view?.kind === 'unmanaged'
   const cancelled = view?.kind === 'cancelled'
@@ -267,17 +300,21 @@ export default function SubscriptionCard() {
                 </Button>
               </ErrorState>
             ) : view ? (
-              <SubscriptionDetails view={view} amounts={amounts} />
+              <SubscriptionDetails view={view} amounts={amounts} beta={beta} />
             ) : null}
           </div>
         </div>
 
-        {!loading && !error && view && (
+        {/* `!beta || active` and not just `view`: under beta the only
+            action left is the cancel button on a live agreement, and the
+            card is a flex row with a 32px gap -- an empty actions column
+            would show as 32px of blank space to the right of the copy. */}
+        {!loading && !error && view && (!beta || active) && (
           <div className={styles.subscriptionActions}>
-            {free && <ButtonLink href="/subscription">查看訂閱方案</ButtonLink>}
+            {free && !beta && <ButtonLink href="/subscription">查看訂閱方案</ButtonLink>}
             {active && (
               <>
-                <ButtonLink href="/subscription">變更訂閱方案</ButtonLink>
+                {!beta && <ButtonLink href="/subscription">變更訂閱方案</ButtonLink>}
                 <Button
                   variant="secondary"
                   className={styles.cancelSubscriptionButton}
@@ -290,15 +327,15 @@ export default function SubscriptionCard() {
             {/* No cancel button: nothing is renewing, and the days are
                 already paid for. Buying more is the only action that
                 would do anything. */}
-            {unmanaged && (
+            {unmanaged && !beta && (
               <ButtonLink href="/subscription">
                 {isDayPassPlanCode(view.planCode) ? '再購買天數' : '查看訂閱方案'}
               </ButtonLink>
             )}
-            {cancelled && (
+            {cancelled && !beta && (
               <ButtonLink href="/subscription">重新訂閱</ButtonLink>
             )}
-            {paymentFailed && (
+            {paymentFailed && !beta && (
               <ButtonLink href="/subscription">重新建立訂閱</ButtonLink>
             )}
           </div>

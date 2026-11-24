@@ -39,6 +39,7 @@ import {
 } from '@/lib/guardianArtwork'
 import { apiFetch, apiPost } from '@/lib/api'
 import { useAuth } from '@/contexts/AuthContext'
+import { isBetaMode, resolveEntitlement } from '@/lib/beta'
 import { useGrowthBonus } from '@/hooks/useGrowthBonus'
 import SupportNote from './SupportNote'
 // The screen's arithmetic -- what the slider caps at, and the XP an
@@ -191,12 +192,20 @@ export default function BoxClient() {
   const availablePoints = totalPoints
   const level = guardian?.level ?? 1
   const complete = level >= MAX_LEVEL
-  // `entitled`, not `active`: cancelling auto-renew flips the period to
-  // `cancelled` immediately while the days already paid for keep running,
-  // so `active` goes false for someone who still has paid access -- and
-  // the server grants them the bonus regardless of what this says. A day
-  // pass reports both, having no agreement to cancel in the first place.
-  const hasMemberExperienceBonus = subscription?.entitled === true
+  /**
+   * Paid access as this screen reads it: true / false / null = not known
+   * yet. Both things gated here -- the growth bonus and the VIP egg --
+   * read this one value, through resolveEntitlement so that beta mode
+   * opens them without a second check per feature.
+   *
+   * `entitled`, not `active`: cancelling auto-renew flips the period to
+   * `cancelled` immediately while the days already paid for keep running,
+   * so `active` goes false for someone who still has paid access -- and
+   * the server grants them the bonus regardless of what this says. A day
+   * pass reports both, having no agreement to cancel in the first place.
+   */
+  const entitled = resolveEntitlement(subscription)
+  const hasMemberExperienceBonus = entitled === true
   const xpUntilNextLevel =
     guardian === undefined || guardian.nextLevelXp === null
       ? 0
@@ -250,7 +259,7 @@ export default function BoxClient() {
     // This is intentionally a frontend-only product gate. Keeping the
     // check beside the mutation as well as on the card prevents a dialog
     // opened under stale client state from submitting.
-    if (eggToExchange.requiresSubscription && subscription?.entitled !== true) {
+    if (eggToExchange.requiresSubscription && entitled !== true) {
       setActionError('這顆 VIP 蛋僅限訂閱會員兌換。')
       return
     }
@@ -687,8 +696,8 @@ export default function BoxClient() {
                   // would need no change here, and renaming this one's
                   // code cannot unlock it.
                   const isVip = egg.requiresSubscription
-                  const checkingVipAccess = isVip && subscription === null
-                  const vipLocked = isVip && subscription?.entitled === false
+                  const checkingVipAccess = isVip && entitled === null
+                  const vipLocked = isVip && entitled === false
                   const art = artworkFor(egg.code)
                   return (
                     <Card key={egg.id} className="sp-store-card">
@@ -724,7 +733,9 @@ export default function BoxClient() {
                         </div>
                         <p className="sp-description">
                           {isVip
-                            ? '訂閱會員可取得的限定精靈；滿級後可任選公益類別支持。'
+                            ? isBetaMode()
+                              ? '公開測試期間開放兌換的限定精靈；滿級後可任選公益類別支持。'
+                              : '訂閱會員可取得的限定精靈；滿級後可任選公益類別支持。'
                             : '孵化並培育這顆蛋，逐步解鎖精靈與牠的專屬棲地。'}
                         </p>
                         {vipLocked && !isOwned && (

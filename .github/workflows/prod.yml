@@ -48,6 +48,12 @@ jobs:
           echo NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }} >> .env
           echo NEXT_PUBLIC_FIREBASE_APP_ID=${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }} >> .env
           echo NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=${{ secrets.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID }} >> .env
+          # Beta mode. A literal and not a secret: it is 'true' or
+          # 'false', and having it in git is the point -- flipping it is a
+          # reviewable commit. Its backend twin is BETA_MODE in
+          # backend_new/aws/cloudformation/template.yaml and the two are
+          # changed in the same commit; see AGENTS.md.
+          echo NEXT_PUBLIC_BETA_MODE=true >> .env
 
       - name: Deploy to production environment
         run: |

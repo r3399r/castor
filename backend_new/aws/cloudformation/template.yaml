@@ -132,6 +132,22 @@ Resources:
             Fn::ImportValue: !Sub celestial-studio-${TargetEnvr}-db-endpoint
           DB_PWD: !Sub '{{resolve:ssm:mysql-${TargetEnvr}-${Project}-pwd}}'
           DB_POOL_SIZE: '2'
+          # Beta mode: every paid feature is open to every signed-in
+          # user. Read by src/lib/beta.ts, which treats anything that is
+          # not exactly 'true' as off.
+          #
+          # A literal here and not an SSM parameter, unlike ECPAY_MODE
+          # below. 'true'/'false' is not a credential, and
+          # {{resolve:ssm:...}} resolves at stack-update time anyway --
+          # so SSM would buy no ability to flip this without a deploy,
+          # while adding a parameter that has to exist by hand or the
+          # whole stack fails to update.
+          #
+          # Flipping it is an edit plus a deploy of BOTH halves:
+          # NEXT_PUBLIC_BETA_MODE in .github/workflows/{dev,prod}.yml is
+          # this flag's frontend twin, and AGENTS.md records what each
+          # disagreement between them looks like.
+          BETA_MODE: 'true'
           FIREBASE_ADMIN_KEY: !Sub '{{resolve:ssm:${Project}-firebase-admin-key}}'
           LOGGER_QUEUE_URL: !Sub https://sqs.${AWS::Region}.amazonaws.com/${AWS::AccountId}/polaris-${TargetEnvr}-logger-queue
           # POST /question/image transcribes an uploaded paper via Gemini.

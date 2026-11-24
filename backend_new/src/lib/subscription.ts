@@ -1,5 +1,6 @@
 import { and, desc, eq, gt, inArray } from 'drizzle-orm';
 import { userSubscriptionTable } from 'src/db/schema';
+import { isBetaMode } from 'src/lib/beta';
 import {
   DayPassPlan,
   RENEWAL_GRACE_MS,
@@ -89,6 +90,29 @@ export const findEntitledSubscription = async (
     .limit(1);
 
   return row;
+};
+
+/**
+ * Whether a user may use the paid features right now.
+ *
+ * The question every gate asks, phrased so that beta mode (see
+ * src/lib/beta.ts) is opened in one place rather than by an
+ * `isBetaMode() ||` at each one. Used by the subscriber-only egg in
+ * store.ts and the growth bonus in guardian.ts. The
+ * requireSubscription middleware deliberately keeps its own
+ * findEntitledSubscription call instead -- it publishes the period to
+ * the request context, which a boolean cannot carry -- so it repeats
+ * the beta check and the two have to agree on the rule, which is why
+ * both read it from isBetaMode rather than from their own env lookup.
+ *
+ * Returns a boolean and not the period, because beta grants access
+ * with no row behind it: there is no subscription to hand back, and a
+ * caller that needs the plan or the expiry date needs
+ * findEntitledSubscription and has to cope with it being absent.
+ */
+export const hasPaidAccess = async (db: Db, userId: number): Promise<boolean> => {
+  if (isBetaMode()) return true;
+  return (await findEntitledSubscription(db, userId)) !== undefined;
 };
 
 export type SubscriptionPeriod = {

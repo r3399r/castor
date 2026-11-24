@@ -352,6 +352,21 @@ describe('guardian routes', () => {
         expect(body.totalPoints).toBe(99_000);
       });
 
+      // Beta mode is paid access, so it pays the bonus. Worth its own
+      // case because this gate is a silent one: the invest succeeds
+      // either way and only the xp figure differs, so a beta that
+      // forgot this would underpay every beta user with nothing
+      // failing.
+      it('pays 10% with no subscription at all under BETA_MODE', async () => {
+        process.env.BETA_MODE = 'true';
+        try {
+          const body = await investWith(1_000);
+          expect(body.xpGained).toBe(1_100);
+        } finally {
+          delete process.env.BETA_MODE;
+        }
+      });
+
       it('counts the bonus toward levelling up', async () => {
         // 2,500 is the Lv1->Lv2 threshold: 2,273 + 227 reaches it and
         // 2,273 alone does not, so this fails if the bonus is added

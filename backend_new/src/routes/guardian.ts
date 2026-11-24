@@ -23,7 +23,7 @@ import {
   userTable,
 } from 'src/db/schema';
 import { LEVEL_XP_THRESHOLDS, MAX_LEVEL, investmentXp, nextLevelXp } from 'src/lib/guardianLevel';
-import { findEntitledSubscription } from 'src/lib/subscription';
+import { hasPaidAccess } from 'src/lib/subscription';
 import { BadRequestError, NotFoundError } from 'src/model/error';
 import { UserEnv } from 'src/middleware/requireUser';
 
@@ -202,12 +202,13 @@ export const guardian = new Hono<UserEnv>()
     // promise. Read here rather than taken from the client: the request
     // body carries only `points`, and the bonus is value being granted,
     // so the only acceptable source is the server's own entitlement
-    // lookup. findEntitledSubscription, not findActiveSubscription --
-    // the same question requireSubscription asks, so a cancelled
-    // agreement still inside its paid period earns it, and a day pass
-    // does too.
-    const entitled = await findEntitledSubscription(db, user.id);
-    const xpGained = investmentXp(points, entitled !== undefined);
+    // lookup. Entitled, not active -- the same question
+    // requireSubscription asks, so a cancelled agreement still inside
+    // its paid period earns it, and a day pass does too.
+    // hasPaidAccess, not findEntitledSubscription: it asks the same
+    // question and also answers yes under BETA_MODE, so the beta
+    // preview grants the bonus the box page is already showing.
+    const xpGained = investmentXp(points, await hasPaidAccess(db, user.id));
 
     // Every invested point becomes at least 1 xp, plus the bonus above.
     // Levels up as many times as the xp covers in one call (a single

@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { app } from 'src/app';
 import { closeDb, getDb } from 'src/db/client';
 import { userSubscriptionTable, userTable } from 'src/db/schema';
@@ -299,6 +299,46 @@ describe('subscription', () => {
       vi.mocked(verifyIdTokenUid).mockResolvedValue(null);
       const res = await gatedApp.request('/gated/thing');
       expect(res.status).toBe(401);
+    });
+
+    // Beta mode opens every paid feature to every signed-in user, so the
+    // gate has to admit someone with no subscription row at all. These
+    // two assertions are the pair that matters: the flag must move the
+    // entitlement check and must NOT move the identity check, because a
+    // beta that also stopped requiring a user would hand the per-user
+    // routes behind this gate somebody else's data.
+    describe('under BETA_MODE', () => {
+      beforeEach(() => {
+        process.env.BETA_MODE = 'true';
+      });
+
+      afterEach(() => {
+        delete process.env.BETA_MODE;
+      });
+
+      it('admits a user with no subscription', async () => {
+        await seedUser();
+        vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
+
+        const res = await gatedApp.request('/gated/thing');
+        expect(res.status).toBe(200);
+        expect(await res.json()).toEqual({ ok: true });
+      });
+
+      it('still rejects an unauthenticated caller with 401', async () => {
+        vi.mocked(verifyIdTokenUid).mockResolvedValue(null);
+        const res = await gatedApp.request('/gated/thing');
+        expect(res.status).toBe(401);
+      });
+
+      it('leaves the paywall standing for a value that is not "true"', async () => {
+        process.env.BETA_MODE = 'false';
+        await seedUser();
+        vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
+
+        const res = await gatedApp.request('/gated/thing');
+        expect(res.status).toBe(403);
+      });
     });
   });
 
