@@ -340,7 +340,10 @@ const upsertStatHistory = async (
 // attempt at the same question updates score/wrongCount/lastWrongAt in
 // place (matches user_wrong_question's UNIQUE KEY on (userId,
 // questionId): there's never more than one row to update) so the row
-// always reflects the most recent wrong answer -- but a later *correct*
+// always reflects the most recent wrong answer -- score, repliedAnswer and
+// lastWrongAt therefore always describe the same one attempt, which is why
+// the answer is written here rather than joined out of `reply` when the
+// 錯題本 is read -- but a later *correct*
 // answer never calls this at all (see the call site's `score < 10`
 // guard), so it can't reset or delete anything here. note and createdAt
 // are the only fields this never touches; removing an entry, or
@@ -353,6 +356,7 @@ const upsertWrongQuestion = async (
   parentId: number | null,
   subjectId: number,
   score: number,
+  repliedAnswer: string,
   wrongAt: Date
 ) => {
   const [existing] = await db
@@ -363,7 +367,13 @@ const upsertWrongQuestion = async (
   if (existing) {
     await db
       .update(userWrongQuestionTable)
-      .set({ score, wrongCount: existing.wrongCount + 1, lastWrongAt: wrongAt, updatedAt: wrongAt })
+      .set({
+        score,
+        repliedAnswer,
+        wrongCount: existing.wrongCount + 1,
+        lastWrongAt: wrongAt,
+        updatedAt: wrongAt,
+      })
       .where(eq(userWrongQuestionTable.id, existing.id));
     return;
   }
@@ -374,6 +384,7 @@ const upsertWrongQuestion = async (
     parentId,
     subjectId,
     score,
+    repliedAnswer,
     wrongCount: 1,
     lastWrongAt: wrongAt,
     createdAt: wrongAt,
@@ -707,6 +718,7 @@ export const reply = new Hono<UserEnv>()
           parentQuestion ? parentQuestion.id : null,
           question.subjectId,
           score,
+          item.repliedAnswer,
           repliedAt
         );
 

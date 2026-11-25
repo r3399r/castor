@@ -56,6 +56,7 @@ type WrongQuestionEntryDto = {
   id: number;
   question: QuestionDetailDto;
   score: number;
+  repliedAnswer: string | null;
   wrongCount: number;
   lastWrongAt: string;
   note: string | null;
@@ -296,7 +297,16 @@ describe('wrongQuestion routes', () => {
       expect(body.data[0].subject.name).toBe('fixture subject');
       expect(body.data[0].entries).toHaveLength(1);
       expect(body.data[0].entries[0].question.id).toBe(mine.id);
-      expect(body.data[0].entries[0]).toMatchObject({ score: 0, wrongCount: 1, note: null });
+      // repliedAnswer is what seedWrongQuestion submitted ('B' against an
+      // answer key of 'A'), not the key -- the card prints the two side by
+      // side, so sending the wrong one would look right in every other
+      // assertion here.
+      expect(body.data[0].entries[0]).toMatchObject({
+        score: 0,
+        repliedAnswer: 'B',
+        wrongCount: 1,
+        note: null,
+      });
       expect(body.data[0].lastWrongAt).not.toBeNull();
     });
 
@@ -808,6 +818,7 @@ describe('wrongQuestion routes', () => {
         'lastWrongAt',
         'note',
         'question',
+        'repliedAnswer',
         'score',
         'updatedAt',
         'wrongCount',

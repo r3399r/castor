@@ -384,6 +384,11 @@ export const userWrongQuestionTable = mysqlTable('user_wrong_question', {
     .notNull()
     .references(() => subjectTable.id),
   score: double('score').notNull().default(0),
+  // The answer given on the attempt `score` and `lastWrongAt` describe --
+  // same grain as those, and nullable because a row written before the
+  // column existed has none. See the DDL for why this is stored rather
+  // than joined back out of `reply`.
+  repliedAnswer: varchar('replied_answer', { length: 255 }),
   wrongCount: int('wrong_count', { unsigned: true }).notNull().default(1),
   lastWrongAt: datetime('last_wrong_at', { mode: 'date', fsp: 3 }).notNull(),
   note: text('note'),

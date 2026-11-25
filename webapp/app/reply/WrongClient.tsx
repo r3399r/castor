@@ -93,6 +93,16 @@ function WrongEntry({
   // `partial` or `wrong` -- never `correct`.
   const outcome = scoreOutcome(entry.score)
 
+  // What was filled in on that same attempt. Null is "nothing recorded"
+  // -- either an empty submission, or a row from before the column
+  // existed -- and is kept distinct from the empty string a readableAnswer
+  // miss could produce.
+  const lastWrongAnswer =
+    entry.repliedAnswer === null
+      ? null
+      : readableAnswer(question.type, entry.repliedAnswer, question.options) ??
+        entry.repliedAnswer
+
   // Read here rather than threaded down from WrongClient: entitlement is
   // a global fact, and WrongCard sits in between with no use for it.
   const { subscription } = useAuth()
@@ -190,12 +200,30 @@ function WrongEntry({
         )
       )}
 
-      {question.answer && (
-        <div className="mt-2 text-base text-black-700">
-          正確答案：
-          <span className={styles.value}>
-            {readableAnswer(question.type, question.answer, question.options) ?? question.answer}
-          </span>
+      {/* The attempt and the key side by side, since comparing the two is
+          what a 錯題本 entry is for. Both through readableAnswer, so a
+          MULTIPLE's OXOX and a CLOZE's option indices read the same way on
+          either side of the row. `lastWrongAnswer` is null for a row
+          written before user_wrong_question.replied_answer existed, and
+          for a question submitted blank -- the label still appears, saying
+          未作答, because a missing row here would otherwise read as "we
+          have no record" rather than "nothing was filled in". */}
+      {(question.answer || lastWrongAnswer !== null) && (
+        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-base text-black-700">
+          <div>
+            最後答錯作答：
+            <span className={`${styles.value} ${valueTone[outcome]}`}>
+              {lastWrongAnswer ?? '未作答'}
+            </span>
+          </div>
+          {question.answer && (
+            <div>
+              正確答案：
+              <span className={`${styles.value} ${styles.valueCorrect}`}>
+                {readableAnswer(question.type, question.answer, question.options) ?? question.answer}
+              </span>
+            </div>
+          )}
         </div>
       )}
 

@@ -55,6 +55,12 @@ export const wrongQuestionEntrySchema = z.object({
     .describe(
       '0-10, from the most recent wrong attempt. Not an integer where the type awards partial credit (MULTIPLE, CLOZE), and always below 10 -- a row is only written while the score falls short of full marks'
     ),
+  repliedAnswer: z
+    .string()
+    .nullable()
+    .describe(
+      'What the user filled in on that same attempt, in the raw stored form (`A`, `OXOX`, `301`) -- a client renders it the way it renders `question.answer`. Null for a row written before this was recorded, and for one where nothing was submitted'
+    ),
   wrongCount: z.number().int().describe('How many times this has gone wrong'),
   lastWrongAt: z.string().describe('ISO 8601'),
   note: z.string().nullable(),
@@ -274,6 +280,7 @@ export const wrongQuestion = new Hono<UserEnv>()
         id: row.id,
         question,
         score: row.score,
+        repliedAnswer: row.repliedAnswer,
         wrongCount: row.wrongCount,
         lastWrongAt: row.lastWrongAt.toISOString(),
         note: row.note,
