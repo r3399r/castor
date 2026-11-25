@@ -7,7 +7,7 @@ import { apiFetch, apiPost } from '@/lib/api'
 import { readableAnswer } from '@/lib/answerDisplay'
 import { blankNumbersFromPassage } from '@/lib/questionBlank'
 import { combinedOutcome, scoreOutcome, type ScoreOutcome } from '@/lib/scoreOutcome'
-import { formatNumber } from '@/lib/number'
+import { formatNumber, formatScore } from '@/lib/number'
 import { groupCategoriesByKind, resolveActiveKind } from '@/lib/categoryKind'
 import { groupLevelConcepts } from '@/lib/questionConcept'
 import Chip, { tagColors } from '@/components/Chip'
@@ -164,7 +164,7 @@ function ResultBox({
             <div className="text-base text-black-700">
               正確答案：<span className={styles.resultValue}>{correctAnswerText}</span>
             </div>
-            <div className="text-base text-black-500">得分：<span className={styles.resultValue}>{result.score}</span></div>
+            <div className="text-base text-black-500">得分：<span className={styles.resultValue}>{formatScore(result.score)}</span></div>
           </div>
           <DiscussionLink fbPostId={result.fbPostId} />
         </div>

@@ -399,7 +399,11 @@ export const postReplyResponseSchema = z.array(
     correctAnswer: z
       .string()
       .describe('The answer key, returned so the result screen can mark the attempt'),
-    score: z.number().int().describe('0-10 for this sub-question'),
+    score: z
+      .number()
+      .describe(
+        '0-10 for this sub-question. **Not an integer**: MULTIPLE deducts per wrong position and CLOZE credits per correct blank, so any count that does not divide 10 evenly lands on a fraction (three blanks, two right = 6.666...). Deliberately unrounded all the way from calcScore -- the same value feeds user_concept_stat and question.scoring_total, where rounding would accumulate. Clients should format it for display'
+      ),
     awardedPoints: z
       .number()
       .int()
@@ -430,7 +434,9 @@ export const replyGroupSchema = z.object({
       questionId: z.number().int(),
       question: questionDetailSchema,
       parentId: z.number().int().nullable(),
-      score: z.number().int(),
+      score: z
+        .number()
+        .describe('0-10, and not an integer where the type awards partial credit -- see the same field on the POST response'),
       repliedAnswer: z.string().nullable(),
       createdAt: z.string().nullable().describe('ISO 8601'),
     })

@@ -50,7 +50,11 @@ export const wrongQuestionEntrySchema = z.object({
       'The user_wrong_question row -- what PUT /{id}/note and DELETE /{id} act on. The note is per sub-question, since that is the granularity a user writes it at'
     ),
   question: questionDetailSchema,
-  score: z.number().int().describe('0-10, from the most recent wrong attempt'),
+  score: z
+    .number()
+    .describe(
+      '0-10, from the most recent wrong attempt. Not an integer where the type awards partial credit (MULTIPLE, CLOZE), and always below 10 -- a row is only written while the score falls short of full marks'
+    ),
   wrongCount: z.number().int().describe('How many times this has gone wrong'),
   lastWrongAt: z.string().describe('ISO 8601'),
   note: z.string().nullable(),

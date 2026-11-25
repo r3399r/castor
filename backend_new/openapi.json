@@ -1600,7 +1600,8 @@
                   ]
                 },
                 "score": {
-                  "type": "integer"
+                  "type": "number",
+                  "description": "0-10, and not an integer where the type awards partial credit -- see the same field on the POST response"
                 },
                 "repliedAnswer": {
                   "type": [
@@ -1703,8 +1704,8 @@
             "$ref": "#/components/schemas/QuestionDetail"
           },
           "score": {
-            "type": "integer",
-            "description": "0-10, from the most recent wrong attempt"
+            "type": "number",
+            "description": "0-10, from the most recent wrong attempt. Not an integer where the type awards partial credit (MULTIPLE, CLOZE), and always below 10 -- a row is only written while the score falls short of full marks"
           },
           "wrongCount": {
             "type": "integer",
@@ -6725,8 +6726,8 @@
                         "description": "The answer key, returned so the result screen can mark the attempt"
                       },
                       "score": {
-                        "type": "integer",
-                        "description": "0-10 for this sub-question"
+                        "type": "number",
+                        "description": "0-10 for this sub-question. **Not an integer**: MULTIPLE deducts per wrong position and CLOZE credits per correct blank, so any count that does not divide 10 evenly lands on a fraction (three blanks, two right = 6.666...). Deliberately unrounded all the way from calcScore -- the same value feeds user_concept_stat and question.scoring_total, where rounding would accumulate. Clients should format it for display"
                       },
                       "awardedPoints": {
                         "type": "integer",

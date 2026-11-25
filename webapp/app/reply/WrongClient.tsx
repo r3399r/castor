@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { BookOpenText, ChevronDown, ChevronUp } from 'lucide-react'
 import { apiDelete, apiFetch, apiPut, LIMIT } from '@/lib/api'
 import { readableAnswer } from '@/lib/answerDisplay'
+import { scoreOutcome } from '@/lib/scoreOutcome'
 import Chip, { tagColors } from '@/components/Chip'
 import DifficultyStars from '@/components/DifficultyStars'
 import DiscussionLink from '@/components/DiscussionLink'
@@ -12,7 +13,7 @@ import Pagination from '@/components/Pagination'
 import { Button, ButtonLink, EmptyState, ErrorState, LoadingState } from '@/components/ui'
 import { useAuth } from '@/contexts/AuthContext'
 import { resolveEntitlement } from '@/lib/beta'
-import { formatNumber } from '@/lib/number'
+import { formatNumber, formatScore } from '@/lib/number'
 import { blankNumberFromContent, markBlanksInPassage } from '@/lib/questionBlank'
 import { groupLevelConcepts } from '@/lib/questionConcept'
 import type {
@@ -22,6 +23,7 @@ import type {
   WrongQuestionEntry,
 } from '@/types/api'
 import type { QueryFilters } from './useSharedFilters'
+import { statusTone, valueTone } from './scoreTone'
 import styles from './reply.module.css'
 
 const typeLabel: Record<string, string> = {
@@ -84,6 +86,12 @@ function WrongEntry({
 }) {
   const question = entry.question
   const difficulty = question.adjustedDifficulty ?? question.difficulty ?? 0
+
+  // The same three states the 歷史紀錄 tab uses, off the same helper, so a
+  // partially-credited answer carries one tone on both tabs. `score` here
+  // is the most recent sub-full-mark attempt, so in practice this is
+  // `partial` or `wrong` -- never `correct`.
+  const outcome = scoreOutcome(entry.score)
 
   // Read here rather than threaded down from WrongClient: entitlement is
   // a global fact, and WrongCard sits in between with no use for it.
@@ -191,7 +199,7 @@ function WrongEntry({
         </div>
       )}
 
-      <div className={`${styles.statusPanel} ${styles.statusWrong} mt-3`}>
+      <div className={`${styles.statusPanel} ${statusTone[outcome]} mt-3`}>
         <div className="flex flex-col gap-2 text-base text-black-700 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4">
           <div>
             最後答錯時間：
@@ -200,11 +208,11 @@ function WrongEntry({
           <div className="flex items-center gap-4">
             <div>
               得分：
-              <span className={`${styles.value} ${styles.valueWrong}`}>{entry.score}</span>
+              <span className={`${styles.value} ${valueTone[outcome]}`}>{formatScore(entry.score)}</span>
             </div>
             <div>
               答錯次數：
-              <span className={`${styles.value} ${styles.valueWrong}`}>
+              <span className={`${styles.value} ${valueTone[outcome]}`}>
                 {formatNumber(entry.wrongCount)}
               </span>
             </div>

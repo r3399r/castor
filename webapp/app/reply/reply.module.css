@@ -193,6 +193,14 @@
   background: var(--reply-correct-bg);
 }
 
+/* Partial credit (MULTIPLE, CLOZE): neither tone above. Gold rather than
+   a blend of the two, so it is legible as its own state -- same token the
+   practice page's result notice uses for it. See lib/scoreOutcome. */
+.statusPartial {
+  border-color: var(--color-warning);
+  background: var(--color-warning-soft);
+}
+
 .statusWrong {
   border-color: var(--color-danger);
   background: var(--color-danger-soft);
@@ -209,6 +217,7 @@
 }
 
 .valueCorrect { border-color: var(--reply-correct); color: var(--reply-correct-text); }
+.valuePartial { border-color: var(--color-warning); color: var(--color-warning-text); }
 .valueWrong { border-color: var(--color-danger); color: var(--color-danger-text); }
 
 /* The blank a wrong 文意選填 sub-question stands for, highlighted inside the

@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import { BookOpenText } from 'lucide-react'
 import { apiFetch, LIMIT } from '@/lib/api'
 import { readableAnswer } from '@/lib/answerDisplay'
+import { formatScore } from '@/lib/number'
+import { scoreOutcome } from '@/lib/scoreOutcome'
 import { groupLevelConcepts } from '@/lib/questionConcept'
 import Chip, { tagColors } from '@/components/Chip'
 import DifficultyStars from '@/components/DifficultyStars'
@@ -13,6 +15,7 @@ import Pagination from '@/components/Pagination'
 import { ButtonLink, EmptyState, ErrorState, LoadingState } from '@/components/ui'
 import type { GetReplyResponse, ReplyGroup } from '@/types/api'
 import type { QueryFilters } from './useSharedFilters'
+import { statusTone, valueTone } from './scoreTone'
 import styles from './reply.module.css'
 
 const typeLabel: Record<string, string> = {
@@ -108,8 +111,23 @@ function ReplyRow({ item }: { item: ReplyGroup }) {
         {/* Sub-questions (for 題組) or single answer block */}
         <div className={`flex flex-col ${isGroup ? 'gap-6' : 'gap-0'}`}>
           {item.children.map((child, idx) => {
-            const correct = child.score > 0
+            // Three states, not a boolean: MULTIPLE and CLOZE award
+            // partial credit, and anything short of full marks is a
+            // question the 錯題本 tab is holding -- so calling 7-of-10
+            // 答對 here contradicted that tab. See lib/scoreOutcome.
+            const outcome = scoreOutcome(child.score)
             const childQ = isGroup ? child.question : null
+            // Only shown when the attempt fell short of full marks:
+            // printing the key next to an answer that already matched it
+            // says the same thing twice.
+            const correctAnswer =
+              outcome === 'correct'
+                ? null
+                : readableAnswer(
+                    child.question?.type,
+                    child.question?.answer,
+                    child.question?.options
+                  ) ?? child.question?.answer ?? null
             return (
               <div key={child.id} className={isGroup ? styles.subQuestion : ''}>
                 {/* This sub-question's own concepts, above its stem, in the
@@ -136,7 +154,7 @@ function ReplyRow({ item }: { item: ReplyGroup }) {
                   />
                 )}
                 <div
-                  className={`${styles.statusPanel} ${correct ? styles.statusCorrect : styles.statusWrong}`}
+                  className={`${styles.statusPanel} ${statusTone[outcome]}`}
                 >
                   <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
                     <div className="flex flex-col gap-2 text-base text-black-700 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4">
@@ -147,7 +165,7 @@ function ReplyRow({ item }: { item: ReplyGroup }) {
                         作答時間：
                         <span className="font-medium text-black-900">{formatDate(child.createdAt)}</span>
                       </div>
-                      <div className="flex items-center gap-4">
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                         <div>
                           作答：
                           <span className={styles.value}>
@@ -160,12 +178,18 @@ function ReplyRow({ item }: { item: ReplyGroup }) {
                               '—'}
                           </span>
                         </div>
+                        {correctAnswer !== null && (
+                          <div>
+                            正確答案：
+                            <span className={`${styles.value} ${styles.valueCorrect}`}>
+                              {correctAnswer}
+                            </span>
+                          </div>
+                        )}
                         <div>
                           得分：
-                          <span
-                            className={`${styles.value} ${correct ? styles.valueCorrect : styles.valueWrong}`}
-                          >
-                            {child.score}
+                          <span className={`${styles.value} ${valueTone[outcome]}`}>
+                            {formatScore(child.score)}
                           </span>
                         </div>
                       </div>
