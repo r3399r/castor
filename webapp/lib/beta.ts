@@ -45,17 +45,43 @@ export function isBetaMode(): boolean {
  * subscriber on every page load. Under beta mode there is nothing to
  * wait for, so this answers true immediately.
  *
- * Every frontend read of `subscription.entitled` goes through here. A
- * screen that tests the field itself would keep its paywall through
- * beta, which is exactly the bug this function exists to prevent --
- * `/analysis` is the one deliberate exception, and it is deliberate
- * because the analysis endpoint's own 403 is a better source of truth
- * than this flag.
+ * No screen reads `subscription.entitled` itself: one that did would
+ * keep its paywall through beta, which is exactly the bug this function
+ * exists to prevent. Two deliberate exceptions, and both have a name
+ * rather than a raw field read:
+ *
+ *   `/analysis` draws its locked state from the endpoint's own 403,
+ *     which is a better source of truth than this flag.
+ *   the VIP egg uses resolveSubscriberOnly below, because beta does not
+ *     include it.
  */
 export function resolveEntitlement(
   subscription: { entitled: boolean } | null,
 ): boolean | null {
   if (isBetaMode()) return true
+  if (subscription === null) return null
+  return subscription.entitled
+}
+
+/**
+ * Paid access that beta does **not** grant: a real, bought subscription.
+ *
+ * The VIP egg is the one paid feature beta leaves closed, so it asks
+ * this instead of resolveEntitlement. It is also hidden from the store
+ * and the collection under beta (`BoxClient`), which is the product
+ * decision; this is what keeps the button honest for the rows that do
+ * stay visible -- an egg a user already owned before the flag went on.
+ *
+ * `POST /store/redeem` enforces the same thing and is the actual gate:
+ * the egg's `category_id` is NULL, which is what lets its owner direct
+ * a real donation to any category, so points plus a crafted POST must
+ * not be enough. A function here rather than `subscription?.entitled`
+ * at the call site so the rule has one definition and one reason
+ * written down.
+ */
+export function resolveSubscriberOnly(
+  subscription: { entitled: boolean } | null,
+): boolean | null {
   if (subscription === null) return null
   return subscription.entitled
 }

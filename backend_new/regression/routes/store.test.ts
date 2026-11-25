@@ -332,34 +332,21 @@ describe('store routes', () => {
       expect(((await res.json()) as ErrorBody).code).toBe('SUBSCRIPTION_REQUIRED');
     });
 
-    // Beta mode opens the subscriber-only egg too -- it is one of the
-    // three paid features, and the one whose gate lives in a route
-    // rather than in the middleware, so it is the one that gets
-    // forgotten. The points still have to be enough: beta removes the
-    // paywall, not the price.
-    it('redeems a subscriber-only species with no subscription under BETA_MODE', async () => {
+    // The subscriber-only egg is the one paid feature BETA_MODE leaves
+    // closed, so this is a deliberate asymmetry with the analysis gate
+    // and the growth bonus, both of which beta opens. /box hides the egg
+    // under beta, and this is what stops points plus a crafted POST
+    // being enough -- the egg's category_id is NULL, which is what lets
+    // its owner direct a real donation anywhere.
+    it('still refuses a subscriber-only species under BETA_MODE', async () => {
       process.env.BETA_MODE = 'true';
       try {
         await seedUser(100);
         const speciesId = await seedSpecies({ requiresSubscription: true, cost: 10 });
 
         const res = await postRedeem({ speciesId });
-        expect(res.status).toBe(200);
-        expect(((await res.json()) as PostRedeemResponse).totalPoints).toBe(90);
-      } finally {
-        delete process.env.BETA_MODE;
-      }
-    });
-
-    it('still refuses a subscriber-only species under BETA_MODE without the points', async () => {
-      process.env.BETA_MODE = 'true';
-      try {
-        await seedUser(5);
-        const speciesId = await seedSpecies({ requiresSubscription: true, cost: 10 });
-
-        const res = await postRedeem({ speciesId });
         expect(res.status).toBe(400);
-        expect(((await res.json()) as ErrorBody).code).toBe('INSUFFICIENT_POINTS');
+        expect(((await res.json()) as ErrorBody).code).toBe('SUBSCRIPTION_REQUIRED');
       } finally {
         delete process.env.BETA_MODE;
       }

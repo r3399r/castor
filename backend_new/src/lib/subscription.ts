@@ -93,17 +93,21 @@ export const findEntitledSubscription = async (
 };
 
 /**
- * Whether a user may use the paid features right now.
+ * Whether a user may use the paid features that beta mode opens.
  *
- * The question every gate asks, phrased so that beta mode (see
- * src/lib/beta.ts) is opened in one place rather than by an
- * `isBetaMode() ||` at each one. Used by the subscriber-only egg in
- * store.ts and the growth bonus in guardian.ts. The
- * requireSubscription middleware deliberately keeps its own
- * findEntitledSubscription call instead -- it publishes the period to
- * the request context, which a boolean cannot carry -- so it repeats
- * the beta check and the two have to agree on the rule, which is why
- * both read it from isBetaMode rather than from their own env lookup.
+ * Phrased so that beta (see src/lib/beta.ts) is granted in one place
+ * rather than by an `isBetaMode() ||` at each gate. Used by the growth
+ * bonus in guardian.ts; `requireSubscription` applies the same rule but
+ * keeps its own findEntitledSubscription call, because it publishes the
+ * period to the request context and a boolean cannot carry it. Both
+ * read isBetaMode rather than process.env, so there is one definition
+ * of the flag for the two to agree on.
+ *
+ * **Not every paid feature.** The subscriber-only egg in store.ts asks
+ * findEntitledSubscription directly, because beta deliberately does not
+ * include it -- see the comment there, and the regression test that
+ * pins the refusal. A new paid feature wants this function unless it
+ * has that kind of reason not to.
  *
  * Returns a boolean and not the period, because beta grants access
  * with no row behind it: there is no subscription to hand back, and a

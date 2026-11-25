@@ -11,7 +11,7 @@ import {
   userGuardianTable,
   userTable,
 } from 'src/db/schema';
-import { hasPaidAccess } from 'src/lib/subscription';
+import { findEntitledSubscription } from 'src/lib/subscription';
 import { BadRequestError, NotFoundError } from 'src/model/error';
 import { UserEnv } from 'src/middleware/requireUser';
 
@@ -195,11 +195,16 @@ export const store = new Hono<UserEnv>()
     // already paid for still grants paid access, same rule guardian.ts
     // uses for the XP bonus.
     //
-    // hasPaidAccess, not findEntitledSubscription: BETA_MODE opens this
-    // along with the rest of the paid features, and the one helper is
-    // what keeps beta from having to be remembered here.
-    if (species.requiresSubscription && !(await hasPaidAccess(db, user.id)))
-      throw new BadRequestError('subscription required for this guardian', 'SUBSCRIPTION_REQUIRED');
+    // findEntitledSubscription and deliberately NOT hasPaidAccess: this
+    // is the one paid feature BETA_MODE leaves closed. The egg is hidden
+    // from /box under beta, which is the product decision, and this is
+    // what makes it a decision rather than a suggestion -- the paragraph
+    // above is the reason the UI cannot be the gate here.
+    if (species.requiresSubscription) {
+      const entitled = await findEntitledSubscription(db, user.id);
+      if (entitled === undefined)
+        throw new BadRequestError('subscription required for this guardian', 'SUBSCRIPTION_REQUIRED');
+    }
 
     if (user.totalPoints < species.cost) throw new BadRequestError('insufficient points', 'INSUFFICIENT_POINTS');
 

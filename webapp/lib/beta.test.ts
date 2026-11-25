@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { isBetaMode, resolveEntitlement } from '@/lib/beta'
+import { isBetaMode, resolveEntitlement, resolveSubscriberOnly } from '@/lib/beta'
 
 describe('isBetaMode', () => {
   const original = process.env.NEXT_PUBLIC_BETA_MODE
@@ -66,5 +66,33 @@ describe('resolveEntitlement', () => {
       expect(resolveEntitlement({ entitled: false })).toBe(true)
       expect(resolveEntitlement({ entitled: true })).toBe(true)
     })
+  })
+})
+
+/**
+ * The VIP egg's gate, and the point of it is the one case
+ * resolveEntitlement answers differently: beta does not include that
+ * egg, so this must keep saying no while the flag is on.
+ */
+describe('resolveSubscriberOnly', () => {
+  const original = process.env.NEXT_PUBLIC_BETA_MODE
+
+  afterEach(() => {
+    if (original === undefined) delete process.env.NEXT_PUBLIC_BETA_MODE
+    else process.env.NEXT_PUBLIC_BETA_MODE = original
+  })
+
+  it.each(['true', 'false'])('ignores beta mode (%o)', (value) => {
+    process.env.NEXT_PUBLIC_BETA_MODE = value
+    expect(resolveSubscriberOnly(null)).toBe(null)
+    expect(resolveSubscriberOnly({ entitled: false })).toBe(false)
+    expect(resolveSubscriberOnly({ entitled: true })).toBe(true)
+  })
+
+  // The asymmetry this function exists for, stated as one assertion.
+  it('disagrees with resolveEntitlement for a non-subscriber in beta', () => {
+    process.env.NEXT_PUBLIC_BETA_MODE = 'true'
+    expect(resolveEntitlement({ entitled: false })).toBe(true)
+    expect(resolveSubscriberOnly({ entitled: false })).toBe(false)
   })
 })
