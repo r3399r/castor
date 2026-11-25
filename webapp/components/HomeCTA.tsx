@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import { isBetaMode } from '@/lib/beta'
 
 /**
  * The closing call to action, and the only entrance on the public site
@@ -12,10 +11,10 @@ import { isBetaMode } from '@/lib/beta'
  *     so the page renders for a visitor with the button locked. That
  *     was pointless while nothing linked to it: the only ways in were
  *     the card on /user and the paywall on /analysis, which both
- *     require an account. Hidden under beta mode: nothing is for sale,
- *     so the strongest button on the public site would lead to a page
- *     that says so. The band then runs with /impact alone, which it
- *     lays out for -- the row is flex, not a two-column grid.
+ *     require an account. Shown under beta mode too: the page is a
+ *     notice there rather than a plan list, and telling a visitor the
+ *     paid features are currently free is worth a button -- hiding it
+ *     left this band with one.
  *   /impact -- the donation record. A transparency page reachable only
  *     by people who already trust us enough to sign up is not evidence,
  *     which is why the page itself sits outside AuthGuard.
@@ -41,14 +40,12 @@ export default function HomeCTA() {
               two 中文 labels of this length overflow a narrow screen when
               forced onto one row. */}
           <div className="mt-8 flex flex-col items-stretch gap-3 sm:flex-row sm:justify-center">
-            {!isBetaMode() && (
-              <Link
-                href="/subscription"
-                className="inline-flex min-h-[var(--control-height-lg)] items-center justify-center rounded-[var(--radius-spirit-control)] bg-spirit-cream px-6 py-3 text-base font-bold text-spirit-canopy transition-colors hover:bg-white"
-              >
-                查看訂閱方案
-              </Link>
-            )}
+            <Link
+              href="/subscription"
+              className="inline-flex min-h-[var(--control-height-lg)] items-center justify-center rounded-[var(--radius-spirit-control)] bg-spirit-cream px-6 py-3 text-base font-bold text-spirit-canopy transition-colors hover:bg-white"
+            >
+              查看訂閱方案
+            </Link>
             <Link
               href="/impact"
               className="inline-flex min-h-[var(--control-height-lg)] items-center justify-center rounded-[var(--radius-spirit-control)] border border-spirit-on-dark/40 px-6 py-3 text-base font-bold text-spirit-on-dark transition-colors hover:border-spirit-on-dark hover:bg-spirit-on-dark/10"
