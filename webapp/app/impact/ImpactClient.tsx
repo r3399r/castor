@@ -6,7 +6,12 @@ import Pagination from '@/components/Pagination'
 import { ContentPanel, EmptyState, ErrorState, LoadingState } from '@/components/ui'
 import { apiFetch, LIMIT } from '@/lib/api'
 import { formatNumber } from '@/lib/number'
-import type { DonationEvidence, GetInfoDonationResponse } from '@/types/api'
+import type {
+  CharityRosterOrganization,
+  DonationEvidence,
+  GetInfoCharityOrganizationResponse,
+  GetInfoDonationResponse,
+} from '@/types/api'
 
 /**
  * Every published payout, with the arithmetic shown rather than summarised.
@@ -46,11 +51,68 @@ function EvidenceLink({ evidence }: { evidence: DonationEvidence }) {
   )
 }
 
+/**
+ * One organisation on the roster.
+ *
+ * The amount is printed even when it is zero, and says so in words: a
+ * card with nothing under it reads as a loading failure, while "尚未有
+ * 撥款" is the honest and common state -- an organisation enters the
+ * roster the moment it is on offer, not when someone picks it.
+ */
+function RosterCard({ organization }: { organization: CharityRosterOrganization }) {
+  return (
+    <li className="donation-roster-card">
+      <div className="donation-roster-head">
+        <h3>
+          {organization.websiteUrl ? (
+            <a
+              className="donation-record-link"
+              href={organization.websiteUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {organization.name} <ExternalLink size={14} aria-hidden="true" />
+            </a>
+          ) : (
+            organization.name
+          )}
+        </h3>
+        {/* A withdrawn organisation is on this list only because it has
+            already been paid: its batches are still on the page above, so
+            it has to stay nameable here. Saying why beats a card that
+            looks like it is still on offer. */}
+        {!organization.isActive && (
+          <span className="donation-roster-badge">已退出，不再接受指定</span>
+        )}
+      </div>
+      {organization.categories.length > 0 && (
+        <ul className="donation-roster-chips">
+          {organization.categories.map((category) => (
+            <li key={category.id}>{category.name}</li>
+          ))}
+        </ul>
+      )}
+      <p className="sp-description">{organization.introduction}</p>
+      <p className="donation-roster-amount">
+        {organization.receivedAmount === 0
+          ? '尚未有撥款'
+          : `累計收到 NT$${formatNumber(organization.receivedAmount)}．${formatNumber(organization.batchCount)} 批`}
+      </p>
+    </li>
+  )
+}
+
 export default function ImpactClient() {
   const [data, setData] = useState<GetInfoDonationResponse | null>(null)
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
+  // Its own request and its own failure, deliberately not folded into the
+  // one above: the roster is unpaginated and never changes with the page,
+  // and the payout record is what this page is for -- losing the roster
+  // must not take the records down with it.
+  const [roster, setRoster] = useState<GetInfoCharityOrganizationResponse | null>(null)
+  const [rosterError, setRosterError] = useState(false)
 
   const load = async (targetPage: number) => {
     setLoading(true)
@@ -73,6 +135,14 @@ export default function ImpactClient() {
 
   useEffect(() => {
     load(1)
+  }, [])
+
+  useEffect(() => {
+    // No token: this endpoint takes none, and the CloudFront behavior in
+    // front of it does not forward Authorization anyway.
+    apiFetch<GetInfoCharityOrganizationResponse>('info/charity-organization')
+      .then(setRoster)
+      .catch(() => setRosterError(true))
   }, [])
 
   if (loading && data === null) return <LoadingState />
@@ -221,6 +291,38 @@ export default function ImpactClient() {
         )}
 
         <Pagination page={page} totalPages={data.paginate.totalPages} onChange={load} />
+
+        {/* Who the money can go to, beside the record of where it went.
+            The payout list cannot answer this on its own: an organisation
+            nobody has chosen yet has no batch, so it appears nowhere
+            above while being exactly what a reader checking this page --
+            or a user about to reach LV5 -- wants to see. */}
+        <ContentPanel>
+          <h2>合作的公益組織</h2>
+          <p className="sp-description">
+            使用者把精靈養到 LV5 時，就是從這份清單裡指定一個單位。
+            每個單位的「累計收到」只計已公開的撥款，所以全部加起來就等於上面的「已完成撥款」。
+          </p>
+          {rosterError ? (
+            <ErrorState>暫時無法載入公益組織清單，請稍後再試。</ErrorState>
+          ) : roster === null ? (
+            <LoadingState />
+          ) : roster.length === 0 ? (
+            <EmptyState>公益組織清單整理中。</EmptyState>
+          ) : (
+            <>
+              <p className="donation-roster-count">
+                共 {formatNumber(roster.filter((organization) => organization.isActive).length)}{' '}
+                個單位可供指定
+              </p>
+              <ul className="donation-roster-grid">
+                {roster.map((organization) => (
+                  <RosterCard key={organization.id} organization={organization} />
+                ))}
+              </ul>
+            </>
+          )}
+        </ContentPanel>
 
         <ContentPanel>
           <h2>關於這些捐款</h2>

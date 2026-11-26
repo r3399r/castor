@@ -39,11 +39,12 @@ export const app = new Hono()
   // injected by CloudFormation without a circular dependency. See
   // src/lib/apiOrigin.ts.
   .use('*', apiOrigin)
-  // Bound to the two paths that read the database, not /api/info/*, so the
+  // Bound to each path that reads the database, not to /api/info/*, so the
   // health check at /api/info stays answerable with the database down.
   .use('/api/info/stats', transaction)
   .use('/api/info/popular', transaction)
   .use('/api/info/donation', transaction)
+  .use('/api/info/charity-organization', transaction)
   .route('/api/info', info)
   .use('/api/category/*', adminAuth)
   .use('/api/category/*', transaction)

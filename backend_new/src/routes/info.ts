@@ -1,12 +1,14 @@
 import 'zod-openapi/extend';
 import { zValidator } from '@hono/zod-validator';
-import { and, asc, count, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/mysql-core';
 import { Hono } from 'hono';
 import { describeRoute, resolver } from 'hono-openapi';
 import { z } from 'zod';
 import {
   categoryTable,
+  charityCategoryTable,
+  charityOrganizationCategoryTable,
   charityOrganizationTable,
   donationBatchEvidenceTable,
   donationBatchTable,
@@ -212,6 +214,73 @@ export const getInfoDonationResponseSchema = z.object({
   paginate: paginationSchema,
 });
 
+/**
+ * The roster of organisations behind the payout list.
+ *
+ * `/donation` answers "where did the money go", one batch at a time. It
+ * cannot answer "who can be supported at all", and the two are not the
+ * same list: an organisation nobody has chosen yet has no batch, so it is
+ * invisible there while being exactly what a reader deciding whether to
+ * trust this page wants to see -- and what a user about to grow a spirit
+ * to LV5 is choosing from.
+ *
+ * One row per organisation, each carrying its categories, rather than
+ * categories each carrying their organisations. An organisation may be
+ * filed under two categories, so the nested shape would print it twice
+ * and nothing summed from the rendered cards would be checkable. Flat,
+ * **the amounts add up**: every published batch belongs to exactly one
+ * organisation and every such organisation is listed here, so summing
+ * `receivedAmount` over this list gives /donation's
+ * `summary.transferredAmount` exactly. The page says so, which is only
+ * honest while this stays one row per organisation.
+ *
+ * The `taxId` is deliberately not here, matching the organisation block
+ * on /donation: the public record names the recipient, it does not
+ * publish its paperwork.
+ */
+const charityRosterCategorySchema = z.object({
+  id: z.number().int(),
+  code: z.string(),
+  name: z.string(),
+}).openapi({ ref: 'CharityRosterCategory' });
+
+const charityRosterOrganizationSchema = z.object({
+  id: z.number().int(),
+  name: z.string(),
+  introduction: z.string(),
+  websiteUrl: z.string().nullable(),
+  logoUrl: z.string().nullable(),
+  isActive: z
+    .boolean()
+    .describe(
+      'false is a withdrawn organisation, listed only because it has already been paid: it is out of the chooser but stays part of the record'
+    ),
+  categories: z
+    .array(charityRosterCategorySchema)
+    .describe(
+      'Ordered by the category sortOrder, then id. Never empty. Includes a category that is itself out of circulation -- it is what routed the money there'
+    ),
+  receivedAmount: z
+    .number()
+    .int()
+    .describe(
+      'Summed over published batches only, so this list adds up to /donation summary.transferredAmount. It is what left the bank account, platform top-up included'
+    ),
+  batchCount: z
+    .number()
+    .int()
+    .describe('Published batches naming it; 0 for one nobody has chosen yet'),
+}).openapi({ ref: 'CharityRosterOrganization' });
+
+/**
+ * Unpaginated, unlike every other list in this API.
+ *
+ * The table is curated by hand -- there is no sign-up flow and never will
+ * be -- so this is tens of rows, and the page renders all of them: a
+ * roster whose point is completeness cannot sit behind a "next page".
+ */
+export const getInfoCharityOrganizationResponseSchema = z.array(charityRosterOrganizationSchema);
+
 // mysql2 hands back a bare SUM() over an INT column as a *string*, which
 // would survive JSON.stringify and reach the page as "57000". Every
 // aggregate below is therefore cast to signed in SQL, the same way
@@ -281,6 +350,21 @@ const donationDoc = describeRoute({
       content: { 'application/json': { schema: resolver(getInfoDonationResponseSchema) } },
     },
     400: { description: 'limit beyond the cap, or a malformed offset or order' },
+  },
+});
+
+const charityDoc = describeRoute({
+  summary: 'The public roster of charity organisations',
+  description:
+    "Every organisation a LV5 contribution can be directed to, with what it has already received. Public and unauthenticated, like the payout list it accompanies. One row per organisation, each with its categories, so `receivedAmount` summed over the list equals /api/info/donation's `summary.transferredAmount`. A withdrawn organisation appears only once it has been paid (`isActive: false`); one nobody has chosen appears with `receivedAmount: 0`. No `taxId`, matching the organisation block on /donation. Unpaginated: the table is hand-curated and this roster is only worth anything complete.",
+  tags: ['info'],
+  responses: {
+    200: {
+      description: 'The roster, offered organisations first, then withdrawn ones',
+      content: {
+        'application/json': { schema: resolver(getInfoCharityOrganizationResponseSchema) },
+      },
+    },
   },
 });
 
@@ -577,6 +661,133 @@ export const info = new Hono<TransactionEnv>()
       }),
       paginate: genPagination(total, limit, offset),
     } satisfies z.infer<typeof getInfoDonationResponseSchema>);
+  })
+  /**
+   * Who the money can go to, beside the record of where it went.
+   *
+   * The public view of `charity_organization`, the way /donation is the
+   * public view of `donation_batch`. `GET /api/charity-organization`
+   * already reads without credentials and would have served this, but it
+   * sits under the /api/* behavior, which forwards Authorization and
+   * caches nothing; mounted here it takes the 5-minute TTL in front of
+   * /api/info/*, which is where the one page that may actually get a
+   * traffic spike is served from. It also carries two figures that list
+   * has no business computing for an admin filtering by category -- the
+   * received total and the batch count, which need an aggregate join.
+   */
+  .get('/charity-organization', charityDoc, async (c) => {
+    console.log('GET /api/info/charity-organization');
+    const db = c.get('db');
+
+    // Published only, and the same condition /donation's summary uses --
+    // that is what makes the two sections' numbers the same numbers. An
+    // unpublished batch has no evidence attached yet and may still be
+    // wrong; counting it here would announce a payout nobody can check.
+    const payouts = await db
+      .select({
+        organizationId: donationBatchTable.organizationId,
+        batchCount: count(),
+        receivedAmount: sql<number>`cast(coalesce(sum(${donationBatchTable.transferredAmount}), 0) as signed)`,
+      })
+      .from(donationBatchTable)
+      .where(eq(donationBatchTable.published, true))
+      .groupBy(donationBatchTable.organizationId);
+
+    const payoutByOrganizationId = new Map(payouts.map((row) => [row.organizationId, row]));
+    const paidIds = payouts.map((row) => row.organizationId);
+
+    // Active, *or* already paid. The second half is not a nicety: a
+    // foundation that folds is switched to is_active = 0 rather than
+    // deleted, precisely so the batches naming it keep rendering -- and
+    // dropping it from this list would break the sum the page prints,
+    // leaving money in the total that belongs to nobody on the list.
+    const rows = await db
+      .select({
+        id: charityOrganizationTable.id,
+        name: charityOrganizationTable.name,
+        introduction: charityOrganizationTable.introduction,
+        websiteUrl: charityOrganizationTable.websiteUrl,
+        logoUrl: charityOrganizationTable.logoUrl,
+        isActive: charityOrganizationTable.isActive,
+      })
+      .from(charityOrganizationTable)
+      .where(
+        // No `IN ()` when nothing has been paid out yet: it is not valid
+        // SQL.
+        paidIds.length === 0
+          ? eq(charityOrganizationTable.isActive, true)
+          : or(
+              eq(charityOrganizationTable.isActive, true),
+              inArray(charityOrganizationTable.id, paidIds)
+            )
+      )
+      // Offered first, then the curated order, then id. isActive descends
+      // because a withdrawn organisation is a footnote on this page, not
+      // something to lead with; id breaks the tie because sortOrder
+      // defaults to 0 for every row, so without it the order is whatever
+      // MySQL happens to return and the list reshuffles between loads.
+      .orderBy(
+        desc(charityOrganizationTable.isActive),
+        asc(charityOrganizationTable.sortOrder),
+        asc(charityOrganizationTable.id)
+      );
+
+    const organizationIds = rows.map((row) => row.id);
+
+    // Every linked category, including an inactive one: it is out of the
+    // chooser, but it is still what this organisation is offered under,
+    // and a card with no label at all is worse than a label for a
+    // category nobody can pick today.
+    const links =
+      organizationIds.length === 0
+        ? []
+        : await db
+            .select({
+              organizationId: charityOrganizationCategoryTable.organizationId,
+              id: charityCategoryTable.id,
+              code: charityCategoryTable.code,
+              name: charityCategoryTable.name,
+            })
+            .from(charityOrganizationCategoryTable)
+            .innerJoin(
+              charityCategoryTable,
+              eq(charityCategoryTable.id, charityOrganizationCategoryTable.categoryId)
+            )
+            .where(inArray(charityOrganizationCategoryTable.organizationId, organizationIds))
+            .orderBy(asc(charityCategoryTable.sortOrder), asc(charityCategoryTable.id));
+
+    const categoriesByOrganizationId = new Map<
+      number,
+      z.infer<typeof charityRosterCategorySchema>[]
+    >();
+    for (const link of links) {
+      const list = categoriesByOrganizationId.get(link.organizationId) ?? [];
+      list.push({ id: link.id, code: link.code, name: link.name });
+      categoriesByOrganizationId.set(link.organizationId, list);
+    }
+
+    // Field by field, not a spread: charity_organization holds a taxId,
+    // and a column added to that table must not reach this page by
+    // default. See "Map the row field by field" in AGENTS.md.
+    return c.json(
+      rows.map((row) => {
+        const payout = payoutByOrganizationId.get(row.id);
+        return {
+          id: row.id,
+          name: row.name,
+          introduction: row.introduction,
+          websiteUrl: row.websiteUrl,
+          logoUrl: row.logoUrl,
+          isActive: row.isActive,
+          categories: categoriesByOrganizationId.get(row.id) ?? [],
+          // ?? 0, not a cast: an organisation nothing has been paid for
+          // has no row in `payouts` at all, which is a missing row rather
+          // than a SUM of nothing.
+          receivedAmount: payout?.receivedAmount ?? 0,
+          batchCount: Number(payout?.batchCount ?? 0),
+        };
+      }) satisfies z.infer<typeof getInfoCharityOrganizationResponseSchema>
+    );
   })
   // Public and unauthenticated -- it only feeds the landing page's counter
   // bar, so it reports catalog sizes and nothing per-user.

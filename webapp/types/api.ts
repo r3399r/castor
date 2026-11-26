@@ -60,6 +60,7 @@ export type CategoryKind = components['schemas']['CategoryKind']
 export type AdminSpecies = components['schemas']['AdminSpecies']
 export type CharityCategoryRow = components['schemas']['CharityCategoryRow']
 export type CharityOrganization = components['schemas']['CharityOrganization']
+export type CharityRosterOrganization = components['schemas']['CharityRosterOrganization']
 export type DailyMastery = components['schemas']['DailyMastery']
 export type DayPassPurchase = components['schemas']['DayPassPurchase']
 export type Donation = components['schemas']['Donation']
@@ -133,6 +134,7 @@ export type PutFilterOptionSubjectsResponse = Ok<'putApiFilterOptionByIdSubject'
 export type GetGuardianResponse = Ok<'getApiGuardian'>
 export type PostGuardianInvestResponse = Ok<'postApiGuardianByIdInvest'>
 
+export type GetInfoCharityOrganizationResponse = Ok<'getApiInfoCharityOrganization'>
 export type GetInfoDonationResponse = Ok<'getApiInfoDonation'>
 export type GetInfoGrowthResponse = Ok<'getApiInfoGrowth'>
 export type GetInfoPlansResponse = Ok<'getApiInfoPlans'>

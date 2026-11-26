@@ -42,7 +42,7 @@ API Gateway (REST, ANY /{proxy+})
 
 | prefix | 額外 middleware | 誰呼叫得動 |
 | --- | --- | --- |
-| `/api/info` | `transaction` 只掛 `/stats`、`/popular`、`/donation` | 公開 |
+| `/api/info` | `transaction` 只掛 `/stats`、`/popular`、`/donation`、`/charity-organization` | 公開 |
 | `/api/category` `/api/subject` `/api/exam` `/api/tag` `/api/concept-group` `/api/concept` `/api/filter-dimension` `/api/filter-option` | `adminAuth` → `transaction` | **GET 完全公開**，寫入限 admin |
 | `/api/charity-category` | `adminAuth` → `transaction` | 公開讀；目前沒有寫入，所以 `adminAuth` 實際上沒守到任何東西（刻意，為了下一條寫入預設被守） |
 | `/api/charity-organization` | `adminAuth` → `transaction` | 公開讀（名稱／簡介／網站就是公開頁要印的），寫入限 admin |
@@ -65,8 +65,9 @@ API Gateway (REST, ANY /{proxy+})
 - **順序是語意，不是風格。** `requireUser` 讀 `c.get('db')`，所以一定在
   `transaction` 之後；`requireSubscription` 讀 `c.get('user')`，所以一定在
   `requireUser` 之後。寫反了不會噴編譯錯，會在執行時拿到 undefined。
-- **`/api/info` 刻意只有三條路徑包 transaction**，這樣 `/api/info` 的 health check
-  在資料庫掛掉時還答得出來。
+- **`/api/info` 刻意逐條路徑包 transaction**（目前四條），不是 `/api/info/*`，
+  這樣 `/api/info` 的 health check 在資料庫掛掉時還答得出來。新增一條會讀資料庫的
+  `/api/info/*` route 就要在 `app.ts` 多掛一行，漏掉的話 `c.get('db')` 是 undefined。
 - **`/api/user` 的 gate 寫在每條 route 上**，不是 `app.ts` 的 wildcard，因為
   `POST /api/user/sync` 是唯一「user row 還不存在就要能呼叫」的 route ——
   它就是唯一會建立那一列的東西。其他每條都自己帶 `requireAdmin` 或 `requireUser`。

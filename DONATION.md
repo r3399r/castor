@@ -15,12 +15,13 @@
 | `/api/charity-organization` | ✅ 完成，31 個 regression test |
 | `/api/donation` | ✅ 完成，23 個 regression test |
 | `/api/info/donation` | ✅ 完成，19 個 regression test |
+| `/api/info/charity-organization` | ✅ 完成，16 個 regression test（2026-11-27 加，公開頁的組織清單） |
 | `/api/charity-category` | ✅ 完成，6 個 regression test |
 | `/api/charity-organization/suggest` | ✅ 完成，12 個 regression test |
 | `/api/donation-batch` | ✅ 完成，51 個 regression test |
 | admin 介面（前端） | ✅ 完成，兩頁 |
 | 使用者前端（`/box/donation`） | ✅ 完成，改打真實 API |
-| 公開捐款頁（`/impact`） | ✅ 完成，不需登入 |
+| 公開捐款頁（`/impact`） | ✅ 完成，不需登入。2026-11-27 加上「合作的公益組織」清單 |
 
 已驗證：五支 SQL 實際灌進本機 dev DB、五條 FK 建立成功、drizzle 欄位名對得上真實資料庫、後端全套測試 193 unit ＋ 714 regression 全過（45 檔 907 個）、webapp `next build` 通過。
 
@@ -243,6 +244,27 @@ promisedAmount   = confirmedAmount + pendingAmount
    - **`SupportNote` 的金額改成從 API 讀**。它原本寫死 `NT$10`，在後端 `DONATION_AMOUNT` 搬動後就過期了；承諾旁邊的數字是最不該放第二份副本的地方。讀不到時不印佔位數字，只是不報價
    - 樣式沿用 `webapp/styles/donation-demo.css`（名字已經不準，檔頭加了說明：`.donation-flow-*` 等規則現在三個畫面共用）
 
+7. **公開頁的組織清單**（2026-11-27 加）— `GET /api/info/charity-organization` ＋ `/impact` 的「合作的公益組織」區塊
+   - **為什麼不是靠 `/api/info/donation` 就好**：那支只列批次，而**沒人選過的組織沒有批次**——它在撥款紀錄上完全看不到，
+     可是「有哪些單位可以被指定」正是來核對這一頁的人想知道的事，也是使用者快到 LV5 時想先看的東西
+   - **為什麼不直接打既有的 `GET /api/charity-organization`**：那支讀端本來就公開，功能上做得到。
+     差別有兩個：它掛在 `/api/*` behavior 下（轉送 `Authorization`、完全不快取），搬到 `/api/info/*` 就直接吃到那條
+     5 分鐘 TTL；而且「累計收到多少 / 幾批」要 aggregate join，不該讓 admin 按類別篩選時也跑一次
+   - **刻意是「一個組織一列，列上帶它的類別」，不是「類別底下掛組織」。** 一個組織可以掛兩個類別，
+     巢狀結構會把它印兩次，於是從畫面上加總出來的任何數字都不可核對。扁平的話這條成立：
+     **清單上每個單位的「累計收到」加起來 ＝ 上方的「已完成撥款」**，頁面就這麼寫，regression test 釘住了這句話
+   - `receivedAmount` 只計 **`published = 1`** 的批次，和 `/api/info/donation` 的 `transferredAmount` 同一個條件——
+     兩邊的數字才是同一個數字。未公開的批次還沒附證明、也可能是錯的
+   - 算的是批次的 `transferred_amount`（含平台加碼），不是捐款小計：那才是真的匯給該單位的錢
+   - **已停用的組織只有在「已經被撥過款」時才列出**，並標 `isActive: false`、排在現役的後面。
+     不列的話上面那條加總就破了——總額裡會有一筆錢不屬於清單上任何人；而且撥款紀錄仍然印著它的名字
+   - 類別標籤連已停用的類別也印。它已經不在選單裡，但那就是當初把錢導過去的類別，卡片上完全沒有標籤更糟
+   - **不帶 `taxId`**，和 `/api/info/donation` 的組織區塊一致：公開紀錄寫出受贈單位是誰，不公開它的證件號碼。
+     exact-key-set 測試就是釘這件事（`charity_organization` 有這個欄位，不能讓它跟著漏出去）
+   - **不分頁。** 這張表是人工維護的、沒有也不會有申請流程，清單的價值就在完整
+   - 前端是**另一個 request、另一個錯誤狀態**，不併進原本那支：清單不隨分頁變，而撥款紀錄才是這頁的本體，
+     清單載不到不該把紀錄一起拖下水
+
 每一步都要附 regression test，照 `backend_new/regression/routes/` 既有寫法。
 
 ### 兩個頁面
@@ -390,7 +412,7 @@ mysql ... < db/table/donation.sql
 | `webapp/app/admin/donation-batch/` | 新增。撥款流程兩個 tab |
 | `webapp/app/admin/page.tsx` | 加兩個後台入口 |
 | `backend_new/src/lib/donationAmount.ts` | 新增。`DONATION_AMOUNT` 從 `routes/donation.ts` 搬出來，給 `/api/info/donation` 共用 |
-| `backend_new/src/routes/info.ts` | 加 `GET /donation`（公開捐款） |
+| `backend_new/src/routes/info.ts` | 加 `GET /donation`（公開捐款）、`GET /charity-organization`（公開組織清單，2026-11-27） |
 | `backend_new/src/routes/species.ts` | 加回傳 `category`，讓 `/admin/species` 看得見漏綁類別的蛋 |
 | `webapp/app/admin/species/SpeciesClient.tsx` | 印公益類別；未綁定時出警示 badge |
 | `backend_new/docker-compose.yml` | 掛載 29–33 |

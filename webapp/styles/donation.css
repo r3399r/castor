@@ -156,6 +156,20 @@
 .donation-impact-list .donation-record-card header h2 { margin: 0 0 6px; font-size: var(--text-spirit-heading); }
 .donation-impact-evidence { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
 
+/* The roster of organisations, same page. Deliberately not .donation-org-card:
+   that one is a radio button in the picker (pointer cursor, hover lift,
+   clamped blurb) and nothing here is clickable but the 官網 link. */
+.donation-roster-count { margin: 14px 0 0; color: var(--color-spirit-muted); font-size: var(--text-spirit-small); }
+.donation-roster-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); align-items: start; gap: 16px; margin: 14px 0 0; padding: 0; list-style: none; }
+.donation-roster-card { display: flex; flex-direction: column; gap: 10px; padding: 20px; border: 1px solid var(--color-spirit-line); border-radius: var(--radius-spirit-small); background: color-mix(in srgb, var(--color-spirit-paper) 45%, transparent); }
+.donation-roster-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 10px; }
+.donation-roster-card h3 { margin: 0; font-size: var(--text-spirit-body); line-height: var(--leading-compact); }
+.donation-roster-badge { padding: 2px 8px; border-radius: 999px; color: var(--color-spirit-muted); background: var(--color-spirit-mist); font-size: var(--text-spirit-small); font-weight: 600; }
+.donation-roster-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.donation-roster-chips li { padding: 2px 9px; border: 1px solid color-mix(in srgb, var(--color-spirit-line) 72%, transparent); border-radius: 999px; color: var(--color-spirit-forest); font-size: var(--text-spirit-small); font-weight: 600; }
+.donation-roster-card .sp-description { margin: 0; line-height: var(--leading-relaxed); }
+.donation-roster-amount { margin: auto 0 0; padding-top: 6px; color: var(--color-spirit-forest); font-weight: 700; }
+
 @media (width < 64rem) {
   .donation-org-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
