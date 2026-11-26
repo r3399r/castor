@@ -94,7 +94,12 @@ API Gateway (REST, ANY /{proxy+})
 兩者都驗 Firebase ID token 並比對 `ADMIN_EMAILS`（`src/middleware/adminAuth.ts`
 裡硬寫的 allowlist，資料模型裡沒有 role 概念）。差別是守備範圍：
 
-- `adminAuth` **只守 POST/PUT/DELETE**，GET 原封不動放過。
+- `adminAuth` **只守會改東西的 method**，`GET`／`HEAD`／`OPTIONS` 原封不動放過。
+  判斷式寫的是「安全的三個 method」而不是「POST/PUT/DELETE」：2026-11-27 之前是後者，
+  於是任何不在那三個裡的 method 都無憑證通過——而 CloudFront 的 `/api/*` behavior 允許 PATCH，
+  所以第一支 PATCH route 會是一個從 edge 就打得到的未驗證寫入，而且沒有任何東西會出聲。
+  預設關著的 gate 不會因為「忘記改 middleware」而被打開（`test/middleware/adminAuth.test.ts` 用一支
+  沒有任何 route 的 PATCH 釘住這件事）。
 - `requireAdmin` 守每一個 method。
 
 這是最容易寫錯文件的一處：一個 group 掛在 `adminAuth` 後面，不等於這個 group
