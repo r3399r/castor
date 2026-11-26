@@ -482,7 +482,7 @@ export default function DonationBatchClient() {
 
                     <Field
                       label="實際匯出金額"
-                      hint="預設是小計。平台自行加碼湊整數時填實際匯出的數字。"
+                      hint="預設是小計。自行加碼湊整數時填實際匯出的數字。"
                     >
                       <input
                         type="number"
@@ -499,7 +499,7 @@ export default function DonationBatchClient() {
                         className={`text-sm ${topUp < 0 ? 'text-red-600' : 'text-[#2E6B2E]'}`}
                       >
                         {topUp > 0
-                          ? `平台加碼 NT$${formatNumber(topUp)}`
+                          ? `營運者加碼 NT$${formatNumber(topUp)}`
                           : `比小計少 NT$${formatNumber(-topUp)}——批次可以建立，但無法公開，直到金額更正。`}
                       </p>
                     )}
@@ -579,7 +579,7 @@ export default function DonationBatchClient() {
                   <th className="px-4 py-3">匯款日期</th>
                   <th className="px-4 py-3 text-right">筆數</th>
                   <th className="px-4 py-3 text-right">小計</th>
-                  <th className="px-4 py-3 text-right">平台加碼</th>
+                  <th className="px-4 py-3 text-right">營運者加碼</th>
                   <th className="px-4 py-3 text-right">匯出金額</th>
                   <th className="px-4 py-3">證明</th>
                   <th className="px-4 py-3">狀態</th>
@@ -666,7 +666,7 @@ export default function DonationBatchClient() {
               <dd>
                 {detail.donationCount} 筆 · NT${formatNumber(detail.donationSubtotal)}
               </dd>
-              <dt className="text-black-500">平台加碼</dt>
+              <dt className="text-black-500">營運者加碼</dt>
               <dd className={detail.platformTopUp < 0 ? 'text-red-600' : ''}>
                 {detail.platformTopUp < 0
                   ? `−NT$${formatNumber(-detail.platformTopUp)}`

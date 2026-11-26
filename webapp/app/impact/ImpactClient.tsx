@@ -164,7 +164,7 @@ export default function ImpactClient() {
           <p className="sp-eyebrow">Learn for Good</p>
           <h1>公益捐款紀錄</h1>
           <p>
-            使用者把精靈養到 LV5，就能指定一個公益組織，由平台捐出款項——使用者不需付費。
+            使用者把精靈養到 LV5，就能指定一個公益組織，由平台營運者個人捐出款項——使用者不需付費。
             這一頁列出所有已完成的撥款，連同匯款證明，任何人都可以核對。
           </p>
         </header>
@@ -212,7 +212,7 @@ export default function ImpactClient() {
 
         {data.data.length === 0 ? (
           <EmptyState>
-            還沒有已公開的撥款紀錄。平台會定期彙整撥款，完成並取得證明後公布於此。
+            還沒有已公開的撥款紀錄。營運者會定期彙整撥款，完成並取得證明後公布於此。
           </EmptyState>
         ) : (
           <div className="donation-impact-list">
@@ -250,7 +250,7 @@ export default function ImpactClient() {
                     </dd>
                   </div>
                   <div>
-                    <dt>平台加碼</dt>
+                    <dt>營運者加碼</dt>
                     <dd>NT${formatNumber(batch.platformTopUp)}</dd>
                   </div>
                   <div>
@@ -298,10 +298,19 @@ export default function ImpactClient() {
             above while being exactly what a reader checking this page --
             or a user about to reach LV5 -- wants to see. */}
         <ContentPanel>
-          <h2>合作的公益組織</h2>
+          <h2>公益組織清單</h2>
           <p className="sp-description">
             使用者把精靈養到 LV5 時，就是從這份清單裡指定一個單位。
             每個單位的「累計收到」只計已公開的撥款，所以全部加起來就等於上面的「已完成撥款」。
+          </p>
+          {/* Said out loud, because a page that lists organisations beside
+              a platform's name implies a relationship that does not exist.
+              There is no agreement, sponsorship or partnership with any of
+              them: the platform donates the way any other donor does, and
+              the organisations have not endorsed anything. */}
+          <p className="sp-description">
+            平台營運者與這些單位沒有合作、贊助或任何協議關係——就只是以個人捐款人的身分捐出款項，
+            清單由營運者自行挑選，並不代表這些單位與本站有關聯或為本站背書。
           </p>
           {rosterError ? (
             <ErrorState>暫時無法載入公益組織清單，請稍後再試。</ErrorState>
@@ -327,8 +336,9 @@ export default function ImpactClient() {
         <ContentPanel>
           <h2>關於這些捐款</h2>
           <p className="sp-description">
-            款項全數由平台支付，使用者在培育精靈的過程中不需付費，也不會向使用者募集任何財物。
-            因此這些捐款不屬於使用者的捐贈行為，平台不提供捐款收據或稅務抵扣憑證。
+            款項全數由平台營運者以個人名義捐出，使用者在培育精靈的過程中不需付費，
+            也不會向使用者募集任何財物。因此這些捐款不屬於使用者的捐贈行為，
+            不會提供捐款收據或稅務抵扣憑證給使用者。
             每一筆撥款的受贈單位、金額與證明文件都列在這一頁，金額以實際匯出為準。
           </p>
         </ContentPanel>

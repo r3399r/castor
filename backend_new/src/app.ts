@@ -70,7 +70,9 @@ export const app = new Hono()
   .use('/api/filter-option/*', adminAuth)
   .use('/api/filter-option/*', transaction)
   .route('/api/filter-option', filterOption)
-  // The partner foundations. Same posture as the catalog groups above:
+  // The charity organisations a LV5 contribution can be directed to --
+  // chosen by the operator, with no agreement or partnership behind any
+  // of them. Same posture as the catalog groups above:
   // adminAuth gates the writes and leaves GETs open, which here is
   // intended rather than tolerated -- a foundation's name, blurb and
   // website are exactly what the public transparency page publishes.

@@ -70,7 +70,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   DONATION_CATEGORY_REQUIRED: '請先選擇一個公益類別。',
   DONATION_CATEGORY_INACTIVE: '這個公益類別目前沒有開放，請改選其他類別。',
   DONATION_CATEGORY_INVALID: '這隻精靈不能支持這個類別。',
-  ORGANIZATION_INACTIVE: '這個組織已停止合作，請改選其他組織。',
+  ORGANIZATION_INACTIVE: '這個組織目前沒有開放指定，請改選其他組織。',
   ORGANIZATION_CATEGORY_MISMATCH: '這個組織不屬於所選的公益類別，請重新選擇。',
 }
 
@@ -205,7 +205,7 @@ export function DonationEntry({
           </Badge>
           <h3>滿級達成！讓這份陪伴延續下去</h3>
           <p>
-            你已完成這隻精靈的養成，可以選擇一個公益組織，由平台捐出 NT$
+            你已完成這隻精靈的養成，可以選擇一個公益組織，由平台營運者個人捐出 NT$
             {formatNumber(donationAmount)}。
           </p>
           <Button onClick={() => open('choose')}>選擇支持對象</Button>
@@ -214,9 +214,9 @@ export function DonationEntry({
         <div className="donation-unlocked-message">
           <Badge tone="complete">
             {donation.batch === null
-              ? '等待平台撥款'
+              ? '等待撥款'
               : donation.batch.published
-                ? '平台已完成撥款'
+                ? '已完成撥款'
                 : '已撥款，捐款資料準備中'}
           </Badge>
           <h3>已選擇支持{donation.organization.name}</h3>
@@ -237,7 +237,7 @@ export function DonationEntry({
           </div>
           <p className="donation-celebration-copy">
             恭喜你完成一隻精靈的養成！現在可以選擇一個相關公益組織作為捐款對象，
-            <strong>這份支持由平台提供。</strong>
+            <strong>這份支持由平台營運者個人捐出。</strong>
           </p>
           <div className="sp-dialog-actions">
             <Button variant="secondary" onClick={() => setCelebrating(false)}>
@@ -535,7 +535,7 @@ export function DonationFlowClient() {
             </ButtonLink>
             <header className="donation-flow-heading">
               <h1>選擇支持的公益組織</h1>
-              <p>本次由平台捐出 NT${formatNumber(donationAmount)}，你不需要付款。</p>
+              <p>本次由平台營運者個人捐出 NT${formatNumber(donationAmount)}，你不需要付款。</p>
             </header>
             <SpiritSummary
               guardian={guardian}
@@ -551,11 +551,11 @@ export function DonationFlowClient() {
               <p>載入公益組織…</p>
             ) : organizations.length === 0 ? (
               <ContentPanel className="donation-centered-state">
-                <h2>這個類別目前沒有合作組織</h2>
+                <h2>這個類別目前沒有可指定的組織</h2>
                 <p>
                   {guardian.category === null
                     ? '請改選其他公益類別。'
-                    : '平台正在洽談合作中，你的選擇機會會保留著，稍後再回來即可。'}
+                    : '平台正在整理這個類別的名單，你的選擇機會會保留著，稍後再回來即可。'}
                 </p>
                 <ButtonLink href="/box/">返回精靈養成</ButtonLink>
               </ContentPanel>
@@ -677,12 +677,12 @@ export function DonationFlowClient() {
                   <dd>{draft.name}</dd>
                 </div>
                 <div>
-                  <dt>平台捐款金額</dt>
+                  <dt>捐款金額</dt>
                   <dd>NT${formatNumber(donationAmount)}</dd>
                 </div>
               </dl>
-              <p>款項由平台支付，你不需要付款。</p>
-              <p>平台會定期彙整撥款，完成後可在公開捐款頁查到這筆紀錄。</p>
+              <p>款項由平台營運者個人支付，你不需要付款。</p>
+              <p>營運者會定期彙整撥款，完成後可在公開捐款頁查到這筆紀錄。</p>
               <p className="donation-final-warning">確認後將無法更換本次支持對象。</p>
               {submitError && <p className="donation-final-warning">{submitError}</p>}
               <div className="donation-confirm-actions">
@@ -706,10 +706,10 @@ export function DonationFlowClient() {
             </span>
             <h1>已收到你的支持選擇</h1>
             <p>
-              你已選擇支持{donation.organization.name}，平台將捐出 NT$
+              你已選擇支持{donation.organization.name}，平台營運者將個人捐出 NT$
               {formatNumber(donation.amount)}。
             </p>
-            <Badge tone="growth">等待平台撥款</Badge>
+            <Badge tone="growth">等待撥款</Badge>
             <ButtonLink href="/box/">返回精靈養成</ButtonLink>
           </ContentPanel>
         ) : donation ? (
@@ -760,7 +760,7 @@ export function DonationFlowClient() {
                     frozen at confirmation and a later change must not
                     rewrite what this record says was promised. */}
                 <div>
-                  <dt>平台捐款金額</dt>
+                  <dt>捐款金額</dt>
                   <dd>NT${formatNumber(donation.amount)}</dd>
                 </div>
                 <div>
@@ -771,9 +771,9 @@ export function DonationFlowClient() {
                   <dt>目前狀態</dt>
                   <dd>
                     {donation.batch === null
-                      ? '等待平台撥款'
+                      ? '等待撥款'
                       : donation.batch.published
-                        ? '平台已完成撥款'
+                        ? '已完成撥款'
                         : '已撥款，捐款資料準備中'}
                   </dd>
                 </div>
@@ -795,7 +795,7 @@ export function DonationFlowClient() {
                       </a>
                     ) : (
                       <span className="donation-record-pending">
-                        將於平台完成撥款並上傳證明後提供
+                        將於撥款完成並上傳證明後提供
                       </span>
                     )}
                   </dd>

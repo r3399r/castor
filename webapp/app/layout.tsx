@@ -22,7 +22,7 @@ const fredoka = Fredoka({
 // spelling, and "Learn for Good" is the half of the brand that is unambiguous.
 const TITLE = '學益 Learn for Good - 考試題庫與練習平台'
 const DESCRIPTION =
-  '涵蓋高中／大學／公職／證照考試，以智慧出題與個人化練習，幫你精準掌握重點、穩定提升成績。練習累積的積分還能培育精靈，完成培育後由平台提撥款項支持公益——學習有所得，也讓世界有所益。'
+  '涵蓋高中／大學／公職／證照考試，以智慧出題與個人化練習，幫你精準掌握重點、穩定提升成績。練習累積的積分還能培育精靈，完成培育後由平台營運者個人捐出款項支持公益——學習有所得，也讓世界有所益。'
 
 export const metadata: Metadata = {
   // Open Graph tags have to carry absolute URLs, and a static export has no

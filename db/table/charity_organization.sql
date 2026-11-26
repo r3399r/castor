@@ -1,7 +1,14 @@
 -- The foundations and associations a user can direct the platform's LV5
 -- contribution to. Curated by hand through the admin UI -- there is no
--- sign-up flow and never will be, since every row here is a real
--- organisation the platform has an arrangement with.
+-- sign-up flow and never will be: a row exists because the operator chose
+-- that organisation, having checked it is real.
+--
+-- **No row here implies a relationship.** The platform has no agreement,
+-- sponsorship or partnership with any of these organisations, and they
+-- have endorsed nothing -- it donates to them the way any other donor
+-- does. That is why there is no column recording terms, a contact or a
+-- consent date: there is nothing of the sort to record, and a column for
+-- it would invite the claim. The public page says so in as many words.
 --
 -- Rows are never deleted. A donation made years ago still has to render
 -- its recipient's name and introduction on the public record page, so a

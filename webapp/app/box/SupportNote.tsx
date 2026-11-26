@@ -48,7 +48,7 @@ export default function SupportNote() {
           <p className="sp-support-eyebrow">Learn for Good</p>
           <h2>讓學習成果，成為一份真實的支持</h2>
           <p>
-            每完成一隻精靈的最高階段，平台就會提撥資金，支持與精靈主題相關的公益機構。
+            每完成一隻精靈的最高階段，平台營運者就會以個人名義捐出款項，支持與精靈主題相關的公益機構。
           </p>
           <p>
             <a
@@ -64,19 +64,21 @@ export default function SupportNote() {
         <div
           className="sp-support-result"
           aria-label={
-            amount === null ? '完成 LV5，平台提撥' : `完成 LV5，平台提撥新台幣 ${amount} 元`
+            amount === null
+              ? '完成 LV5，營運者捐出'
+              : `完成 LV5，營運者個人捐出新台幣 ${amount} 元`
           }
         >
           <Sprout size={22} aria-hidden="true" />
           <span>完成 LV5</span>
-          <span>平台提撥</span>
+          <span>營運者捐出</span>
           <strong>{amount === null ? 'NT$—' : `NT$${formatNumber(amount)}`}</strong>
         </div>
       </div>
       <div className="sp-support-rules">
         <p>
-          實際受贈機構、捐款時間與執行方式，將依當期公益計畫及合作條件為準。
-          平台會定期彙整撥款，完成並取得證明文件後公布於公開捐款頁。
+          實際受贈機構、捐款時間與執行方式，將依當期公益計畫為準。
+          營運者會定期彙整撥款，完成並取得證明文件後公布於公開捐款頁。
           本活動中的積分與培育行為不等同於使用者直接捐款，亦不提供捐款收據或稅務抵扣憑證。
           每筆提撥金額以確認支持對象的當下為準，後續調整不影響已確認的紀錄。
         </p>
