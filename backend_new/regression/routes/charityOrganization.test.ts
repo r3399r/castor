@@ -103,9 +103,9 @@ const getSuggest = (query = '') =>
 
 /**
  * One confirmed donation to an organisation, so the suggestion has
- * something to rank by. Each one needs its own user and spirit --
+ * something to rank by. Each one needs its own user and guardian --
  * donation's UNIQUE is on user_guardian_id, so a second donation cannot
- * reuse the first one's spirit.
+ * reuse the first one's guardian.
  */
 const seedDonationTo = async (organizationId: number, categoryId: number, amount = 1000) => {
   const db = getDb();
@@ -466,7 +466,7 @@ describe('charity organization routes', () => {
         createdAt: new Date(),
         updatedAt: new Date(),
       });
-      // A spirit species belonging to this category, then one owned
+      // A guardian species belonging to this category, then one owned
       // instance of it at max level.
       const [{ insertId: speciesId }] = await db.insert(guardianTable).values({
         code: `species-${cat}`,

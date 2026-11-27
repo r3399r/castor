@@ -5,7 +5,7 @@
 --
 -- The names are the seven guardian.theme strings and the codes the seven
 -- guardian.code values, as of 2026-11-08; keep both in step with the
--- Spirit categories table in AGENTS.md. Ids are auto-increment and
+-- Guardian categories table in AGENTS.md. Ids are auto-increment and
 -- nothing should depend on a particular one.
 --
 -- SET NAMES is not optional: docker-entrypoint-initdb.d uses a latin1

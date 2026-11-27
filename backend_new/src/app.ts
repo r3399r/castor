@@ -150,7 +150,7 @@ export const app = new Hono()
   .use('/api/guardian/*', transaction)
   .use('/api/guardian/*', requireUser)
   .route('/api/guardian', guardian)
-  // A signed-in person spending one maxed spirit, and reading back what
+  // A signed-in person spending one maxed guardian, and reading back what
   // they have already given. Next to /api/guardian because that is the
   // entitlement it draws on. The *public* record of the same donations
   // lives under /api/info, which has no Authorization forwarded to it.

@@ -1,9 +1,9 @@
 /**
- * How far a spirit has grown.
+ * How far a guardian has grown.
  *
  * These used to be module constants inside routes/guardian.ts, which was
  * fine while that route was the only thing that cared. The donation
- * routes care too -- a donation is bought with a *maxed* spirit -- and
+ * routes care too -- a donation is bought with a *maxed* guardian -- and
  * MAX_LEVEL is exactly the sort of constant that must not exist twice:
  * two copies that drift mean "maxed" quietly means one thing when the
  * level-up runs and another when the donation is confirmed.
@@ -26,7 +26,7 @@
 //
 // **Raising it is ruled out** (2026-11-20), not a last resort. `level` and
 // `xp` are stored and only recomputed on invest, so a raise silently moves
-// the goalposts under every spirit mid-level; and because MAX_LEVEL is
+// the goalposts under every guardian mid-level; and because MAX_LEVEL is
 // derived from this array's *length*, everyone already at LV5 keeps a
 // real-money donation entitlement that the new thresholds would not grant.
 // Neither has a remedy. If the donation amount has to be made solvent,
@@ -36,7 +36,7 @@ export const LEVEL_XP_THRESHOLDS = [2_500, 7_500, 22_500, 67_500];
 
 export const MAX_LEVEL = LEVEL_XP_THRESHOLDS.length + 1;
 
-/** The XP needed for the next level, or null for a spirit already maxed. */
+/** The XP needed for the next level, or null for a guardian already maxed. */
 export const nextLevelXp = (level: number): number | null =>
   level < MAX_LEVEL ? LEVEL_XP_THRESHOLDS[level - 1] : null;
 

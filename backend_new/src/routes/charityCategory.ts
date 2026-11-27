@@ -51,7 +51,7 @@ export const charityCategoryRowSchema = z.object({
   id: z.number().int(),
   code: z
     .string()
-    .describe('Stable identifier, and what ties a spirit species to this category'),
+    .describe('Stable identifier, and what ties a guardian species to this category'),
   name: z.string(),
   sortOrder: z.number().int().describe('Ascending, hand-assigned; ties are broken by id'),
   isActive: z
@@ -71,7 +71,7 @@ export const getCharityCategoryListResponseSchema = z.object({
 const listDoc = describeRoute({
   summary: 'List the public-interest categories',
   description:
-    'Open to anyone: these names are printed on the public transparency page. GET-only, and the group is mounted behind `adminAuth`, which gates POST/PUT/DELETE -- so on a resource with none it gates nothing. That is intended here, not an oversight; the rows are seeded by SQL because they are tied to the spirit species by `code`.',
+    'Open to anyone: these names are printed on the public transparency page. GET-only, and the group is mounted behind `adminAuth`, which gates POST/PUT/DELETE -- so on a resource with none it gates nothing. That is intended here, not an oversight; the rows are seeded by SQL because they are tied to the guardian species by `code`.',
   tags: ['charity-category'],
   responses: {
     200: {

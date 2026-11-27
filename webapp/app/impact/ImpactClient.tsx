@@ -181,7 +181,7 @@ export default function ImpactClient() {
               <dd>{formatNumber(summary.publishedBatchCount)} 批</dd>
             </div>
             <div>
-              <dt>已指定支持對象</dt>
+              <dt>已指定</dt>
               <dd>
                 {formatNumber(summary.confirmedCount)} 筆 · NT$
                 {formatNumber(summary.confirmedAmount)}
@@ -204,9 +204,9 @@ export default function ImpactClient() {
               amount frozen at that moment, and only the unchosen half is
               valued at today's rate. */}
           <p className="sp-description">
-            「累計應捐金額」＝ 已指定的金額（確認當時凍結） ＋ 尚未指定的筆數 × 目前每筆 NT$
+            累計應捐金額＝ 已指定的金額 ＋ 尚未指定的筆數 × 目前每筆 NT$
             {formatNumber(summary.donationAmount)}。目前共有{' '}
-            {formatNumber(summary.maxedSpiritCount)} 隻精靈達到 LV5。
+            {formatNumber(summary.maxedGuardianCount)} 隻精靈達到 LV5。
           </p>
         </ContentPanel>
 

@@ -73,8 +73,8 @@ const seedCategory = async () => {
   return insertId;
 };
 
-/** One owned spirit, at max level unless a test says otherwise. */
-const seedSpirit = async (userId: number, categoryId: number, level = MAX_LEVEL) => {
+/** One owned guardian, at max level unless a test says otherwise. */
+const seedGuardian = async (userId: number, categoryId: number, level = MAX_LEVEL) => {
   const db = getDb();
   seq += 1;
   const [{ insertId: speciesId }] = await db.insert(guardianTable).values({
@@ -150,7 +150,7 @@ const seedDonation = async ({
   batchId?: number | null;
 }) => {
   const userId = await seedUser();
-  const userGuardianId = await seedSpirit(userId, categoryId);
+  const userGuardianId = await seedGuardian(userId, categoryId);
   const [{ insertId }] = await getDb().insert(donationTable).values({
     userId,
     userGuardianId,
@@ -207,7 +207,7 @@ describe('info donation record', () => {
     expect(body.data).toEqual([]);
     expect(body.paginate.total).toBe(0);
     expect(body.summary).toMatchObject({
-      maxedSpiritCount: 0,
+      maxedGuardianCount: 0,
       confirmedCount: 0,
       confirmedAmount: 0,
       pendingCount: 0,
@@ -360,19 +360,19 @@ describe('info donation record', () => {
 
   describe('the promised total', () => {
     // The consequence of creating the donation row at confirmation rather
-    // than at max level: a maxed spirit whose owner has not chosen yet is
+    // than at max level: a maxed guardian whose owner has not chosen yet is
     // invisible to SUM(donation.amount), and is already owed.
-    it('includes maxed spirits that have not chosen an organisation yet', async () => {
+    it('includes maxed guardians that have not chosen an organisation yet', async () => {
       const categoryId = await seedCategory();
       const organizationId = await seedOrganization('OO 基金會');
       await seedDonation({ categoryId, organizationId });
-      // Two more maxed spirits, neither of them with a donation row.
+      // Two more maxed guardians, neither of them with a donation row.
       const waiting = await seedUser();
-      await seedSpirit(waiting, categoryId);
-      await seedSpirit(waiting, categoryId);
+      await seedGuardian(waiting, categoryId);
+      await seedGuardian(waiting, categoryId);
 
       const body = await getRecord();
-      expect(body.summary.maxedSpiritCount).toBe(3);
+      expect(body.summary.maxedGuardianCount).toBe(3);
       expect(body.summary.confirmedCount).toBe(1);
       expect(body.summary.confirmedAmount).toBe(DONATION_AMOUNT);
       expect(body.summary.pendingCount).toBe(2);
@@ -394,13 +394,13 @@ describe('info donation record', () => {
       expect(body.summary.promisedAmount).toBe(10);
     });
 
-    it('ignores spirits that have not reached max level', async () => {
+    it('ignores guardians that have not reached max level', async () => {
       const categoryId = await seedCategory();
       const userId = await seedUser();
-      await seedSpirit(userId, categoryId, MAX_LEVEL - 1);
+      await seedGuardian(userId, categoryId, MAX_LEVEL - 1);
 
       const body = await getRecord();
-      expect(body.summary.maxedSpiritCount).toBe(0);
+      expect(body.summary.maxedGuardianCount).toBe(0);
       expect(body.summary.promisedAmount).toBe(0);
     });
   });
@@ -522,7 +522,7 @@ describe('info donation record', () => {
         'confirmedAmount',
         'confirmedCount',
         'donationAmount',
-        'maxedSpiritCount',
+        'maxedGuardianCount',
         'pendingAmount',
         'pendingCount',
         'promisedAmount',

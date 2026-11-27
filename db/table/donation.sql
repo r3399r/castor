@@ -1,8 +1,8 @@
--- One user's contribution, earned by growing one spirit to MAX_LEVEL and
+-- One user's contribution, earned by growing one guardian to MAX_LEVEL and
 -- directed at one organisation. The user pays nothing; the platform does.
 --
 -- The row is created when the user confirms a choice, not when the
--- spirit reaches max level. That means a spirit that is maxed but whose
+-- guardian reaches max level. That means a guardian that is maxed but whose
 -- owner has not chosen yet has no row here, so the public page's
 -- "promised so far" figure is counted from user_guardian at max level
 -- rather than from SUM(amount) over this table.
@@ -10,14 +10,14 @@ CREATE TABLE IF NOT EXISTS castor.donation (
     id INT UNSIGNED AUTO_INCREMENT,
     user_id INT UNSIGNED NOT NULL,
 
-    -- The entitlement itself: one maxed spirit buys one choice. The
+    -- The entitlement itself: one maxed guardian buys one choice. The
     -- unique key on this column is the load-bearing constraint of the
     -- whole feature -- without it a replayed confirmation becomes a
     -- second promise of real money.
     user_guardian_id INT UNSIGNED NOT NULL,
 
     -- The public-interest category the user actually chose. Usually the
-    -- category of the spirit's own species, which is why it looks
+    -- category of the guardian's own species, which is why it looks
     -- redundant -- but a species with no category of its own (VIP, whose
     -- guardian.category_id is NULL) may donate to any of them, so it
     -- cannot be recovered by joining through user_guardian.

@@ -179,10 +179,10 @@ const donationRecordBatchSchema = z.object({
 }).openapi({ ref: 'DonationRecordBatch' });
 
 const donationRecordSummarySchema = z.object({
-  maxedSpiritCount: z
+  maxedGuardianCount: z
     .number()
     .int()
-    .describe('Spirits grown to max level -- every one of them is owed'),
+    .describe('Guardians grown to max level -- every one of them is owed'),
   confirmedCount: z.number().int(),
   confirmedAmount: z.number().int().describe('Summed from the frozen per-donation amounts'),
   pendingCount: z
@@ -221,7 +221,7 @@ export const getInfoDonationResponseSchema = z.object({
  * cannot answer "who can be supported at all", and the two are not the
  * same list: an organisation nobody has chosen yet has no batch, so it is
  * invisible there while being exactly what a reader deciding whether to
- * trust this page wants to see -- and what a user about to grow a spirit
+ * trust this page wants to see -- and what a user about to grow a guardian
  * to LV5 is choosing from.
  *
  * One row per organisation, each carrying its categories, rather than
@@ -568,7 +568,7 @@ export const info = new Hono<TransactionEnv>()
 
     // How much has been promised in total. Not SUM(donation.amount): a
     // donation row appears only when its owner picks an organisation, so
-    // spirits that have maxed and not chosen yet are invisible to that
+    // guardians that have maxed and not chosen yet are invisible to that
     // table -- and they are already owed.
     //
     // The two halves are counted differently on purpose. What has been
@@ -576,8 +576,8 @@ export const info = new Hono<TransactionEnv>()
     // DONATION_AMOUNT cannot rewrite it. What has not been chosen has no
     // frozen amount to read, so it is priced at today's figure, which is
     // the one part of this page that moves if that number moves.
-    const [{ maxedSpiritCount }] = await db
-      .select({ maxedSpiritCount: count() })
+    const [{ maxedGuardianCount }] = await db
+      .select({ maxedGuardianCount: count() })
       .from(userGuardianTable)
       .where(eq(userGuardianTable.level, MAX_LEVEL));
 
@@ -599,7 +599,7 @@ export const info = new Hono<TransactionEnv>()
     // donation is confirmed through a max-level guard, so this cannot go
     // negative today, but a negative count would silently reduce the
     // promised total below what has already been paid out.
-    const pendingCount = Math.max(0, maxedSpiritCount - confirmed.confirmedCount);
+    const pendingCount = Math.max(0, maxedGuardianCount - confirmed.confirmedCount);
     const confirmedAmount = confirmed.confirmedAmount;
     const pendingAmount = pendingCount * DONATION_AMOUNT;
 
@@ -608,7 +608,7 @@ export const info = new Hono<TransactionEnv>()
     // sentences here would only give them somewhere to drift.
     return c.json({
       summary: {
-        maxedSpiritCount,
+        maxedGuardianCount,
         confirmedCount: confirmed.confirmedCount,
         confirmedAmount,
         pendingCount,

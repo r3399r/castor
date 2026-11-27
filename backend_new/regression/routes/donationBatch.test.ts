@@ -88,7 +88,7 @@ const unpublish = (id: number) => app.request(`${base}/${id}/unpublish`, { metho
 const deleteBatch = (id: number) => app.request(`${base}/${id}`, { method: 'DELETE' });
 
 // FK-safe order: evidence -> donation -> batch -> org links -> org ->
-// spirits -> species -> users -> categories (guardian points at
+// guardians -> species -> users -> categories (guardian points at
 // charity_category, so categories go last).
 const clearTables = async () => {
   const db = getDb();
@@ -136,7 +136,7 @@ const seedCategory = async () => {
   return insertId;
 };
 
-const seedSpirit = async (userId: number, categoryId: number) => {
+const seedGuardian = async (userId: number, categoryId: number) => {
   const db = getDb();
   seq += 1;
   const [{ insertId: speciesId }] = await db.insert(guardianTable).values({
@@ -188,7 +188,7 @@ const seedDonation = async (
 ) => {
   const db = getDb();
   const userId = await seedUser();
-  const userGuardianId = await seedSpirit(userId, categoryId);
+  const userGuardianId = await seedGuardian(userId, categoryId);
   const [{ insertId }] = await db.insert(donationTable).values({
     userId,
     userGuardianId,

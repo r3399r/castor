@@ -66,7 +66,7 @@ SELECT COUNT(*), AVG(awarded_points), MIN(awarded_points), MAX(awarded_points)
    沒有錯誤、沒有通知，使用者要到下次投入才會發現。
 2. **LV5 的捐款資格會變成跨使用者不一致，而且不可追溯。**
    `MAX_LEVEL = LEVEL_XP_THRESHOLDS.length + 1`，改門檻的**值**不改**長度**，所以 `MAX_LEVEL` 還是 5；
-   而 `routes/donation.ts` 的守門是 `if (spirit.level < MAX_LEVEL)`，只看存著的 `level`。
+   而 `routes/donation.ts` 的守門是 `if (guardian.level < MAX_LEVEL)`，只看存著的 `level`。
    於是用舊門檻衝到 LV5 的人保有 LV5、也保有那筆真錢的資格，改動後投入同樣積分的人拿不到。
    兩種人並存在同一張表裡，**沒有任何欄位記錄他們是在哪一套規則下長大的**。
 

@@ -109,11 +109,11 @@ const seedSpecies = async (categoryId: number | null) => {
 };
 
 /**
- * One owned spirit. Takes the *category* and creates the species behind
+ * One owned guardian. Takes the *category* and creates the species behind
  * it, because every test here cares about the category, not the egg --
  * except the VIP cases, which pass null.
  */
-const seedSpirit = async (userId: number, categoryId: number | null, level = MAX_LEVEL) => {
+const seedGuardian = async (userId: number, categoryId: number | null, level = MAX_LEVEL) => {
   const db = getDb();
   const speciesId = await seedSpecies(categoryId);
   const [{ insertId }] = await db.insert(userGuardianTable).values({
@@ -172,17 +172,17 @@ describe('donation routes', () => {
   });
 
   describe('POST /', () => {
-    it('confirms a donation for a maxed spirit and freezes the amount', async () => {
+    it('confirms a donation for a maxed guardian and freezes the amount', async () => {
       const userId = await seedUser();
       const category = await seedCategory();
-      const spirit = await seedSpirit(userId, category);
+      const guardian = await seedGuardian(userId, category);
       const organization = await seedOrganization([category]);
 
-      const res = await postDonation({ userGuardianId: spirit, organizationId: organization });
+      const res = await postDonation({ userGuardianId: guardian, organizationId: organization });
       expect(res.status).toBe(201);
       const body = (await res.json()) as DonationDto;
       expect(body).toMatchObject({
-        userGuardianId: spirit,
+        userGuardianId: guardian,
         amount: DONATION_AMOUNT,
         batch: null,
       });
@@ -193,7 +193,7 @@ describe('donation routes', () => {
       expect(rows).toHaveLength(1);
       expect(rows[0]).toMatchObject({
         userId,
-        userGuardianId: spirit,
+        userGuardianId: guardian,
         categoryId: category,
         organizationId: organization,
         amount: DONATION_AMOUNT,
@@ -202,13 +202,13 @@ describe('donation routes', () => {
       });
     });
 
-    it('rejects a spirit that is not yet at max level', async () => {
+    it('rejects a guardian that is not yet at max level', async () => {
       const userId = await seedUser();
       const category = await seedCategory();
-      const spirit = await seedSpirit(userId, category, MAX_LEVEL - 1);
+      const guardian = await seedGuardian(userId, category, MAX_LEVEL - 1);
       const organization = await seedOrganization([category]);
 
-      const res = await postDonation({ userGuardianId: spirit, organizationId: organization });
+      const res = await postDonation({ userGuardianId: guardian, organizationId: organization });
       expect(res.status).toBe(400);
       expect(await res.json()).toMatchObject({ code: 'GUARDIAN_NOT_MAX_LEVEL' });
       expect(await getDb().select().from(donationTable)).toHaveLength(0);
@@ -217,30 +217,30 @@ describe('donation routes', () => {
     // The irreversibility of the whole feature. donation.userGuardianId is
     // UNIQUE; this check exists so a double-tapped button says so instead
     // of surfacing a driver error as a 500.
-    it('refuses a second donation from the same spirit', async () => {
+    it('refuses a second donation from the same guardian', async () => {
       const userId = await seedUser();
       const category = await seedCategory();
-      const spirit = await seedSpirit(userId, category);
+      const guardian = await seedGuardian(userId, category);
       const first = await seedOrganization([category]);
       const second = await seedOrganization([category]);
 
-      expect((await postDonation({ userGuardianId: spirit, organizationId: first })).status).toBe(201);
+      expect((await postDonation({ userGuardianId: guardian, organizationId: first })).status).toBe(201);
 
-      const res = await postDonation({ userGuardianId: spirit, organizationId: second });
+      const res = await postDonation({ userGuardianId: guardian, organizationId: second });
       expect(res.status).toBe(400);
       expect(await res.json()).toMatchObject({ code: 'DONATION_ALREADY_CONFIRMED' });
       expect(await getDb().select().from(donationTable)).toHaveLength(1);
     });
 
-    // user_guardian is UNIQUE on (user_id, guardian_id), i.e. one spirit
-    // per *species*. seedSpirit mints a fresh species per call, so this
-    // is two spirits under one category -- which the schema now permits
+    // user_guardian is UNIQUE on (user_id, guardian_id), i.e. one guardian
+    // per *species*. seedGuardian mints a fresh species per call, so this
+    // is two guardians under one category -- which the schema now permits
     // because a category may hold several eggs.
-    it('lets a different maxed spirit of the same user donate too', async () => {
+    it('lets a different maxed guardian of the same user donate too', async () => {
       const userId = await seedUser();
       const category = await seedCategory();
-      const a = await seedSpirit(userId, category);
-      const b = await seedSpirit(userId, category);
+      const a = await seedGuardian(userId, category);
+      const b = await seedGuardian(userId, category);
       const organization = await seedOrganization([category]);
 
       expect((await postDonation({ userGuardianId: a, organizationId: organization })).status).toBe(201);
@@ -248,22 +248,22 @@ describe('donation routes', () => {
       expect(await getDb().select().from(donationTable)).toHaveLength(2);
     });
 
-    // Someone else's spirit reads as not-found rather than forbidden:
+    // Someone else's guardian reads as not-found rather than forbidden:
     // whether a given id exists is not this caller's business.
-    it('cannot spend a spirit belonging to another user', async () => {
+    it('cannot spend a guardian belonging to another user', async () => {
       const mine = await seedUser();
       const theirs = await seedUser('other-uid');
       const category = await seedCategory();
-      const theirSpirit = await seedSpirit(theirs, category);
+      const theirGuardian = await seedGuardian(theirs, category);
       const organization = await seedOrganization([category]);
 
-      const res = await postDonation({ userGuardianId: theirSpirit, organizationId: organization });
+      const res = await postDonation({ userGuardianId: theirGuardian, organizationId: organization });
       expect(res.status).toBe(404);
       expect(await getDb().select().from(donationTable)).toHaveLength(0);
       void mine;
     });
 
-    it('returns 404 for an unknown spirit', async () => {
+    it('returns 404 for an unknown guardian', async () => {
       await seedUser();
       const category = await seedCategory();
       const organization = await seedOrganization([category]);
@@ -276,18 +276,18 @@ describe('donation routes', () => {
     it('returns 404 for an unknown organization', async () => {
       const userId = await seedUser();
       const category = await seedCategory();
-      const spirit = await seedSpirit(userId, category);
+      const guardian = await seedGuardian(userId, category);
 
-      expect((await postDonation({ userGuardianId: spirit, organizationId: 999999 })).status).toBe(404);
+      expect((await postDonation({ userGuardianId: guardian, organizationId: 999999 })).status).toBe(404);
     });
 
     it('rejects a deactivated organization', async () => {
       const userId = await seedUser();
       const category = await seedCategory();
-      const spirit = await seedSpirit(userId, category);
+      const guardian = await seedGuardian(userId, category);
       const organization = await seedOrganization([category], { isActive: false });
 
-      const res = await postDonation({ userGuardianId: spirit, organizationId: organization });
+      const res = await postDonation({ userGuardianId: guardian, organizationId: organization });
       expect(res.status).toBe(400);
       expect(await res.json()).toMatchObject({ code: 'ORGANIZATION_INACTIVE' });
     });
@@ -298,49 +298,49 @@ describe('donation routes', () => {
       const userId = await seedUser();
       const category = await seedCategory();
       const otherCategory = await seedCategory();
-      const spirit = await seedSpirit(userId, category);
+      const guardian = await seedGuardian(userId, category);
       const organization = await seedOrganization([otherCategory]);
 
-      const res = await postDonation({ userGuardianId: spirit, organizationId: organization });
+      const res = await postDonation({ userGuardianId: guardian, organizationId: organization });
       expect(res.status).toBe(400);
       expect(await res.json()).toMatchObject({ code: 'ORGANIZATION_CATEGORY_MISMATCH' });
     });
 
     describe('category rules', () => {
-      it('files an ordinary spirit under its own category when none is given', async () => {
+      it('files an ordinary guardian under its own category when none is given', async () => {
         const userId = await seedUser();
         const category = await seedCategory();
-        const spirit = await seedSpirit(userId, category);
+        const guardian = await seedGuardian(userId, category);
         const organization = await seedOrganization([category]);
 
-        const res = await postDonation({ userGuardianId: spirit, organizationId: organization });
+        const res = await postDonation({ userGuardianId: guardian, organizationId: organization });
         expect(((await res.json()) as DonationDto).category.id).toBe(category);
       });
 
-      it('accepts an ordinary spirit restating its own category', async () => {
+      it('accepts an ordinary guardian restating its own category', async () => {
         const userId = await seedUser();
         const category = await seedCategory();
-        const spirit = await seedSpirit(userId, category);
+        const guardian = await seedGuardian(userId, category);
         const organization = await seedOrganization([category]);
 
         const res = await postDonation({
-          userGuardianId: spirit,
+          userGuardianId: guardian,
           organizationId: organization,
           categoryId: category,
         });
         expect(res.status).toBe(201);
       });
 
-      it('refuses an ordinary spirit asking for a different category', async () => {
+      it('refuses an ordinary guardian asking for a different category', async () => {
         const userId = await seedUser();
         const category = await seedCategory();
         const otherCategory = await seedCategory();
-        const spirit = await seedSpirit(userId, category);
-        // Offered under both, so only the spirit's own rule can reject it.
+        const guardian = await seedGuardian(userId, category);
+        // Offered under both, so only the guardian's own rule can reject it.
         const organization = await seedOrganization([category, otherCategory]);
 
         const res = await postDonation({
-          userGuardianId: spirit,
+          userGuardianId: guardian,
           organizationId: organization,
           categoryId: otherCategory,
         });
@@ -352,14 +352,14 @@ describe('donation routes', () => {
       // category, so its owner picks one. That is why donation.categoryId
       // exists separately from user_guardian.guardianId -- it cannot be
       // recovered by joining through the species.
-      it('lets a spirit with no category of its own choose one', async () => {
+      it('lets a guardian with no category of its own choose one', async () => {
         const userId = await seedUser();
         const target = await seedCategory();
-        const spirit = await seedSpirit(userId, null);
+        const guardian = await seedGuardian(userId, null);
         const organization = await seedOrganization([target]);
 
         const res = await postDonation({
-          userGuardianId: spirit,
+          userGuardianId: guardian,
           organizationId: organization,
           categoryId: target,
         });
@@ -371,13 +371,13 @@ describe('donation routes', () => {
         expect(row.categoryId).toBe(target);
       });
 
-      it('requires such a spirit to say which category', async () => {
+      it('requires such a guardian to say which category', async () => {
         const userId = await seedUser();
         const target = await seedCategory();
-        const spirit = await seedSpirit(userId, null);
+        const guardian = await seedGuardian(userId, null);
         const organization = await seedOrganization([target]);
 
-        const res = await postDonation({ userGuardianId: spirit, organizationId: organization });
+        const res = await postDonation({ userGuardianId: guardian, organizationId: organization });
         expect(res.status).toBe(400);
         expect(await res.json()).toMatchObject({ code: 'DONATION_CATEGORY_REQUIRED' });
       });
@@ -387,11 +387,11 @@ describe('donation routes', () => {
       it('refuses an inactive category', async () => {
         const userId = await seedUser();
         const retired = await seedCategory({ isActive: false });
-        const spirit = await seedSpirit(userId, null);
+        const guardian = await seedGuardian(userId, null);
         const organization = await seedOrganization([retired]);
 
         const res = await postDonation({
-          userGuardianId: spirit,
+          userGuardianId: guardian,
           organizationId: organization,
           categoryId: retired,
         });
@@ -407,9 +407,9 @@ describe('donation routes', () => {
       const theirs = await seedUser('other-uid');
       const category = await seedCategory();
       const organization = await seedOrganization([category]);
-      const first = await seedSpirit(userId, category);
-      const second = await seedSpirit(userId, category);
-      const theirSpirit = await seedSpirit(theirs, category);
+      const first = await seedGuardian(userId, category);
+      const second = await seedGuardian(userId, category);
+      const theirGuardian = await seedGuardian(theirs, category);
 
       const a = (await (
         await postDonation({ userGuardianId: first, organizationId: organization })
@@ -421,7 +421,7 @@ describe('donation routes', () => {
       // A donation belonging to somebody else, inserted directly.
       await getDb().insert(donationTable).values({
         userId: theirs,
-        userGuardianId: theirSpirit,
+        userGuardianId: theirGuardian,
         categoryId: category,
         organizationId: organization,
         amount: DONATION_AMOUNT,
@@ -442,8 +442,8 @@ describe('donation routes', () => {
       const userId = await seedUser();
       const category = await seedCategory();
       const organization = await seedOrganization([category]);
-      const first = await seedSpirit(userId, category);
-      const second = await seedSpirit(userId, category);
+      const first = await seedGuardian(userId, category);
+      const second = await seedGuardian(userId, category);
       const a = (await (
         await postDonation({ userGuardianId: first, organizationId: organization })
       ).json()) as DonationDto;
@@ -468,9 +468,9 @@ describe('donation routes', () => {
     it('reports batch as null while the donation is awaiting payout', async () => {
       const userId = await seedUser();
       const category = await seedCategory();
-      const spirit = await seedSpirit(userId, category);
+      const guardian = await seedGuardian(userId, category);
       const organization = await seedOrganization([category]);
-      await postDonation({ userGuardianId: spirit, organizationId: organization });
+      await postDonation({ userGuardianId: guardian, organizationId: organization });
 
       const body = (await (await getDonations()).json()) as ListDto;
       expect(body.data[0].batch).toBeNull();
@@ -480,10 +480,10 @@ describe('donation routes', () => {
       const db = getDb();
       const userId = await seedUser();
       const category = await seedCategory();
-      const spirit = await seedSpirit(userId, category);
+      const guardian = await seedGuardian(userId, category);
       const organization = await seedOrganization([category]);
       const created = (await (
-        await postDonation({ userGuardianId: spirit, organizationId: organization })
+        await postDonation({ userGuardianId: guardian, organizationId: organization })
       ).json()) as DonationDto;
 
       const [{ insertId: batchId }] = await db.insert(donationBatchTable).values({
@@ -505,8 +505,8 @@ describe('donation routes', () => {
       const category = await seedCategory();
       const organization = await seedOrganization([category]);
       for (let i = 0; i < 3; i++) {
-        const spirit = await seedSpirit(userId, category);
-        await postDonation({ userGuardianId: spirit, organizationId: organization });
+        const guardian = await seedGuardian(userId, category);
+        await postDonation({ userGuardianId: guardian, organizationId: organization });
       }
 
       const page = (await (await getDonations('?limit=2')).json()) as ListDto;
@@ -542,7 +542,7 @@ describe('donation routes', () => {
       const categoryId = await seedCategory();
       const organizationId = await seedOrganization([categoryId]);
       const speciesId = await seedSpecies(categoryId);
-      const userGuardianId = await seedSpirit(userId, categoryId);
+      const userGuardianId = await seedGuardian(userId, categoryId);
 
       const created: unknown = await (
         await postDonation({ userGuardianId, organizationId })
@@ -587,7 +587,7 @@ describe('donation routes', () => {
       const categoryId = await seedCategory();
       const organizationId = await seedOrganization([categoryId]);
       await seedSpecies(categoryId);
-      const userGuardianId = await seedSpirit(userId, categoryId);
+      const userGuardianId = await seedGuardian(userId, categoryId);
       const created = (await (
         await postDonation({ userGuardianId, organizationId })
       ).json()) as DonationDto;

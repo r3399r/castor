@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS castor.guardian (
     name VARCHAR(100) NOT NULL,
     cost INT UNSIGNED NOT NULL, -- points required to redeem one of this guardian in the store
     -- The public-interest category this species supports, or NULL for a
-    -- species that is not tied to one. NULL is what the VIP spirit is:
+    -- species that is not tied to one. NULL is what the VIP guardian is:
     -- its owner may direct the donation at any category. That replaced
     -- an unrestricted_category TINYINT flag, which said the same thing
     -- without the database being able to enforce it.

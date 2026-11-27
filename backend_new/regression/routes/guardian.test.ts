@@ -179,8 +179,8 @@ describe('guardian routes', () => {
       expect(body.data[0]).toMatchObject({ guardianId: speciesId, level: 1, xp: 0, nextLevelXp: 2_500 });
     });
 
-    it('names the category the spirit supports, which the LV5 donation screen needs', async () => {
-      // The donation flow is per spirit: it has to list that category's
+    it('names the category the guardian supports, which the LV5 donation screen needs', async () => {
+      // The donation flow is per guardian: it has to list that category's
       // organisations. It is also the only name of a cause this response
       // carries, since the `theme` column that held a copy of it is gone.
       const userId = await seedUser(0);
@@ -192,9 +192,9 @@ describe('guardian routes', () => {
       expect(body.data[0].category).toEqual({ id: categoryId, name: '類別 1' });
     });
 
-    it('still returns a spirit whose species is tied to no category', async () => {
+    it('still returns a guardian whose species is tied to no category', async () => {
       // This is what VIP is -- categoryId null, owner may direct the
-      // donation at any category. An inner join here would drop the spirit
+      // donation at any category. An inner join here would drop the guardian
       // out of its owner's own collection, which is strictly worse than
       // not naming a category.
       const userId = await seedUser(0);

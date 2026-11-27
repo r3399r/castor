@@ -454,7 +454,7 @@ export const guardianTable = mysqlTable('guardian', {
   name: varchar('name', { length: 100 }).notNull(),
   cost: int('cost', { unsigned: true }).notNull(),
   // The public-interest category this species supports, or null for a
-  // species not tied to one -- which is how the VIP spirit says its owner
+  // species not tied to one -- which is how the VIP guardian says its owner
   // may direct the donation at any category. Replaced an
   // unrestrictedCategory boolean that said the same thing without the
   // database being able to enforce it.
@@ -620,7 +620,7 @@ export const paymentPurchaseTable = mysqlTable('payment_purchase', {
 });
 
 // A foundation or association the platform contributes to on a user's
-// behalf once they grow a spirit to max level. Curated by hand through
+// behalf once they grow a guardian to max level. Curated by hand through
 // the admin UI; never deleted, because a past donation still has to
 // render its recipient's name on the public record. isActive = false
 // removes it from the chooser and nothing else.
@@ -732,10 +732,10 @@ export const donationBatchEvidenceTable = mysqlTable('donation_batch_evidence', 
   createdAt: datetime('created_at', { mode: 'date', fsp: 3 }),
 });
 
-// One user's contribution, earned by growing one spirit to max level and
+// One user's contribution, earned by growing one guardian to max level and
 // directed at one organisation. The user pays nothing; the platform
 // does. The row is created when the user confirms a choice, not when the
-// spirit maxes -- so a maxed spirit whose owner has not chosen yet has
+// guardian maxes -- so a maxed guardian whose owner has not chosen yet has
 // no row here, and the public page counts what is promised from
 // userGuardian at max level instead of from SUM(amount) over this table.
 export const donationTable = mysqlTable('donation', {
@@ -743,14 +743,14 @@ export const donationTable = mysqlTable('donation', {
   userId: int('user_id', { unsigned: true })
     .notNull()
     .references(() => userTable.id),
-  // The entitlement: one maxed spirit buys one choice. Its UNIQUE index
+  // The entitlement: one maxed guardian buys one choice. Its UNIQUE index
   // is the load-bearing constraint of the whole feature -- without it a
   // replayed confirmation becomes a second promise of real money.
   userGuardianId: int('user_guardian_id', { unsigned: true })
     .notNull()
     .references(() => userGuardianTable.id),
   // The category the user actually chose. Usually the category of the
-  // spirit's own species, which is why it looks redundant -- but a
+  // guardian's own species, which is why it looks redundant -- but a
   // species with no category of its own (VIP, whose categoryId is null)
   // may pick any of them, so it cannot be recovered by joining through
   // userGuardian.

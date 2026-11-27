@@ -18,7 +18,7 @@
 --
 -- A code `spiritCatalog` has no drawn entry for falls back to the locked
 -- egg silently. These mirror the live table -- confirm against
--- /admin/species rather than this file, and keep AGENTS.md's Spirit
+-- /admin/species rather than this file, and keep AGENTS.md's Guardian
 -- categories table in step.
 --
 -- `cost` is a flat 10 in the live table, not a ladder. Do not "fix" it.

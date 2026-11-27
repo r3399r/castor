@@ -20,10 +20,10 @@ import { UserEnv } from 'src/middleware/requireUser';
 import { BadRequestError, NotFoundError } from 'src/model/error';
 
 export const donationBodySchema = z.object({
-  // The entitlement being spent: one maxed spirit, one donation.
+  // The entitlement being spent: one maxed guardian, one donation.
   userGuardianId: z.number().int().positive(),
   organizationId: z.number().int().positive(),
-  // The public-interest category. Optional because an ordinary spirit has
+  // The public-interest category. Optional because an ordinary guardian has
   // exactly one legal value (its own species' category), so the client
   // need not repeat it; a species with no category of its own (VIP) must
   // say which one it is choosing.
@@ -93,7 +93,7 @@ export const donationSchema = z.object({
   userGuardianId: z
     .number()
     .int()
-    .describe('Which maxed spirit paid for it -- how the picker knows one is spent'),
+    .describe('Which maxed guardian paid for it -- how the picker knows one is spent'),
   amount: z
     .number()
     .int()
@@ -132,14 +132,14 @@ export const getDonationResponseSchema = z.object({
     .number()
     .int()
     .describe(
-      'What confirming one more spirit would be worth. The figure a *new* donation would freeze, which is why every row above carries its own amount instead.'
+      'What confirming one more guardian would be worth. The figure a *new* donation would freeze, which is why every row above carries its own amount instead.'
     ),
 });
 
 const listDoc = describeRoute({
   summary: "The caller's own donations",
   description:
-    'Behind requireUser, and scoped to the caller. Carries `userGuardianId` so the client can tell which of its maxed spirits have already chosen: this list and GET /api/guardian are what the picker is built from.',
+    'Behind requireUser, and scoped to the caller. Carries `userGuardianId` so the client can tell which of its maxed guardians have already chosen: this list and GET /api/guardian are what the picker is built from.',
   tags: ['donation'],
   responses: {
     200: {
@@ -152,9 +152,9 @@ const listDoc = describeRoute({
 });
 
 const createDoc = describeRoute({
-  summary: 'Confirm which organisation one maxed spirit supports',
+  summary: 'Confirm which organisation one maxed guardian supports',
   description:
-    'Behind requireUser. Irreversible by design: `donation.user_guardian_id` is UNIQUE, so one spirit means one donation forever. `categoryId` is required only for a species tied to no category (the VIP spirit, whose owner may direct the donation anywhere); for any other spirit the only legal value is its own category, so it can be left out.',
+    'Behind requireUser. Irreversible by design: `donation.user_guardian_id` is UNIQUE, so one guardian means one donation forever. `categoryId` is required only for a species tied to no category (the VIP guardian, whose owner may direct the donation anywhere); for any other guardian the only legal value is its own category, so it can be left out.',
   tags: ['donation'],
   responses: {
     201: {
@@ -163,12 +163,12 @@ const createDoc = describeRoute({
     },
     400: {
       description:
-        'The spirit is not at the maximum level (GUARDIAN_NOT_MAX_LEVEL), it has already chosen (DONATION_ALREADY_CONFIRMED), a category is required (DONATION_CATEGORY_REQUIRED) or not its own (DONATION_CATEGORY_INVALID) or out of circulation (DONATION_CATEGORY_INACTIVE), the organisation is out of circulation (ORGANIZATION_INACTIVE) or is not offered under the chosen category (ORGANIZATION_CATEGORY_MISMATCH) -- the code in the body says which',
+        'The guardian is not at the maximum level (GUARDIAN_NOT_MAX_LEVEL), it has already chosen (DONATION_ALREADY_CONFIRMED), a category is required (DONATION_CATEGORY_REQUIRED) or not its own (DONATION_CATEGORY_INVALID) or out of circulation (DONATION_CATEGORY_INACTIVE), the organisation is out of circulation (ORGANIZATION_INACTIVE) or is not offered under the chosen category (ORGANIZATION_CATEGORY_MISMATCH) -- the code in the body says which',
     },
     401: { description: 'No valid identity' },
     404: {
       description:
-        'No such spirit belongs to this caller, or no such organisation. Someone else\'s spirit reads as not-found rather than forbidden: whether a given id exists is not this caller\'s business',
+        'No such guardian belongs to this caller, or no such organisation. Someone else\'s guardian reads as not-found rather than forbidden: whether a given id exists is not this caller\'s business',
     },
   },
 });
@@ -219,7 +219,7 @@ const toDto = (row: DonationRow): z.infer<typeof donationSchema> => ({
 export const donation = new Hono<UserEnv>()
   /**
    * The caller's own donations. Includes userGuardianId so the client can
-   * tell which of its maxed spirits have already chosen -- the two lists
+   * tell which of its maxed guardians have already chosen -- the two lists
    * (/api/guardian and this one) are what the picker is built from.
    */
   .get('/', listDoc, zValidator('query', donationListQuerySchema), async (c) => {
@@ -235,7 +235,7 @@ export const donation = new Hono<UserEnv>()
 
     const rows = await selectDonations(db)
       .where(eq(donationTable.userId, user.id))
-      // id as the tiebreaker: several spirits confirmed in one sitting
+      // id as the tiebreaker: several guardians confirmed in one sitting
       // share a confirmedAt to the millisecond often enough that without
       // it a paginated list can repeat or skip rows between pages.
       .orderBy(
@@ -255,10 +255,10 @@ export const donation = new Hono<UserEnv>()
     } satisfies z.infer<typeof getDonationResponseSchema>);
   })
   /**
-   * Confirm which organisation one maxed spirit supports.
+   * Confirm which organisation one maxed guardian supports.
    *
    * Irreversible by design: donation.userGuardianId is UNIQUE, so one
-   * spirit means one donation forever. That constraint is the real
+   * guardian means one donation forever. That constraint is the real
    * guarantee here -- the checks below are there to answer with something
    * meaningful instead of a driver error, not to be the only line of
    * defence against a replayed request.
@@ -271,15 +271,15 @@ export const donation = new Hono<UserEnv>()
     );
     const db = c.get('db');
 
-    // The spirit, its species row, and that species' category, in one go.
-    // Scoped to the caller's own rows: someone else's spirit must read as
+    // The guardian, its species row, and that species' category, in one go.
+    // Scoped to the caller's own rows: someone else's guardian must read as
     // "not found", not as "forbidden", since whether a given id exists is
     // not this caller's business.
-    const [spirit] = await db
+    const [guardian] = await db
       .select({
         id: userGuardianTable.id,
         level: userGuardianTable.level,
-        // null for a species not tied to a category -- the VIP spirit,
+        // null for a species not tied to a category -- the VIP guardian,
         // whose owner may direct the donation anywhere. This replaced an
         // unrestrictedCategory flag: the absence of a category *is* the
         // permission, so there is nothing left to keep in step.
@@ -288,11 +288,11 @@ export const donation = new Hono<UserEnv>()
       .from(userGuardianTable)
       .innerJoin(guardianTable, eq(guardianTable.id, userGuardianTable.guardianId))
       .where(and(eq(userGuardianTable.id, userGuardianId), eq(userGuardianTable.userId, user.id)));
-    if (spirit === undefined) throw new NotFoundError(`guardian ${userGuardianId} not found`);
+    if (guardian === undefined) throw new NotFoundError(`guardian ${userGuardianId} not found`);
 
-    if (spirit.level < MAX_LEVEL)
+    if (guardian.level < MAX_LEVEL)
       throw new BadRequestError(
-        `guardian ${userGuardianId} is level ${spirit.level}, not ${MAX_LEVEL}`,
+        `guardian ${userGuardianId} is level ${guardian.level}, not ${MAX_LEVEL}`,
         'GUARDIAN_NOT_MAX_LEVEL'
       );
 
@@ -315,7 +315,7 @@ export const donation = new Hono<UserEnv>()
     // naming. A species without one (VIP) has every active category to
     // choose from, so it has to say.
     let chosenCategoryId: number;
-    if (spirit.speciesCategoryId === null) {
+    if (guardian.speciesCategoryId === null) {
       if (categoryId === undefined)
         throw new BadRequestError(
           'categoryId is required for a guardian that may support any category',
@@ -335,12 +335,12 @@ export const donation = new Hono<UserEnv>()
         );
       chosenCategoryId = category.id;
     } else {
-      if (categoryId !== undefined && categoryId !== spirit.speciesCategoryId)
+      if (categoryId !== undefined && categoryId !== guardian.speciesCategoryId)
         throw new BadRequestError(
-          `guardian ${userGuardianId} may only support its own category ${spirit.speciesCategoryId}`,
+          `guardian ${userGuardianId} may only support its own category ${guardian.speciesCategoryId}`,
           'DONATION_CATEGORY_INVALID'
         );
-      chosenCategoryId = spirit.speciesCategoryId;
+      chosenCategoryId = guardian.speciesCategoryId;
     }
 
     const [organization] = await db

@@ -15,7 +15,7 @@
 | ③ `webapp/lib/guardianArtwork.ts` | 兩處：`SpiritSpecies` 聯集 ＋ `spiritCatalog` 項目 | **TypeScript 編譯失敗**（唯一會吵的一處） |
 | ④ `webapp/public/illustrations/guardians/<code>/lv1..lv5.webp` | 五張圖 | 顯示鎖住的蛋 |
 | ⑤ `webapp/source-assets/png/illustrations/guardians/<code>/lv1..lv5.png` | 原始 PNG | 日後重壓圖沒來源 |
-| ⑥ `AGENTS.md` 的 **Spirit categories** 表 | 加一列 | 下一個 agent 照過期清單工作 |
+| ⑥ `AGENTS.md` 的 **Guardian categories** 表 | 加一列 | 下一個 agent 照過期清單工作 |
 
 ### 三條硬規則
 
@@ -117,7 +117,7 @@ localStorage 捐款 demo 刪除而更新。改動上述任一處時，連同這�
 | 4 | 同上 → `spiritCatalog` | `name`、`artwork`、`tone`、`stages` | 型別缺 key，編譯失敗 |
 | 5 | `webapp/public/illustrations/guardians/<code>/lv1..lv5.webp` | 五張圖 | **無聲**：`artworkFor()` 回 undefined，顯示鎖住的蛋 |
 | 6 | `webapp/source-assets/png/illustrations/guardians/<code>/` | 原始 PNG | 之後要重壓圖時沒有來源 |
-| 7 | `AGENTS.md` 的 **Spirit categories** 表 | 一列 | 下一個人（或 AI）讀到的是過期清單 |
+| 7 | `AGENTS.md` 的 **Guardian categories** 表 | 一列 | 下一個人（或 AI）讀到的是過期清單 |
 
 第 3、4 項會讓 build 失敗，所以不會漏。**真正會咬人的是 1 和 5**——它們都無聲。
 
@@ -247,7 +247,7 @@ export const spiritCatalog: Record<SpiritSpecies, SpiritDefinition> = {
 
 ### A-5. `AGENTS.md`
 
-**Spirit categories** 那張表加一列：
+**Guardian categories** 那張表加一列：
 
 ```
 | `fox` | 生態環境與動物福利 (`forest`) | 狐 | LV1-LV5 available | 狐狸之蛋 |

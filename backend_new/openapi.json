@@ -89,9 +89,9 @@
       "DonationRecordSummary": {
         "type": "object",
         "properties": {
-          "maxedSpiritCount": {
+          "maxedGuardianCount": {
             "type": "integer",
-            "description": "Spirits grown to max level -- every one of them is owed"
+            "description": "Guardians grown to max level -- every one of them is owed"
           },
           "confirmedCount": {
             "type": "integer"
@@ -125,7 +125,7 @@
           }
         },
         "required": [
-          "maxedSpiritCount",
+          "maxedGuardianCount",
           "confirmedCount",
           "confirmedAmount",
           "pendingCount",
@@ -658,7 +658,7 @@
           },
           "code": {
             "type": "string",
-            "description": "Stable identifier, and what ties a spirit species to this category"
+            "description": "Stable identifier, and what ties a guardian species to this category"
           },
           "name": {
             "type": "string"
@@ -1917,7 +1917,7 @@
               "id",
               "name"
             ],
-            "description": "The donation category this species supports, or null for one tied to none. null is both what the planned VIP spirit is and what a seeded egg looks like when its category_id was forgotten -- indistinguishable from here, which is why the admin page says it out loud."
+            "description": "The donation category this species supports, or null for one tied to none. null is both what the planned VIP guardian is and what a seeded egg looks like when its category_id was forgotten -- indistinguishable from here, which is why the admin page says it out loud."
           },
           "ownersByLevel": {
             "type": "object",
@@ -2027,7 +2027,7 @@
               "integer",
               "null"
             ],
-            "description": "XP this spirit still needs for its next level, or null at the maximum"
+            "description": "XP this guardian still needs for its next level, or null at the maximum"
           },
           "category": {
             "type": [
@@ -2068,7 +2068,7 @@
           },
           "userGuardianId": {
             "type": "integer",
-            "description": "Which maxed spirit paid for it -- how the picker knows one is spent"
+            "description": "Which maxed guardian paid for it -- how the picker knows one is spent"
           },
           "amount": {
             "type": "integer",
@@ -4676,7 +4676,7 @@
       "get": {
         "operationId": "getApiCharityCategory",
         "summary": "List the public-interest categories",
-        "description": "Open to anyone: these names are printed on the public transparency page. GET-only, and the group is mounted behind `adminAuth`, which gates POST/PUT/DELETE -- so on a resource with none it gates nothing. That is intended here, not an oversight; the rows are seeded by SQL because they are tied to the spirit species by `code`.",
+        "description": "Open to anyone: these names are printed on the public transparency page. GET-only, and the group is mounted behind `adminAuth`, which gates POST/PUT/DELETE -- so on a resource with none it gates nothing. That is intended here, not an oversight; the rows are seeded by SQL because they are tied to the guardian species by `code`.",
         "tags": [
           "charity-category"
         ],
@@ -7175,7 +7175,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The new spirit and the balance left",
+            "description": "The new guardian and the balance left",
             "content": {
               "application/json": {
                 "schema": {
@@ -7233,14 +7233,14 @@
     "/api/guardian": {
       "get": {
         "operationId": "getApiGuardian",
-        "summary": "List the caller's spirits",
-        "description": "Every spirit this user owns, with the caller's point balance.",
+        "summary": "List the caller's guardians",
+        "description": "Every guardian this user owns, with the caller's point balance.",
         "tags": [
           "guardian"
         ],
         "responses": {
           "200": {
-            "description": "The spirits and the balance",
+            "description": "The guardians and the balance",
             "content": {
               "application/json": {
                 "schema": {
@@ -7270,14 +7270,14 @@
     "/api/guardian/{id}/invest": {
       "post": {
         "operationId": "postApiGuardianByIdInvest",
-        "summary": "Invest points into a spirit",
-        "description": "Spends the full `points` and adds XP, levelling the spirit up as many times as the XP covers. Paid access earns a growth bonus, which the server decides for itself from the caller's entitlement -- the request body cannot ask for it.",
+        "summary": "Invest points into a guardian",
+        "description": "Spends the full `points` and adds XP, levelling the guardian up as many times as the XP covers. Paid access earns a growth bonus, which the server decides for itself from the caller's entitlement -- the request body cannot ask for it.",
         "tags": [
           "guardian"
         ],
         "responses": {
           "200": {
-            "description": "The spirit after the investment, the new balance, and the XP granted",
+            "description": "The guardian after the investment, the new balance, and the XP granted",
             "content": {
               "application/json": {
                 "schema": {
@@ -7307,7 +7307,7 @@
             "description": "Already at the maximum level, or not enough points"
           },
           "404": {
-            "description": "No such spirit belongs to this caller"
+            "description": "No such guardian belongs to this caller"
           }
         },
         "parameters": [
@@ -7326,7 +7326,7 @@
       "get": {
         "operationId": "getApiDonation",
         "summary": "The caller's own donations",
-        "description": "Behind requireUser, and scoped to the caller. Carries `userGuardianId` so the client can tell which of its maxed spirits have already chosen: this list and GET /api/guardian are what the picker is built from.",
+        "description": "Behind requireUser, and scoped to the caller. Carries `userGuardianId` so the client can tell which of its maxed guardians have already chosen: this list and GET /api/guardian are what the picker is built from.",
         "tags": [
           "donation"
         ],
@@ -7349,7 +7349,7 @@
                     },
                     "donationAmount": {
                       "type": "integer",
-                      "description": "What confirming one more spirit would be worth. The figure a *new* donation would freeze, which is why every row above carries its own amount instead."
+                      "description": "What confirming one more guardian would be worth. The figure a *new* donation would freeze, which is why every row above carries its own amount instead."
                     }
                   },
                   "required": [
@@ -7371,8 +7371,8 @@
       },
       "post": {
         "operationId": "postApiDonation",
-        "summary": "Confirm which organisation one maxed spirit supports",
-        "description": "Behind requireUser. Irreversible by design: `donation.user_guardian_id` is UNIQUE, so one spirit means one donation forever. `categoryId` is required only for a species tied to no category (the VIP spirit, whose owner may direct the donation anywhere); for any other spirit the only legal value is its own category, so it can be left out.",
+        "summary": "Confirm which organisation one maxed guardian supports",
+        "description": "Behind requireUser. Irreversible by design: `donation.user_guardian_id` is UNIQUE, so one guardian means one donation forever. `categoryId` is required only for a species tied to no category (the VIP guardian, whose owner may direct the donation anywhere); for any other guardian the only legal value is its own category, so it can be left out.",
         "tags": [
           "donation"
         ],
@@ -7388,13 +7388,13 @@
             }
           },
           "400": {
-            "description": "The spirit is not at the maximum level (GUARDIAN_NOT_MAX_LEVEL), it has already chosen (DONATION_ALREADY_CONFIRMED), a category is required (DONATION_CATEGORY_REQUIRED) or not its own (DONATION_CATEGORY_INVALID) or out of circulation (DONATION_CATEGORY_INACTIVE), the organisation is out of circulation (ORGANIZATION_INACTIVE) or is not offered under the chosen category (ORGANIZATION_CATEGORY_MISMATCH) -- the code in the body says which"
+            "description": "The guardian is not at the maximum level (GUARDIAN_NOT_MAX_LEVEL), it has already chosen (DONATION_ALREADY_CONFIRMED), a category is required (DONATION_CATEGORY_REQUIRED) or not its own (DONATION_CATEGORY_INVALID) or out of circulation (DONATION_CATEGORY_INACTIVE), the organisation is out of circulation (ORGANIZATION_INACTIVE) or is not offered under the chosen category (ORGANIZATION_CATEGORY_MISMATCH) -- the code in the body says which"
           },
           "401": {
             "description": "No valid identity"
           },
           "404": {
-            "description": "No such spirit belongs to this caller, or no such organisation. Someone else's spirit reads as not-found rather than forbidden: whether a given id exists is not this caller's business"
+            "description": "No such guardian belongs to this caller, or no such organisation. Someone else's guardian reads as not-found rather than forbidden: whether a given id exists is not this caller's business"
           }
         }
       }

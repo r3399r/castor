@@ -32,7 +32,7 @@ export const investBodySchema = z.object({ points: z.number().int().positive() }
 const categorySchema = z.object({ id: z.number().int(), name: z.string() });
 
 /**
- * A spirit as this API reports it.
+ * A guardian as this API reports it.
  *
  * A schema rather than a hand-written type, because it is the single
  * description of the response: the handler's return is checked against
@@ -54,12 +54,12 @@ const guardianSchema = z.object({
     .number()
     .int()
     .nullable()
-    .describe('XP this spirit still needs for its next level, or null at the maximum'),
+    .describe('XP this guardian still needs for its next level, or null at the maximum'),
   /**
    * Null for a species tied to no category -- which is what VIP is, and
    * what lets its owner direct the donation at any category.
    *
-   * Carried here because the LV5 donation screen is per spirit: it has to
+   * Carried here because the LV5 donation screen is per guardian: it has to
    * list that category's organisations. It is also what the card's eyebrow
    * prints -- a `theme` column used to, holding a copy of this name, and
    * was dropped on 2026-11-21.
@@ -90,29 +90,29 @@ type GuardianDto = z.infer<typeof guardianSchema>;
  * middleware, so where it is constructed makes no difference.
  */
 const listDoc = describeRoute({
-  summary: "List the caller's spirits",
-  description: "Every spirit this user owns, with the caller's point balance.",
+  summary: "List the caller's guardians",
+  description: "Every guardian this user owns, with the caller's point balance.",
   tags: ['guardian'],
   responses: {
     200: {
-      description: 'The spirits and the balance',
+      description: 'The guardians and the balance',
       content: { 'application/json': { schema: resolver(getGuardianResponseSchema) } },
     },
   },
 });
 
 const investDoc = describeRoute({
-  summary: 'Invest points into a spirit',
+  summary: 'Invest points into a guardian',
   description:
-    'Spends the full `points` and adds XP, levelling the spirit up as many times as the XP covers. Paid access earns a growth bonus, which the server decides for itself from the caller\'s entitlement -- the request body cannot ask for it.',
+    'Spends the full `points` and adds XP, levelling the guardian up as many times as the XP covers. Paid access earns a growth bonus, which the server decides for itself from the caller\'s entitlement -- the request body cannot ask for it.',
   tags: ['guardian'],
   responses: {
     200: {
-      description: 'The spirit after the investment, the new balance, and the XP granted',
+      description: 'The guardian after the investment, the new balance, and the XP granted',
       content: { 'application/json': { schema: resolver(postGuardianInvestResponseSchema) } },
     },
     400: { description: 'Already at the maximum level, or not enough points' },
-    404: { description: 'No such spirit belongs to this caller' },
+    404: { description: 'No such guardian belongs to this caller' },
   },
 });
 
@@ -157,7 +157,7 @@ export const guardian = new Hono<UserEnv>()
       .from(userGuardianTable)
       .innerJoin(guardianTable, eq(guardianTable.id, userGuardianTable.guardianId))
       // Left, not inner: guardian.categoryId is NULL for a species tied to
-      // no category, and an inner join would drop that spirit out of the
+      // no category, and an inner join would drop that guardian out of the
       // owner's own collection entirely.
       .leftJoin(charityCategoryTable, eq(charityCategoryTable.id, guardianTable.categoryId))
       .where(eq(userGuardianTable.userId, user.id));

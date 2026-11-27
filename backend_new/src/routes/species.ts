@@ -44,7 +44,7 @@ export const adminSpeciesSchema = z.object({
     .object({ id: z.number().int(), name: z.string() })
     .nullable()
     .describe(
-      'The donation category this species supports, or null for one tied to none. null is both what the planned VIP spirit is and what a seeded egg looks like when its category_id was forgotten -- indistinguishable from here, which is why the admin page says it out loud.'
+      'The donation category this species supports, or null for one tied to none. null is both what the planned VIP guardian is and what a seeded egg looks like when its category_id was forgotten -- indistinguishable from here, which is why the admin page says it out loud.'
     ),
   ownersByLevel: z
     .record(z.number().int())
@@ -135,7 +135,7 @@ export const species = new Hono<TransactionEnv>().get('/', listDoc, async (c) =>
       // The donation category this species supports, or null for one
       // tied to none. The only name this response carries for a cause --
       // a `theme` column held a copy of it until 2026-11-21. null is both
-      // what the VIP spirit is and what a freshly seeded egg looks like
+      // what the VIP guardian is and what a freshly seeded egg looks like
       // when its category_id was forgotten -- indistinguishable from
       // here, which is why the admin page says it out loud.
       category:

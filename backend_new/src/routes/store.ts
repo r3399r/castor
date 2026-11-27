@@ -91,7 +91,7 @@ const redeemDoc = describeRoute({
   tags: ['store'],
   responses: {
     200: {
-      description: 'The new spirit and the balance left',
+      description: 'The new guardian and the balance left',
       content: { 'application/json': { schema: resolver(postStoreRedeemResponseSchema) } },
     },
     400: {
@@ -183,7 +183,7 @@ export const store = new Hono<UserEnv>()
 
     // BoxClient checks this on the card and again beside the mutation,
     // but both are frontend: without this check, `cost` points and a
-    // direct POST are enough to own a spirit whose category_id is NULL --
+    // direct POST are enough to own a guardian whose category_id is NULL --
     // and NULL is what lets its owner send a real donation to any
     // category.
     //
