@@ -2,7 +2,15 @@ name: DEV
 
 on:
   push:
-    branches: [ dev ]
+    # test/ecpay-daily-plan is here only so that pushing that branch
+    # deploys to the same test environment dev does -- ECPay's scheduler
+    # cannot reach localhost, so the recurring renewal it exists to
+    # exercise can only be tested on a deployed stack.
+    #
+    # DO NOT MERGE THIS LINE INTO dev. The branch carries a plan that is
+    # not for sale, and the trigger has no reason to outlive it. Both the
+    # branch and this entry go away together.
+    branches: [ dev, test/ecpay-daily-plan ]
 
 jobs:
   # Typecheck, unit tests, and the openapi/webapp-types gate. Defined in
