@@ -51,8 +51,9 @@ const ENDPOINTS = {
  * guessing wrong the other way just means nothing gets paid and someone
  * notices immediately.
  */
-const endpoints = () =>
-  process.env.ECPAY_MODE === 'production' ? ENDPOINTS.production : ENDPOINTS.stage;
+export const isEcpayProduction = (): boolean => process.env.ECPAY_MODE === 'production';
+
+const endpoints = () => (isEcpayProduction() ? ENDPOINTS.production : ENDPOINTS.stage);
 
 export const checkoutUrl = (): string => endpoints().checkout;
 

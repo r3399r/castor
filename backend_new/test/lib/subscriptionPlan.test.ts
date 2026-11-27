@@ -1,6 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import {
   PLANS,
+  availablePlans,
+  findPurchasablePlan,
   RENEWAL_GRACE_MS,
   dayPassEnd,
   findDayPassPlan,
@@ -72,6 +74,73 @@ describe('the plan catalog', () => {
     // webhook's unknown-plan branch handles, so this pins that the code
     // really is gone rather than merely unused.
     expect(findPlan('annual')).toBeUndefined();
+  });
+});
+
+/**
+ * The test-only plan, and the switch that hides it.
+ *
+ * `testDaily` charges every day so that ECPay's scheduler can be seen
+ * firing PeriodReturnURL. The danger it carries is plain -- a NT$10
+ * daily agreement must never be buyable with a real card -- and the gate
+ * is ECPAY_MODE, the same variable that decides whether real money moves
+ * at all. These cases exist because that is a safety property, not a
+ * presentation one.
+ */
+describe('a test-only plan', () => {
+  afterEach(() => {
+    delete process.env.ECPAY_MODE;
+  });
+
+  it('is in the catalog and respects the limits ECPay enforces', () => {
+    const plan = findRecurringPlan('testDaily')!;
+    expect(plan.periodType).toBe('D');
+    expect(plan.frequency).toBe(1);
+    // ECPay's documented minimum, and the point of it: two charges prove
+    // the scheduler fires, then the agreement ends by itself instead of
+    // billing their test environment forever.
+    expect(plan.execTimes).toBe(2);
+    expect(plan.testOnly).toBe(true);
+  });
+
+  it('is offered while ECPay is not in production', () => {
+    expect(availablePlans().map((plan) => plan.code)).toContain('testDaily');
+    expect(findPurchasablePlan('testDaily')).toBeDefined();
+  });
+
+  it('disappears entirely once ECPAY_MODE is production', () => {
+    process.env.ECPAY_MODE = 'production';
+    expect(availablePlans().map((plan) => plan.code)).not.toContain('testDaily');
+    expect(findPurchasablePlan('testDaily')).toBeUndefined();
+    // The real plans are untouched: the filter must not be able to empty
+    // the catalog.
+    expect(availablePlans().map((plan) => plan.code)).toEqual([
+      'monthly',
+      'days30',
+      'days90',
+      'days365',
+    ]);
+  });
+
+  it('stays offered for any value that is not exactly production', () => {
+    // Same posture as BETA_MODE: the flag is an exact string match, so a
+    // typo cannot quietly change which ECPay this deploy believes it is
+    // talking to. Here that direction is the safe one -- the unsafe
+    // direction would be hiding the plan while still charging real cards.
+    for (const value of ['Production', 'PRODUCTION', 'stage', 'true', '']) {
+      process.env.ECPAY_MODE = value;
+      expect(findPurchasablePlan('testDaily'), value).toBeDefined();
+    }
+  });
+
+  it('is still resolvable by the webhook after it stops being purchasable', () => {
+    // The distinction findPurchasablePlan exists for. An order already in
+    // payment_order has to be grantable when its notification arrives,
+    // whatever the flag now says -- otherwise flipping it takes money and
+    // gives nothing back.
+    process.env.ECPAY_MODE = 'production';
+    expect(findPlan('testDaily')).toBeDefined();
+    expect(findRecurringPlan('testDaily')).toBeDefined();
   });
 });
 

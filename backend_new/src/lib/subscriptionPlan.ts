@@ -25,7 +25,9 @@
  * our `current_period_end` does not influence when they charge.
  */
 
-export type RecurringPlanCode = 'monthly';
+import { isEcpayProduction } from 'src/lib/ecpay';
+
+export type RecurringPlanCode = 'monthly' | 'testDaily';
 export type DayPassPlanCode = 'days30' | 'days90' | 'days365';
 export type PlanCode = RecurringPlanCode | DayPassPlanCode;
 
@@ -35,6 +37,23 @@ type PlanCommon = {
   /** Shown on ECPay's payment page and the cardholder's statement. */
   itemName: string;
   tradeDesc: string;
+  /**
+   * Offered only while this deploy talks to ECPay's stage environment.
+   *
+   * Set on a plan that exists to exercise the integration rather than to
+   * sell anything -- today just `testDaily`, whose whole purpose is to
+   * make ECPay's scheduler fire PeriodReturnURL within a day instead of
+   * a month. `availablePlans` and `findPurchasablePlan` drop it once
+   * ECPAY_MODE is 'production', which is the same switch that decides
+   * whether a real card can be charged at all: one flag, so there is no
+   * state where real money and a test plan are both live.
+   *
+   * It gates *starting* a purchase, not honouring one. findPlan and
+   * findRecurringPlan still resolve the code, because an order already
+   * in payment_order has to be grantable when its notification arrives
+   * -- refusing there would mean money taken and nothing given.
+   */
+  testOnly?: true;
 };
 
 export type RecurringPlan = PlanCommon & {
@@ -105,10 +124,68 @@ export const PLANS: readonly Plan[] = [
     itemName: '學益 365 天方案',
     tradeDesc: '學益 Learn for Good 365 天',
   },
+  /**
+   * Not for sale: the only way to watch a *renewal* happen.
+   *
+   * The one real recurring plan is monthly, so the second charge -- and
+   * with it the first PeriodReturnURL this codebase ever receives from
+   * ECPay's scheduler -- lands a month after the first. That is not
+   * something anyone can test. ECPay's documented minimum period is one
+   * day (PeriodType 'D', Frequency 1), so this plan turns that month
+   * into a day.
+   *
+   * `execTimes: 2` is their documented minimum, and is chosen over a
+   * larger number deliberately: it is the smallest run that proves the
+   * scheduler fires at all, and the agreement then ends by itself rather
+   * than charging their test environment every day forever.
+   *
+   * The amount is a token NT$10. None of the pages read for this (2868
+   * 定期定額, 5631 定期定額付款結果通知, 2858 介接注意事項) states a
+   * minimum order amount for a credit card, so if ECPay refuses it, this
+   * number is the thing to raise.
+   *
+   * Deleting this plan is safe at any time: a stored period naming the
+   * code still renders, because getSubscriptionPlan already tolerates one
+   * it does not know -- the same path `annual` left behind.
+   */
+  {
+    kind: 'recurring',
+    code: 'testDaily',
+    testOnly: true,
+    amount: 10,
+    periodType: 'D',
+    frequency: 1,
+    execTimes: 2,
+    itemName: '學益 測試方案（每日）',
+    tradeDesc: '學益 Learn for Good 測試用每日方案',
+  },
 ] as const;
 
 export const findPlan = (code: string): Plan | undefined =>
   PLANS.find((plan) => plan.code === code);
+
+/**
+ * Whether this deploy may start a purchase of this plan.
+ *
+ * One definition, shared by the catalog endpoint and by checkout: a plan
+ * that is listed but not buyable, or buyable but not listed, is a bug in
+ * either direction.
+ */
+const isOffered = (plan: Plan): boolean => plan.testOnly !== true || !isEcpayProduction();
+
+/** PLANS, minus anything test-only once ECPAY_MODE is 'production'. */
+export const availablePlans = (): readonly Plan[] => PLANS.filter(isOffered);
+
+/**
+ * The plan a *new* purchase may be started for.
+ *
+ * Deliberately not findPlan, which answers "what is this code" and has
+ * to keep answering it for an order that already exists.
+ */
+export const findPurchasablePlan = (code: string): Plan | undefined => {
+  const plan = findPlan(code);
+  return plan !== undefined && isOffered(plan) ? plan : undefined;
+};
 
 export const isRecurringPlan = (plan: Plan): plan is RecurringPlan =>
   plan.kind === 'recurring';

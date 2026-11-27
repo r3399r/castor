@@ -20,7 +20,7 @@ import {
   findActiveOrder,
 } from 'src/lib/paymentOrder';
 import { findEntitledSubscription, setSubscription } from 'src/lib/subscription';
-import { findPlan, isDayPassPlan } from 'src/lib/subscriptionPlan';
+import { findPurchasablePlan, isDayPassPlan } from 'src/lib/subscriptionPlan';
 import { PURCHASE_STATUS_CREATED, purchaseStillOpen } from 'src/lib/paymentPurchase';
 import { BadRequestError, NotFoundError } from 'src/model/error';
 import { UserEnv } from 'src/middleware/requireUser';
@@ -188,7 +188,10 @@ export const payment = new Hono<UserEnv>()
     const db = c.get('db');
     console.log(`POST /api/payment/checkout userId=${user.id} plan=${planCode}`);
 
-    const plan = findPlan(planCode);
+    // findPurchasablePlan, not findPlan: a test-only plan has to read as
+    // a code that does not exist once ECPAY_MODE is 'production', which
+    // is indistinguishable from a typo -- exactly what is wanted there.
+    const plan = findPurchasablePlan(planCode);
     if (plan === undefined) throw new NotFoundError(`unknown plan ${planCode}`, 'UNKNOWN_PLAN');
 
     /**

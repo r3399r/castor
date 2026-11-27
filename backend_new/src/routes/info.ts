@@ -23,7 +23,7 @@ import {
 import { DONATION_AMOUNT } from 'src/lib/donationAmount';
 import { MAX_LEVEL, SUBSCRIBER_XP_BONUS_PERCENT } from 'src/lib/guardianLevel';
 import { DEFAULT_LIMIT, genPagination, MAX_LIMIT, paginationSchema } from 'src/lib/paginator';
-import { PLANS } from 'src/lib/subscriptionPlan';
+import { availablePlans } from 'src/lib/subscriptionPlan';
 import { TransactionEnv } from 'src/middleware/transaction';
 
 // Sized for the landing page's card grid (three across on a wide screen,
@@ -424,7 +424,7 @@ export const info = new Hono<TransactionEnv>()
       // pass is "N days, once". There is no periodType that honestly
       // describes a day pass -- 'D' with frequency 30 would read as
       // "charged every 30 days", which is exactly what it is not.
-      PLANS.map((plan) =>
+      availablePlans().map((plan) =>
         plan.kind === 'recurring'
           ? {
               kind: 'recurring' as const,

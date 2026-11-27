@@ -171,6 +171,37 @@ export default function SubscriptionPageClient() {
   const [submitting, setSubmitting] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const { amounts, failed: amountsFailed } = usePlanAmounts()
+
+  /**
+   * The plans this page offers: the ones the server says it sells.
+   *
+   * `subscriptionPlans` holds how a plan *reads* -- its name, period
+   * label and note, which are Chinese copy and belong here. What it must
+   * not be is a second opinion on which plans exist, and that is what
+   * this filter removes. The server decides:
+   *
+   *   offered there, unknown here  -- no card. Someone has to write the
+   *     copy; until they do, nothing is shown rather than something
+   *     unlabelled. (`testDaily`, offered only while ECPAY_MODE is not
+   *     'production', reaches the page exactly this way -- with no flag
+   *     of its own on this side, so the two cannot disagree.)
+   *   known here, not offered there -- no card either. This is the
+   *     direction that used to bite: a retired plan left a card with no
+   *     price and a button that could never be pressed, because
+   *     `canSubscribe` needs an amount the server never sent.
+   *
+   * Until `amounts` arrives everything renders, priceless and on
+   * purpose: filtering during the load would blank the page on every
+   * visit. A failed fetch leaves `amounts` null, so the cards stay up
+   * unbuyable beside the price warning, which is the existing behaviour.
+   */
+  const plans = useMemo(
+    () =>
+      amounts === null
+        ? subscriptionPlans
+        : subscriptionPlans.filter((plan) => amounts[plan.code] !== undefined),
+    [amounts],
+  )
   const { bonusPercent, failed: bonusFailed } = useGrowthBonus()
 
   const loadStatus = useCallback(async () => {
@@ -203,8 +234,8 @@ export default function SubscriptionPageClient() {
   }, [authLoading, loadStatus])
 
   const selected = useMemo(
-    () => subscriptionPlans.find((plan) => plan.code === selectedPlan) ?? subscriptionPlans[0],
-    [selectedPlan],
+    () => plans.find((plan) => plan.code === selectedPlan) ?? plans[0],
+    [plans, selectedPlan],
   )
   const managedSubscription = view?.kind === 'active' || view?.kind === 'cancelled'
   const statePending = authLoading || statusLoading
@@ -220,8 +251,8 @@ export default function SubscriptionPageClient() {
     () =>
       view === null
         ? null
-        : new Map(subscriptionPlans.map((plan) => [plan.code, planOffer(view, plan)])),
-    [view],
+        : new Map(plans.map((plan) => [plan.code, planOffer(view, plan)])),
+    [plans, view],
   )
   const offer = offers?.get(selected.code) ?? null
   // The day paid access runs out, for the three views that have one.
@@ -238,9 +269,9 @@ export default function SubscriptionPageClient() {
   // actually on offer once the state is known.
   useEffect(() => {
     if (offers === null || offers.get(selectedPlan)?.allowed !== false) return
-    const open = subscriptionPlans.find((plan) => offers.get(plan.code)?.allowed)
+    const open = plans.find((plan) => offers.get(plan.code)?.allowed)
     if (open !== undefined) setSelectedPlan(open.code)
-  }, [offers, selectedPlan])
+  }, [offers, plans, selectedPlan])
 
   const resuming = offer?.allowed === true && offer.action === 'resume'
   const alreadyOnThisPlan =
@@ -321,7 +352,7 @@ export default function SubscriptionPageClient() {
             aria-disabled={!canChoosePlan}
           >
             <div className={styles.planOptions}>
-              {subscriptionPlans.map((plan) => {
+              {plans.map((plan) => {
                 const current = managedSubscription && plan.code === currentPlanCode
                 const amount = amounts?.[plan.code]
                 // Still selectable while the state loads: `offers` is

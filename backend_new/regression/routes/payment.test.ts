@@ -141,6 +141,44 @@ describe('payment', () => {
       expect(order.merchantTradeNo).toBe(body.params.MerchantTradeNo);
     });
 
+    it('checks out the test-only daily plan while ECPay is not in production', async () => {
+      // Its whole purpose: a one-day period, so ECPay's scheduler fires
+      // PeriodReturnURL tomorrow rather than next month.
+      await seedUser();
+      vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
+
+      const res = await app.request('/api/payment/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: 'testDaily' }),
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { params: Record<string, string> };
+      expect(body.params.PeriodType).toBe('D');
+      expect(body.params.Frequency).toBe('1');
+      expect(body.params.ExecTimes).toBe('2');
+      expect(body.params.TotalAmount).toBe('10');
+      expect(body.params.PeriodAmount).toBe('10');
+      expect(body.params.PeriodReturnURL).toContain('/api/webhook/ecpay/period');
+    });
+
+    it('refuses the test-only plan as an unknown code in production', async () => {
+      // A NT$10 daily agreement against a real card is the failure this
+      // gate exists for. 404 rather than 403 on purpose: in production
+      // the code simply does not exist.
+      process.env.ECPAY_MODE = 'production';
+      await seedUser();
+      vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
+
+      const res = await app.request('/api/payment/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: 'testDaily' }),
+      });
+      expect(res.status).toBe(404);
+      expect(((await res.json()) as { code?: string }).code).toBe('UNKNOWN_PLAN');
+    });
+
     // Nothing is charged until the webhook says so, so a checkout alone
     // must not hand out access.
     it('grants no entitlement by itself', async () => {
@@ -891,6 +929,23 @@ describe('payment', () => {
       const res = await app.request('/api/info/plans');
       expect(res.status).toBe(200);
       const plans = (await res.json()) as PlanInfo[];
+      // testDaily is here too: it is offered while ECPAY_MODE is not
+      // 'production', and beforeEach clears that variable. The next case
+      // pins that it is the only difference between the two modes.
+      expect(plans.map((p) => p.code)).toEqual([
+        'monthly',
+        'days30',
+        'days90',
+        'days365',
+        'testDaily',
+      ]);
+    });
+
+    it('stops listing the test-only plan once ECPay is in production', async () => {
+      // The catalog and checkout share one rule, so a plan that vanishes
+      // here is also one checkout refuses -- see the 404 case above.
+      process.env.ECPAY_MODE = 'production';
+      const plans = (await (await app.request('/api/info/plans')).json()) as PlanInfo[];
       expect(plans.map((p) => p.code)).toEqual(['monthly', 'days30', 'days90', 'days365']);
     });
 

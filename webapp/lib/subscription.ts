@@ -4,7 +4,7 @@ import type {
 } from '@/types/api'
 import { formatNumber } from '@/lib/number'
 
-export type SubscriptionPlanCode = 'monthly' | 'days30' | 'days90' | 'days365'
+export type SubscriptionPlanCode = 'monthly' | 'days30' | 'days90' | 'days365' | 'testDaily'
 
 /**
  * How a plan is presented. Deliberately holds no price.
@@ -34,7 +34,7 @@ export type SubscriptionPlan = {
   /** The unit a price is quoted in: `NT$179／月`, `NT$549／90 天`. */
   periodLabel: string
   /** How the renewal reads in a sentence: "將每月自動續訂". */
-  renewalLabel?: '每月' | '每年'
+  renewalLabel?: '每月' | '每年' | '每日'
   note: string
   recommended?: boolean
 }
@@ -69,6 +69,26 @@ export const subscriptionPlans: readonly SubscriptionPlan[] = [
     name: '365 天',
     periodLabel: '365 天',
     note: '不自動續訂，每天最便宜',
+  },
+  /**
+   * The backend's test-only daily plan, here only so that it has a name
+   * and a label for the days it is on offer.
+   *
+   * Whether it is shown is not decided here and must not be. The one
+   * gate is the server's ECPAY_MODE: `/subscription` renders a card only
+   * for a plan GET /api/info/plans actually returned, so this entry is
+   * inert on a deploy that does not offer the code. A second flag on
+   * this side is exactly the two-flag mismatch BETA_MODE taught this
+   * repo to avoid, and the failure would be worse than beta's -- a
+   * visitor offered a NT$10 plan the server refuses.
+   */
+  {
+    code: 'testDaily',
+    kind: 'recurring',
+    name: '測試方案',
+    periodLabel: '日',
+    renewalLabel: '每日',
+    note: '僅測試環境：每日扣款，共 2 期',
   },
 ] as const
 
