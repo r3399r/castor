@@ -147,7 +147,7 @@ Resources:
           # NEXT_PUBLIC_BETA_MODE in .github/workflows/{dev,prod}.yml is
           # this flag's frontend twin, and AGENTS.md records what each
           # disagreement between them looks like.
-          BETA_MODE: 'true'
+          BETA_MODE: 'false'
           FIREBASE_ADMIN_KEY: !Sub '{{resolve:ssm:${Project}-firebase-admin-key}}'
           LOGGER_QUEUE_URL: !Sub https://sqs.${AWS::Region}.amazonaws.com/${AWS::AccountId}/polaris-${TargetEnvr}-logger-queue
           # POST /question/image transcribes an uploaded paper via Gemini.

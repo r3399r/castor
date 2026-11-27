@@ -53,7 +53,7 @@ jobs:
           # reviewable commit. Its backend twin is BETA_MODE in
           # backend_new/aws/cloudformation/template.yaml and the two are
           # changed in the same commit; see AGENTS.md.
-          echo NEXT_PUBLIC_BETA_MODE=true >> .env
+          echo NEXT_PUBLIC_BETA_MODE=false >> .env
 
       - name: Deploy to dev environment
         run: |
