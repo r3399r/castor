@@ -56,7 +56,11 @@ CREATE TABLE IF NOT EXISTS castor.payment_purchase (
     --               arrived. For ATM/CVS/BARCODE this is where the row
     --               spends most of its life; a card never enters it.
     -- paid       -- payment confirmed, days granted
-    -- expired    -- the code's deadline passed with no payment
+    -- expired    -- it can no longer be paid: the code's deadline passed,
+    --               or a checkout was abandoned and nothing came back
+    --               within PURCHASE_CHECKOUT_WINDOW_MINUTES. Our own
+    --               inference either way -- ECPay never reports an
+    --               expiry
     -- failed     -- ECPay reported the payment as failed
     status VARCHAR(16) NOT NULL,
 

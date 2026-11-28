@@ -26,6 +26,7 @@ import { subscriptionStatusSchema } from 'src/routes/subscription';
 
 const FIXTURE_UID = 'payment-fixture-uid';
 const DAY_MS = 24 * 60 * 60 * 1000;
+const MINUTE_MS = 60 * 1000;
 
 const clearTables = async () => {
   const db = getDb();
@@ -192,23 +193,51 @@ describe('payment', () => {
         expect(await getDb().select().from(paymentOrderTable)).toEqual([]);
       });
 
+      /**
+       * A day-pass purchase in whatever state it has to be found in.
+       *
+       * Only `status`, `expireAt` and `createdAt` matter to the guard --
+       * between them they say whether money could still arrive -- and
+       * the rest is what checkout would have written. Spelt out per
+       * case, because every case below is one of those three differing.
+       */
+      let slips = 0;
+      const seedSlip = async (
+        userId: number,
+        row: {
+          status: string;
+          choosePayment?: string;
+          expireAt?: Date | null;
+          createdAt?: Date;
+        }
+      ) => {
+        slips += 1;
+        await getDb()
+          .insert(paymentPurchaseTable)
+          .values({
+            userId,
+            plan: 'days90',
+            provider: 'ecpay',
+            merchantTradeNo: `CSDP${String(slips).padStart(4, '0')}`,
+            amount: 549,
+            days: 90,
+            choosePayment: 'ATM',
+            expireAt: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            ...row,
+          });
+      };
+
       it('refuses while an unpaid day-pass slip is still open', async () => {
         // The one path that would otherwise reach the housekeep sweep:
         // the slip is paid days later, supersedes the agreement, and the
         // user's auto-renew disappears overnight with nothing having
         // warned them.
         const userId = await seedUser();
-        await getDb().insert(paymentPurchaseTable).values({
-          userId,
-          plan: 'days90',
-          provider: 'ecpay',
-          merchantTradeNo: 'CSDP0001',
-          amount: 549,
-          days: 90,
-          choosePayment: 'ATM',
+        await seedSlip(userId, {
           status: 'awaiting',
-          createdAt: new Date(),
-          updatedAt: new Date(),
+          expireAt: new Date(Date.now() + 6 * DAY_MS),
         });
 
         const res = await checkoutMonthly();
@@ -217,22 +246,78 @@ describe('payment', () => {
         expect(await res.json()).toMatchObject({ code: 'PENDING_DAY_PASS' });
       });
 
+      it('lets the user subscribe the moment the slip stops being payable', async () => {
+        // Not "once the housekeep sweep has relabelled it". The guard
+        // asking for `status IN (...)` is what made the two indis-
+        // tinguishable, and it cost the user up to a day of being
+        // refused by a slip no ATM would have taken either.
+        const userId = await seedUser();
+        await seedSlip(userId, {
+          status: 'awaiting',
+          expireAt: new Date(Date.now() - 60 * MINUTE_MS),
+          createdAt: new Date(Date.now() - 8 * DAY_MS),
+        });
+
+        expect((await checkoutMonthly()).status).toBe(200);
+      });
+
+      it('refuses while ECPay\u2019s own page could still be open', async () => {
+        // A card checkout from a minute ago. There is no code and so no
+        // deadline to read: `created` plus the checkout window is the
+        // whole of what is known about it.
+        const userId = await seedUser();
+        await seedSlip(userId, {
+          status: 'created',
+          choosePayment: 'Credit',
+          createdAt: new Date(Date.now() - MINUTE_MS),
+        });
+
+        const res = await checkoutMonthly();
+
+        expect(res.status).toBe(400);
+        expect(await res.json()).toMatchObject({ code: 'PENDING_DAY_PASS' });
+      });
+
+      it('releases a card payer who closed the tab', async () => {
+        // The lockout this window exists for. A card payment never
+        // reaches `awaiting`, so it never gets an expire_at, so the
+        // sweep had nothing to expire and the row stayed open for good:
+        // that user could never take out an agreement again, and all the
+        // page would say was "請稍後再試".
+        const userId = await seedUser();
+        await seedSlip(userId, {
+          status: 'created',
+          choosePayment: 'Credit',
+          createdAt: new Date(Date.now() - 31 * MINUTE_MS),
+        });
+
+        expect((await checkoutMonthly()).status).toBe(200);
+      });
+
+      it('falls back to the checkout window for a slip with no deadline stored', async () => {
+        // Defensive: `awaiting` is written together with the expire_at
+        // ECPay sent, so a NULL means their ExpireDate did not parse.
+        // Unparsed must not mean unending -- that is the shape of the
+        // bug -- and a code that really was issued is still protected
+        // for as long as the checkout could plausibly be live.
+        const userId = await seedUser();
+        await seedSlip(userId, { status: 'awaiting', createdAt: new Date() });
+
+        expect((await checkoutMonthly()).status).toBe(400);
+
+        await getDb()
+          .update(paymentPurchaseTable)
+          .set({ createdAt: new Date(Date.now() - 31 * MINUTE_MS) })
+          .where(eq(paymentPurchaseTable.userId, userId));
+
+        expect((await checkoutMonthly()).status).toBe(200);
+      });
+
       it('ignores a day-pass slip that has already lapsed', async () => {
         // `expired` cannot become `paid` under normal operation, so it
         // must not lock the user out of subscribing for good.
         const userId = await seedUser();
-        await getDb().insert(paymentPurchaseTable).values({
-          userId,
-          plan: 'days90',
-          provider: 'ecpay',
-          merchantTradeNo: 'CSDP0002',
-          amount: 549,
-          days: 90,
-          choosePayment: 'ATM',
-          status: 'expired',
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        });
+        await seedSlip(userId, { status: 'expired' });
 
         expect((await checkoutMonthly()).status).toBe(200);
       });

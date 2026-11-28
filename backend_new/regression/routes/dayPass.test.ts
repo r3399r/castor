@@ -50,6 +50,7 @@ const API_GATEWAY_EVENT = {
   },
 } as unknown as LambdaEvent;
 const DAY_MS = 24 * 60 * 60 * 1000;
+const MINUTE_MS = 60 * 1000;
 
 const clearTables = async () => {
   const db = getDb();
@@ -808,6 +809,33 @@ it('sends the browser back by GET only, never by a POST we cannot answer', async
 
       expect(await expireUnpaidPurchases(getDb())).toBe(0);
       expect((await purchasesOf(userId))[0].status).toBe('awaiting');
+    });
+
+    it('expires an abandoned checkout, which has no code to expire', async () => {
+      // A card payer who closed the tab. Nothing will ever arrive for
+      // this row, and until it was closed here the checkout guard read
+      // it as a payment in progress -- permanently, since no
+      // notification and no sweep ever moved it out of `created`.
+      const userId = await seedUser();
+      const no = await buy('days90', 'Credit');
+      await getDb()
+        .update(paymentPurchaseTable)
+        .set({ createdAt: new Date(Date.now() - 31 * MINUTE_MS) })
+        .where(eq(paymentPurchaseTable.merchantTradeNo, no));
+
+      expect(await expireUnpaidPurchases(getDb())).toBe(1);
+      expect((await purchasesOf(userId))[0].status).toBe('expired');
+    });
+
+    it('leaves a checkout that may still be in progress alone', async () => {
+      // The other half: `created` is not evidence of abandonment, and
+      // closing a row somebody is still paying would put "過期" on
+      // screen next to a card form that is about to succeed.
+      const userId = await seedUser();
+      await buy('days90', 'Credit');
+
+      expect(await expireUnpaidPurchases(getDb())).toBe(0);
+      expect((await purchasesOf(userId))[0].status).toBe('created');
     });
 
     it('never expires a purchase that was paid', async () => {

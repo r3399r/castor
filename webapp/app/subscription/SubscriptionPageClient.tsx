@@ -37,6 +37,28 @@ import type {
 import { benefitSummary } from './benefits'
 import styles from './subscription.module.css'
 
+/**
+ * What to say when the server refuses a checkout.
+ *
+ * `planOffer` already hides the buttons the server would refuse, so this
+ * is not a second copy of that rule but the other half of it: the codes
+ * here are the ones the page cannot predict from its own state.
+ *
+ * PENDING_DAY_PASS is why it exists. An unpaid day-pass slip is invisible
+ * to this page -- it would have to fetch the purchase list to know -- so
+ * a user holding one was told to try again later, advice that came true
+ * only once the slip expired, and never at all while a `created` row
+ * could not expire.
+ */
+const CHECKOUT_ERRORS: Record<string, string | undefined> = {
+  ALREADY_SUBSCRIBED: '你已經在使用這個方案了。',
+  PENDING_DAY_PASS:
+    '你有一筆天數方案的款項還沒付完。請先完成付款，或等繳費期限過了再訂閱。',
+  ALREADY_ENTITLED: '你目前的付費期間還沒結束，到期後才能開始自動續訂。',
+  CANCEL_AUTORENEW_FIRST: '請先關閉自動續訂，再購買天數方案。',
+  PAYMENT_METHOD_REQUIRED: '請先選擇付款方式。',
+}
+
 const analysisFeatures = [
   {
     title: '進步曲線',
@@ -255,9 +277,8 @@ export default function SubscriptionPageClient() {
       setSubmitting(false)
       setConfirming(false)
       setActionError(
-        e instanceof ApiError && e.code === 'ALREADY_SUBSCRIBED'
-          ? '你已經在使用這個方案了。'
-          : '無法前往付款頁面，請稍後再試。',
+        (e instanceof ApiError && e.code !== undefined ? CHECKOUT_ERRORS[e.code] : undefined) ??
+          '無法前往付款頁面，請稍後再試。',
       )
     }
   }, [selected.code, selected.kind, selectedMethod])

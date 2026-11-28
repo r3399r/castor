@@ -1,6 +1,6 @@
 import 'zod-openapi/extend';
 import { zValidator } from '@hono/zod-validator';
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { describeRoute, resolver } from 'hono-openapi';
 import { z } from 'zod';
@@ -21,10 +21,7 @@ import {
 } from 'src/lib/paymentOrder';
 import { findEntitledSubscription, setSubscription } from 'src/lib/subscription';
 import { findPlan, isDayPassPlan } from 'src/lib/subscriptionPlan';
-import {
-  PURCHASE_STATUS_CREATED,
-  PURCHASE_STATUSES_OPEN,
-} from 'src/lib/paymentPurchase';
+import { PURCHASE_STATUS_CREATED, purchaseStillOpen } from 'src/lib/paymentPurchase';
 import { BadRequestError, NotFoundError } from 'src/model/error';
 import { UserEnv } from 'src/middleware/requireUser';
 
@@ -256,15 +253,15 @@ export const payment = new Hono<UserEnv>()
     // the agreement, and the user's auto-renew disappears the same
     // night with nothing on screen having warned them. Refusing here is
     // the warning.
+    //
+    // `purchaseStillOpen`, not `status IN (...)`: the statuses carry no
+    // deadline, so asking for them refused this user as long as the row
+    // existed. For an abandoned card checkout that is forever -- nothing
+    // moves such a row out of `created`, and no screen shows it.
     const [openPurchase] = await db
       .select({ id: paymentPurchaseTable.id })
       .from(paymentPurchaseTable)
-      .where(
-        and(
-          eq(paymentPurchaseTable.userId, user.id),
-          inArray(paymentPurchaseTable.status, [...PURCHASE_STATUSES_OPEN])
-        )
-      )
+      .where(and(eq(paymentPurchaseTable.userId, user.id), purchaseStillOpen(new Date())))
       .limit(1);
     if (openPurchase !== undefined)
       throw new BadRequestError(

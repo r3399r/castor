@@ -1,18 +1,18 @@
-import { and, eq, gt, isNotNull, lt } from 'drizzle-orm';
+import { and, eq, gt } from 'drizzle-orm';
 import { MySql2Database } from 'drizzle-orm/mysql2';
 import { paymentOrderTable, paymentPurchaseTable } from 'src/db/schema';
 import { cancelPeriodOrder } from 'src/lib/ecpay';
 import { ORDER_STATUS_ACTIVE, ORDER_STATUS_CANCELLED } from 'src/lib/paymentOrder';
 import {
-  PURCHASE_STATUS_AWAITING,
   PURCHASE_STATUS_EXPIRED,
   PURCHASE_STATUS_PAID,
+  purchaseTimedOut,
 } from 'src/lib/paymentPurchase';
 
 type Db = MySql2Database;
 
 /**
- * Closes day-pass purchases whose payment code has run out.
+ * Closes day-pass purchases that can no longer be paid.
  *
  * Cosmetic rather than load-bearing: an unpaid purchase grants nothing
  * whatever its status says, so nothing depends on this running. It exists
@@ -20,22 +20,25 @@ type Db = MySql2Database;
  * account on display that no longer works, and so the sweep below has a
  * smaller set to scan.
  *
- * Only rows that actually reached `awaiting` have an expiry to pass --
- * `created` ones were never issued a code, and ECPay may still be about
- * to issue one.
+ * That first sentence was false for four days, and why is worth keeping.
+ * The checkout guard asked for `status IN ('created','awaiting')` with no
+ * deadline attached, which quietly made it depend on this job: until a
+ * row was swept, it refused that user a recurring agreement. A `created`
+ * row has no code and so no expiry to pass, this swept none of them, and
+ * an abandoned card checkout therefore locked its user out of subscribing
+ * permanently -- behind "請稍後再試", with no screen showing the row that
+ * did it. The guard now asks `purchaseStillOpen`, which carries its own
+ * deadline, and this is cosmetic again.
+ *
+ * Both kinds are closed here, by the exact complement of the guard's
+ * question, so the two cannot drift apart again.
  */
 export const expireUnpaidPurchases = async (db: Db): Promise<number> => {
   const now = new Date();
   const [{ affectedRows }] = await db
     .update(paymentPurchaseTable)
     .set({ status: PURCHASE_STATUS_EXPIRED, updatedAt: now })
-    .where(
-      and(
-        eq(paymentPurchaseTable.status, PURCHASE_STATUS_AWAITING),
-        isNotNull(paymentPurchaseTable.expireAt),
-        lt(paymentPurchaseTable.expireAt, now)
-      )
-    );
+    .where(purchaseTimedOut(now));
 
   if (affectedRows > 0) console.log(`expired ${affectedRows} unpaid day-pass purchases`);
   return affectedRows;
