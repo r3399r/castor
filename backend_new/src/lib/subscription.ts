@@ -387,6 +387,33 @@ const storedEndIncludesGrace = (planCode: string): boolean => {
 };
 
 /**
+ * When the provider is expected to charge again, or null when nothing is.
+ *
+ * `current_period_end` is not that date and must not be shown as one:
+ * it has RENEWAL_GRACE_DAYS added, so printing it as the next charge
+ * date overstated it by three days on every screen that did. On the
+ * monthly plan "about a month" hid that; on the one-day test plan it
+ * read as four days, which is how it was noticed.
+ *
+ * Subtracting the grace is exact rather than approximate -- it is the
+ * same arithmetic renewSubscriptionPeriod did to get here, run
+ * backwards, so this returns nominalPeriodEnd to the millisecond.
+ *
+ * Null for a period with no grace in it, which is a period nothing is
+ * scheduled to renew: a day pass, or a plan code the catalog no longer
+ * has. Null is the honest answer there, not a date three days early.
+ *
+ * It does not promise ECPay will actually charge. An agreement whose
+ * `execTimes` are exhausted is `terminated` at their end and still
+ * `active` at ours -- we only learn by notifications stopping -- so a
+ * caller displaying this says "about", as the UI does.
+ */
+export const nextChargeAt = (planCode: string, currentPeriodEnd: Date): Date | null =>
+  storedEndIncludesGrace(planCode)
+    ? new Date(currentPeriodEnd.getTime() - RENEWAL_GRACE_MS)
+    : null;
+
+/**
  * Adds a day pass's days to a user's entitlement.
  *
  * Stacks rather than replaces: the days go onto whichever is later, now

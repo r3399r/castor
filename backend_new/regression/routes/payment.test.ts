@@ -687,6 +687,45 @@ describe('payment', () => {
       expect(spanDays).toBeLessThan(93 + 3.5);
     });
 
+    /**
+     * What a client may print as the next charge date.
+     *
+     * Every stored period end has RENEWAL_GRACE_DAYS added to it, so a
+     * screen reading `expiresAt` as a billing date is three days late.
+     * That was invisible on the monthly plan and glaring on the one-day
+     * test plan, where it rendered as a charge four days out.
+     */
+    it('reports a charge date a month out, not the graced period end', async () => {
+      const userId = await seedUser();
+      await seedOrder(userId, { status: 'active' });
+
+      await postWebhook('/api/webhook/ecpay/period', renewalBody('3001'));
+
+      vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
+      const body = (await (await app.request('/api/subscription/me')).json()) as {
+        autoRenew: boolean;
+        expiresAt: string;
+        nextChargeAt: string;
+      };
+
+      const [period] = await subscriptionsOf(userId);
+      expect(body.autoRenew).toBe(true);
+      // Exactly the grace, recovered: this is the stored end's own
+      // arithmetic run backwards, not an estimate.
+      expect(new Date(body.expiresAt).getTime() - new Date(body.nextChargeAt).getTime()).toBe(
+        3 * DAY_MS
+      );
+      expect(new Date(body.nextChargeAt).getTime()).toBe(
+        period.currentPeriodEnd.getTime() - 3 * DAY_MS
+      );
+      // And a month from the period's start rather than a month and
+      // three days, which is what the old screens said.
+      const daysOut =
+        (new Date(body.nextChargeAt).getTime() - period.currentPeriodStart.getTime()) / DAY_MS;
+      expect(daysOut).toBeGreaterThan(27);
+      expect(daysOut).toBeLessThan(32);
+    });
+
     it('treats each authorisation as distinct even on the same order', async () => {
       const userId = await seedUser();
       await seedOrder(userId, { status: 'active' });
@@ -829,8 +868,12 @@ describe('payment', () => {
         'autoRenew',
         'entitled',
         'expiresAt',
+        'nextChargeAt',
         'plan',
       ]);
+      // Nothing is scheduled any more, which is what the caller just
+      // asked for. The days already paid for are expiresAt's business.
+      expect(body).toMatchObject({ autoRenew: false, nextChargeAt: null });
     });
   });
 

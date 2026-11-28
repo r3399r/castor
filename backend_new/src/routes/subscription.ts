@@ -10,6 +10,7 @@ import {
   findActiveSubscription,
   findEntitledSubscription,
   listSubscriptionHistory,
+  nextChargeAt,
   setSubscription,
 } from 'src/lib/subscription';
 import { UserEnv } from 'src/middleware/requireUser';
@@ -44,6 +45,12 @@ export const subscriptionStatusSchema = z.object({
     .boolean()
     .describe(
       'Whether anything will charge the card again. Not derivable from entitlement -- a day pass grants access with no agreement behind it.'
+    ),
+  nextChargeAt: z
+    .string()
+    .nullable()
+    .describe(
+      'ISO 8601 moment the provider is expected to charge next, or null when nothing is scheduled. Deliberately NOT expiresAt: that has the three-day renewal grace added, so showing it as a charge date is three days out. Null whenever autoRenew is false, and also for an agreement whose current period is a day pass (the hours between buying one as a subscriber and housekeep cancelling the agreement) -- there is no graced end to unwind there.'
     ),
 }).openapi({ ref: 'SubscriptionStatus' });
 
@@ -142,6 +149,13 @@ export const subscription = new Hono<UserEnv>()
       // deriving it from entitlement told day-pass buyers their one-off
       // purchase renewed every month.
       autoRenew: order !== undefined,
+      // The date a client may print next to "next charge". `expiresAt`
+      // is three days later than this by construction, and every screen
+      // that printed it said so wrongly -- see nextChargeAt.
+      nextChargeAt:
+        order === undefined || active === undefined
+          ? null
+          : (nextChargeAt(active.plan, active.currentPeriodEnd)?.toISOString() ?? null),
     } satisfies z.infer<typeof subscriptionStatusSchema>);
   })
   /**
@@ -220,5 +234,9 @@ export const subscription = new Hono<UserEnv>()
       // agreement and it has just been cancelled, or there never was
       // one and the caller's intent was already true.
       autoRenew: false,
+      // Nothing is scheduled any more, which is the whole point of the
+      // call. Null rather than the period end: the days already paid for
+      // are `entitled` and `expiresAt`, not a charge date.
+      nextChargeAt: null,
     } satisfies z.infer<typeof subscriptionStatusSchema>);
   });

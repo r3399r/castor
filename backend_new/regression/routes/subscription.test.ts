@@ -145,6 +145,21 @@ describe('subscription', () => {
       expect(await res.json()).toMatchObject({ active: false, entitled: false });
     });
 
+    /**
+     * A period with no agreement behind it has no charge date, and the
+     * client must not be handed one to print. `expiresAt` is three days
+     * later than any real charge would be -- the grace -- so the field
+     * exists precisely so that nobody reaches for `expiresAt` again.
+     */
+    it('reports no charge date when nothing is scheduled to renew', async () => {
+      const userId = await seedUser();
+      await grant(userId, {});
+      vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
+
+      const res = await app.request('/api/subscription/me');
+      expect(await res.json()).toMatchObject({ autoRenew: false, nextChargeAt: null });
+    });
+
     it('reports both for a live agreement', async () => {
       // So an inverted `entitled` cannot pass on the cancelled cases
       // alone.
@@ -178,6 +193,7 @@ describe('subscription', () => {
         'autoRenew',
         'entitled',
         'expiresAt',
+        'nextChargeAt',
         'plan',
       ]);
     });

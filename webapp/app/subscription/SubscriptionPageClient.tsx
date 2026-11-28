@@ -125,7 +125,13 @@ function CurrentSubscriptionSummary({ view }: { view: SubscriptionView }) {
       <div className={styles.currentSummary}>
         <Badge tone="complete">訂閱中</Badge>
         <strong>目前使用：{plan?.name ?? view.planCode}</strong>
-        <span>下次扣款日：{formatTaiwanDate(view.entitlementEndsAt)}</span>
+        {/* nextChargeAt, never entitlementEndsAt: the latter carries the
+            renewal grace, so it is three days past any charge. */}
+        <span>
+          {view.nextChargeAt === null
+            ? `可使用至 ${formatTaiwanDate(view.entitlementEndsAt)}`
+            : `下次扣款日：${formatTaiwanDate(view.nextChargeAt)}`}
+        </span>
       </div>
     )
   }

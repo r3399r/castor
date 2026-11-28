@@ -17,6 +17,7 @@ const status = (over: Partial<SubscriptionStatus> = {}): SubscriptionStatus => (
   expiresAt: null,
   entitled: false,
   autoRenew: false,
+  nextChargeAt: null,
   ...over,
 })
 
@@ -32,6 +33,7 @@ const period = (over: Partial<HistoryItem> = {}): HistoryItem => ({
 })
 
 const future = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+const charge = new Date(Date.now() + 4 * 24 * 60 * 60 * 1000).toISOString()
 const past = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
 
 describe('getSubscriptionPlan', () => {
@@ -132,14 +134,55 @@ describe('formatTaiwanDate', () => {
 describe('deriveSubscriptionView', () => {
   it('is active when a live agreement will charge again', () => {
     const view = deriveSubscriptionView(
-      status({ active: true, plan: 'monthly', expiresAt: future, autoRenew: true }),
+      status({
+        active: true,
+        plan: 'monthly',
+        expiresAt: future,
+        autoRenew: true,
+        nextChargeAt: charge,
+      }),
       []
     )
     expect(view).toEqual({
       kind: 'active',
       planCode: 'monthly',
       entitlementEndsAt: future,
+      nextChargeAt: charge,
     })
+  })
+
+  /**
+   * The two dates are different facts and the view keeps them apart.
+   *
+   * `expiresAt` has the server's three-day renewal grace in it, so the
+   * cards that printed it as 「下一次扣款日」 were three days late on
+   * every plan -- invisible on a monthly period, and a charge four days
+   * out on the one-day test plan, which is how it was noticed.
+   */
+  it('carries the charge date separately from the entitlement date', () => {
+    const view = deriveSubscriptionView(
+      status({
+        active: true,
+        plan: 'monthly',
+        expiresAt: future,
+        autoRenew: true,
+        nextChargeAt: charge,
+      }),
+      []
+    )
+    expect(view.kind === 'active' && view.nextChargeAt).toBe(charge)
+    expect(view.kind === 'active' && view.entitlementEndsAt).not.toBe(charge)
+  })
+
+  it('passes a withheld charge date through as null', () => {
+    // The hours after buying a pass as a subscriber: the agreement will
+    // charge again, but the period on file is the pass and has no
+    // billing date in it. The card renders no date at all there.
+    const view = deriveSubscriptionView(
+      status({ active: true, plan: 'days30', expiresAt: future, autoRenew: true }),
+      []
+    )
+    expect(view.kind === 'active' && view.nextChargeAt).toBeNull()
   })
 
   it('is unmanaged when access is paid for but nothing renews', () => {
@@ -237,7 +280,12 @@ describe('planOffer', () => {
   const endsAt = new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString()
 
   const free: SubscriptionView = { kind: 'free', previousExpired: false }
-  const active: SubscriptionView = { kind: 'active', planCode: 'monthly', entitlementEndsAt: endsAt }
+  const active: SubscriptionView = {
+    kind: 'active',
+    planCode: 'monthly',
+    entitlementEndsAt: endsAt,
+    nextChargeAt: endsAt,
+  }
   const passHolder: SubscriptionView = {
     kind: 'unmanaged',
     planCode: 'days90',

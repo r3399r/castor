@@ -660,7 +660,12 @@ it('sends the browser back by GET only, never by a POST we cannot answer', async
       vi.mocked(verifyIdTokenUid).mockResolvedValue(FIXTURE_UID);
       const res = await app.request('/api/subscription/me');
       expect(res.status).toBe(200);
-      return (await res.json()) as { active: boolean; plan: string | null; autoRenew: boolean };
+      return (await res.json()) as {
+        active: boolean;
+        plan: string | null;
+        autoRenew: boolean;
+        nextChargeAt: string | null;
+      };
     };
 
     it('reports autoRenew false for a pass, so nothing offers to cancel it', async () => {
@@ -678,6 +683,20 @@ it('sends the browser back by GET only, never by a POST we cannot answer', async
       // state where cancelling means something.
       await seedOrder(userId);
       expect((await me()).autoRenew).toBe(true);
+    });
+
+    it('offers no charge date while the current period is the pass', async () => {
+      // autoRenew is true here and the agreement really will charge
+      // again, but the period on file is the pass -- and a pass has no
+      // grace in it, so unwinding three days from its end would name a
+      // date inside days the user paid for and call it a charge. Null
+      // is the honest answer; the card's own copy says the same.
+      const userId = await seedUser();
+      const no = await buy('days30', 'Credit');
+      await postWebhook('/api/webhook/ecpay/notify', paidBody(no));
+      await seedOrder(userId);
+
+      expect(await me()).toMatchObject({ plan: 'days30', autoRenew: true, nextChargeAt: null });
     });
 
     it('does not eat the grace days when an agreement starts after a pass', async () => {

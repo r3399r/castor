@@ -106,10 +106,18 @@ function SubscriptionDetails({
             已購買的天數可使用至 {formatTaiwanDate(view.entitlementEndsAt)}。
             先前的自動續訂仍在生效，系統會在一天內自動停止；也可以現在手動取消。
           </p>
+        ) : view.nextChargeAt === null ? (
+          // No date rather than the wrong one. The server withholds it
+          // for a period it cannot read a billing date out of, and
+          // inventing one here would put a promise on screen.
+          <p className={styles.subscriptionMeta}>
+            本方案將{plan?.renewalLabel ?? ''}自動續訂。
+            權益目前可使用至 {formatTaiwanDate(view.entitlementEndsAt)}。
+          </p>
         ) : (
           <p className={styles.subscriptionMeta}>
             本方案將{plan?.renewalLabel ?? ''}自動續訂，下一次扣款日約為{' '}
-            {formatTaiwanDate(view.entitlementEndsAt)}。
+            {formatTaiwanDate(view.nextChargeAt)}。
           </p>
         )}
       </>

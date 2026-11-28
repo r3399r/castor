@@ -887,6 +887,13 @@
           "autoRenew": {
             "type": "boolean",
             "description": "Whether anything will charge the card again. Not derivable from entitlement -- a day pass grants access with no agreement behind it."
+          },
+          "nextChargeAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "ISO 8601 moment the provider is expected to charge next, or null when nothing is scheduled. Deliberately NOT expiresAt: that has the three-day renewal grace added, so showing it as a charge date is three days out. Null whenever autoRenew is false, and also for an agreement whose current period is a day pass (the hours between buying one as a subscriber and housekeep cancelling the agreement) -- there is no graced end to unwind there."
           }
         },
         "required": [
@@ -894,7 +901,8 @@
           "plan",
           "expiresAt",
           "entitled",
-          "autoRenew"
+          "autoRenew",
+          "nextChargeAt"
         ]
       },
       "SubscriptionHistoryItem": {

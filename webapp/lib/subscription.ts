@@ -139,11 +139,20 @@ export type SubscriptionView =
    * Paid access *and* a live agreement: something will charge again
    * unless it is cancelled. The only state where a cancel button has
    * anything to cancel.
+   *
+   * `nextChargeAt` is the only date that may be shown as a billing
+   * date, and it is a separate field because it is not derivable here:
+   * `entitlementEndsAt` has the server's three-day renewal grace in it,
+   * so the screens that printed it as 「下一次扣款日」 were three days
+   * late on every plan. Null when the server has no date to give --
+   * the hours between buying a pass as a subscriber and housekeep
+   * cancelling the agreement, where the period on file is the pass.
    */
   | {
       kind: 'active'
       planCode: string
       entitlementEndsAt: string
+      nextChargeAt: string | null
     }
   /**
    * Paid access with nothing behind it to renew -- a day pass, or a
@@ -189,11 +198,21 @@ export function deriveSubscriptionView(
     // buyers their one-off purchase renewed every month, and offered
     // them a cancel button that reported success while stopping
     // nothing.
-    return {
-      kind: current.autoRenew ? 'active' : 'unmanaged',
-      planCode: current.plan,
-      entitlementEndsAt: current.expiresAt,
-    }
+    return current.autoRenew
+      ? {
+          kind: 'active',
+          planCode: current.plan,
+          entitlementEndsAt: current.expiresAt,
+          // Passed through rather than computed: the grace is the
+          // server's number, and a second copy of it here is the kind
+          // of duplicate constant that drifts.
+          nextChargeAt: current.nextChargeAt,
+        }
+      : {
+          kind: 'unmanaged',
+          planCode: current.plan,
+          entitlementEndsAt: current.expiresAt,
+        }
   }
 
   const latest = history[0]
